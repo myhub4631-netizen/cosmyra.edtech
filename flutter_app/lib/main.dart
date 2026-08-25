@@ -17,7 +17,7 @@ class CosmyraApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Cosmyra NEET/JEE Exam Platform',
+      title: 'ExamPrep - Practice | Analyze | Succeed',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
@@ -29,6 +29,7 @@ class CosmyraApp extends StatelessWidget {
               : (Uri.base.path.contains('admin') ? '/admin' : '/')),
       routes: {
         '/': (context) => const MainNavigationScreen(initialIndex: 0),
+        '/landing': (context) => const MainNavigationScreen(initialIndex: 0),
         '/admin': (context) => const MainNavigationScreen(initialIndex: 8),
         '/admin/pricing': (context) => const MainNavigationScreen(initialIndex: 9),
         '/pricing': (context) => const MainNavigationScreen(initialIndex: 9),

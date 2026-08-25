@@ -3,6 +3,7 @@ import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/responsive_layout.dart';
 import '../auth/auth_screen.dart';
+import '../landing/landing_page_screen.dart';
 import '../home/home_screen.dart';
 import '../practice/practice_screen.dart';
 import '../practice/custom_practice_wizard.dart';
@@ -50,14 +51,22 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final uriFragment = Uri.base.fragment;
     final isHierarchyRoute = uriPath.contains('hierarchy') || uriFragment.contains('hierarchy');
     final isPricingRoute = uriPath.contains('pricing') || uriFragment.contains('pricing');
-    final isStudentRoute = uriPath.contains('student') || uriFragment.contains('student');
+    final isAdminRoute = uriPath.contains('admin') || uriFragment.contains('admin');
+    final isLandingRoute = uriPath.contains('landing') || uriPath == '/' || uriPath.isEmpty;
 
-    _selectedIndex = widget.initialIndex ??
-        (isHierarchyRoute
-            ? 10
-            : (isPricingRoute ? 9 : (isStudentRoute ? 0 : 8)));
-    _currentUser = SupabaseService.getMockProfile(role: 'admin');
+    if (widget.initialIndex != null) {
+      _selectedIndex = widget.initialIndex!;
+    } else if (isHierarchyRoute) {
+      _selectedIndex = 10;
+    } else if (isPricingRoute) {
+      _selectedIndex = 9;
+    } else if (isAdminRoute) {
+      _selectedIndex = 8;
+    } else {
+      _selectedIndex = 0; // Front Landing Page
+    }
 
+    _currentUser = SupabaseService.getMockProfile(role: 'student');
     _loadUser();
   }
 
@@ -167,7 +176,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       return AdminHierarchyScreen(userProfile: _currentUser);
     }
 
-    // 5. Standard Navigation Body Shell
+    // 5. Front Website Landing Page (Index 0)
+    if (_selectedIndex == 0) {
+      return LandingPageScreen(
+        onStartPracticing: _openCustomPracticeWizard,
+        onExploreTests: _startCustomTest,
+        onSignUp: _openAuthModal,
+        onLogIn: _openAuthModal,
+      );
+    }
+
+    // 6. Student Dashboard Navigation Shell
     return ResponsiveLayoutShell(
       selectedIndex: _selectedIndex,
       onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
@@ -181,12 +200,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget _buildCurrentTab() {
     switch (_selectedIndex) {
       case 0:
-        return HomeScreen(
-          userProfile: _currentUser,
-          activeExam: _activeExam,
-          onNavigate: (idx) => setState(() => _selectedIndex = idx),
-          onStartCustomPractice: _openCustomPracticeWizard,
-          onStartCustomTest: _startCustomTest,
+        return LandingPageScreen(
+          onStartPracticing: _openCustomPracticeWizard,
+          onExploreTests: _startCustomTest,
+          onSignUp: _openAuthModal,
+          onLogIn: _openAuthModal,
         );
       case 1:
         return Center(
