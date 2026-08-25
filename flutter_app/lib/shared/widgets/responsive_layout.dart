@@ -133,6 +133,10 @@ class _ResponsiveLayoutShellState extends State<ResponsiveLayoutShell> {
                             child: Text('ADMINISTRATION', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
                           ),
                           _buildSidebarItem(8, Icons.admin_panel_settings_rounded, 'Admin Dashboard'),
+                          _buildSidebarItem(12, Icons.note_alt_rounded, 'Paper Predictions'),
+                          _buildSidebarItem(9, Icons.sell_rounded, 'Pricing & Plans'),
+                          _buildSidebarItem(10, Icons.account_tree_rounded, 'Exam Hierarchy'),
+                          _buildSidebarItem(11, Icons.leaderboard_rounded, 'Admin Leaderboard'),
                         ],
                       ],
                     ),
@@ -295,6 +299,14 @@ class _ResponsiveLayoutShellState extends State<ResponsiveLayoutShell> {
         return 'User Profile & Settings';
       case 8:
         return 'Admin Dashboard Control';
+      case 9:
+        return 'Admin Pricing & Plans';
+      case 10:
+        return 'Exam & Content Hierarchy';
+      case 11:
+        return 'Admin Leaderboard';
+      case 12:
+        return 'Paper Predictions & Management';
       default:
         return 'Cosmyra Edu Platform';
     }

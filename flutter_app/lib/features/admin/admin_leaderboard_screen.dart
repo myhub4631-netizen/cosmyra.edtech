@@ -263,13 +263,15 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
                 _buildSidebarSectionLabel('MAIN NAVIGATION'),
-                _buildSidebarTile('Overview & KPIs', Icons.dashboard_outlined, false),
+                _buildSidebarTile('Dashboard', Icons.dashboard_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin')),
+                _buildSidebarTile('Paper Predictions', Icons.note_alt_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
+                _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
+                _buildSidebarTile('Pricing & Plans', Icons.sell_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/pricing')),
                 _buildSidebarTile('Question Bank', Icons.quiz_outlined, false),
                 _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false),
-                _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false),
                 _buildSidebarTile('Reported Questions', Icons.flag_outlined, false),
-                _buildSidebarTile('PYQs & Papers', Icons.auto_stories_outlined, false),
-                _buildSidebarTile('Leaderboard', Icons.emoji_events_outlined, true),
+                _buildSidebarTile('PYQs & Papers', Icons.auto_stories_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
+                _buildSidebarTile('Leaderboard', Icons.emoji_events_outlined, true, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),
                 _buildSidebarTile('User Management', Icons.people_outline_rounded, false),
 
                 const SizedBox(height: 16),
@@ -359,9 +361,9 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
     );
   }
 
-  Widget _buildSidebarTile(String title, IconData icon, bool isActive) {
+  Widget _buildSidebarTile(String title, IconData icon, bool isActive, {VoidCallback? onTap}) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),

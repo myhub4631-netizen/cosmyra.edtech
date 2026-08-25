@@ -328,15 +328,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
-                _buildSidebarTile('Dashboard', Icons.dashboard_rounded, true),
+                _buildSidebarTile('Dashboard', Icons.dashboard_rounded, true, onTap: () => Navigator.pushNamed(context, '/admin')),
                 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('CONTENT MANAGEMENT'),
+                _buildSidebarTile('Paper Predictions', Icons.note_alt_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
                 _buildSidebarTile('Question Bank', Icons.quiz_outlined, false, hasDropdown: true),
                 _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false, onTap: _pickAndValidateCSV),
-                _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false),
+                _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
+                _buildSidebarTile('Pricing & Plans', Icons.sell_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/pricing')),
                 _buildSidebarTile('Tags & Topics', Icons.label_outline_rounded, false),
-                _buildSidebarTile('PYQs & Papers', Icons.description_outlined, false),
+                _buildSidebarTile('PYQs & Papers', Icons.description_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
                 _buildSidebarTile('Mistake Book', Icons.history_edu_outlined, false),
                 _buildSidebarTile('Bookmarks', Icons.bookmark_outline_rounded, false),
 
@@ -351,7 +353,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 _buildSidebarTile('Analytics Dashboard', Icons.bar_chart_rounded, false),
                 _buildSidebarTile('Question Reports', Icons.outlined_flag_rounded, false),
                 _buildSidebarTile('Student Performance', Icons.insights_rounded, false),
-                _buildSidebarTile('Leaderboard', Icons.leaderboard_outlined, false),
+                _buildSidebarTile('Leaderboard', Icons.leaderboard_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('SYSTEM & SETTINGS'),
@@ -1191,7 +1193,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             _buildQuickActionCard('Add New Question', 'Create single question', Icons.add_circle_outline_rounded, const Color(0xFF6366F1), () => _openQuestionEditor()),
             _buildQuickActionCard('Bulk Import Questions', 'Upload via CSV/Excel', Icons.cloud_upload_outlined, const Color(0xFF10B981), _pickAndValidateCSV),
             _buildQuickActionCard('Manage Topics', 'Create & organize topics', Icons.folder_open_outlined, const Color(0xFFF59E0B), () {}),
-            _buildQuickActionCard('Import PYQs', 'Add previous year papers', Icons.description_outlined, const Color(0xFFEC4899), () {}),
+            _buildQuickActionCard('Paper Predictions', 'Manage prediction sets & PYQs', Icons.note_alt_outlined, const Color(0xFFEC4899), () => Navigator.pushNamed(context, '/admin/predictions')),
             _buildQuickActionCard('User Management', 'Manage students & roles', Icons.people_outline_rounded, const Color(0xFF3B82F6), () {}),
             _buildQuickActionCard('Question Reports', 'View detailed reports', Icons.bar_chart_rounded, const Color(0xFF8B5CF6), () {}),
             _buildQuickActionCard('Performance Analytics', 'Detailed performance data', Icons.trending_up_rounded, const Color(0xFF0D9488), () {}),

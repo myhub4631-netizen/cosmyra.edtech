@@ -346,10 +346,10 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
                   padding: EdgeInsets.only(left: 12, bottom: 8),
                   child: Text('MAIN', style: TextStyle(color: Color(0xFF475569), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
                 ),
-                _buildNavItem(Icons.dashboard_outlined, 'Dashboard', false),
-                _buildNavItem(Icons.people_outline, 'Users', false),
-                _buildNavItem(Icons.book_outlined, 'Courses', false),
-                _buildNavItem(Icons.assignment_outlined, 'Tests', false),
+                _buildNavItem(Icons.dashboard_outlined, 'Dashboard', false, onTap: () => Navigator.pushNamed(context, '/admin')),
+                _buildNavItem(Icons.account_tree_outlined, 'Exam Hierarchy', false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
+                _buildNavItem(Icons.sell_outlined, 'Pricing & Plans', false, onTap: () => Navigator.pushNamed(context, '/admin/pricing')),
+                _buildNavItem(Icons.leaderboard_outlined, 'Leaderboard', false, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),
                 _buildNavItem(Icons.play_circle_outline, 'Practice', false),
 
                 // Active Accordion: Paper Prediction
@@ -444,7 +444,7 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, bool isActive) {
+  Widget _buildNavItem(IconData icon, String label, bool isActive, {VoidCallback? onTap}) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 2),
       decoration: BoxDecoration(
@@ -456,7 +456,7 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
         horizontalTitleGap: 8,
         leading: Icon(icon, color: isActive ? Colors.white : const Color(0xFF94A3B8), size: 18),
         title: Text(label, style: TextStyle(color: isActive ? Colors.white : const Color(0xFFCBD5E1), fontSize: 12.5)),
-        onTap: () {},
+        onTap: onTap,
       ),
     );
   }

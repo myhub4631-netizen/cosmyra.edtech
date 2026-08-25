@@ -352,12 +352,14 @@ class _AdminHierarchyScreenState extends State<AdminHierarchyScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
                 _buildSidebarSectionLabel('MAIN NAVIGATION'),
-                _buildSidebarTile('Overview & KPIs', Icons.dashboard_outlined, false),
+                _buildSidebarTile('Dashboard', Icons.dashboard_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin')),
+                _buildSidebarTile('Paper Predictions', Icons.note_alt_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
                 _buildSidebarTile('Question Bank', Icons.quiz_outlined, false),
                 _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false),
-                _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, true),
+                _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, true, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
+                _buildSidebarTile('Pricing & Plans', Icons.sell_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/pricing')),
                 _buildSidebarTile('Tags & Topics', Icons.label_outline_rounded, false),
-                _buildSidebarTile('PYQs & Papers', Icons.auto_stories_outlined, false),
+                _buildSidebarTile('PYQs & Papers', Icons.auto_stories_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
                 _buildSidebarTile('Mistake Book', Icons.menu_book_outlined, false),
                 _buildSidebarTile('Bookmarks', Icons.bookmark_outline_rounded, false),
                 _buildSidebarTile('Reported Questions', Icons.flag_outlined, false),
@@ -374,7 +376,7 @@ class _AdminHierarchyScreenState extends State<AdminHierarchyScreen> {
                 _buildSidebarTile('Analytics Dashboard', Icons.bar_chart_rounded, false),
                 _buildSidebarTile('Question Reports', Icons.assessment_outlined, false),
                 _buildSidebarTile('Student Performance', Icons.insights_rounded, false),
-                _buildSidebarTile('Leaderboard', Icons.emoji_events_outlined, false),
+                _buildSidebarTile('Leaderboard', Icons.emoji_events_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('SYSTEM & SETTINGS'),
@@ -461,9 +463,9 @@ class _AdminHierarchyScreenState extends State<AdminHierarchyScreen> {
     );
   }
 
-  Widget _buildSidebarTile(String title, IconData icon, bool isActive) {
+  Widget _buildSidebarTile(String title, IconData icon, bool isActive, {VoidCallback? onTap}) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),

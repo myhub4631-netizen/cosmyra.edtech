@@ -232,8 +232,10 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
-                _buildSidebarSectionLabel('MAIN'),
-                _buildSidebarTile('Dashboard', Icons.dashboard_outlined, false),
+                 _buildSidebarSectionLabel('MAIN'),
+                _buildSidebarTile('Dashboard', Icons.dashboard_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin')),
+                _buildSidebarTile('Paper Prediction', Icons.note_alt_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
+                _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
                 _buildSidebarTile('Users', Icons.people_outline_rounded, false),
                 _buildSidebarTile('Exams', Icons.assignment_outlined, false),
                 _buildSidebarTile('Subjects', Icons.book_outlined, false),
@@ -247,7 +249,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('BUSINESS'),
                 _buildSidebarTile('Subscriptions', Icons.card_membership_outlined, false, hasDropdown: true),
-                _buildSidebarTile('Pricing & Plans', Icons.monetization_on_outlined, true),
+                _buildSidebarTile('Pricing & Plans', Icons.monetization_on_outlined, true, onTap: () => Navigator.pushNamed(context, '/admin/pricing')),
                 _buildSidebarTile('Coupons & Offers', Icons.local_offer_outlined, false),
                 _buildSidebarTile('Transactions', Icons.receipt_long_outlined, false),
                 _buildSidebarTile('Refunds', Icons.replay_rounded, false),
@@ -255,7 +257,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('CONTENT & ENGAGEMENT'),
-                _buildSidebarTile('Paper Prediction', Icons.auto_awesome_outlined, false),
+                _buildSidebarTile('Paper Prediction', Icons.auto_awesome_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
                 _buildSidebarTile('Announcements', Icons.campaign_outlined, false),
                 _buildSidebarTile('Notifications', Icons.notifications_none_rounded, false),
                 _buildSidebarTile('Banners', Icons.view_carousel_outlined, false),
@@ -263,6 +265,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('REPORTS & ANALYTICS'),
                 _buildSidebarTile('Analytics', Icons.bar_chart_rounded, false),
+                _buildSidebarTile('Leaderboard', Icons.emoji_events_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),
                 _buildSidebarTile('Student Performance', Icons.insights_rounded, false),
                 _buildSidebarTile('Sales Reports', Icons.trending_up_rounded, false),
                 _buildSidebarTile('System Logs', Icons.list_alt_rounded, false),
@@ -290,9 +293,9 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
     );
   }
 
-  Widget _buildSidebarTile(String title, IconData icon, bool isActive, {bool hasDropdown = false}) {
+  Widget _buildSidebarTile(String title, IconData icon, bool isActive, {bool hasDropdown = false, VoidCallback? onTap}) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),

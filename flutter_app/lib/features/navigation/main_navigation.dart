@@ -7,6 +7,7 @@ import '../landing/landing_page_screen.dart';
 import '../home/home_screen.dart';
 import '../practice/practice_screen.dart';
 import '../practice/custom_practice_wizard.dart';
+import '../tests/mock_tests_screen.dart';
 import '../tests/test_screen.dart';
 import '../tests/test_result_screen.dart';
 import '../pyq_nta/pyq_nta_screen.dart';
@@ -240,27 +241,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ),
         );
       case 2:
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.timer_rounded, size: 64, color: Colors.purple),
-              const SizedBox(height: 16),
-              const Text('Custom Mock Examination Engine', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text('Timed exam simulator. Feedback & solutions are hidden until final submit.', style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _startCustomTest,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Start Full Mock Test Now'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                ),
-              ),
-            ],
-          ),
+        return MockTestsScreen(
+          onStartTest: _startCustomTest,
         );
       case 3:
         return PyqNtaScreen(

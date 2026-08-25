@@ -6,11 +6,11 @@ class SupabaseService {
   // Supports dynamic injection via --dart-define=SUPABASE_URL=... and --dart-define=SUPABASE_ANON_KEY=...
   static const String supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'https://uhfzbuebbgzoiygwjvex.supabase.co',
+    defaultValue: 'https://kxlseyibgwpfthpryrgn.supabase.co',
   );
   static const String supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoZnpidWViYmd6b2l5Z3dqdmV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NTAwMTgsImV4cCI6MjEwMzIyNjAxOH0.MFDOO7J4TAXn_-7MuW-_Ss2Tf1ihcQgPKpZpbRJzixI',
+    defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4bHNleWliZ3dwZnRocHJ5cmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NzM4NTQsImV4cCI6MjEwMzI0OTg1NH0.l4_fUxXoTX2Q4sOPTqB9XtvYzpvAEkljevBmsjrO2JU',
   );
 
   static bool _isInitialized = false;
