@@ -1,0 +1,23 @@
+# MacOS files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Build & Tool directories
+build/
+.dart_tool/
+.idea/
+.vscode/
+*.iml
+node_modules/
+
+# Environment secrets
+.env
+*.env.local
+
+# Android / iOS generated files
+flutter_app/android/local.properties
+flutter_app/ios/Pods/
+flutter_app/ios/.symlinks/
+flutter_app/ios/Flutter/Flutter.framework
+flutter_app/ios/Flutter/Flutter.podspec
