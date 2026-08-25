@@ -15,6 +15,7 @@ import '../leaderboard/leaderboard_screen.dart';
 import '../profile/profile_screen.dart';
 import '../admin/admin_dashboard_screen.dart';
 import '../admin/admin_pricing_screen.dart';
+import '../admin/admin_hierarchy_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final int? initialIndex;
@@ -44,13 +45,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void initState() {
     super.initState();
 
-    // Check URL path or fragment to see if user accessed /admin or #admin
+    // Check URL path or fragment
     final uriPath = Uri.base.path;
     final uriFragment = Uri.base.fragment;
+    final isHierarchyRoute = uriPath.contains('hierarchy') || uriFragment.contains('hierarchy');
     final isPricingRoute = uriPath.contains('pricing') || uriFragment.contains('pricing');
     final isStudentRoute = uriPath.contains('student') || uriFragment.contains('student');
 
-    _selectedIndex = widget.initialIndex ?? (isPricingRoute ? 9 : (isStudentRoute ? 0 : 8));
+    _selectedIndex = widget.initialIndex ??
+        (isHierarchyRoute
+            ? 10
+            : (isPricingRoute ? 9 : (isStudentRoute ? 0 : 8)));
     _currentUser = SupabaseService.getMockProfile(role: 'admin');
 
     _loadUser();
@@ -158,6 +163,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     if (_selectedIndex == 9) {
       return AdminPricingScreen(userProfile: _currentUser);
     }
+    if (_selectedIndex == 10) {
+      return AdminHierarchyScreen(userProfile: _currentUser);
+    }
 
     // 5. Standard Navigation Body Shell
     return ResponsiveLayoutShell(
@@ -257,6 +265,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         return AdminDashboardScreen(userProfile: _currentUser);
       case 9:
         return AdminPricingScreen(userProfile: _currentUser);
+      case 10:
+        return AdminHierarchyScreen(userProfile: _currentUser);
       default:
         return const SizedBox.shrink();
     }

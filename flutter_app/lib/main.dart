@@ -6,7 +6,7 @@ import 'features/navigation/main_navigation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  usePathUrlStrategy(); // Removes # hash from Flutter Web URLs so /admin and /admin/pricing work cleanly
+  usePathUrlStrategy(); // Removes # hash from Flutter Web URLs
   await SupabaseService.initialize();
   runApp(const CosmyraApp());
 }
@@ -22,20 +22,26 @@ class CosmyraApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
-      initialRoute: Uri.base.path.contains('pricing')
-          ? '/admin/pricing'
-          : (Uri.base.path.contains('admin') ? '/admin' : '/'),
+      initialRoute: Uri.base.path.contains('hierarchy')
+          ? '/admin/hierarchy'
+          : (Uri.base.path.contains('pricing')
+              ? '/admin/pricing'
+              : (Uri.base.path.contains('admin') ? '/admin' : '/')),
       routes: {
         '/': (context) => const MainNavigationScreen(initialIndex: 0),
         '/admin': (context) => const MainNavigationScreen(initialIndex: 8),
         '/admin/pricing': (context) => const MainNavigationScreen(initialIndex: 9),
         '/pricing': (context) => const MainNavigationScreen(initialIndex: 9),
+        '/admin/hierarchy': (context) => const MainNavigationScreen(initialIndex: 10),
+        '/hierarchy': (context) => const MainNavigationScreen(initialIndex: 10),
       },
       onUnknownRoute: (settings) => MaterialPageRoute(
         builder: (context) => MainNavigationScreen(
-          initialIndex: settings.name?.contains('pricing') == true
-              ? 9
-              : (settings.name?.contains('admin') == true ? 8 : 0),
+          initialIndex: settings.name?.contains('hierarchy') == true
+              ? 10
+              : (settings.name?.contains('pricing') == true
+                  ? 9
+                  : (settings.name?.contains('admin') == true ? 8 : 0)),
         ),
       ),
     );
