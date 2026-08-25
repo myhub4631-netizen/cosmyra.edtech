@@ -31,6 +31,56 @@ class SupabaseService {
   }
 
   // ================= AUTHENTICATION =================
+  static Future<AuthResponse?> signUp({
+    required String email,
+    required String password,
+    required String fullName,
+    required String phone,
+  }) async {
+    try {
+      final res = await client.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          'full_name': fullName,
+          'phone': phone,
+        },
+      );
+      if (res.user != null) {
+        try {
+          await client.from('profiles').upsert({
+            'id': res.user!.id,
+            'email': email,
+            'full_name': fullName,
+            'phone': phone,
+            'role': 'student',
+          });
+        } catch (pe) {
+          debugPrint('Profile upsert warning: $pe');
+        }
+      }
+      return res;
+    } catch (e) {
+      debugPrint('Error signing up: $e');
+      rethrow;
+    }
+  }
+
+  static Future<AuthResponse?> signIn({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      return await client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+    } catch (e) {
+      debugPrint('Error signing in: $e');
+      rethrow;
+    }
+  }
+
   static Future<UserProfileModel?> getCurrentUser() async {
     try {
       final user = client.auth.currentUser;

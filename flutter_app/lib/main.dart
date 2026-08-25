@@ -3,6 +3,8 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/supabase_service.dart';
 import 'features/navigation/main_navigation.dart';
+import 'features/auth/signup_screen.dart';
+import 'features/auth/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,6 +48,8 @@ class CosmyraApp extends StatelessWidget {
       routes: {
         '/': (context) => MainNavigationScreen(initialIndex: initialIdx),
         '/landing': (context) => const MainNavigationScreen(initialIndex: 0),
+        '/signup': (context) => const SignUpScreen(),
+        '/login': (context) => const LoginScreen(),
         '/practice': (context) => const MainNavigationScreen(initialIndex: 1),
         '/tests': (context) => const MainNavigationScreen(initialIndex: 2),
         '/mock-tests': (context) => const MainNavigationScreen(initialIndex: 2),
@@ -65,7 +69,13 @@ class CosmyraApp extends StatelessWidget {
         '/predictions': (context) => const MainNavigationScreen(initialIndex: 12),
       },
       onGenerateRoute: (settings) {
-        final targetPath = settings.name ?? Uri.base.path;
+        final targetPath = (settings.name ?? Uri.base.path).toLowerCase();
+        if (targetPath.contains('signup')) {
+          return MaterialPageRoute(builder: (context) => const SignUpScreen(), settings: settings);
+        }
+        if (targetPath.contains('login')) {
+          return MaterialPageRoute(builder: (context) => const LoginScreen(), settings: settings);
+        }
         final targetIdx = _getInitialIndexFromPath(targetPath);
         return MaterialPageRoute(
           builder: (context) => MainNavigationScreen(initialIndex: targetIdx),
