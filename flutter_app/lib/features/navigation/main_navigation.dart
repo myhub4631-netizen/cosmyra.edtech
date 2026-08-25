@@ -14,6 +14,7 @@ import '../analytics/analytics_screen.dart';
 import '../leaderboard/leaderboard_screen.dart';
 import '../profile/profile_screen.dart';
 import '../admin/admin_dashboard_screen.dart';
+import '../admin/admin_pricing_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final int? initialIndex;
@@ -46,10 +47,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     // Check URL path or fragment to see if user accessed /admin or #admin
     final uriPath = Uri.base.path;
     final uriFragment = Uri.base.fragment;
+    final isPricingRoute = uriPath.contains('pricing') || uriFragment.contains('pricing');
     final isStudentRoute = uriPath.contains('student') || uriFragment.contains('student');
 
-    // Default to Index 8 (Master Admin Control Dashboard) for instant preview
-    _selectedIndex = widget.initialIndex ?? (isStudentRoute ? 0 : 8);
+    _selectedIndex = widget.initialIndex ?? (isPricingRoute ? 9 : (isStudentRoute ? 0 : 8));
     _currentUser = SupabaseService.getMockProfile(role: 'admin');
 
     _loadUser();
@@ -150,9 +151,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       );
     }
 
-    // 4. If selected tab is 8 (Admin Dashboard Control), render full screen Admin Dashboard
+    // 4. Standalone Admin Screens
     if (_selectedIndex == 8) {
       return AdminDashboardScreen(userProfile: _currentUser);
+    }
+    if (_selectedIndex == 9) {
+      return AdminPricingScreen(userProfile: _currentUser);
     }
 
     // 5. Standard Navigation Body Shell
@@ -251,6 +255,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         );
       case 8:
         return AdminDashboardScreen(userProfile: _currentUser);
+      case 9:
+        return AdminPricingScreen(userProfile: _currentUser);
       default:
         return const SizedBox.shrink();
     }
