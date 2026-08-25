@@ -234,7 +234,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       backgroundColor: const Color(0xFFF8FAFC),
       body: Row(
         children: [
-          // 1. LEFT SIDEBAR NAVIGATION (Dark Slate #0B0F19 / #0F172A)
+          // 1. LEFT SIDEBAR NAVIGATION (Dark Navy #0B0F19)
           if (isDesktop) _buildAdminSidebar(),
 
           // 2. MAIN ADMIN DASHBOARD CONTENT AREA
@@ -284,7 +284,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   // ================= 1. LEFT SIDEBAR =================
   Widget _buildAdminSidebar() {
     return Container(
-      width: 250,
+      width: 240,
       color: const Color(0xFF0B0F19),
       child: Column(
         children: [
@@ -310,7 +310,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   children: [
                     Text(
                       'Cosmyra Admin',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                     Text(
                       'Control Center',
@@ -366,18 +366,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [const Color(0xFF4F46E5).withOpacity(0.9), const Color(0xFF7C3AED).withOpacity(0.9)],
+                      colors: [const Color(0xFF4F46E5).withOpacity(0.95), const Color(0xFF7C3AED).withOpacity(0.95)],
                     ),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(Icons.info_outline_rounded, color: Colors.amber, size: 18),
-                          SizedBox(width: 6),
-                          Text('Need Help?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                          const Row(
+                            children: [
+                              Icon(Icons.info_outline_rounded, color: Colors.amber, size: 16),
+                              SizedBox(width: 6),
+                              Text('Need Help?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                            ],
+                          ),
+                          InkWell(
+                            onTap: () {},
+                            child: const Icon(Icons.close, color: Colors.white70, size: 14),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -645,7 +654,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               subtext: '12.5% vs last week',
               icon: Icons.people_outline_rounded,
               iconColor: const Color(0xFF6366F1),
-              trendColor: Colors.green,
+              trendColor: const Color(0xFF10B981),
             ),
             _buildMetricCard(
               title: 'Total Questions',
@@ -654,7 +663,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               subtext: '8400 PYQs · 12,500 NTA',
               icon: Icons.layers_outlined,
               iconColor: const Color(0xFF10B981),
-              trendColor: Colors.green,
+              trendColor: const Color(0xFF10B981),
             ),
             _buildMetricCard(
               title: "Today's Attempts",
@@ -663,7 +672,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               subtext: 'Peak: 1,200 attempts/hr',
               icon: Icons.show_chart_rounded,
               iconColor: const Color(0xFF3B82F6),
-              trendColor: Colors.green,
+              trendColor: const Color(0xFF10B981),
             ),
             _buildMetricCard(
               title: 'Accuracy Rate',
@@ -672,7 +681,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               subtext: 'Average this week',
               icon: Icons.adjust_rounded,
               iconColor: const Color(0xFF0D9488),
-              trendColor: Colors.green,
+              trendColor: const Color(0xFF10B981),
             ),
             _buildMetricCard(
               title: 'Pending Reports',
@@ -680,8 +689,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               trend: 'Requires attention',
               subtext: '',
               icon: Icons.outlined_flag_rounded,
-              iconColor: Colors.redAccent,
-              trendColor: Colors.red,
+              iconColor: const Color(0xFFEF4444),
+              trendColor: const Color(0xFFEF4444),
             ),
             _buildMetricCard(
               title: 'System Health',
@@ -690,7 +699,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               subtext: '',
               icon: Icons.verified_user_outlined,
               iconColor: const Color(0xFF10B981),
-              trendColor: Colors.green,
+              trendColor: const Color(0xFF10B981),
             ),
           ],
         );
@@ -839,10 +848,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 ),
                 const SizedBox(height: 12),
                 _buildActivityTile('Admin User', 'Imported 2,450 questions via CSV', '2 min ago', Icons.description_outlined, const Color(0xFF10B981)),
-                _buildActivityTile('System', 'Automated backup completed', '15 min ago', Icons.cloud_done_outlined, Colors.purple),
-                _buildActivityTile('Moderator', 'Reviewed 120 questions', '1 hour ago', Icons.person_outline, Colors.blue),
-                _buildActivityTile('Admin User', 'Created new topic: Organic Chemistry', '2 hours ago', Icons.edit_note_outlined, Colors.orange),
-                _buildActivityTile('System', 'Weekly analytics report generated', '3 hours ago', Icons.assessment_outlined, Colors.indigo),
+                _buildActivityTile('System', 'Automated backup completed', '15 min ago', Icons.cloud_done_outlined, const Color(0xFF8B5CF6)),
+                _buildActivityTile('Moderator', 'Reviewed 120 questions', '1 hour ago', Icons.person_outline, const Color(0xFF3B82F6)),
+                _buildActivityTile('Admin User', 'Created new topic: Organic Chemistry', '2 hours ago', Icons.edit_note_outlined, const Color(0xFFF59E0B)),
+                _buildActivityTile('System', 'Weekly analytics report generated', '3 hours ago', Icons.assessment_outlined, const Color(0xFF6366F1)),
               ],
             ),
           ),
@@ -871,11 +880,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   ],
                 ),
                 const SizedBox(height: 12),
-                _buildExamPerformanceRow('NEET UG 2026 Mock Test 15', 'Avg Score: 612/720', '85.0%', Colors.green),
-                _buildExamPerformanceRow('JEE Main 2025 Paper 8', 'Avg Score: 285/300', '82.3%', Colors.green),
-                _buildExamPerformanceRow('JEE Advanced 2025 Mock 7', 'Avg Score: 598/720', '80.6%', Colors.green),
-                _buildExamPerformanceRow('NEET UG 2025 Full Test 24', 'Avg Score: 598/720', '78.9%', Colors.green),
-                _buildExamPerformanceRow('NEET UG 2026 Chapter Test', 'Avg Score: 156/180', '77.3%', Colors.green),
+                _buildExamPerformanceRow('NEET UG 2026 Mock Test 15', 'Avg Score: 612/720', '85.0%', const Color(0xFF10B981), Icons.medical_services_outlined, const Color(0xFF10B981)),
+                _buildExamPerformanceRow('JEE Main 2025 Paper 8', 'Avg Score: 285/300', '82.3%', const Color(0xFF10B981), Icons.school_outlined, const Color(0xFF8B5CF6)),
+                _buildExamPerformanceRow('JEE Advanced 2025 Mock 7', 'Avg Score: 598/720', '80.6%', const Color(0xFF10B981), Icons.shield_outlined, const Color(0xFFF59E0B)),
+                _buildExamPerformanceRow('NEET UG 2025 Full Test 24', 'Avg Score: 598/720', '78.9%', const Color(0xFF10B981), Icons.medical_services_outlined, const Color(0xFF10B981)),
+                _buildExamPerformanceRow('NEET UG 2026 Chapter Test', 'Avg Score: 156/180', '77.3%', const Color(0xFF10B981), Icons.article_outlined, const Color(0xFF3B82F6)),
               ],
             ),
           ),
@@ -924,15 +933,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     );
   }
 
-  Widget _buildExamPerformanceRow(String name, String avgScore, String percent, Color color) {
+  Widget _buildExamPerformanceRow(String name, String avgScore, String percent, Color percentColor, IconData icon, Color iconColor) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-            child: const Icon(Icons.assignment_turned_in_outlined, size: 14, color: Colors.blue),
+            decoration: BoxDecoration(color: iconColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, size: 14, color: iconColor),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -944,7 +953,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               ],
             ),
           ),
-          Text(percent, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color)),
+          Text(percent, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: percentColor)),
         ],
       ),
     );
