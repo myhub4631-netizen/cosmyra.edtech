@@ -17,6 +17,7 @@ import '../profile/profile_screen.dart';
 import '../admin/admin_dashboard_screen.dart';
 import '../admin/admin_pricing_screen.dart';
 import '../admin/admin_hierarchy_screen.dart';
+import '../admin/admin_leaderboard_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final int? initialIndex;
@@ -49,13 +50,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     // Check URL path or fragment
     final uriPath = Uri.base.path;
     final uriFragment = Uri.base.fragment;
+    final isLeaderboardRoute = uriPath.contains('leaderboard') || uriFragment.contains('leaderboard');
     final isHierarchyRoute = uriPath.contains('hierarchy') || uriFragment.contains('hierarchy');
     final isPricingRoute = uriPath.contains('pricing') || uriFragment.contains('pricing');
     final isAdminRoute = uriPath.contains('admin') || uriFragment.contains('admin');
-    final isLandingRoute = uriPath.contains('landing') || uriPath == '/' || uriPath.isEmpty;
 
     if (widget.initialIndex != null) {
       _selectedIndex = widget.initialIndex!;
+    } else if (isLeaderboardRoute) {
+      _selectedIndex = 11;
     } else if (isHierarchyRoute) {
       _selectedIndex = 10;
     } else if (isPricingRoute) {
@@ -66,7 +69,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       _selectedIndex = 0; // Front Landing Page
     }
 
-    _currentUser = SupabaseService.getMockProfile(role: 'student');
+    _currentUser = SupabaseService.getMockProfile(role: 'admin');
     _loadUser();
   }
 
@@ -174,6 +177,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     }
     if (_selectedIndex == 10) {
       return AdminHierarchyScreen(userProfile: _currentUser);
+    }
+    if (_selectedIndex == 11) {
+      return AdminLeaderboardScreen(userProfile: _currentUser);
     }
 
     // 5. Front Website Landing Page (Index 0)
@@ -285,6 +291,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         return AdminPricingScreen(userProfile: _currentUser);
       case 10:
         return AdminHierarchyScreen(userProfile: _currentUser);
+      case 11:
+        return AdminLeaderboardScreen(userProfile: _currentUser);
       default:
         return const SizedBox.shrink();
     }

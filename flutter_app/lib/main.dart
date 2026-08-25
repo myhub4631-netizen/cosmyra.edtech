@@ -22,11 +22,13 @@ class CosmyraApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
-      initialRoute: Uri.base.path.contains('hierarchy')
-          ? '/admin/hierarchy'
-          : (Uri.base.path.contains('pricing')
-              ? '/admin/pricing'
-              : (Uri.base.path.contains('admin') ? '/admin' : '/')),
+      initialRoute: Uri.base.path.contains('leaderboard')
+          ? '/admin/leaderboard'
+          : (Uri.base.path.contains('hierarchy')
+              ? '/admin/hierarchy'
+              : (Uri.base.path.contains('pricing')
+                  ? '/admin/pricing'
+                  : (Uri.base.path.contains('admin') ? '/admin' : '/'))),
       routes: {
         '/': (context) => const MainNavigationScreen(initialIndex: 0),
         '/landing': (context) => const MainNavigationScreen(initialIndex: 0),
@@ -35,14 +37,18 @@ class CosmyraApp extends StatelessWidget {
         '/pricing': (context) => const MainNavigationScreen(initialIndex: 9),
         '/admin/hierarchy': (context) => const MainNavigationScreen(initialIndex: 10),
         '/hierarchy': (context) => const MainNavigationScreen(initialIndex: 10),
+        '/admin/leaderboard': (context) => const MainNavigationScreen(initialIndex: 11),
+        '/leaderboard': (context) => const MainNavigationScreen(initialIndex: 11),
       },
       onUnknownRoute: (settings) => MaterialPageRoute(
         builder: (context) => MainNavigationScreen(
-          initialIndex: settings.name?.contains('hierarchy') == true
-              ? 10
-              : (settings.name?.contains('pricing') == true
-                  ? 9
-                  : (settings.name?.contains('admin') == true ? 8 : 0)),
+          initialIndex: settings.name?.contains('leaderboard') == true
+              ? 11
+              : (settings.name?.contains('hierarchy') == true
+                  ? 10
+                  : (settings.name?.contains('pricing') == true
+                      ? 9
+                      : (settings.name?.contains('admin') == true ? 8 : 0))),
         ),
       ),
     );
