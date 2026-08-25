@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import '../../models/models.dart';
 
 class AdminPredictionsScreen extends StatefulWidget {
@@ -12,137 +11,185 @@ class AdminPredictionsScreen extends StatefulWidget {
 }
 
 class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
-  String _selectedExamFilter = 'All Exams';
-  String _selectedYearFilter = 'All Years';
-  String _selectedStatusFilter = 'All Status';
-  String _selectedTypeFilter = 'All Types';
-  String _searchQuery = '';
-  String _sortBy = 'Latest First';
+  // Sidebar accordion expansion state
+  bool _paperPredictionExpanded = true;
+  String _activeSubTab = 'All Papers';
 
-  final List<Map<String, dynamic>> _predictions = [
+  // Filter state
+  String _selectedYear = 'Select Year';
+  String _selectedSubject = 'Select Subject';
+  String _selectedStatus = 'Select Status';
+  String _searchQuery = '';
+
+  // Form configuration state for selected paper
+  int _selectedPaperIndex = 0;
+
+  final List<Map<String, dynamic>> _predictionPapers = [
     {
-      'title': 'NEET UG Prediction - 24 May 2025',
-      'tag': "Today's Prediction",
-      'tagColor': const Color(0xFF10B981),
-      'exam': 'NEET UG',
-      'examColor': const Color(0xFF8B5CF6),
-      'date': '24 May 2025',
-      'type': 'Daily',
-      'accuracy': '68 – 72%',
-      'attempts': '2,842',
+      'title': 'NEET 2024 Paper Prediction Set - 1',
+      'year': '2024',
+      'set': '1',
+      'subjects': ['Physics', 'Chemistry', 'Biology'],
+      'questions': 180,
+      'marks': 540,
+      'duration': '3:20 Hrs',
       'status': 'Published',
       'statusColor': const Color(0xFF10B981),
-      'icon': Icons.person_outline,
+      'statusBg': const Color(0xFFDCFCE7),
     },
     {
-      'title': 'NEET UG Prediction - 25 May 2025',
-      'tag': 'Tomorrow',
-      'tagColor': const Color(0xFF3B82F6),
-      'exam': 'NEET UG',
-      'examColor': const Color(0xFF8B5CF6),
-      'date': '25 May 2025',
-      'type': 'Daily',
-      'accuracy': '-',
-      'attempts': '-',
-      'status': 'Scheduled',
+      'title': 'NEET 2024 Paper Prediction Set - 2',
+      'year': '2024',
+      'set': '2',
+      'subjects': ['Physics', 'Chemistry', 'Biology'],
+      'questions': 180,
+      'marks': 540,
+      'duration': '3:20 Hrs',
+      'status': 'Published',
+      'statusColor': const Color(0xFF10B981),
+      'statusBg': const Color(0xFFDCFCE7),
+    },
+    {
+      'title': 'NEET 2024 Paper Prediction Set - 3',
+      'year': '2024',
+      'set': '3',
+      'subjects': ['Physics', 'Chemistry', 'Biology'],
+      'questions': 180,
+      'marks': 540,
+      'duration': '3:20 Hrs',
+      'status': 'Published',
+      'statusColor': const Color(0xFF10B981),
+      'statusBg': const Color(0xFFDCFCE7),
+    },
+    {
+      'title': 'NEET 2024 Paper Prediction Set - 4',
+      'year': '2024',
+      'set': '4',
+      'subjects': ['Physics', 'Chemistry', 'Biology'],
+      'questions': 180,
+      'marks': 540,
+      'duration': '3:20 Hrs',
+      'status': 'Draft',
       'statusColor': const Color(0xFFF59E0B),
-      'icon': Icons.calendar_today_outlined,
+      'statusBg': const Color(0xFFFEF3C7),
     },
     {
-      'title': 'NEET UG Prediction - 26 May 2025',
-      'tag': 'Upcoming',
-      'tagColor': const Color(0xFF10B981),
-      'exam': 'NEET UG',
-      'examColor': const Color(0xFF8B5CF6),
-      'date': '26 May 2025',
-      'type': 'Daily',
-      'accuracy': '-',
-      'attempts': '-',
-      'status': 'Scheduled',
+      'title': 'NEET 2023 Paper Prediction Set - 1',
+      'year': '2023',
+      'set': '1',
+      'subjects': ['Physics', 'Chemistry', 'Biology'],
+      'questions': 180,
+      'marks': 540,
+      'duration': '3:20 Hrs',
+      'status': 'Published',
+      'statusColor': const Color(0xFF10B981),
+      'statusBg': const Color(0xFFDCFCE7),
+    },
+    {
+      'title': 'NEET 2023 Paper Prediction Set - 2',
+      'year': '2023',
+      'set': '2',
+      'subjects': ['Physics', 'Chemistry', 'Biology'],
+      'questions': 180,
+      'marks': 540,
+      'duration': '3:20 Hrs',
+      'status': 'Archived',
+      'statusColor': const Color(0xFFEF4444),
+      'statusBg': const Color(0xFFFEE2E2),
+    },
+    {
+      'title': 'NEET 2022 Paper Prediction Set - 1',
+      'year': '2022',
+      'set': '1',
+      'subjects': ['Physics', 'Chemistry', 'Biology'],
+      'questions': 180,
+      'marks': 540,
+      'duration': '3:20 Hrs',
+      'status': 'Published',
+      'statusColor': const Color(0xFF10B981),
+      'statusBg': const Color(0xFFDCFCE7),
+    },
+    {
+      'title': 'NEET 2022 Paper Prediction Set - 2',
+      'year': '2022',
+      'set': '2',
+      'subjects': ['Physics', 'Chemistry', 'Biology'],
+      'questions': 180,
+      'marks': 540,
+      'duration': '3:20 Hrs',
+      'status': 'Draft',
       'statusColor': const Color(0xFFF59E0B),
-      'icon': Icons.edit_calendar_outlined,
+      'statusBg': const Color(0xFFFEF3C7),
     },
     {
-      'title': 'JEE Main Prediction - 26 May 2025',
-      'tag': 'Upcoming',
-      'tagColor': const Color(0xFFF59E0B),
-      'exam': 'JEE Main',
-      'examColor': const Color(0xFF3B82F6),
-      'date': '26 May 2025',
-      'type': 'Daily',
-      'accuracy': '-',
-      'attempts': '-',
-      'status': 'Scheduled',
-      'statusColor': const Color(0xFFF59E0B),
-      'icon': Icons.description_outlined,
+      'title': 'NEET 2021 Paper Prediction Set - 1',
+      'year': '2021',
+      'set': '1',
+      'subjects': ['Physics', 'Chemistry', 'Biology'],
+      'questions': 180,
+      'marks': 540,
+      'duration': '3:20 Hrs',
+      'status': 'Published',
+      'statusColor': const Color(0xFF10B981),
+      'statusBg': const Color(0xFFDCFCE7),
     },
     {
-      'title': 'NEET UG Prediction - 10 May 2025',
-      'tag': '',
-      'tagColor': Colors.transparent,
-      'exam': 'NEET UG',
-      'examColor': const Color(0xFF8B5CF6),
-      'date': '10 May 2025',
-      'type': 'Daily',
-      'accuracy': '70 – 74%',
-      'attempts': '5,231',
-      'status': 'Completed',
-      'statusColor': const Color(0xFF0D9488),
-      'icon': Icons.hexagon_outlined,
-    },
-    {
-      'title': 'JEE Main Prediction - 09 May 2025',
-      'tag': '',
-      'tagColor': Colors.transparent,
-      'exam': 'JEE Main',
-      'examColor': const Color(0xFF3B82F6),
-      'date': '09 May 2025',
-      'type': 'Daily',
-      'accuracy': '69 – 73%',
-      'attempts': '4,892',
-      'status': 'Completed',
-      'statusColor': const Color(0xFF0D9488),
-      'icon': Icons.camera_alt_outlined,
-    },
-    {
-      'title': 'NEET UG Prediction - 2024 (Analysis)',
-      'tag': '',
-      'tagColor': Colors.transparent,
-      'exam': 'NEET UG',
-      'examColor': const Color(0xFF8B5CF6),
-      'date': '12 May 2024',
-      'type': 'Yearly',
-      'accuracy': '72.8%',
-      'attempts': '8,231',
-      'status': 'Completed',
-      'statusColor': const Color(0xFF0D9488),
-      'icon': Icons.star_border_rounded,
-    },
-    {
-      'title': 'JEE Main Prediction - 2024 (Analysis)',
-      'tag': '',
-      'tagColor': Colors.transparent,
-      'exam': 'JEE Main',
-      'examColor': const Color(0xFF3B82F6),
-      'date': '12 Apr 2024',
-      'type': 'Yearly',
-      'accuracy': '73.6%',
-      'attempts': '7,926',
-      'status': 'Completed',
-      'statusColor': const Color(0xFF0D9488),
-      'icon': Icons.star_border_rounded,
+      'title': 'NEET 2021 Paper Prediction Set - 2',
+      'year': '2021',
+      'set': '2',
+      'subjects': ['Physics', 'Chemistry', 'Biology'],
+      'questions': 180,
+      'marks': 540,
+      'duration': '3:20 Hrs',
+      'status': 'Archived',
+      'statusColor': const Color(0xFFEF4444),
+      'statusBg': const Color(0xFFFEE2E2),
     },
   ];
 
-  void _openCreatePredictionModal() {
-    final titleCtrl = TextEditingController();
+  // Paper Form Controls
+  late TextEditingController _titleCtrl;
+  late TextEditingController _descriptionCtrl;
+  late TextEditingController _sortOrderCtrl;
+  late TextEditingController _negativeMarksCtrl;
 
+  bool _physicsChecked = true;
+  bool _chemistryChecked = true;
+  bool _biologyChecked = true;
+
+  String _visibilityOption = 'Visible to All Users';
+  bool _featuredToggle = true;
+
+  bool _showSolutions = true;
+  bool _showAnalysis = true;
+  bool _allowDownload = true;
+  bool _negativeMarking = true;
+  bool _shuffleQuestions = false;
+  bool _shuffleOptions = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPaperData(0);
+  }
+
+  void _loadPaperData(int index) {
+    _selectedPaperIndex = index;
+    final paper = _predictionPapers[index];
+    _titleCtrl = TextEditingController(text: paper['title']);
+    _descriptionCtrl = TextEditingController(text: 'This paper is based on latest pattern analysis and contains most important questions');
+    _sortOrderCtrl = TextEditingController(text: '1');
+    _negativeMarksCtrl = TextEditingController(text: '1');
+  }
+
+  void _addNewPaperModal() {
+    final titleCtrl = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
-          width: 500,
+          width: 480,
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -151,12 +198,19 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Create Paper Prediction Set', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('Add New Prediction Paper', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(ctx).pop()),
                 ],
               ),
               const SizedBox(height: 16),
-              TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Prediction Title (e.g. NEET 2026 Expected Questions)')),
+              TextField(
+                controller: titleCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Paper Title',
+                  hintText: 'e.g. NEET 2025 Prediction Set - 1',
+                  border: OutlineInputBorder(),
+                ),
+              ),
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -167,27 +221,26 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
                     onPressed: () {
                       if (titleCtrl.text.isNotEmpty) {
                         setState(() {
-                          _predictions.insert(0, {
+                          _predictionPapers.insert(0, {
                             'title': titleCtrl.text,
-                            'tag': 'Upcoming',
-                            'tagColor': const Color(0xFF10B981),
-                            'exam': 'NEET UG',
-                            'examColor': const Color(0xFF8B5CF6),
-                            'date': 'Tomorrow',
-                            'type': 'Daily',
-                            'accuracy': '-',
-                            'attempts': '-',
-                            'status': 'Scheduled',
+                            'year': '2025',
+                            'set': '1',
+                            'subjects': ['Physics', 'Chemistry', 'Biology'],
+                            'questions': 180,
+                            'marks': 540,
+                            'duration': '3:20 Hrs',
+                            'status': 'Draft',
                             'statusColor': const Color(0xFFF59E0B),
-                            'icon': Icons.auto_awesome_outlined,
+                            'statusBg': const Color(0xFFFEF3C7),
                           });
+                          _loadPaperData(0);
                         });
                         Navigator.of(ctx).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Prediction "${titleCtrl.text}" created!')));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Paper "${titleCtrl.text}" created!')));
                       }
                     },
                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5)),
-                    child: const Text('Create Prediction'),
+                    child: const Text('Create Paper'),
                   ),
                 ],
               ),
@@ -202,63 +255,48 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Column(
+      body: Row(
         children: [
-          // Top Header Bar
-          _buildAdminHeader(),
+          // 1. Dark Left Navigation Sidebar
+          _buildDarkSidebar(),
 
-          // Main Scrollable Body Canvas
+          // 2. Main Content Body Area
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Breadcrumb + Title Row
-                  _buildBreadcrumbAndTitleRow(),
-                  const SizedBox(height: 24),
+            child: Column(
+              children: [
+                // Top Header Bar
+                _buildTopHeader(),
 
-                  // Top 6 Metrics Cards Row
-                  _buildTopMetricsRow(),
-                  const SizedBox(height: 24),
+                // Scrollable Content Canvas
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Title + Breadcrumb + Action Button
+                        _buildPageHeaderRow(),
+                        const SizedBox(height: 24),
 
-                  // Main Content Area: Left (Filters + Table) & Right (Analytics & Quick Actions Stack)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Left Section: Filters + Predictions Table
-                      Expanded(
-                        flex: 8,
-                        child: Column(
-                          children: [
-                            _buildFilterControlCard(),
-                            const SizedBox(height: 20),
-                            _buildPredictionsTableCard(),
-                          ],
-                        ),
-                      ),
+                        // Top 4 Summary Metrics Cards
+                        _buildSummaryMetricsCards(),
+                        const SizedBox(height: 24),
 
-                      const SizedBox(width: 20),
+                        // Filter Control Bar
+                        _buildFilterControlBar(),
+                        const SizedBox(height: 24),
 
-                      // Right Section: Accuracy Trend + Exam Wise + Top Performers + Quick Actions
-                      SizedBox(
-                        width: 320,
-                        child: Column(
-                          children: [
-                            _buildAccuracyTrendCard(),
-                            const SizedBox(height: 20),
-                            _buildExamWiseAccuracyCard(),
-                            const SizedBox(height: 20),
-                            _buildTopPerformingPredictionsCard(),
-                            const SizedBox(height: 20),
-                            _buildQuickActionsCard(),
-                          ],
-                        ),
-                      ),
-                    ],
+                        // Prediction Papers Table Card
+                        _buildPredictionPapersTable(),
+                        const SizedBox(height: 32),
+
+                        // Lower Detailed Configuration Panel (3 Columns + Advanced Options)
+                        _buildDetailedConfigurationPanel(),
+                      ],
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -266,8 +304,187 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
     );
   }
 
-  // ================= 1. TOP HEADER BAR =================
-  Widget _buildAdminHeader() {
+  // ================= 1. DARK LEFT SIDEBAR =================
+  Widget _buildDarkSidebar() {
+    return Container(
+      width: 250,
+      color: const Color(0xFF0B0F19),
+      child: Column(
+        children: [
+          // App Brand Logo
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF6366F1), Color(0xFF4F46E5)]),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.school_rounded, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('ExamPrep', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text('Admin Panel', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: Color(0xFF1E293B), height: 1),
+
+          // Nav Items
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(left: 12, bottom: 8),
+                  child: Text('MAIN', style: TextStyle(color: Color(0xFF475569), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                ),
+                _buildNavItem(Icons.dashboard_outlined, 'Dashboard', false),
+                _buildNavItem(Icons.people_outline, 'Users', false),
+                _buildNavItem(Icons.book_outlined, 'Courses', false),
+                _buildNavItem(Icons.assignment_outlined, 'Tests', false),
+                _buildNavItem(Icons.play_circle_outline, 'Practice', false),
+
+                // Active Accordion: Paper Prediction
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4F46E5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        dense: true,
+                        horizontalTitleGap: 8,
+                        leading: const Icon(Icons.note_alt_outlined, color: Colors.white, size: 18),
+                        title: const Text('Paper Prediction', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                        trailing: Icon(_paperPredictionExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: Colors.white, size: 18),
+                        onTap: () => setState(() => _paperPredictionExpanded = !_paperPredictionExpanded),
+                      ),
+                      if (_paperPredictionExpanded) ...[
+                        _buildSubNavItem('All Papers', _activeSubTab == 'All Papers'),
+                        _buildSubNavItem('Add New Paper', false, onTap: _addNewPaperModal),
+                        _buildSubNavItem('Categories', false),
+                        _buildSubNavItem('Subjects', false),
+                        _buildSubNavItem('Years', false),
+                        const SizedBox(height: 6),
+                      ],
+                    ],
+                  ),
+                ),
+
+                _buildNavItem(Icons.help_outline_rounded, 'Questions', false),
+                _buildNavItem(Icons.bar_chart_outlined, 'Reports', false),
+                _buildNavItem(Icons.show_chart_rounded, 'Analytics', false),
+                _buildNavItem(Icons.payment_outlined, 'Payments', false),
+                _buildNavItem(Icons.notifications_none_rounded, 'Notifications', false),
+                _buildNavItem(Icons.local_offer_outlined, 'Offers & Coupons', false),
+                _buildNavItem(Icons.article_outlined, 'Content', false),
+                _buildNavItem(Icons.settings_outlined, 'Settings', false),
+              ],
+            ),
+          ),
+
+          // Upgrade to Pro Banner Card
+          Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1E1B4B), Color(0xFF312E81)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF4338CA)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(color: Color(0xFFF59E0B), shape: BoxShape.circle),
+                  child: const Icon(Icons.emoji_events, color: Colors.white, size: 16),
+                ),
+                const SizedBox(height: 10),
+                const Text('Upgrade to Pro', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                const Text(
+                  'Unlock advanced features and grow your platform.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0xFFC7D2FE), fontSize: 10),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {},
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6366F1),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    child: const Text('Upgrade Now', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, String label, bool isActive) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      decoration: BoxDecoration(
+        color: isActive ? const Color(0xFF1E293B) : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: ListTile(
+        dense: true,
+        horizontalTitleGap: 8,
+        leading: Icon(icon, color: isActive ? Colors.white : const Color(0xFF94A3B8), size: 18),
+        title: Text(label, style: TextStyle(color: isActive ? Colors.white : const Color(0xFFCBD5E1), fontSize: 12.5)),
+        onTap: () {},
+      ),
+    );
+  }
+
+  Widget _buildSubNavItem(String label, bool isActive, {VoidCallback? onTap}) {
+    return Container(
+      margin: const EdgeInsets.only(left: 36, right: 12, top: 2, bottom: 2),
+      decoration: BoxDecoration(
+        color: isActive ? Colors.white.withOpacity(0.15) : Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: ListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+        title: Row(
+          children: [
+            Container(width: 4, height: 4, decoration: BoxDecoration(color: isActive ? Colors.white : const Color(0xFFA5B4FC), shape: BoxShape.circle)),
+            const SizedBox(width: 8),
+            Text(label, style: TextStyle(color: isActive ? Colors.white : const Color(0xFFE0E7FF), fontSize: 11.5, fontWeight: isActive ? FontWeight.bold : FontWeight.normal)),
+          ],
+        ),
+        onTap: onTap ?? () => setState(() => _activeSubTab = label),
+      ),
+    );
+  }
+
+  // ================= 2. TOP HEADER BAR =================
+  Widget _buildTopHeader() {
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -280,65 +497,41 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
           const Icon(Icons.menu, color: Color(0xFF64748B)),
           const SizedBox(width: 20),
 
-          // Search Input Bar
-          Expanded(
-            child: Container(
-              height: 38,
-              constraints: const BoxConstraints(maxWidth: 460),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 18),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Search students, tests, questions...',
-                        hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
+          // Search Box
+          Container(
+            width: 320,
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.search, size: 16, color: Color(0xFF94A3B8)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search anything...',
+                      hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                      border: InputBorder.none,
+                      isDense: true,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFCBD5E1)),
-                    ),
-                    child: const Text('⌘ K', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
 
-          // Header Right Icons & Avatar
+          const Spacer(),
+
+          // Notifications & Admin Avatar
           Row(
             children: [
               Stack(
                 children: [
-                  IconButton(icon: const Icon(Icons.notifications_none_rounded, size: 22, color: Color(0xFF64748B)), onPressed: () {}),
-                  Positioned(
-                    right: 8,
-                    top: 8,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                      child: const Text('12', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-              Stack(
-                children: [
-                  IconButton(icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20, color: Color(0xFF64748B)), onPressed: () {}),
+                  IconButton(icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF64748B), size: 22), onPressed: () {}),
                   Positioned(
                     right: 8,
                     top: 8,
@@ -350,7 +543,6 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
                   ),
                 ],
               ),
-              IconButton(icon: const Icon(Icons.help_outline_rounded, size: 20, color: Color(0xFF64748B)), onPressed: () {}),
               const SizedBox(width: 12),
               const CircleAvatar(
                 radius: 16,
@@ -361,8 +553,8 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Mahboob Hasan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  Text('Super Admin', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                  Text('Admin', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  Text('Super Admin', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
                 ],
               ),
             ],
@@ -372,244 +564,83 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
     );
   }
 
-  // ================= 2. BREADCRUMB & TITLE ROW =================
-  Widget _buildBreadcrumbAndTitleRow() {
-    return Column(
+  // ================= 3. PAGE TITLE & BREADCRUMB =================
+  Widget _buildPageHeaderRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Dashboard', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-            Text('  >  ', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-            Text('Paper Prediction', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-            Text('  >  ', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-            Text('Manage Predictions', style: TextStyle(fontSize: 11, color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Paper Prediction Management', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                SizedBox(height: 2),
-                Text('Create, manage and analyze NEET & JEE Main paper predictions', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-              ],
-            ),
+            Text('Paper Prediction', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            SizedBox(height: 4),
             Row(
               children: [
-                OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.settings_outlined, size: 16, color: Color(0xFF4F46E5)),
-                  label: const Text('Prediction Settings', style: TextStyle(fontSize: 12, color: Color(0xFF4F46E5), fontWeight: FontWeight.bold)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFE2E8F0)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.upload_file_outlined, size: 16, color: Color(0xFF4F46E5)),
-                  label: const Text('Import Questions', style: TextStyle(fontSize: 12, color: Color(0xFF4F46E5), fontWeight: FontWeight.bold)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFE2E8F0)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                ElevatedButton.icon(
-                  onPressed: _openCreatePredictionModal,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Create New Prediction', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4F46E5),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 0,
-                  ),
-                ),
+                Text('Dashboard', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                Text('  >  ', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                Text('Paper Prediction', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                Text('  >  ', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                Text('All Papers', style: TextStyle(fontSize: 11, color: Color(0xFF4F46E5), fontWeight: FontWeight.bold)),
               ],
             ),
           ],
+        ),
+        ElevatedButton.icon(
+          onPressed: _addNewPaperModal,
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('Add New Prediction Paper', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF4F46E5),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            elevation: 0,
+          ),
         ),
       ],
     );
   }
 
-  // ================= 3. TOP 6 METRICS CARDS ROW =================
-  Widget _buildTopMetricsRow() {
+  // ================= 4. SUMMARY METRICS CARDS =================
+  Widget _buildSummaryMetricsCards() {
     return Row(
       children: [
-        Expanded(child: _buildMetricCard('Total Predictions', '156', 'across all exams', '↑ 12 this month', Icons.emoji_events_outlined, const Color(0xFF8B5CF6))),
-        const SizedBox(width: 12),
-        Expanded(child: _buildMetricCard('Average Accuracy', '68.7%', 'All time average', '↑ 5.3% vs last month', Icons.track_changes_outlined, const Color(0xFF10B981))),
-        const SizedBox(width: 12),
-        Expanded(child: _buildMetricCard('Total Attempts', '24,582', 'Across all predictions', '↑ 18.6% this month', Icons.calculate_outlined, const Color(0xFF3B82F6))),
-        const SizedBox(width: 12),
-        Expanded(child: _buildMetricCard('Students Participated', '8,732', 'Unique students', '↑ 14.2% this month', Icons.star_border_rounded, const Color(0xFFF59E0B))),
-        const SizedBox(width: 12),
-        Expanded(child: _buildMetricCardWithLink('Top Accuracy (NEET)', '72.8%', 'NEET UG 2024', Icons.emoji_events_outlined, const Color(0xFFEC4899))),
-        const SizedBox(width: 12),
-        Expanded(child: _buildMetricCardWithLink('Top Accuracy (JEE)', '73.6%', 'JEE Main 2024', Icons.emoji_events_outlined, const Color(0xFF8B5CF6))),
+        Expanded(child: _buildMetricCard('Total Papers', '128', 'All Prediction Papers', Icons.description_outlined, const Color(0xFF4F46E5), const Color(0xFFEEF2FF))),
+        const SizedBox(width: 16),
+        Expanded(child: _buildMetricCard('Published', '96', 'Visible to students', Icons.check_circle_outline, const Color(0xFF10B981), const Color(0xFFECFDF5))),
+        const SizedBox(width: 16),
+        Expanded(child: _buildMetricCard('Draft', '22', 'Saved as draft', Icons.access_time, const Color(0xFFF59E0B), const Color(0xFFFFFBEB))),
+        const SizedBox(width: 16),
+        Expanded(child: _buildMetricCard('Archived', '10', 'Not visible', Icons.delete_outline, const Color(0xFFEF4444), const Color(0xFFFEF2F2))),
       ],
     );
   }
 
-  Widget _buildMetricCard(String title, String value, String sub1, String sub2, IconData icon, Color color) {
+  Widget _buildMetricCard(String label, String value, String sub, IconData icon, Color color, Color bg) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(title, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                child: Icon(icon, color: color, size: 14),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-          const SizedBox(height: 2),
-          Text(sub1, style: const TextStyle(fontSize: 9.5, color: Colors.grey)),
-          const SizedBox(height: 6),
-          Text(sub2, style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricCardWithLink(String title, String value, String sub, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(title, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                child: Icon(icon, color: color, size: 14),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-          const SizedBox(height: 2),
-          Text(sub, style: const TextStyle(fontSize: 9.5, color: Colors.grey)),
-          const SizedBox(height: 6),
-          TextButton(
-            onPressed: () {},
-            style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-            child: const Text('View details', style: TextStyle(fontSize: 10, color: Color(0xFF4F46E5), fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ================= 4. FILTER CONTROL PANEL CARD =================
-  Widget _buildFilterControlCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
         children: [
-          Expanded(child: _buildFilterDropdown('Exam', _selectedExamFilter, ['All Exams', 'NEET UG', 'JEE Main'], (v) => setState(() => _selectedExamFilter = v!))),
-          const SizedBox(width: 10),
-          Expanded(child: _buildFilterDropdown('Year', _selectedYearFilter, ['All Years', '2025', '2024'], (v) => setState(() => _selectedYearFilter = v!))),
-          const SizedBox(width: 10),
-          Expanded(child: _buildFilterDropdown('Status', _selectedStatusFilter, ['All Status', 'Published', 'Scheduled', 'Completed'], (v) => setState(() => _selectedStatusFilter = v!))),
-          const SizedBox(width: 10),
-          Expanded(child: _buildFilterDropdown('Type', _selectedTypeFilter, ['All Types', 'Daily', 'Yearly'], (v) => setState(() => _selectedTypeFilter = v!))),
-          const SizedBox(width: 12),
-
-          // Search Input
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 14),
-                Container(
-                  height: 36,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.search_rounded, size: 16, color: Color(0xFF94A3B8)),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: TextField(
-                          onChanged: (v) => setState(() => _searchQuery = v),
-                          decoration: const InputDecoration(
-                            hintText: 'Search prediction title...',
-                            hintStyle: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                            border: InputBorder.none,
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+            child: Icon(icon, color: color, size: 22),
           ),
-          const SizedBox(width: 12),
-
+          const SizedBox(width: 16),
           Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.filter_alt_outlined, size: 14, color: Color(0xFF4F46E5)),
-                    label: const Text('Filter', style: TextStyle(fontSize: 11, color: Color(0xFF4F46E5), fontWeight: FontWeight.bold)),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFCBD5E1)),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Text('Reset', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                  ),
-                ],
-              ),
+              Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+              const SizedBox(height: 2),
+              Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              const SizedBox(height: 2),
+              Text(sub, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
             ],
           ),
         ],
@@ -617,35 +648,126 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
     );
   }
 
-  Widget _buildFilterDropdown(String label, String value, List<String> items, ValueChanged<String?> onChanged) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-        const SizedBox(height: 4),
-        Container(
-          height: 36,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFCBD5E1)),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: value,
-              isExpanded: true,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-              items: items.map((i) => DropdownMenuItem(value: i, child: Text(i, overflow: TextOverflow.ellipsis))).toList(),
-              onChanged: onChanged,
+  // ================= 5. FILTER CONTROL BAR =================
+  Widget _buildFilterControlBar() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          // Search Input
+          Expanded(
+            flex: 3,
+            child: Container(
+              height: 40,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.search, size: 16, color: Color(0xFF94A3B8)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      onChanged: (v) => setState(() => _searchQuery = v),
+                      decoration: const InputDecoration(
+                        hintText: 'Search papers by title, set name...',
+                        hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                        border: InputBorder.none,
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+          const SizedBox(width: 12),
+
+          // Year Dropdown
+          Expanded(flex: 2, child: _buildDropdown(_selectedYear, ['Select Year', '2024', '2023', '2022', '2021'], (v) => setState(() => _selectedYear = v!))),
+          const SizedBox(width: 12),
+
+          // Subject Dropdown
+          Expanded(flex: 2, child: _buildDropdown(_selectedSubject, ['Select Subject', 'Physics', 'Chemistry', 'Biology'], (v) => setState(() => _selectedSubject = v!))),
+          const SizedBox(width: 12),
+
+          // Status Dropdown
+          Expanded(flex: 2, child: _buildDropdown(_selectedStatus, ['Select Status', 'Published', 'Draft', 'Archived'], (v) => setState(() => _selectedStatus = v!))),
+          const SizedBox(width: 12),
+
+          // Filters Button
+          ElevatedButton.icon(
+            onPressed: () {},
+            icon: const Icon(Icons.tune, size: 14, color: Color(0xFF4F46E5)),
+            label: const Text('Filters', style: TextStyle(fontSize: 12, color: Color(0xFF4F46E5), fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEEF2FF),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Reset Button
+          OutlinedButton.icon(
+            onPressed: () {
+              setState(() {
+                _selectedYear = 'Select Year';
+                _selectedSubject = 'Select Subject';
+                _selectedStatus = 'Select Status';
+                _searchQuery = '';
+              });
+            },
+            icon: const Icon(Icons.refresh_rounded, size: 14, color: Color(0xFF64748B)),
+            label: const Text('Reset', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFFCBD5E1)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // ================= 5. PREDICTIONS TABLE CARD =================
-  Widget _buildPredictionsTableCard() {
+  Widget _buildDropdown(String value, List<String> items, ValueChanged<String?> onChanged) {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A), fontWeight: FontWeight.w500),
+          items: items.map((i) => DropdownMenuItem(value: i, child: Text(i))).toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  // ================= 6. PREDICTION PAPERS TABLE =================
+  Widget _buildPredictionPapersTable() {
+    final filteredPapers = _predictionPapers.where((paper) {
+      final matchesSearch = paper['title'].toString().toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesYear = _selectedYear == 'Select Year' || paper['year'] == _selectedYear;
+      final matchesStatus = _selectedStatus == 'Select Status' || paper['status'] == _selectedStatus;
+      return matchesSearch && matchesYear && matchesStatus;
+    }).toList();
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -653,94 +775,64 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Table Card Header Row
+          // Header Row
           Padding(
             padding: const EdgeInsets.all(18),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Text('All Predictions', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(10)),
-                      child: const Text('156', style: TextStyle(color: Color(0xFF4F46E5), fontSize: 10, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    const Text('Sort by: ', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                      decoration: BoxDecoration(border: Border.all(color: const Color(0xFFCBD5E1)), borderRadius: BorderRadius.circular(6)),
-                      child: const Text('Latest First ∨', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                    ),
-                    const SizedBox(width: 12),
-                    const Icon(Icons.format_list_bulleted_rounded, size: 18, color: Color(0xFF4F46E5)),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.grid_view_rounded, size: 18, color: Color(0xFF94A3B8)),
-                  ],
-                ),
-              ],
-            ),
+            child: Text('Prediction Papers (${filteredPapers.length})', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
           ),
           const Divider(height: 1),
 
-          // Table Headers
+          // Columns Header Row
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             color: const Color(0xFFF8FAFC),
             child: const Row(
               children: [
-                Expanded(flex: 4, child: Text('PREDICTION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-                Expanded(flex: 2, child: Text('EXAM', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-                Expanded(flex: 2, child: Text('DATE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-                Expanded(flex: 2, child: Text('TYPE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-                Expanded(flex: 2, child: Text('ACCURACY', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-                Expanded(flex: 2, child: Text('ATTEMPTS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+                SizedBox(width: 40, child: Icon(Icons.check_box_outline_blank, size: 16, color: Colors.grey)),
+                Expanded(flex: 5, child: Text('TITLE & SET', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+                Expanded(flex: 4, child: Text('SUBJECTS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+                Expanded(flex: 2, child: Text('YEAR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+                Expanded(flex: 2, child: Text('QUESTIONS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+                Expanded(flex: 2, child: Text('MARKS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+                Expanded(flex: 2, child: Text('DURATION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
                 Expanded(flex: 2, child: Text('STATUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-                SizedBox(width: 110, child: Center(child: Text('ACTIONS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))))),
+                SizedBox(width: 100, child: Center(child: Text('ACTIONS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B))))),
               ],
             ),
           ),
           const Divider(height: 1),
 
-          // Prediction Rows
-          ..._predictions
-              .where((p) => p['title'].toString().toLowerCase().contains(_searchQuery.toLowerCase()))
-              .map((row) => _buildPredictionRow(row))
-              .toList(),
+          // Paper List Rows
+          ...List.generate(filteredPapers.length, (idx) => _buildPaperRow(filteredPapers[idx], idx)),
 
           const Divider(height: 1),
 
-          // Pagination Footer
+          // Footer Pagination Row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Showing 1 to 8 of 156 predictions', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                const Text('Show ', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(border: Border.all(color: const Color(0xFFCBD5E1)), borderRadius: BorderRadius.circular(6)),
+                  child: const Text('10 ∨', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+                const Text('  entries', style: TextStyle(fontSize: 12, color: Colors.grey)),
+
+                const Spacer(),
+
                 Row(
                   children: [
                     _buildPageBtn('<', false),
                     _buildPageBtn('1', true),
                     _buildPageBtn('2', false),
                     _buildPageBtn('3', false),
-                    _buildPageBtn('4', false),
-                    _buildPageBtn('5', false),
                     const Text(' ... ', style: TextStyle(color: Colors.grey)),
-                    _buildPageBtn('16', false),
+                    _buildPageBtn('13', false),
                     _buildPageBtn('>', false),
-                    const SizedBox(width: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(border: Border.all(color: const Color(0xFFCBD5E1)), borderRadius: BorderRadius.circular(6)),
-                      child: const Text('10 / page ∨', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                    ),
                   ],
                 ),
               ],
@@ -751,126 +843,93 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
     );
   }
 
-  Widget _buildPredictionRow(Map<String, dynamic> row) {
+  Widget _buildPaperRow(Map<String, dynamic> paper, int index) {
+    final isSelected = _selectedPaperIndex == index;
+
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              // Prediction Title & Badge Icon
-              Expanded(
-                flex: 4,
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(8)),
-                      child: Icon(row['icon'] as IconData, size: 16, color: const Color(0xFF4F46E5)),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(row['title'], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                          if (row['tag'].toString().isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(color: (row['tagColor'] as Color).withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
-                              child: Text(row['tag'], style: TextStyle(color: row['tagColor'] as Color, fontSize: 9, fontWeight: FontWeight.bold)),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Exam
-              Expanded(
-                flex: 2,
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: (row['examColor'] as Color).withOpacity(0.12), borderRadius: BorderRadius.circular(6)),
-                      child: Text(row['exam'], style: TextStyle(color: row['examColor'] as Color, fontSize: 10, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Date
-              Expanded(flex: 2, child: Text(row['date'], style: const TextStyle(fontSize: 11, color: Color(0xFF475569)))),
-
-              // Type
-              Expanded(
-                flex: 2,
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
-                      child: Text(row['type'], style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Accuracy
-              Expanded(
-                flex: 2,
-                child: Text(
-                  row['accuracy'],
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: row['accuracy'] != '-' ? const Color(0xFF10B981) : Colors.grey,
+        InkWell(
+          onTap: () => setState(() => _loadPaperData(index)),
+          child: Container(
+            color: isSelected ? const Color(0xFFEEF2FF) : Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 40,
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_box_outline_blank, size: 16, color: Color(0xFF94A3B8)),
+                      SizedBox(width: 4),
+                      Icon(Icons.drag_indicator, size: 14, color: Color(0xFFCBD5E1)),
+                    ],
                   ),
                 ),
-              ),
 
-              // Attempts
-              Expanded(flex: 2, child: Text(row['attempts'], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)))),
+                // Title
+                Expanded(
+                  flex: 5,
+                  child: Text(paper['title'], style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                ),
 
-              // Status Badge
-              Expanded(
-                flex: 2,
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: (row['statusColor'] as Color).withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(width: 4, height: 4, decoration: BoxDecoration(color: row['statusColor'] as Color, shape: BoxShape.circle)),
-                          const SizedBox(width: 4),
-                          Text(row['status'], style: TextStyle(color: row['statusColor'] as Color, fontSize: 9.5, fontWeight: FontWeight.bold)),
-                        ],
+                // Subjects Pills
+                Expanded(
+                  flex: 4,
+                  child: Row(
+                    children: (paper['subjects'] as List<String>).map((sub) {
+                      Color color = const Color(0xFF3B82F6);
+                      if (sub == 'Chemistry') color = const Color(0xFF0D9488);
+                      if (sub == 'Biology') color = const Color(0xFF10B981);
+                      return Container(
+                        margin: const EdgeInsets.only(right: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
+                        child: Text(sub, style: TextStyle(color: color, fontSize: 9.5, fontWeight: FontWeight.bold)),
+                      );
+                    }).toList(),
+                  ),
+                ),
+
+                // Year
+                Expanded(flex: 2, child: Text(paper['year'], style: const TextStyle(fontSize: 12, color: Color(0xFF475569)))),
+
+                // Questions
+                Expanded(flex: 2, child: Text('${paper['questions']}', style: const TextStyle(fontSize: 12, color: Color(0xFF475569)))),
+
+                // Marks
+                Expanded(flex: 2, child: Text('${paper['marks']}', style: const TextStyle(fontSize: 12, color: Color(0xFF475569)))),
+
+                // Duration
+                Expanded(flex: 2, child: Text(paper['duration'], style: const TextStyle(fontSize: 12, color: Color(0xFF475569)))),
+
+                // Status Badge
+                Expanded(
+                  flex: 2,
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: paper['statusBg'] as Color, borderRadius: BorderRadius.circular(12)),
+                        child: Text(paper['status'], style: TextStyle(color: paper['statusColor'] as Color, fontSize: 10, fontWeight: FontWeight.bold)),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              // Actions
-              SizedBox(
-                width: 110,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    IconButton(icon: const Icon(Icons.remove_red_eye_outlined, size: 14, color: Color(0xFF4F46E5)), onPressed: () {}),
-                    IconButton(icon: const Icon(Icons.bar_chart_rounded, size: 14, color: Color(0xFF4F46E5)), onPressed: () {}),
-                    IconButton(icon: const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF64748B)), onPressed: () {}),
-                    IconButton(icon: const Icon(Icons.more_vert_rounded, size: 14, color: Color(0xFF64748B)), onPressed: () {}),
-                  ],
+                // Actions
+                SizedBox(
+                  width: 100,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      IconButton(icon: const Icon(Icons.remove_red_eye_outlined, size: 15, color: Color(0xFF64748B)), onPressed: () {}),
+                      IconButton(icon: const Icon(Icons.edit_outlined, size: 15, color: Color(0xFF64748B)), onPressed: () {}),
+                      IconButton(icon: const Icon(Icons.more_horiz, size: 15, color: Color(0xFF64748B)), onPressed: () {}),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         const Divider(height: 1),
@@ -894,10 +953,80 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
     );
   }
 
-  // ================= 6. RIGHT SIDEBAR ANALYTICS CARDS =================
-  Widget _buildAccuracyTrendCard() {
+  // ================= 7. LOWER DETAILED CONFIGURATION PANEL =================
+  Widget _buildDetailedConfigurationPanel() {
+    return Column(
+      children: [
+        // 3 Column Configuration Cards
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Column 1: Paper Details
+            Expanded(child: _buildPaperDetailsColumn()),
+            const SizedBox(width: 20),
+
+            // Column 2: Paper Status & Visibility
+            Expanded(child: _buildPaperStatusVisibilityColumn()),
+            const SizedBox(width: 20),
+
+            // Column 3: Paper Settings
+            Expanded(child: _buildPaperSettingsColumn()),
+          ],
+        ),
+        const SizedBox(height: 24),
+
+        // Advanced Options Row Grid
+        _buildAdvancedOptionsGrid(),
+        const SizedBox(height: 32),
+
+        // Bottom Action Buttons Footer
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            OutlinedButton(
+              onPressed: () {},
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(width: 12),
+            OutlinedButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Paper saved as Draft')));
+              },
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF4F46E5)),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text('Save as Draft', style: TextStyle(color: Color(0xFF4F46E5), fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Paper configuration updated successfully!')));
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+              child: const Text('Update Paper', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaperDetailsColumn() {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -906,185 +1035,112 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Text('Paper Details', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+          const SizedBox(height: 16),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Title', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                    Text(_titleCtrl.text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  ],
+                ),
+              ),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('Year', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                  Text('2024', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Accuracy Trend (Last 6 Months)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-              Text('All Exams ∨', style: TextStyle(fontSize: 9.5, color: Colors.grey)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Set Number', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                  Text('1', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                ],
+              ),
+              Text('1', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
             ],
           ),
           const SizedBox(height: 16),
 
-          // Line Chart
-          SizedBox(
-            height: 120,
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(show: false),
-                titlesData: FlTitlesData(
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (val, meta) {
-                        final titles = ['Dec \'24', 'Jan \'25', 'Feb \'25', 'Mar \'25', 'Apr \'25', 'May \'25'];
-                        if (val.toInt() >= 0 && val.toInt() < titles.length) {
-                          return Text(titles[val.toInt()], style: const TextStyle(fontSize: 8, color: Colors.grey));
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                  ),
-                  leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                ),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: const [
-                      FlSpot(0, 58),
-                      FlSpot(1, 68),
-                      FlSpot(2, 74),
-                      FlSpot(3, 62),
-                      FlSpot(4, 68),
-                      FlSpot(5, 85),
-                    ],
-                    isCurved: true,
-                    color: const Color(0xFF4F46E5),
-                    barWidth: 2,
-                    dotData: FlDotData(show: true),
-                  ),
-                ],
-              ),
+          const Text('Description', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _descriptionCtrl,
+            maxLines: 3,
+            style: const TextStyle(fontSize: 11, color: Color(0xFF475569)),
+            decoration: InputDecoration(
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+              contentPadding: const EdgeInsets.all(10),
             ),
           ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () {},
-            style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-            child: const Text('View Full Analytics →', style: TextStyle(fontSize: 11, color: Color(0xFF4F46E5), fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
+          const SizedBox(height: 16),
 
-  Widget _buildExamWiseAccuracyCard() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Exam Wise Accuracy', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-          const SizedBox(height: 14),
+          const Text('Subjects', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Checkbox(value: _physicsChecked, onChanged: (v) => setState(() => _physicsChecked = v!), activeColor: const Color(0xFF4F46E5)),
+              const Text('Physics', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              Checkbox(value: _chemistryChecked, onChanged: (v) => setState(() => _chemistryChecked = v!), activeColor: const Color(0xFF4F46E5)),
+              const Text('Chemistry', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              Checkbox(value: _biologyChecked, onChanged: (v) => setState(() => _biologyChecked = v!), activeColor: const Color(0xFF4F46E5)),
+              const Text('Biology', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 16),
 
           Row(
             children: [
-              // Donut Chart
-              SizedBox(
-                width: 90,
-                height: 90,
-                child: Stack(
-                  children: [
-                    PieChart(
-                      PieChartData(
-                        sectionsSpace: 2,
-                        centerSpaceRadius: 28,
-                        sections: [
-                          PieChartSectionData(color: const Color(0xFF4F46E5), value: 69.2, radius: 10, showTitle: false),
-                          PieChartSectionData(color: const Color(0xFF3B82F6), value: 67.8, radius: 10, showTitle: false),
-                          PieChartSectionData(color: const Color(0xFFF59E0B), value: 54.1, radius: 10, showTitle: false),
-                        ],
-                      ),
-                    ),
-                    const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text('68.7%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                          Text('Overall', style: TextStyle(fontSize: 7, color: Colors.grey)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
-
-              // Legend
-              const Expanded(
-                child: Column(
-                  children: [
-                    _LegendRow('NEET UG', '69.2%', Color(0xFF4F46E5)),
-                    SizedBox(height: 6),
-                    _LegendRow('JEE Main', '67.8%', Color(0xFF3B82F6)),
-                    SizedBox(height: 6),
-                    _LegendRow('Others', '54.1%', Color(0xFFF59E0B)),
-                  ],
-                ),
-              ),
+              Expanded(child: _buildMetricMiniBadge('Total Questions', '180', Icons.description_outlined, const Color(0xFFEEF2FF), const Color(0xFF4F46E5))),
+              const SizedBox(width: 8),
+              Expanded(child: _buildMetricMiniBadge('Total Marks', '540', Icons.emoji_events_outlined, const Color(0xFFFEF3C7), const Color(0xFFF59E0B))),
+              const SizedBox(width: 8),
+              Expanded(child: _buildMetricMiniBadge('Duration', '3:20 Hrs', Icons.access_time_rounded, const Color(0xFFEEF2FF), const Color(0xFF3B82F6))),
             ],
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () {},
-            style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
-            child: const Text('View Detailed Report →', style: TextStyle(fontSize: 11, color: Color(0xFF4F46E5), fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTopPerformingPredictionsCard() {
+  Widget _buildMetricMiniBadge(String label, String val, IconData icon, Color bg, Color color) {
     return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE2E8F0))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text(label, style: const TextStyle(fontSize: 8.5, color: Colors.grey)),
+          const SizedBox(height: 2),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Top Performing Predictions', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-              TextButton(onPressed: () {}, child: const Text('View All', style: TextStyle(fontSize: 10, color: Color(0xFF4F46E5), fontWeight: FontWeight.bold))),
+              Text(val, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              Container(padding: const EdgeInsets.all(2), decoration: BoxDecoration(color: bg, shape: BoxShape.circle), child: Icon(icon, size: 10, color: color)),
             ],
           ),
-          const SizedBox(height: 10),
-          _buildTopRow('🥇', 'NEET UG Prediction 2024', '72.8%'),
-          _buildTopRow('🥈', 'JEE Main Prediction 2024', '73.6%'),
-          _buildTopRow('🥉', 'NEET UG Prediction - 10 May 2025', '70.5%'),
         ],
       ),
     );
   }
 
-  Widget _buildTopRow(String medal, String title, String acc) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
-        children: [
-          Text(medal, style: const TextStyle(fontSize: 14)),
-          const SizedBox(width: 8),
-          Expanded(child: Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
-          Text(acc, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionsCard() {
+  Widget _buildPaperStatusVisibilityColumn() {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -1093,63 +1149,206 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Quick Actions', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          const Text('Paper Status & Visibility', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+          const SizedBox(height: 16),
+
+          const Text('Status', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+          const SizedBox(height: 4),
+          _buildDropdown('Published', ['Published', 'Draft', 'Archived'], (v) {}),
+          const SizedBox(height: 16),
+
+          const Text('Visibility', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+          const SizedBox(height: 4),
+          RadioListTile<String>(
+            value: 'Visible to All Users',
+            groupValue: _visibilityOption,
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Visible to All Users', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+            activeColor: const Color(0xFF4F46E5),
+            onChanged: (v) => setState(() => _visibilityOption = v!),
+          ),
+          RadioListTile<String>(
+            value: 'Visible to Specific Users',
+            groupValue: _visibilityOption,
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Visible to Specific Users', style: TextStyle(fontSize: 11)),
+            activeColor: const Color(0xFF4F46E5),
+            onChanged: (v) => setState(() => _visibilityOption = v!),
+          ),
+          RadioListTile<String>(
+            value: 'Hide (Admin Only)',
+            groupValue: _visibilityOption,
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Hide (Admin Only)', style: TextStyle(fontSize: 11)),
+            activeColor: const Color(0xFF4F46E5),
+            onChanged: (v) => setState(() => _visibilityOption = v!),
+          ),
           const SizedBox(height: 12),
+
+          const Text('Publish Date', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+          const SizedBox(height: 4),
+          Container(
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(border: Border.all(color: const Color(0xFFCBD5E1)), borderRadius: BorderRadius.circular(8)),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('12/05/2024 10:30 AM', style: TextStyle(fontSize: 11, color: Color(0xFF475569))),
+                Icon(Icons.calendar_month_outlined, size: 16, color: Color(0xFF64748B)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(child: _buildQuickBtn('Create Daily Prediction', Icons.calendar_today_outlined, _openCreatePredictionModal)),
-              const SizedBox(width: 8),
-              Expanded(child: _buildQuickBtn('Add Questions', Icons.add, () {})),
+              const Text('Featured Paper', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              Switch(value: _featuredToggle, onChanged: (v) => setState(() => _featuredToggle = v), activeColor: const Color(0xFF4F46E5)),
             ],
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: _buildQuickBtn('Send Notification', Icons.send_outlined, () {})),
-              const SizedBox(width: 8),
-              Expanded(child: _buildQuickBtn('View Student Results', Icons.bar_chart_rounded, () {})),
-            ],
+          const SizedBox(height: 12),
+
+          const Text('Sort Order', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+          const SizedBox(height: 4),
+          TextField(
+            controller: _sortOrderCtrl,
+            style: const TextStyle(fontSize: 11),
+            decoration: InputDecoration(
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            ),
           ),
+          const SizedBox(height: 2),
+          const Text('Lower numbers show first', style: TextStyle(fontSize: 9, color: Colors.grey)),
         ],
       ),
     );
   }
 
-  Widget _buildQuickBtn(String label, IconData icon, VoidCallback onTap) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 12, color: const Color(0xFF4F46E5)),
-      label: Text(label, style: const TextStyle(fontSize: 9.5, color: Color(0xFF334155), fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-      style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: Color(0xFFCBD5E1)),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+  Widget _buildPaperSettingsColumn() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Paper Settings', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+          const SizedBox(height: 16),
+
+          _buildToggleRow('Show Solutions', 'Allow students to view solutions after attempt', _showSolutions, (v) => setState(() => _showSolutions = v)),
+          const SizedBox(height: 10),
+          _buildToggleRow('Show Analysis', 'Show detailed performance analysis', _showAnalysis, (v) => setState(() => _showAnalysis = v)),
+          const SizedBox(height: 10),
+          _buildToggleRow('Allow Download', 'Allow students to download PDF', _allowDownload, (v) => setState(() => _allowDownload = v)),
+          const SizedBox(height: 10),
+          _buildToggleRow('Negative Marking', 'Marks deducted for wrong answer', _negativeMarking, (v) => setState(() => _negativeMarking = v)),
+          const SizedBox(height: 6),
+
+          if (_negativeMarking) ...[
+            const Text('Negative Marks', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+            const SizedBox(height: 4),
+            TextField(
+              controller: _negativeMarksCtrl,
+              style: const TextStyle(fontSize: 11),
+              decoration: InputDecoration(
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              ),
+            ),
+            const SizedBox(height: 2),
+            const Text('Marks deducted for wrong answer', style: TextStyle(fontSize: 9, color: Colors.grey)),
+            const SizedBox(height: 10),
+          ],
+
+          _buildToggleRow('Shuffle Questions', 'Questions will be shuffled for each user', _shuffleQuestions, (v) => setState(() => _shuffleQuestions = v)),
+          const SizedBox(height: 10),
+          _buildToggleRow('Shuffle Options', 'Options will be shuffled for each user', _shuffleOptions, (v) => setState(() => _shuffleOptions = v)),
+        ],
       ),
     );
   }
-}
 
-class _LegendRow extends StatelessWidget {
-  final String label;
-  final String percent;
-  final Color color;
-
-  const _LegendRow(this.label, this.percent, this.color);
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildToggleRow(String label, String sub, bool value, ValueChanged<bool> onChanged) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              Text(sub, style: const TextStyle(fontSize: 9, color: Colors.grey)),
+            ],
+          ),
+        ),
+        Switch(value: value, onChanged: onChanged, activeColor: const Color(0xFF4F46E5)),
+      ],
+    );
+  }
+
+  // ================= ADVANCED OPTIONS GRID =================
+  Widget _buildAdvancedOptionsGrid() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Advanced Options', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        const SizedBox(height: 12),
         Row(
           children: [
-            Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-            const SizedBox(width: 6),
-            Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+            Expanded(child: _buildAdvCard('Add Instructions', 'Set paper instructions', Icons.article_outlined)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildAdvCard('Add Tags', 'Add relevant tags', Icons.local_offer_outlined)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildAdvCard('Attach Solutions', 'Upload solution PDF', Icons.file_present_outlined)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildAdvCard('SEO Settings', 'Meta title & description', Icons.language_outlined)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildAdvCard('Set Reminder', 'Notify users', Icons.notifications_active_outlined)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildAdvCard('View Analytics', 'Paper performance', Icons.bar_chart_outlined)),
           ],
         ),
-        Text(percent, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
       ],
+    );
+  }
+
+  Widget _buildAdvCard(String title, String sub, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, size: 16, color: const Color(0xFF4F46E5)),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                Text(sub, style: const TextStyle(fontSize: 8.5, color: Colors.grey), overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
