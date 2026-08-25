@@ -809,7 +809,7 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
       child: Flex(
         direction: isDesktop ? Axis.horizontal : Axis.vertical,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: isDesktop ? CrossAlignment.center : CrossAxisAlignment.stretch,
+        crossAxisAlignment: isDesktop ? CrossAxisAlignment.center : CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
