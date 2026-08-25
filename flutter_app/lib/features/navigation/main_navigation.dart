@@ -18,6 +18,7 @@ import '../admin/admin_dashboard_screen.dart';
 import '../admin/admin_pricing_screen.dart';
 import '../admin/admin_hierarchy_screen.dart';
 import '../admin/admin_leaderboard_screen.dart';
+import '../admin/admin_predictions_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final int? initialIndex;
@@ -50,6 +51,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     // Check URL path or fragment
     final uriPath = Uri.base.path;
     final uriFragment = Uri.base.fragment;
+    final isPredictionsRoute = uriPath.contains('predictions') || uriFragment.contains('predictions');
     final isLeaderboardRoute = uriPath.contains('leaderboard') || uriFragment.contains('leaderboard');
     final isHierarchyRoute = uriPath.contains('hierarchy') || uriFragment.contains('hierarchy');
     final isPricingRoute = uriPath.contains('pricing') || uriFragment.contains('pricing');
@@ -57,6 +59,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     if (widget.initialIndex != null) {
       _selectedIndex = widget.initialIndex!;
+    } else if (isPredictionsRoute) {
+      _selectedIndex = 12;
     } else if (isLeaderboardRoute) {
       _selectedIndex = 11;
     } else if (isHierarchyRoute) {
@@ -181,6 +185,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     if (_selectedIndex == 11) {
       return AdminLeaderboardScreen(userProfile: _currentUser);
     }
+    if (_selectedIndex == 12) {
+      return AdminPredictionsScreen(userProfile: _currentUser);
+    }
 
     // 5. Front Website Landing Page (Index 0)
     if (_selectedIndex == 0) {
@@ -293,6 +300,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         return AdminHierarchyScreen(userProfile: _currentUser);
       case 11:
         return AdminLeaderboardScreen(userProfile: _currentUser);
+      case 12:
+        return AdminPredictionsScreen(userProfile: _currentUser);
       default:
         return const SizedBox.shrink();
     }
