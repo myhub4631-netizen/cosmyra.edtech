@@ -23,10 +23,10 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  // Default initialized with guest/aspirant profile so website & dashboard load immediately without login lock
-  UserProfileModel _currentUser = SupabaseService.getMockProfile();
+  // Default initialized with student profile & tab 0 so Website Landing Page renders directly
+  UserProfileModel _currentUser = SupabaseService.getMockProfile(role: 'student');
   bool _showAuthModal = false;
-  int _selectedIndex = 0;
+  int _selectedIndex = 0; // Landing Page / Home Dashboard Index
   String _activeExam = 'NEET';
 
   // Active Practice Engine State
