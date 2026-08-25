@@ -3,8 +3,10 @@
 .AppleDouble
 .LSOverride
 
-# Build & Tool directories
-build/
+build/app/
+build/ios/
+build/android/
+!flutter_app/build/web/
 .dart_tool/
 .idea/
 .vscode/

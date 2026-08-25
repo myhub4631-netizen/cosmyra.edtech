@@ -1,0 +1,19 @@
+<lint-module
+    format="1"
+    dir="/Users/mahboobhasan/.pub-cache/hosted/pub.dev/app_links-6.4.1/android"
+    name=":app_links"
+    type="LIBRARY"
+    maven="com.llfbandit.app_links:app_links:1.0"
+    agpVersion="8.9.1"
+    buildFolder="/Users/mahboobhasan/Desktop/Cosmyra Neet Jee v2/flutter_app/build/app_links"
+    bootClassPath="/Users/mahboobhasan/Library/Android/sdk/platforms/android-36/android.jar:/Users/mahboobhasan/Library/Android/sdk/build-tools/35.0.0/core-lambda-stubs.jar"
+    javaSourceLevel="11"
+    compileTarget="android-36"
+    neverShrinking="true">
+  <lintOptions
+      abortOnError="true"
+      absolutePaths="true"
+      checkReleaseBuilds="true"
+      explainIssues="true"/>
+  <variant name="release"/>
+</lint-module>
