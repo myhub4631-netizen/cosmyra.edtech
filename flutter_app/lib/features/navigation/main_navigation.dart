@@ -16,17 +16,18 @@ import '../profile/profile_screen.dart';
 import '../admin/admin_dashboard_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({Key? key}) : super(key: key);
+  final int? initialIndex;
+
+  const MainNavigationScreen({Key? key, this.initialIndex}) : super(key: key);
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  // Default initialized with student profile & tab 0 so Website Landing Page renders directly
-  UserProfileModel _currentUser = SupabaseService.getMockProfile(role: 'student');
+  late UserProfileModel _currentUser;
   bool _showAuthModal = false;
-  int _selectedIndex = 0; // Landing Page / Home Dashboard Index
+  late int _selectedIndex;
   String _activeExam = 'NEET';
 
   // Active Practice Engine State
@@ -41,6 +42,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Check URL path or fragment to see if user accessed /admin or #admin
+    final uriPath = Uri.base.path;
+    final uriFragment = Uri.base.fragment;
+    final isAdminRoute = uriPath.contains('admin') || uriFragment.contains('admin');
+
+    _selectedIndex = widget.initialIndex ?? (isAdminRoute ? 8 : 0);
+    _currentUser = SupabaseService.getMockProfile(role: isAdminRoute ? 'admin' : 'student');
+
     _loadUser();
   }
 
@@ -139,7 +149,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       );
     }
 
-    // 4. Standard Navigation Body Shell
+    // 4. If selected tab is 8 (Admin Dashboard Control), render full screen Admin Dashboard
+    if (_selectedIndex == 8) {
+      return AdminDashboardScreen(userProfile: _currentUser);
+    }
+
+    // 5. Standard Navigation Body Shell
     return ResponsiveLayoutShell(
       selectedIndex: _selectedIndex,
       onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),

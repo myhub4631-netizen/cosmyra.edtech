@@ -20,7 +20,16 @@ class CosmyraApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
-      home: const MainNavigationScreen(),
+      initialRoute: Uri.base.path.contains('admin') || Uri.base.fragment.contains('admin') ? '/admin' : '/',
+      routes: {
+        '/': (context) => const MainNavigationScreen(initialIndex: 0),
+        '/admin': (context) => const MainNavigationScreen(initialIndex: 8),
+      },
+      onUnknownRoute: (settings) => MaterialPageRoute(
+        builder: (context) => MainNavigationScreen(
+          initialIndex: settings.name?.contains('admin') == true ? 8 : 0,
+        ),
+      ),
     );
   }
 }
