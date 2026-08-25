@@ -21,6 +21,8 @@ import '../admin/admin_hierarchy_screen.dart';
 import '../admin/admin_leaderboard_screen.dart';
 import '../admin/admin_predictions_screen.dart';
 
+import '../dashboard/user_dashboard_screen.dart';
+
 class MainNavigationScreen extends StatefulWidget {
   final int? initialIndex;
 
@@ -214,11 +216,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget _buildCurrentTab() {
     switch (_selectedIndex) {
       case 0:
-        return LandingPageScreen(
-          onStartPracticing: _openCustomPracticeWizard,
-          onExploreTests: _startCustomTest,
-          onSignUp: _openAuthModal,
-          onLogIn: _openAuthModal,
+        return UserDashboardScreen(
+          userProfile: _currentUser,
+          activeExam: _activeExam,
+          onOpenPractice: () => setState(() => _selectedIndex = 1),
+          onOpenMockTests: () => setState(() => _selectedIndex = 2),
+          onOpenPyqs: () => setState(() => _selectedIndex = 3),
+          onOpenMistakes: () => setState(() => _selectedIndex = 4),
         );
       case 1:
         return Center(
