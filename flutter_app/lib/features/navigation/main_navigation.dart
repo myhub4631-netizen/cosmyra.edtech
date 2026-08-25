@@ -23,7 +23,9 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  UserProfileModel? _currentUser;
+  // Default initialized with guest/aspirant profile so website & dashboard load immediately without login lock
+  UserProfileModel _currentUser = SupabaseService.getMockProfile();
+  bool _showAuthModal = false;
   int _selectedIndex = 0;
   String _activeExam = 'NEET';
 
@@ -44,9 +46,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   Future<void> _loadUser() async {
     final profile = await SupabaseService.getCurrentUser();
-    setState(() {
-      _currentUser = profile;
-    });
+    if (profile != null) {
+      setState(() {
+        _currentUser = profile;
+      });
+    }
   }
 
   void _openCustomPracticeWizard() {
@@ -72,13 +76,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     });
   }
 
+  void _openAuthModal() {
+    setState(() => _showAuthModal = true);
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_currentUser == null) {
+    if (_showAuthModal) {
       return AuthScreen(
         onAuthSuccess: (profile) {
           setState(() {
             _currentUser = profile;
+            _showAuthModal = false;
           });
         },
       );
@@ -136,7 +145,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
       activeExam: _activeExam,
       onExamChanged: (newExam) => setState(() => _activeExam = newExam),
-      userProfile: _currentUser!,
+      userProfile: _currentUser,
       body: _buildCurrentTab(),
     );
   }
@@ -145,7 +154,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     switch (_selectedIndex) {
       case 0:
         return HomeScreen(
-          userProfile: _currentUser!,
+          userProfile: _currentUser,
           activeExam: _activeExam,
           onNavigate: (idx) => setState(() => _selectedIndex = idx),
           onStartCustomPractice: _openCustomPracticeWizard,
@@ -216,16 +225,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       case 5:
         return const AnalyticsScreen();
       case 6:
-        return LeaderboardScreen(userProfile: _currentUser!);
+        return LeaderboardScreen(userProfile: _currentUser);
       case 7:
         return ProfileScreen(
-          userProfile: _currentUser!,
+          userProfile: _currentUser,
           activeExam: _activeExam,
           onExamChanged: (newExam) => setState(() => _activeExam = newExam),
-          onSignOut: () => setState(() => _currentUser = null),
+          onSignOut: () => _openAuthModal(),
         );
       case 8:
-        return AdminDashboardScreen(userProfile: _currentUser!);
+        return AdminDashboardScreen(userProfile: _currentUser);
       default:
         return const SizedBox.shrink();
     }
