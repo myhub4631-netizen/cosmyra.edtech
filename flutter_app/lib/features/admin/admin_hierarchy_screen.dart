@@ -79,7 +79,7 @@ class _AdminHierarchyScreenState extends State<AdminHierarchyScreen> {
       'topics': '20 Topics',
       'subtopics': '72 Subtopics',
       'status': 'Active',
-      'icon': Icons.local_flask_outlined,
+      'icon': Icons.biotech_outlined,
       'color': const Color(0xFF10B981),
     },
     {
