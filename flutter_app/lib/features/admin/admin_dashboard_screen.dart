@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import '../../models/models.dart';
@@ -16,7 +17,7 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+  String _activeTab = 'Dashboard';
   bool _isLoading = false;
 
   List<QuestionModel> _questionBank = [];
@@ -31,7 +32,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
     _loadAdminData();
   }
 
@@ -228,251 +228,1017 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = MediaQuery.of(context).size.width >= 900;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Admin Operations & Question Management'),
-        backgroundColor: Colors.redAccent.shade700,
-        foregroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
-          tabs: const [
-            Tab(icon: Icon(Icons.analytics_rounded), text: 'Platform Overview'),
-            Tab(icon: Icon(Icons.quiz_rounded), text: 'Question Bank'),
-            Tab(icon: Icon(Icons.file_upload_rounded), text: 'CSV Bulk Import'),
-            Tab(icon: Icon(Icons.assignment_rounded), text: 'Test Builder'),
-            Tab(icon: Icon(Icons.report_rounded), text: 'Reported Issues'),
-            Tab(icon: Icon(Icons.group_rounded), text: 'User Management'),
-          ],
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: Row(
+        children: [
+          // 1. LEFT SIDEBAR NAVIGATION (Dark Slate #0B0F19 / #0F172A)
+          if (isDesktop) _buildAdminSidebar(),
+
+          // 2. MAIN ADMIN DASHBOARD CONTENT AREA
+          Expanded(
+            child: Column(
               children: [
-                // Tab 1: Platform Overview Metrics
-                SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Platform Health & Metrics', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(child: _buildAdminMetricCard('Total Registered Users', '12,450', Icons.group, Colors.blue)),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildAdminMetricCard('Question Bank Count', '14,890 MCQs', Icons.quiz, Colors.green)),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildAdminMetricCard('Total Tests Attempted', '48,210', Icons.assignment, Colors.purple)),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildAdminMetricCard('Daily Active Aspirants', '3,410', Icons.bolt, Colors.orange)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                // Top Header Bar
+                _buildAdminHeader(),
 
-                // Tab 2: Question Bank Table
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _searchController,
-                              decoration: const InputDecoration(
-                                hintText: 'Search questions by keyword or topic...',
-                                prefixIcon: Icon(Icons.search),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          ElevatedButton.icon(
-                            onPressed: () => _openQuestionEditor(),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Add New Question'),
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: _questionBank.length,
-                          itemBuilder: (ctx, idx) {
-                            final q = _questionBank[idx];
-                            return Card(
-                              child: ListTile(
-                                title: Text(q.questionText, maxLines: 2, overflow: TextOverflow.ellipsis),
-                                subtitle: Text('Exam: ${q.examId} • Difficulty: ${q.difficulty.toUpperCase()} • Source: ${q.source.toUpperCase()}'),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, color: Colors.blue),
-                                      onPressed: () => _openQuestionEditor(questionToEdit: q),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.red),
-                                      onPressed: () {
-                                        setState(() => _questionBank.removeAt(idx));
-                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Question removed.')));
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                // Main Scrollable Dashboard Canvas
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Title & Subtitle + Date Range Picker & Export Button Header
+                        _buildTitleRow(),
+                        const SizedBox(height: 20),
 
-                // Tab 3: CSV Bulk Import
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Bulk Question Import (CSV / Excel)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      const Text('Upload a structured CSV file with columns: question_text, option_a, option_b, option_c, option_d, correct_answer, explanation, difficulty, source.'),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: _pickAndValidateCSV,
-                            icon: const Icon(Icons.upload_file),
-                            label: const Text('Upload CSV File'),
-                          ),
-                          const SizedBox(width: 16),
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sample CSV template downloaded.')));
-                            },
-                            icon: const Icon(Icons.download),
-                            label: const Text('Download CSV Template'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      if (_csvRowsPreview.isNotEmpty) ...[
-                        Text('Preview CSV (${_csvRowsPreview.length - 1} questions detected):', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: _csvRowsPreview.length,
-                            itemBuilder: (ctx, idx) {
-                              return Card(
-                                child: ListTile(
-                                  title: Text(_csvRowsPreview[idx].toString()),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                        // Top 6 Metrics Cards Row
+                        _buildTopMetricsRow(),
+                        const SizedBox(height: 24),
+
+                        // Middle Row: Donut Chart + Recent Activity Feed + Top Performing Exams
+                        _buildMiddleOverviewRow(),
+                        const SizedBox(height: 24),
+
+                        // Bottom Charts Row: Question Attempts + Accuracy Trends + Difficulty Donut
+                        _buildBottomChartsRow(),
+                        const SizedBox(height: 28),
+
+                        // Quick Management Grid (2x5 cards)
+                        _buildQuickManagementSection(),
                       ],
-                    ],
-                  ),
-                ),
-
-                // Tab 4: Admin Test Builder
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Create Official Mock Test Series', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 16),
-                      const TextField(decoration: InputDecoration(labelText: 'Test Title (e.g. NEET 2026 Full Syllabus Test #01)')),
-                      const SizedBox(height: 12),
-                      const Row(
-                        children: [
-                          Expanded(child: TextField(decoration: InputDecoration(labelText: 'Total Questions (e.g. 180)'))),
-                          SizedBox(width: 12),
-                          Expanded(child: TextField(decoration: InputDecoration(labelText: 'Duration (Minutes, e.g. 200)'))),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mock Test created and published to students!')));
-                        },
-                        child: const Text('Create & Publish Mock Test'),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Tab 5: Reported Issues Quality Control
-                ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _reports.length,
-                  itemBuilder: (ctx, idx) {
-                    final rep = _reports[idx];
-                    return Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.report_problem, color: Colors.orange),
-                        title: Text('Reported by ${rep.reporterName}: ${rep.reason}'),
-                        subtitle: Text('Status: ${rep.status.toUpperCase()}'),
-                        trailing: ElevatedButton(
-                          onPressed: () {
-                            setState(() => _reports.removeAt(idx));
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report resolved.')));
-                          },
-                          child: const Text('Resolve'),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-
-                // Tab 6: User Management
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: ListView(
-                    children: [
-                      Card(
-                        child: ListTile(
-                          leading: const CircleAvatar(child: Text('R')),
-                          title: const Text('Rahul Sharma (student@cosmyra.edu)'),
-                          subtitle: const Text('Target: NEET 2026 • Solved: 480 Questions • Rank #14'),
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(color: Colors.green.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
-                            child: const Text('ACTIVE', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11)),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ],
             ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildAdminMetricCard(String title, String value, IconData icon, Color color) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
+  // ================= 1. LEFT SIDEBAR =================
+  Widget _buildAdminSidebar() {
+    return Container(
+      width: 250,
+      color: const Color(0xFF0B0F19),
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          // Logo & Title
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.school_rounded, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Cosmyra Admin',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    Text(
+                      'Control Center',
+                      style: TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Sidebar Navigation Items
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                _buildSidebarTile('Dashboard', Icons.dashboard_rounded, true),
+                
+                const SizedBox(height: 16),
+                _buildSidebarSectionLabel('CONTENT MANAGEMENT'),
+                _buildSidebarTile('Question Bank', Icons.quiz_outlined, false, hasDropdown: true),
+                _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false, onTap: _pickAndValidateCSV),
+                _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false),
+                _buildSidebarTile('Tags & Topics', Icons.label_outline_rounded, false),
+                _buildSidebarTile('PYQs & Papers', Icons.description_outlined, false),
+                _buildSidebarTile('Mistake Book', Icons.history_edu_outlined, false),
+                _buildSidebarTile('Bookmarks', Icons.bookmark_outline_rounded, false),
+
+                const SizedBox(height: 16),
+                _buildSidebarSectionLabel('USERS & ROLES'),
+                _buildSidebarTile('User Management', Icons.people_outline_rounded, false),
+                _buildSidebarTile('Roles & Permissions', Icons.admin_panel_settings_outlined, false),
+                _buildSidebarTile('Activity Logs', Icons.list_alt_rounded, false),
+
+                const SizedBox(height: 16),
+                _buildSidebarSectionLabel('REPORTS & ANALYTICS'),
+                _buildSidebarTile('Analytics Dashboard', Icons.bar_chart_rounded, false),
+                _buildSidebarTile('Question Reports', Icons.outlined_flag_rounded, false),
+                _buildSidebarTile('Student Performance', Icons.insights_rounded, false),
+                _buildSidebarTile('Leaderboard', Icons.leaderboard_outlined, false),
+
+                const SizedBox(height: 16),
+                _buildSidebarSectionLabel('SYSTEM & SETTINGS'),
+                _buildSidebarTile('System Settings', Icons.settings_outlined, false),
+                _buildSidebarTile('Notification Center', Icons.notifications_none_rounded, false),
+                _buildSidebarTile('Backup & Restore', Icons.cloud_sync_outlined, false),
+                _buildSidebarTile('Integrations', Icons.hub_outlined, false),
+
+                const SizedBox(height: 24),
+                // Need Help Card Widget
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [const Color(0xFF4F46E5).withOpacity(0.9), const Color(0xFF7C3AED).withOpacity(0.9)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded, color: Colors.amber, size: 18),
+                          SizedBox(width: 6),
+                          Text('Need Help?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text('Check documentation', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                      const SizedBox(height: 10),
+                      ElevatedButton(
+                        onPressed: () {},
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          elevation: 0,
+                          minimumSize: Size.zero,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('View Docs →', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+
+          // User Profile Footer
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: Color(0xFF1E293B))),
+            ),
+            child: Row(
+              children: [
+                const CircleAvatar(
+                  radius: 16,
+                  backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=33'),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Admin User', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                      Text('Super Administrator', style: TextStyle(color: Color(0xFF64748B), fontSize: 10)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.more_vert_rounded, color: Colors.grey.shade600, size: 18),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarSectionLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, bottom: 8, top: 4),
+      child: Text(
+        label,
+        style: const TextStyle(color: Color(0xFF475569), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+      ),
+    );
+  }
+
+  Widget _buildSidebarTile(String title, IconData icon, bool isActive, {bool hasDropdown = false, VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap ?? () => setState(() => _activeTab = title),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFF4F46E5) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: isActive ? Colors.white : const Color(0xFF94A3B8)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: isActive ? Colors.white : const Color(0xFFCBD5E1),
+                  fontSize: 13,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                ),
+              ),
+            ),
+            if (hasDropdown)
+              Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: isActive ? Colors.white : const Color(0xFF64748B)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ================= 2. TOP HEADER BAR =================
+  Widget _buildAdminHeader() {
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Row(
+        children: [
+          // Search Input Bar
+          Expanded(
+            child: Container(
+              height: 38,
+              constraints: const BoxConstraints(maxWidth: 420),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Search questions, topics, users, reports...',
+                        hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: const Text('⌘ K', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Header Right Actions
+          Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _openQuestionEditor(),
+                icon: const Icon(Icons.bolt_rounded, size: 16, color: Color(0xFF4F46E5)),
+                label: const Text('Quick Actions', style: TextStyle(color: Color(0xFF4F46E5), fontSize: 12, fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFE0E7FF)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+              const SizedBox(width: 12),
+              IconButton(icon: const Icon(Icons.dark_mode_outlined, size: 20, color: Color(0xFF64748B)), onPressed: () {}),
+              Stack(
+                children: [
+                  IconButton(icon: const Icon(Icons.notifications_none_rounded, size: 22, color: Color(0xFF64748B)), onPressed: () {}),
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                      child: const Text('8', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              const CircleAvatar(
+                radius: 16,
+                backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=33'),
+              ),
+              const SizedBox(width: 8),
+              const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Admin User', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  Text('Super Administrator', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ================= 3. TITLE & DATE RANGE ROW =================
+  Widget _buildTitleRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 12),
-            Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
-            const SizedBox(height: 4),
-            Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text('Admin Control Dashboard', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            SizedBox(height: 2),
+            Text("Welcome back! Here's what's happening with your Cosmyra platform.", style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+          ],
+        ),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.calendar_today_rounded, size: 14, color: Color(0xFF64748B)),
+                  SizedBox(width: 8),
+                  Text('Aug 17 - Aug 24, 2026', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                  SizedBox(width: 6),
+                  Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            OutlinedButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.file_download_outlined, size: 16, color: Color(0xFF4F46E5)),
+              label: const Text('Export Report', style: TextStyle(color: Color(0xFF4F46E5), fontSize: 12, fontWeight: FontWeight.bold)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFE0E7FF)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ================= 4. TOP 6 METRICS CARDS ROW =================
+  Widget _buildTopMetricsRow() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final count = constraints.maxWidth > 1200 ? 6 : (constraints.maxWidth > 800 ? 3 : 2);
+        return GridView.count(
+          crossAxisCount: count,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.8,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            _buildMetricCard(
+              title: 'Total Students',
+              value: '24,850',
+              trend: '↑ 340 this week',
+              subtext: '12.5% vs last week',
+              icon: Icons.people_outline_rounded,
+              iconColor: const Color(0xFF6366F1),
+              trendColor: Colors.green,
+            ),
+            _buildMetricCard(
+              title: 'Total Questions',
+              value: '54,200',
+              trend: '↑ 8.4%',
+              subtext: '8400 PYQs · 12,500 NTA',
+              icon: Icons.layers_outlined,
+              iconColor: const Color(0xFF10B981),
+              trendColor: Colors.green,
+            ),
+            _buildMetricCard(
+              title: "Today's Attempts",
+              value: '3,290',
+              trend: '↑ 18.6%',
+              subtext: 'Peak: 1,200 attempts/hr',
+              icon: Icons.show_chart_rounded,
+              iconColor: const Color(0xFF3B82F6),
+              trendColor: Colors.green,
+            ),
+            _buildMetricCard(
+              title: 'Accuracy Rate',
+              value: '84.5%',
+              trend: '↑ 2.3%',
+              subtext: 'Average this week',
+              icon: Icons.adjust_rounded,
+              iconColor: const Color(0xFF0D9488),
+              trendColor: Colors.green,
+            ),
+            _buildMetricCard(
+              title: 'Pending Reports',
+              value: '5',
+              trend: 'Requires attention',
+              subtext: '',
+              icon: Icons.outlined_flag_rounded,
+              iconColor: Colors.redAccent,
+              trendColor: Colors.red,
+            ),
+            _buildMetricCard(
+              title: 'System Health',
+              value: '99.9%',
+              trend: 'All systems operational',
+              subtext: '',
+              icon: Icons.verified_user_outlined,
+              iconColor: const Color(0xFF10B981),
+              trendColor: Colors.green,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildMetricCard({
+    required String title,
+    required String value,
+    required String trend,
+    required String subtext,
+    required IconData icon,
+    required Color iconColor,
+    required Color trendColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(color: iconColor.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                child: Icon(icon, color: iconColor, size: 16),
+              ),
+            ],
+          ),
+          Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          Row(
+            children: [
+              Text(trend, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: trendColor)),
+              if (subtext.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Text(subtext, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ================= 5. MIDDLE OVERVIEW ROW =================
+  Widget _buildMiddleOverviewRow() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Donut Chart: Question Bank Overview
+        Expanded(
+          flex: 4,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Question Bank Overview', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    SizedBox(
+                      height: 160,
+                      width: 160,
+                      child: Stack(
+                        children: [
+                          PieChart(
+                            PieChartData(
+                              sectionsSpace: 3,
+                              centerSpaceRadius: 55,
+                              sections: [
+                                PieChartSectionData(color: const Color(0xFF8B5CF6), value: 22.9, radius: 18, showTitle: false),
+                                PieChartSectionData(color: const Color(0xFF10B981), value: 20.7, radius: 18, showTitle: false),
+                                PieChartSectionData(color: const Color(0xFF3B82F6), value: 19.9, radius: 18, showTitle: false),
+                                PieChartSectionData(color: const Color(0xFFEC4899), value: 16.9, radius: 18, showTitle: false),
+                                PieChartSectionData(color: const Color(0xFFF59E0B), value: 19.4, radius: 18, showTitle: false),
+                              ],
+                            ),
+                          ),
+                          const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('54,200', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                Text('Total Questions', style: TextStyle(fontSize: 9, color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          _buildLegendRow('Physics', '12,450 (22.9%)', const Color(0xFF8B5CF6)),
+                          _buildLegendRow('Chemistry', '11,230 (20.7%)', const Color(0xFF10B981)),
+                          _buildLegendRow('Botany', '10,800 (19.9%)', const Color(0xFF3B82F6)),
+                          _buildLegendRow('Zoology', '9,200 (16.9%)', const Color(0xFFEC4899)),
+                          _buildLegendRow('Mathematics', '10,520 (19.4%)', const Color(0xFFF59E0B)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 16),
+
+        // Recent Activity Feed
+        Expanded(
+          flex: 4,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Recent Activity', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    TextButton(onPressed: () {}, child: const Text('View All', style: TextStyle(fontSize: 12, color: Color(0xFF4F46E5)))),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildActivityTile('Admin User', 'Imported 2,450 questions via CSV', '2 min ago', Icons.description_outlined, const Color(0xFF10B981)),
+                _buildActivityTile('System', 'Automated backup completed', '15 min ago', Icons.cloud_done_outlined, Colors.purple),
+                _buildActivityTile('Moderator', 'Reviewed 120 questions', '1 hour ago', Icons.person_outline, Colors.blue),
+                _buildActivityTile('Admin User', 'Created new topic: Organic Chemistry', '2 hours ago', Icons.edit_note_outlined, Colors.orange),
+                _buildActivityTile('System', 'Weekly analytics report generated', '3 hours ago', Icons.assessment_outlined, Colors.indigo),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 16),
+
+        // Top Performing Exams
+        Expanded(
+          flex: 4,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Top Performing Exams', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    TextButton(onPressed: () {}, child: const Text('View All', style: TextStyle(fontSize: 12, color: Color(0xFF4F46E5)))),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _buildExamPerformanceRow('NEET UG 2026 Mock Test 15', 'Avg Score: 612/720', '85.0%', Colors.green),
+                _buildExamPerformanceRow('JEE Main 2025 Paper 8', 'Avg Score: 285/300', '82.3%', Colors.green),
+                _buildExamPerformanceRow('JEE Advanced 2025 Mock 7', 'Avg Score: 598/720', '80.6%', Colors.green),
+                _buildExamPerformanceRow('NEET UG 2025 Full Test 24', 'Avg Score: 598/720', '78.9%', Colors.green),
+                _buildExamPerformanceRow('NEET UG 2026 Chapter Test', 'Avg Score: 156/180', '77.3%', Colors.green),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLegendRow(String title, String detail, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: Row(
+        children: [
+          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 8),
+          Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          const Spacer(),
+          Text(detail, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityTile(String author, String text, String time, IconData icon, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('$author: $text', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+                Text(time, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExamPerformanceRow(String name, String avgScore, String percent, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            child: const Icon(Icons.assignment_turned_in_outlined, size: 14, color: Colors.blue),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                Text(avgScore, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+              ],
+            ),
+          ),
+          Text(percent, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color)),
+        ],
+      ),
+    );
+  }
+
+  // ================= 6. BOTTOM CHARTS ROW =================
+  Widget _buildBottomChartsRow() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Chart 1: Question Attempts (This Week)
+        Expanded(
+          flex: 4,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Question Attempts (This Week)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    Text('This Week ∨', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 140,
+                  child: LineChart(
+                    LineChartData(
+                      gridData: const FlGridData(show: false),
+                      titlesData: FlTitlesData(
+                        leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (val, meta) {
+                              const d = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                              if (val.toInt() >= 0 && val.toInt() < d.length) {
+                                return Text(d[val.toInt()], style: const TextStyle(fontSize: 10, color: Colors.grey));
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: const [
+                            FlSpot(0, 1200),
+                            FlSpot(1, 900),
+                            FlSpot(2, 1850),
+                            FlSpot(3, 1100),
+                            FlSpot(4, 1600),
+                            FlSpot(5, 1750),
+                            FlSpot(6, 1300),
+                          ],
+                          isCurved: true,
+                          color: const Color(0xFF6366F1),
+                          barWidth: 2.5,
+                          dotData: const FlDotData(show: true),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 16),
+
+        // Chart 2: Accuracy Trends (This Week)
+        Expanded(
+          flex: 4,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Accuracy Trends (This Week)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    Text('This Week ∨', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 140,
+                  child: LineChart(
+                    LineChartData(
+                      gridData: const FlGridData(show: false),
+                      titlesData: FlTitlesData(
+                        leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (val, meta) {
+                              const d = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                              if (val.toInt() >= 0 && val.toInt() < d.length) {
+                                return Text(d[val.toInt()], style: const TextStyle(fontSize: 10, color: Colors.grey));
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: const [
+                            FlSpot(0, 70),
+                            FlSpot(1, 62),
+                            FlSpot(2, 68),
+                            FlSpot(3, 75),
+                            FlSpot(4, 85.2),
+                            FlSpot(5, 78),
+                            FlSpot(6, 82),
+                          ],
+                          isCurved: true,
+                          color: const Color(0xFF10B981),
+                          barWidth: 2.5,
+                          dotData: const FlDotData(show: true),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 16),
+
+        // Donut 3: Difficulty Distribution
+        Expanded(
+          flex: 4,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Difficulty Distribution', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    SizedBox(
+                      height: 120,
+                      width: 120,
+                      child: Stack(
+                        children: [
+                          PieChart(
+                            PieChartData(
+                              sectionsSpace: 3,
+                              centerSpaceRadius: 40,
+                              sections: [
+                                PieChartSectionData(color: const Color(0xFF10B981), value: 23.7, radius: 14, showTitle: false),
+                                PieChartSectionData(color: const Color(0xFF3B82F6), value: 46.9, radius: 14, showTitle: false),
+                                PieChartSectionData(color: const Color(0xFFEF4444), value: 21.9, radius: 14, showTitle: false),
+                                PieChartSectionData(color: const Color(0xFF8B5CF6), value: 5.5, radius: 14, showTitle: false),
+                              ],
+                            ),
+                          ),
+                          const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('54,200', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                Text('Total Questions', style: TextStyle(fontSize: 8, color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          _buildLegendRow('Easy', '12,850 (23.7%)', const Color(0xFF10B981)),
+                          _buildLegendRow('Medium', '25,450 (46.9%)', const Color(0xFF3B82F6)),
+                          _buildLegendRow('Hard', '11,900 (21.9%)', const Color(0xFFEF4444)),
+                          _buildLegendRow('Mixed', '3,000 (5.5%)', const Color(0xFF8B5CF6)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ================= 7. QUICK MANAGEMENT SECTION (10 CARDS) =================
+  Widget _buildQuickManagementSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Quick Management', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        const SizedBox(height: 14),
+        GridView.count(
+          crossAxisCount: MediaQuery.of(context).size.width >= 1200 ? 5 : 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 2.3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            _buildQuickActionCard('Add New Question', 'Create single question', Icons.add_circle_outline_rounded, const Color(0xFF6366F1), () => _openQuestionEditor()),
+            _buildQuickActionCard('Bulk Import Questions', 'Upload via CSV/Excel', Icons.cloud_upload_outlined, const Color(0xFF10B981), _pickAndValidateCSV),
+            _buildQuickActionCard('Manage Topics', 'Create & organize topics', Icons.folder_open_outlined, const Color(0xFFF59E0B), () {}),
+            _buildQuickActionCard('Import PYQs', 'Add previous year papers', Icons.description_outlined, const Color(0xFFEC4899), () {}),
+            _buildQuickActionCard('User Management', 'Manage students & roles', Icons.people_outline_rounded, const Color(0xFF3B82F6), () {}),
+            _buildQuickActionCard('Question Reports', 'View detailed reports', Icons.bar_chart_rounded, const Color(0xFF8B5CF6), () {}),
+            _buildQuickActionCard('Performance Analytics', 'Detailed performance data', Icons.trending_up_rounded, const Color(0xFF0D9488), () {}),
+            _buildQuickActionCard('System Settings', 'Configure platform settings', Icons.settings_outlined, const Color(0xFF64748B), () {}),
+            _buildQuickActionCard('Backup & Restore', 'Data backup management', Icons.backup_outlined, const Color(0xFF3B82F6), () {}),
+            _buildQuickActionCard('Notification Center', 'Send announcements', Icons.notifications_active_outlined, const Color(0xFFF59E0B), () {}, badgeCount: 3),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActionCard(String title, String subtitle, IconData icon, Color color, VoidCallback onTap, {int? badgeCount}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            Stack(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                if (badgeCount != null)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                      child: Text('$badgeCount', style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)), overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
           ],
         ),
       ),
