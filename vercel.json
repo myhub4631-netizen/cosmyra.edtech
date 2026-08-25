@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "buildCommand": "echo \"Serving pre-built Flutter Web\"",
   "outputDirectory": "flutter_app/build/web",
   "cleanUrls": true,
   "rewrites": [

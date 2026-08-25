@@ -2,7 +2,7 @@
   "name": "cosmyra-root",
   "private": true,
   "scripts": {
-    "build": "npm run build --prefix web",
+    "build": "echo \"Serving pre-built Flutter Web\"",
     "dev": "npm run dev --prefix web"
   }
 }
