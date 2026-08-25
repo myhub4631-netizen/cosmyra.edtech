@@ -46,10 +46,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     // Check URL path or fragment to see if user accessed /admin or #admin
     final uriPath = Uri.base.path;
     final uriFragment = Uri.base.fragment;
-    final isAdminRoute = uriPath.contains('admin') || uriFragment.contains('admin');
+    final isStudentRoute = uriPath.contains('student') || uriFragment.contains('student');
 
-    _selectedIndex = widget.initialIndex ?? (isAdminRoute ? 8 : 0);
-    _currentUser = SupabaseService.getMockProfile(role: isAdminRoute ? 'admin' : 'student');
+    // Default to Index 8 (Master Admin Control Dashboard) for instant preview
+    _selectedIndex = widget.initialIndex ?? (isStudentRoute ? 0 : 8);
+    _currentUser = SupabaseService.getMockProfile(role: 'admin');
 
     _loadUser();
   }
