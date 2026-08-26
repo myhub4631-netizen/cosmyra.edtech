@@ -45,7 +45,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isMobile = constraints.maxWidth < 850;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 900 || constraints.maxWidth < 900;
 
         if (isMobile) {
           return Scaffold(
