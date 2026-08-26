@@ -197,6 +197,18 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 ],
               ),
             ),
+            GestureDetector(
+              onTap: () => Navigator.pushNamed(context, '/admin/sections'),
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFC7D2FE)),
+                ),
+                child: const Icon(Icons.dashboard_customize_rounded, color: Color(0xFF4F46E5), size: 16),
+              ),
+            ),
             const SizedBox(width: 8),
 
             Stack(
@@ -992,6 +1004,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   Widget _buildSidebar() {
     final navItems = [
       {'icon': Icons.dashboard_rounded, 'label': 'Dashboard', 'hasArrow': false},
+      {'icon': Icons.dashboard_customize_rounded, 'label': 'Layout Management', 'hasArrow': true},
       {'icon': Icons.track_changes_rounded, 'label': 'Practice', 'hasArrow': true},
       {'icon': Icons.edit_note_rounded, 'label': 'Custom Practice', 'hasArrow': false},
       {'icon': Icons.assignment_outlined, 'label': 'Custom Test', 'hasArrow': false},
@@ -1031,7 +1044,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   child: InkWell(
                     onTap: () async {
                       setState(() => _activeSidebarIndex = index);
-                      if (item['label'] == 'Logout' || index == 15) {
+                      if (item['label'] == 'Layout Management') {
+                        Navigator.pushNamed(context, '/admin/sections');
+                        return;
+                      }
+                      if (item['label'] == 'Logout') {
                         await SupabaseService.logoutUserSession();
                         if (widget.onLogout != null) {
                           widget.onLogout!();
