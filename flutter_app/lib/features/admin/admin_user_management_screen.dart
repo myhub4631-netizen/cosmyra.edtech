@@ -1792,31 +1792,35 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                   width: double.infinity,
                   height: 44,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       if (nameCtrl.text.isNotEmpty && emailCtrl.text.isNotEmpty) {
-                        setState(() {
-                          _allUsers.insert(
-                            0,
-                            AdminUserModel(
-                              id: 'u-${DateTime.now().millisecondsSinceEpoch}',
-                              name: nameCtrl.text.trim(),
-                              email: emailCtrl.text.trim(),
-                              userIdCode: '${230000 + _allUsers.length + 1}',
-                              role: role,
-                              examAccess: exams,
-                              status: 'Active',
-                              lastActive: 'Just now',
-                              joinedOn: 'Aug 26, 2026 09:12 AM',
-                              phone: phoneCtrl.text.trim().isNotEmpty ? phoneCtrl.text.trim() : '+91 98765 43210',
-                              avatarInitials: nameCtrl.text.trim().substring(0, 2).toUpperCase(),
-                              avatarColor: const Color(0xFF6366F1),
-                            ),
-                          );
-                        });
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('User ${nameCtrl.text} added successfully!'), backgroundColor: const Color(0xFF10B981)),
+                        final newUserModel = UserProfileModel(
+                          id: 'usr-${DateTime.now().millisecondsSinceEpoch}',
+                          email: emailCtrl.text.trim(),
+                          fullName: nameCtrl.text.trim(),
+                          phoneNumber: phoneCtrl.text.trim().isNotEmpty ? phoneCtrl.text.trim() : '+91 98765 43210',
+                          targetExam: exams.first,
+                          role: role.toLowerCase(),
                         );
+                        await SupabaseService.addLocalUser(newUserModel);
+                        try {
+                          await SupabaseService.signUp(
+                            email: emailCtrl.text.trim(),
+                            password: 'UserPass@123!',
+                            fullName: nameCtrl.text.trim(),
+                            phone: phoneCtrl.text.trim().isNotEmpty ? phoneCtrl.text.trim() : '+91 98765 43210',
+                            role: role.toLowerCase(),
+                          );
+                        } catch (_) {}
+
+                        await _loadRealUsersFromSupabase();
+
+                        if (mounted) {
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('User ${nameCtrl.text} added successfully!'), backgroundColor: const Color(0xFF10B981)),
+                          );
+                        }
                       }
                     },
                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5)),

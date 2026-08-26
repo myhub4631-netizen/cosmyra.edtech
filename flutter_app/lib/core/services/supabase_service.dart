@@ -99,18 +99,33 @@ class SupabaseService {
     await addLocalUser(realProfile);
 
     try {
-      await client.from('profiles').upsert({
-        'id': userId,
-        'email': email,
-        'full_name': fullName,
-        'phone_number': phone,
-        'phone': phone,
-        'target_exam': targetExam,
-        'target_year': targetYear,
-        'role': role,
-      });
+      await client.from('profiles').upsert(
+        {
+          'id': userId,
+          'email': email,
+          'full_name': fullName,
+          'phone_number': phone,
+          'target_exam': targetExam,
+          'target_year': targetYear,
+        },
+        onConflict: 'email',
+      );
     } catch (pe) {
-      debugPrint('Profile upsert warning: $pe');
+      debugPrint('Primary profile upsert warning: $pe');
+      try {
+        await client.from('profiles').upsert(
+          {
+            'email': email,
+            'full_name': fullName,
+            'phone_number': phone,
+            'target_exam': targetExam,
+            'target_year': targetYear,
+          },
+          onConflict: 'email',
+        );
+      } catch (pe2) {
+        debugPrint('Secondary profile upsert error: $pe2');
+      }
     }
 
     return realProfile;
