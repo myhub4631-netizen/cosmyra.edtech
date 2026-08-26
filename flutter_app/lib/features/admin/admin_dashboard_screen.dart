@@ -360,8 +360,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 _buildSidebarSectionLabel('CONTENT MANAGEMENT'),
                 _buildSidebarTile('Dashboard Sections', Icons.dashboard_customize_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/sections')),
                 _buildSidebarTile('Paper Predictions', Icons.note_alt_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
-                _buildSidebarTile('Question Bank', Icons.quiz_outlined, false, hasDropdown: true),
-                _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false, onTap: _pickAndValidateCSV),
+                _buildSidebarTile('Question Bank', Icons.quiz_outlined, false, hasDropdown: true, onTap: () {
+                  Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
+                }),
+                _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false, onTap: () {
+                  Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
+                }),
                 _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
                 _buildSidebarTile('Pricing & Plans', Icons.sell_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/pricing')),
                 _buildSidebarTile('Tags & Topics', Icons.label_outline_rounded, false),
@@ -380,7 +384,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('REPORTS & ANALYTICS'),
                 _buildSidebarTile('Analytics Dashboard', Icons.bar_chart_rounded, false),
-                _buildSidebarTile('Question Reports', Icons.outlined_flag_rounded, false),
+                _buildSidebarTile('Question Reports', Icons.outlined_flag_rounded, false, onTap: () {
+                  Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
+                }),
                 _buildSidebarTile('Student Performance', Icons.insights_rounded, false),
                 _buildSidebarTile('Leaderboard', Icons.leaderboard_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),
 
@@ -833,17 +839,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
         // Donut Chart: Question Bank Overview
         Expanded(
           flex: 4,
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Question Bank Overview', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          child: InkWell(
+            onTap: () {
+              Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Question Bank Overview', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      const Icon(Icons.arrow_forward_rounded, size: 16, color: Color(0xFF4F46E5)),
+                    ],
+                  ),
                 const SizedBox(height: 20),
                 Row(
                   children: [
@@ -895,6 +912,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             ),
           ),
         ),
+      ),
 
         const SizedBox(width: 16),
 

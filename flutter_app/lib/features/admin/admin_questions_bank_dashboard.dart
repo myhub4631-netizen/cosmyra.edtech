@@ -391,8 +391,12 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     return InkWell(
       onTap: () {
         setState(() => _activeSidebarNav = title);
-        if (widget.onBack != null && title == 'Dashboard') {
-          widget.onBack!();
+        if (title == 'Dashboard') {
+          if (widget.onBack != null) {
+            widget.onBack!();
+          } else if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          }
         }
       },
       borderRadius: BorderRadius.circular(10),
