@@ -140,6 +140,17 @@ class SupabaseService {
     }
   }
 
+  static Future<List<UserProfileModel>> fetchAllProfiles() async {
+    try {
+      final response = await client.from('profiles').select('*').order('created_at', ascending: false);
+      final List<dynamic> data = response as List<dynamic>;
+      return data.map((json) => UserProfileModel.fromJson(json)).toList();
+    } catch (e) {
+      debugPrint('Error fetching all profiles from Supabase: $e');
+      return [];
+    }
+  }
+
   static UserProfileModel getMockProfile({String role = 'student'}) {
     return UserProfileModel(
       id: 'usr-demo-123',

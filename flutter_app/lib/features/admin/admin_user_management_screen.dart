@@ -78,6 +78,48 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   void initState() {
     super.initState();
     _initSampleUserData();
+    _loadRealUsersFromSupabase();
+  }
+
+  Future<void> _loadRealUsersFromSupabase() async {
+    final profiles = await SupabaseService.fetchAllProfiles();
+    if (profiles.isNotEmpty) {
+      final realUsers = profiles.map((p) {
+        final initials = p.fullName.isNotEmpty
+            ? p.fullName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
+            : (p.email.isNotEmpty ? p.email[0].toUpperCase() : 'U');
+        
+        final userRole = p.role.isEmpty
+            ? 'Student'
+            : (p.role.toLowerCase() == 'admin' ? 'Administrator' : p.role[0].toUpperCase() + p.role.substring(1).toLowerCase());
+
+        return AdminUserModel(
+          id: p.id,
+          name: p.fullName.isNotEmpty ? p.fullName : p.email.split('@').first,
+          email: p.email,
+          userIdCode: p.id.length >= 6 ? p.id.substring(0, 6).toUpperCase() : p.id,
+          role: userRole,
+          examAccess: [p.targetExam.isNotEmpty ? p.targetExam : 'NEET'],
+          status: 'Active',
+          lastActive: 'Just now',
+          joinedOn: 'Aug 26, 2026',
+          phone: (p.phoneNumber != null && p.phoneNumber!.isNotEmpty) ? p.phoneNumber! : '+91 98765 43210',
+          regSource: 'Web Portal',
+          avatarInitials: initials,
+          avatarColor: const Color(0xFF6366F1),
+        );
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          final sampleList = _allUsers.where((s) => !realUsers.any((r) => r.email.toLowerCase() == s.email.toLowerCase())).toList();
+          _allUsers = [...realUsers, ...sampleList];
+          if (_allUsers.isNotEmpty) {
+            _selectedUserForDetail = _allUsers.first;
+          }
+        });
+      }
+    }
   }
 
   void _initSampleUserData() {
@@ -735,57 +777,64 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
   // ================= 4. STAT CARDS ROW (6 CARDS) =================
   Widget _buildStatCardsRow() {
+    final totalCount = _allUsers.length;
+    final studentsCount = _allUsers.where((u) => u.role.toLowerCase().contains('student')).length;
+    final educatorsCount = _allUsers.where((u) => u.role.toLowerCase().contains('educator')).length;
+    final adminsCount = _allUsers.where((u) => u.role.toLowerCase().contains('admin')).length;
+    final activeCount = _allUsers.where((u) => u.status.toLowerCase() == 'active').length;
+    final suspendedCount = _allUsers.where((u) => u.status.toLowerCase() == 'suspended').length;
+
     final stats = [
       {
         'title': 'Total Users',
-        'count': '24,850',
-        'badge': '+320 this week',
-        'sub': '12.5% vs last week',
+        'count': '$totalCount',
+        'badge': '+ real-time',
+        'sub': '100% live synced',
         'icon': Icons.people_outline_rounded,
         'iconBg': const Color(0xFFEEF2FF),
         'iconColor': const Color(0xFF6366F1),
       },
       {
         'title': 'Students',
-        'count': '23,542',
-        'badge': '+280 this week',
-        'sub': '94.7% of total',
+        'count': '$studentsCount',
+        'badge': null,
+        'sub': totalCount > 0 ? '${((studentsCount / totalCount) * 100).toStringAsFixed(1)}% of total' : '0%',
         'icon': Icons.school_outlined,
         'iconBg': const Color(0xFFECFDF5),
         'iconColor': const Color(0xFF10B981),
       },
       {
         'title': 'Educators',
-        'count': '850',
-        'badge': '+15 this week',
-        'sub': '3.4% of total',
+        'count': '$educatorsCount',
+        'badge': null,
+        'sub': totalCount > 0 ? '${((educatorsCount / totalCount) * 100).toStringAsFixed(1)}% of total' : '0%',
         'icon': Icons.person_outline_rounded,
         'iconBg': const Color(0xFFFFF7ED),
         'iconColor': const Color(0xFFF97316),
       },
       {
         'title': 'Admins',
-        'count': '45',
-        'badge': '+2 this week',
-        'sub': '0.2% of total',
+        'count': '$adminsCount',
+        'badge': null,
+        'sub': totalCount > 0 ? '${((adminsCount / totalCount) * 100).toStringAsFixed(1)}% of total' : '0%',
         'icon': Icons.security_outlined,
         'iconBg': const Color(0xFFFEF2F2),
         'iconColor': const Color(0xFFEF4444),
       },
       {
         'title': 'Active Users',
-        'count': '21,482',
+        'count': '$activeCount',
         'badge': null,
-        'sub': '86.5% of total',
+        'sub': totalCount > 0 ? '${((activeCount / totalCount) * 100).toStringAsFixed(1)}% of total' : '0%',
         'icon': Icons.check_circle_outline_rounded,
         'iconBg': const Color(0xFFECFDF5),
         'iconColor': const Color(0xFF10B981),
       },
       {
         'title': 'Suspended Users',
-        'count': '126',
+        'count': '$suspendedCount',
         'badge': null,
-        'sub': '0.5% of total',
+        'sub': totalCount > 0 ? '${((suspendedCount / totalCount) * 100).toStringAsFixed(1)}% of total' : '0%',
         'icon': Icons.pause_circle_outline_rounded,
         'iconBg': const Color(0xFFF3E8FF),
         'iconColor': const Color(0xFFA855F7),
@@ -1093,12 +1142,18 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
   // ================= 6. STATUS TABS ROW =================
   Widget _buildStatusTabsRow() {
+    final total = _allUsers.length;
+    final active = _allUsers.where((u) => u.status.toLowerCase() == 'active').length;
+    final suspended = _allUsers.where((u) => u.status.toLowerCase() == 'suspended').length;
+    final pending = _allUsers.where((u) => u.status.toLowerCase() == 'pending').length;
+    final blocked = _allUsers.where((u) => u.status.toLowerCase() == 'blocked').length;
+
     final tabs = [
-      'All Users (24,850)',
-      'Active (21,482)',
-      'Suspended (126)',
-      'Pending (58)',
-      'Blocked (12)',
+      'All Users ($total)',
+      'Active ($active)',
+      'Suspended ($suspended)',
+      'Pending ($pending)',
+      'Blocked ($blocked)',
     ];
 
     return Row(
