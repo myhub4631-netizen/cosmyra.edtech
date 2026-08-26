@@ -106,11 +106,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       setState(() {
         _currentUser = profile;
         _isLoggedIn = true;
-        if (profile.isAdmin || profile.isSuperAdmin) {
-          if (_selectedIndex == 0) {
-            _selectedIndex = 8;
-          }
+        if (profile.isSuperAdmin && (_selectedIndex == -1 || _selectedIndex == 0)) {
+          _selectedIndex = 15;
+        } else if (profile.isAdmin && (_selectedIndex == -1 || _selectedIndex == 0)) {
+          _selectedIndex = 8;
+        } else if (_selectedIndex == -1) {
+          _selectedIndex = 0;
         }
+      });
+    } else {
+      setState(() {
+        _isLoggedIn = false;
+        _selectedIndex = -1;
       });
     }
   }

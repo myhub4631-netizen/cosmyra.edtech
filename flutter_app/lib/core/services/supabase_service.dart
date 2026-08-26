@@ -257,7 +257,14 @@ class SupabaseService {
 
   static Future<UserProfileModel?> getCurrentUser() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final isLoggedOut = prefs.getBool('cosmyra_user_is_logged_out') ?? false;
+
       final user = client.auth.currentUser;
+      if (user == null && isLoggedOut) {
+        return null;
+      }
+
       if (user != null) {
         final res = await client.from('profiles').select('*').eq('id', user.id).maybeSingle();
         if (res != null) {
@@ -268,17 +275,11 @@ class SupabaseService {
       }
 
       // Check active user session in SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
       final rawActiveUser = prefs.getString('cosmyra_active_user_session');
-      if (rawActiveUser != null && rawActiveUser.isNotEmpty) {
+      if (!isLoggedOut && rawActiveUser != null && rawActiveUser.isNotEmpty) {
         final decoded = jsonDecode(rawActiveUser) as Map<String, dynamic>;
         final profile = _ensureSuperAdminRole(UserProfileModel.fromJson(decoded));
         return profile;
-      }
-
-      // Fallback to latest registered user
-      if (_localRegisteredUsers.isNotEmpty) {
-        return _ensureSuperAdminRole(_localRegisteredUsers.last);
       }
 
       return null;
