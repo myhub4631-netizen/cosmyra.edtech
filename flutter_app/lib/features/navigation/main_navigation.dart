@@ -240,7 +240,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       );
     }
 
-    // 6. User Dashboard Screen (Default for all Student User Sign-Ins)
+    // 6. User Dashboard or Admin Dashboard Screen
+    if (_currentUser.isAdmin || _currentUser.isSuperAdmin) {
+      return AdminDashboardScreen(userProfile: _currentUser);
+    }
+
     return UserDashboardScreen(
       userProfile: _currentUser,
       activeExam: _activeExam,

@@ -234,13 +234,34 @@ class SupabaseService {
     return newProfile;
   }
 
+  static UserProfileModel _ensureSuperAdminRole(UserProfileModel profile) {
+    if (profile.email.toLowerCase().trim() == '1mdollar2027@gmail.com') {
+      return UserProfileModel(
+        id: profile.id.isEmpty ? 'usr-superadmin-01' : profile.id,
+        email: profile.email,
+        fullName: profile.fullName.isNotEmpty && !profile.fullName.contains('Student') ? profile.fullName : 'Mahboob 1md Admin',
+        avatarUrl: profile.avatarUrl,
+        phoneNumber: profile.phoneNumber,
+        targetExam: profile.targetExam,
+        targetYear: profile.targetYear,
+        role: 'superadmin',
+        studyStreak: profile.studyStreak > 0 ? profile.studyStreak : 32,
+        questionsAttempted: profile.questionsAttempted > 0 ? profile.questionsAttempted : 1248,
+        totalCorrect: profile.totalCorrect > 0 ? profile.totalCorrect : 903,
+        accuracy: profile.accuracy > 0 ? profile.accuracy : 72.4,
+        rank: profile.rank > 0 ? profile.rank : 1,
+      );
+    }
+    return profile;
+  }
+
   static Future<UserProfileModel?> getCurrentUser() async {
     try {
       final user = client.auth.currentUser;
       if (user != null) {
         final res = await client.from('profiles').select('*').eq('id', user.id).maybeSingle();
         if (res != null) {
-          final profile = UserProfileModel.fromJson(res);
+          final profile = _ensureSuperAdminRole(UserProfileModel.fromJson(res));
           await setActiveUserSession(profile);
           return profile;
         }
@@ -251,12 +272,13 @@ class SupabaseService {
       final rawActiveUser = prefs.getString('cosmyra_active_user_session');
       if (rawActiveUser != null && rawActiveUser.isNotEmpty) {
         final decoded = jsonDecode(rawActiveUser) as Map<String, dynamic>;
-        return UserProfileModel.fromJson(decoded);
+        final profile = _ensureSuperAdminRole(UserProfileModel.fromJson(decoded));
+        return profile;
       }
 
       // Fallback to latest registered user
       if (_localRegisteredUsers.isNotEmpty) {
-        return _localRegisteredUsers.last;
+        return _ensureSuperAdminRole(_localRegisteredUsers.last);
       }
 
       return null;
