@@ -4,8 +4,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import 'dart:convert';
 import '../../models/models.dart';
-import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/latex_view.dart';
+import '../../shared/utils/smooth_page_route.dart';
+import 'admin_question_builder_screen.dart';
 
 class AdminQuestionsBankDashboard extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -1589,243 +1590,19 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
   // ==========================================
   // 9. MODALS: ADD, IMPORT, VIEW, EDIT QUESTION
   // ==========================================
-  void _openAddQuestionDialog() {
-    final qTextCtrl = TextEditingController();
-    final optACtrl = TextEditingController();
-    final optBCtrl = TextEditingController();
-    final optCCtrl = TextEditingController();
-    final optDCtrl = TextEditingController();
-    final explCtrl = TextEditingController();
-
-    String selectedSubject = 'Physics';
-    String selectedChapter = 'Laws of Motion';
-    String selectedSource = 'NTA';
-    String selectedDifficulty = 'Medium';
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlgState) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Container(
-            width: 650,
-            padding: const EdgeInsets.all(24),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Add New Question',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 24, color: Color(0xFFE2E8F0)),
-
-                  // Question Text Input
-                  const Text('Question Text', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF334155))),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: qTextCtrl,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: 'Enter question statement (LaTeX supported using \$...\$)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      contentPadding: const EdgeInsets.all(12),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Options Row A & B
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Option A', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 4),
-                            TextField(
-                              controller: optACtrl,
-                              decoration: InputDecoration(
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Option B', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 4),
-                            TextField(
-                              controller: optBCtrl,
-                              decoration: InputDecoration(
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Options Row C & D
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Option C', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 4),
-                            TextField(
-                              controller: optCCtrl,
-                              decoration: InputDecoration(
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Option D', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 4),
-                            TextField(
-                              controller: optDCtrl,
-                              decoration: InputDecoration(
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Subject & Chapter Selectors
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Subject', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 4),
-                            DropdownButtonFormField<String>(
-                              value: selectedSubject,
-                              items: ['Physics', 'Chemistry', 'Biology', 'Mathematics']
-                                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                                  .toList(),
-                              onChanged: (val) => setDlgState(() => selectedSubject = val!),
-                              decoration: InputDecoration(
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Source Type', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 4),
-                            DropdownButtonFormField<String>(
-                              value: selectedSource,
-                              items: ['NTA', 'PYQ', 'NCERT', 'Practice', 'Other']
-                                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                                  .toList(),
-                              onChanged: (val) => setDlgState(() => selectedSource = val!),
-                              decoration: InputDecoration(
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Submit Buttons
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Cancel'),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton(
-                        onPressed: () {
-                          if (qTextCtrl.text.isNotEmpty) {
-                            setState(() {
-                              _questionsList.insert(0, {
-                                'id': 'Q${123461 + _questionsList.length}',
-                                'questionText': qTextCtrl.text,
-                                'subject': selectedSubject,
-                                'chapter': selectedChapter,
-                                'sourceType': selectedSource,
-                                'difficulty': selectedDifficulty,
-                                'tags': ['New', selectedSubject],
-                                'usedIn': ['Custom Practice', 'Custom Test'],
-                                'addedOn': 'Just now',
-                                'options': [optACtrl.text, optBCtrl.text, optCCtrl.text, optDCtrl.text],
-                                'correctAnswer': optACtrl.text,
-                                'explanation': explCtrl.text,
-                              });
-                            });
-                            Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Question added successfully!'), backgroundColor: Color(0xFF16A34A)),
-                            );
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4F46E5),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        ),
-                        child: const Text('Add Question', style: TextStyle(color: Colors.white)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
+  void _openAddQuestionDialog({Map<String, dynamic>? initialData}) {
+    Navigator.of(context).push(
+      SmoothPageRoute(
+        child: AdminQuestionBuilderScreen(
+          userProfile: widget.userProfile,
+          initialQuestionData: initialData,
         ),
       ),
     );
+  }
+
+  void _openEditQuestionDialog(Map<String, dynamic> q) {
+    _openAddQuestionDialog(initialData: q);
   }
 
   void _openImportQuestionsDialog() {
@@ -1940,10 +1717,6 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
         ),
       ),
     );
-  }
-
-  void _openEditQuestionDialog(Map<String, dynamic> q) {
-    _openAddQuestionDialog();
   }
 }
 

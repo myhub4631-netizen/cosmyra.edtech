@@ -9,6 +9,7 @@ import '../../shared/widgets/latex_view.dart';
 import '../../shared/utils/smooth_page_route.dart';
 import 'admin_user_management_screen.dart';
 import 'admin_questions_bank_dashboard.dart';
+import 'admin_question_builder_screen.dart';
 import '../auth/login_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -1283,7 +1284,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             }),
             _buildQuickActionCard('Dashboard Layout', 'Manage banners, stats & sections', Icons.dashboard_customize_rounded, const Color(0xFF4F46E5), () => Navigator.pushNamed(context, '/admin/sections')),
             _buildQuickActionCard('Add New Question', 'Create single question', Icons.add_circle_outline_rounded, const Color(0xFF6366F1), () {
-              Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
+              Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionBuilderScreen(userProfile: widget.userProfile)));
             }),
             _buildQuickActionCard('Bulk Import Questions', 'Upload via CSV/Excel', Icons.cloud_upload_outlined, const Color(0xFF10B981), () {
               Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
