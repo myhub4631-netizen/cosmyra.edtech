@@ -11,6 +11,7 @@ class AdminPdfImportPreviewScreen extends StatefulWidget {
   final String sourceType;
   final String exam;
   final String subject;
+  final List<Map<String, dynamic>>? initialExtractedQuestions;
 
   const AdminPdfImportPreviewScreen({
     Key? key,
@@ -20,6 +21,7 @@ class AdminPdfImportPreviewScreen extends StatefulWidget {
     required this.sourceType,
     required this.exam,
     required this.subject,
+    this.initialExtractedQuestions,
   }) : super(key: key);
 
   @override
@@ -33,72 +35,28 @@ class _AdminPdfImportPreviewScreenState extends State<AdminPdfImportPreviewScree
   @override
   void initState() {
     super.initState();
-    _extractedQuestions = [
-      {
-        'id': 'EXT_1',
-        'question_number': 1,
-        'page_number': 1,
-        'question_text': r'A block of mass $m = 5\text{ kg}$ rests on a rough horizontal surface with coefficient of static friction $\mu_s = 0.4$. What is the minimum horizontal force $F$ required to initiate motion? (Take $g = 10\text{ m/s}^2$)',
-        'subject': 'Physics',
-        'chapter': 'Laws of Motion',
-        'topic': 'Friction',
-        'source_type': widget.sourceType,
-        'difficulty': 'Medium',
-        'options': [r'$10\text{ N}$', r'$15\text{ N}$', r'$20\text{ N}$', r'$25\text{ N}$'],
-        'correct_answer': r'$20\text{ N}$',
-        'explanation': r'Limiting static friction is given by $f_s = \mu_s N = \mu_s m g = 0.4 \times 5 \times 10 = 20\text{ N}$.',
-        'confidence': 98.5,
-        'status': 'ready',
-      },
-      {
-        'id': 'EXT_2',
-        'question_number': 2,
-        'page_number': 1,
-        'question_text': 'Which of the following alkanes gives only one monochloro derivative upon photochemical chlorination?',
-        'subject': 'Chemistry',
-        'chapter': 'Hydrocarbons',
-        'topic': 'Alkanes',
-        'source_type': widget.sourceType,
-        'difficulty': 'Easy',
-        'options': ['n-Pentane', 'Isopentane', 'Neopentane', '2-Methylbutane'],
-        'correct_answer': 'Neopentane',
-        'explanation': 'Neopentane possesses 12 equivalent hydrogens, yielding a single monochloro product.',
-        'confidence': 99.0,
-        'status': 'ready',
-      },
-      {
-        'id': 'EXT_3',
-        'question_number': 3,
-        'page_number': 2,
-        'question_text': 'Parietal cells (Oxyntic cells) in the gastric mucosa of human stomach secrete:',
-        'subject': 'Biology',
-        'chapter': 'Digestion and Absorption',
-        'topic': 'Stomach Secretions',
-        'source_type': widget.sourceType,
-        'difficulty': 'Easy',
-        'options': ['Pepsinogen and Mucus', 'HCl and Intrinsic Factor', 'Trypsinogen and Amylase', 'Gastrin and Secretin'],
-        'correct_answer': 'HCl and Intrinsic Factor',
-        'explanation': 'Oxyntic cells secrete HCl and Castle Intrinsic Factor.',
-        'confidence': 94.0,
-        'status': 'needs_review',
-      },
-      {
-        'id': 'EXT_4',
-        'question_number': 4,
-        'page_number': 2,
-        'question_text': r'Evaluate the numerical value of $\lim_{x \to 0} \frac{\sin(4x)}{2x}$.',
-        'subject': 'Mathematics',
-        'chapter': 'Limits and Derivatives',
-        'topic': 'Trigonometric Limits',
-        'source_type': widget.sourceType,
-        'difficulty': 'Medium',
-        'options': ['1', '2', '4', '1/2'],
-        'correct_answer': '2',
-        'explanation': r'Using standard limit formula $\lim_{u \to 0} \frac{\sin u}{u} = 1$.',
-        'confidence': 96.5,
-        'status': 'ready',
-      },
-    ];
+    if (widget.initialExtractedQuestions != null && widget.initialExtractedQuestions!.isNotEmpty) {
+      _extractedQuestions = List<Map<String, dynamic>>.from(widget.initialExtractedQuestions!);
+    } else {
+      _extractedQuestions = [
+        {
+          'id': 'EXT_1',
+          'question_number': 1,
+          'page_number': 1,
+          'question_text': r'A block of mass $m = 5\text{ kg}$ rests on a rough horizontal surface with coefficient of static friction $\mu_s = 0.4$. What is the minimum horizontal force $F$ required to initiate motion? (Take $g = 10\text{ m/s}^2$)',
+          'subject': 'Physics',
+          'chapter': 'Laws of Motion',
+          'topic': 'Friction',
+          'source_type': widget.sourceType,
+          'difficulty': 'Medium',
+          'options': [r'$10\text{ N}$', r'$15\text{ N}$', r'$20\text{ N}$', r'$25\text{ N}$'],
+          'correct_answer': r'$20\text{ N}$',
+          'explanation': r'Limiting static friction is given by $f_s = \mu_s N = \mu_s m g = 0.4 \times 5 \times 10 = 20\text{ N}$.',
+          'confidence': 98.5,
+          'status': 'ready',
+        },
+      ];
+    }
   }
 
   void _openSideBySideReview(Map<String, dynamic> question) async {

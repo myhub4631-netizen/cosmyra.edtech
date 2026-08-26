@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/pdf_question_parser_engine.dart';
 import '../../shared/utils/smooth_page_route.dart';
 import 'admin_pdf_import_preview_screen.dart';
 import 'admin_pdf_import_history_screen.dart';
@@ -130,21 +131,29 @@ class _AdminPdfImportScreenState extends State<AdminPdfImportScreen> {
       _isUploading = false;
     });
 
+    // Run real PDF parser engine on uploaded PDF file
+    final extractedQuestions = PdfQuestionParserEngine.parsePdf(
+      pdfFile: _selectedPdfFile!,
+      selectedExam: _selectedExam,
+      selectedSubject: _selectedSubject,
+      sourceType: _selectedSourceType,
+    );
+
     // Save job to local history
     final jobId = 'JOB_${DateTime.now().millisecondsSinceEpoch}';
     final jobRecord = {
       'id': jobId,
       'file_name': _selectedPdfFile!.name,
       'file_size_bytes': _selectedPdfFile!.size,
-      'total_pages': 14,
+      'total_pages': (extractedQuestions.length / 6).ceil(),
       'source_type': _selectedSourceType,
       'exam': _selectedExam,
       'subject': _selectedSubject,
       'status': 'awaiting_review',
       'created_at': DateTime.now().toIso8601String(),
-      'questions_detected': 20,
+      'questions_detected': extractedQuestions.length,
       'questions_imported': 0,
-      'duplicates_count': 1,
+      'duplicates_count': 0,
       'errors_count': 0,
     };
 
@@ -161,6 +170,7 @@ class _AdminPdfImportScreenState extends State<AdminPdfImportScreen> {
             sourceType: _selectedSourceType,
             exam: _selectedExam,
             subject: _selectedSubject,
+            initialExtractedQuestions: extractedQuestions,
           ),
         ),
       );
