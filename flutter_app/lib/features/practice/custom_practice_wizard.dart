@@ -32,63 +32,240 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
   String _chapterSearchQuery = '';
   final Set<int> _expandedChapterIndices = {1}; // Chapter 1 expanded by default
   final Set<String> _selectedSubjectTabs = {'Physics', 'Chemistry', 'Biology'};
+  String _activeSubjectTab = 'Physics';
 
-  final List<Map<String, dynamic>> _screen2ChaptersList = [
-    {
-      'number': 1,
-      'name': 'Physical World and Measurement',
-      'topicsCountText': '6 Topics Selected',
-      'isSelected': true,
-      'subtopics': [
-        {'id': '1.1', 'name': 'Units and Measurements', 'isSelected': true},
-        {'id': '1.2', 'name': 'Dimensional Analysis', 'isSelected': true},
-        {'id': '1.3', 'name': 'Error Analysis', 'isSelected': true},
-        {'id': '1.4', 'name': 'Significant Figures', 'isSelected': false},
-        {'id': '1.5', 'name': 'Vector and Scalars', 'isSelected': true},
-        {'id': '1.6', 'name': 'Measurement of Physical Quantities', 'isSelected': false},
-      ],
-    },
-    {
-      'number': 2,
-      'name': 'Kinematics',
-      'topicsCountText': '8 Topics Selected',
-      'isSelected': true,
-      'subtopics': <Map<String, dynamic>>[
-        {'id': '2.1', 'name': 'Motion in a Straight Line', 'isSelected': true},
-        {'id': '2.2', 'name': 'Motion in a Plane', 'isSelected': true},
-      ],
-    },
-    {
-      'number': 3,
-      'name': 'Laws of Motion',
-      'topicsCountText': '7 Topics Selected',
-      'isSelected': true,
-      'subtopics': <Map<String, dynamic>>[
-        {'id': '3.1', 'name': 'Newton\'s First Law', 'isSelected': true},
-        {'id': '3.2', 'name': 'Momentum and Impulse', 'isSelected': true},
-      ],
-    },
-    {
-      'number': 4,
-      'name': 'Work, Energy and Power',
-      'topicsCountText': '3 Topics Selected',
-      'isSelected': false,
-      'subtopics': <Map<String, dynamic>>[
-        {'id': '4.1', 'name': 'Work Done by Constant Force', 'isSelected': false},
-        {'id': '4.2', 'name': 'Kinetic and Potential Energy', 'isSelected': false},
-      ],
-    },
-    {
-      'number': 5,
-      'name': 'Motion of System of Particles',
-      'topicsCountText': '0 Topic Selected',
-      'isSelected': false,
-      'subtopics': <Map<String, dynamic>>[
-        {'id': '5.1', 'name': 'Center of Mass', 'isSelected': false},
-        {'id': '5.2', 'name': 'Rigid Body Rotation', 'isSelected': false},
-      ],
-    },
-  ];
+  final Map<String, List<Map<String, dynamic>>> _subjectChaptersMap = {
+    'Physics': [
+      {
+        'number': 1,
+        'name': 'Physical World and Measurement',
+        'topicsCountText': '6 Topics Selected',
+        'isSelected': true,
+        'subtopics': [
+          {'id': '1.1', 'name': 'Units and Measurements', 'isSelected': true},
+          {'id': '1.2', 'name': 'Dimensional Analysis', 'isSelected': true},
+          {'id': '1.3', 'name': 'Error Analysis', 'isSelected': true},
+          {'id': '1.4', 'name': 'Significant Figures', 'isSelected': false},
+          {'id': '1.5', 'name': 'Vector and Scalars', 'isSelected': true},
+          {'id': '1.6', 'name': 'Measurement of Physical Quantities', 'isSelected': false},
+        ],
+      },
+      {
+        'number': 2,
+        'name': 'Kinematics',
+        'topicsCountText': '8 Topics Selected',
+        'isSelected': true,
+        'subtopics': <Map<String, dynamic>>[
+          {'id': '2.1', 'name': 'Motion in a Straight Line', 'isSelected': true},
+          {'id': '2.2', 'name': 'Motion in a Plane', 'isSelected': true},
+        ],
+      },
+      {
+        'number': 3,
+        'name': 'Laws of Motion',
+        'topicsCountText': '7 Topics Selected',
+        'isSelected': true,
+        'subtopics': <Map<String, dynamic>>[
+          {'id': '3.1', 'name': 'Newton\'s First Law', 'isSelected': true},
+          {'id': '3.2', 'name': 'Momentum and Impulse', 'isSelected': true},
+        ],
+      },
+      {
+        'number': 4,
+        'name': 'Work, Energy and Power',
+        'topicsCountText': '3 Topics Selected',
+        'isSelected': false,
+        'subtopics': <Map<String, dynamic>>[
+          {'id': '4.1', 'name': 'Work Done by Constant Force', 'isSelected': false},
+          {'id': '4.2', 'name': 'Kinetic and Potential Energy', 'isSelected': false},
+        ],
+      },
+      {
+        'number': 5,
+        'name': 'Motion of System of Particles',
+        'topicsCountText': '0 Topic Selected',
+        'isSelected': false,
+        'subtopics': <Map<String, dynamic>>[
+          {'id': '5.1', 'name': 'Center of Mass', 'isSelected': false},
+          {'id': '5.2', 'name': 'Rigid Body Rotation', 'isSelected': false},
+        ],
+      },
+    ],
+    'Chemistry': [
+      {
+        'number': 1,
+        'name': 'Some Basic Concepts of Chemistry',
+        'topicsCountText': '5 Topics Selected',
+        'isSelected': true,
+        'subtopics': [
+          {'id': '1.1', 'name': 'Mole Concept & Atomic Mass', 'isSelected': true},
+          {'id': '1.2', 'name': 'Stoichiometry & Yield', 'isSelected': true},
+          {'id': '1.3', 'name': 'Molarity & Molality', 'isSelected': true},
+          {'id': '1.4', 'name': 'Empirical & Molecular Formula', 'isSelected': true},
+          {'id': '1.5', 'name': 'Laws of Chemical Combination', 'isSelected': true},
+        ],
+      },
+      {
+        'number': 2,
+        'name': 'Structure of Atom',
+        'topicsCountText': '4 Topics Selected',
+        'isSelected': true,
+        'subtopics': [
+          {'id': '2.1', 'name': 'Bohr\'s Model of Hydrogen Atom', 'isSelected': true},
+          {'id': '2.2', 'name': 'Quantum Numbers & Orbital Filling', 'isSelected': true},
+          {'id': '2.3', 'name': 'de Broglie Wavelength & Photoelectric', 'isSelected': true},
+          {'id': '2.4', 'name': 'Heisenberg Uncertainty Principle', 'isSelected': true},
+        ],
+      },
+      {
+        'number': 3,
+        'name': 'Chemical Bonding & Molecular Structure',
+        'topicsCountText': '6 Topics Selected',
+        'isSelected': true,
+        'subtopics': [
+          {'id': '3.1', 'name': 'Ionic and Covalent Bond', 'isSelected': true},
+          {'id': '3.2', 'name': 'VSEPR Theory & Molecular Shapes', 'isSelected': true},
+          {'id': '3.3', 'name': 'Hybridization (sp, sp2, sp3)', 'isSelected': true},
+          {'id': '3.4', 'name': 'Molecular Orbital Theory (MOT)', 'isSelected': true},
+        ],
+      },
+      {
+        'number': 4,
+        'name': 'Chemical Thermodynamics',
+        'topicsCountText': '3 Topics Selected',
+        'isSelected': false,
+        'subtopics': [
+          {'id': '4.1', 'name': 'First Law & Enthalpy of Reaction', 'isSelected': false},
+          {'id': '4.2', 'name': 'Hess\'s Law & Bond Energies', 'isSelected': false},
+          {'id': '4.3', 'name': 'Entropy & Gibbs Free Energy', 'isSelected': false},
+        ],
+      },
+      {
+        'number': 5,
+        'name': 'Equilibrium',
+        'topicsCountText': '0 Topic Selected',
+        'isSelected': false,
+        'subtopics': [
+          {'id': '5.1', 'name': 'Chemical Equilibrium & Kc/Kp', 'isSelected': false},
+          {'id': '5.2', 'name': 'Ionic Equilibrium & pH Scale', 'isSelected': false},
+          {'id': '5.3', 'name': 'Solubility Product (Ksp)', 'isSelected': false},
+        ],
+      },
+    ],
+    'Biology': [
+      {
+        'number': 1,
+        'name': 'The Living World',
+        'topicsCountText': '4 Topics Selected',
+        'isSelected': true,
+        'subtopics': [
+          {'id': '1.1', 'name': 'What is Living? Biodiversity', 'isSelected': true},
+          {'id': '1.2', 'name': 'Taxonomic Categories & Hierarchy', 'isSelected': true},
+          {'id': '1.3', 'name': 'Binomial Nomenclature Rules', 'isSelected': true},
+          {'id': '1.4', 'name': 'Taxonomical Aids & Herbaria', 'isSelected': true},
+        ],
+      },
+      {
+        'number': 2,
+        'name': 'Biological Classification',
+        'topicsCountText': '5 Topics Selected',
+        'isSelected': true,
+        'subtopics': [
+          {'id': '2.1', 'name': 'Five Kingdom System Overview', 'isSelected': true},
+          {'id': '2.2', 'name': 'Kingdom Monera & Archaebacteria', 'isSelected': true},
+          {'id': '2.3', 'name': 'Kingdom Protista & Fungi', 'isSelected': true},
+          {'id': '2.4', 'name': 'Viruses, Viroids & Lichens', 'isSelected': true},
+        ],
+      },
+      {
+        'number': 3,
+        'name': 'Plant Kingdom',
+        'topicsCountText': '6 Topics Selected',
+        'isSelected': true,
+        'subtopics': [
+          {'id': '3.1', 'name': 'Algae, Bryophytes & Pteridophytes', 'isSelected': true},
+          {'id': '3.2', 'name': 'Gymnosperms & Angiosperms', 'isSelected': true},
+          {'id': '3.3', 'name': 'Plant Life Cycles & Alternation', 'isSelected': true},
+        ],
+      },
+      {
+        'number': 4,
+        'name': 'Animal Kingdom',
+        'topicsCountText': '2 Topics Selected',
+        'isSelected': false,
+        'subtopics': [
+          {'id': '4.1', 'name': 'Basis of Classification (Symmetry, Coelom)', 'isSelected': false},
+          {'id': '4.2', 'name': 'Non-Chordates & Chordates Overview', 'isSelected': false},
+        ],
+      },
+      {
+        'number': 5,
+        'name': 'Cell: The Unit of Life',
+        'topicsCountText': '0 Topic Selected',
+        'isSelected': false,
+        'subtopics': [
+          {'id': '5.1', 'name': 'Prokaryotic vs Eukaryotic Cell Structure', 'isSelected': false},
+          {'id': '5.2', 'name': 'Organelles: Endomembrane & Plastids', 'isSelected': false},
+        ],
+      },
+    ],
+    'Mathematics': [
+      {
+        'number': 1,
+        'name': 'Sets, Relations and Functions',
+        'topicsCountText': '5 Topics Selected',
+        'isSelected': true,
+        'subtopics': [
+          {'id': '1.1', 'name': 'Sets & Venn Diagrams', 'isSelected': true},
+          {'id': '1.2', 'name': 'Types of Relations & Equivalence', 'isSelected': true},
+          {'id': '1.3', 'name': 'Domain, Range & One-One/Onto', 'isSelected': true},
+          {'id': '1.4', 'name': 'Composite & Inverse Functions', 'isSelected': true},
+        ],
+      },
+      {
+        'number': 2,
+        'name': 'Complex Numbers & Quadratic Equations',
+        'topicsCountText': '6 Topics Selected',
+        'isSelected': true,
+        'subtopics': [
+          {'id': '2.1', 'name': 'Modulus, Argument & Polar Form', 'isSelected': true},
+          {'id': '2.2', 'name': 'Roots of Quadratic Equations & Discriminant', 'isSelected': true},
+          {'id': '2.3', 'name': 'De Moivre\'s Theorem & Cube Roots', 'isSelected': true},
+        ],
+      },
+      {
+        'number': 3,
+        'name': 'Matrices and Determinants',
+        'topicsCountText': '7 Topics Selected',
+        'isSelected': true,
+        'subtopics': [
+          {'id': '3.1', 'name': 'Matrix Algebra & Types', 'isSelected': true},
+          {'id': '3.2', 'name': 'Determinants & Properties', 'isSelected': true},
+          {'id': '3.3', 'name': 'Inverse of Matrix & Cramer\'s Rule', 'isSelected': true},
+        ],
+      },
+      {
+        'number': 4,
+        'name': 'Permutations and Combinations',
+        'topicsCountText': '3 Topics Selected',
+        'isSelected': false,
+        'subtopics': [
+          {'id': '4.1', 'name': 'Fundamental Principle of Counting', 'isSelected': false},
+          {'id': '4.2', 'name': 'Permutations & Combinations Formulas', 'isSelected': false},
+        ],
+      },
+      {
+        'number': 5,
+        'name': 'Differential Calculus',
+        'topicsCountText': '0 Topic Selected',
+        'isSelected': false,
+        'subtopics': [
+          {'id': '5.1', 'name': 'Limits, Continuity & Differentiability', 'isSelected': false},
+          {'id': '5.2', 'name': 'Derivatives & Chain Rule', 'isSelected': false},
+        ],
+      },
+    ],
+  };
 
   final Set<String> _selectedChapterNames = {'Mechanics', 'Thermodynamics', 'Optics'};
   final Set<String> _selectedTopicNames = {'Laws of Motion', 'Work, Energy & Power', 'Gravitation'};
@@ -935,22 +1112,40 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
   }
 
   // ==========================================
-  // SCREEN 2: CHAPTERS & TOPICS SELECTION (Exact Replica)
-  // ==========================================
-  // ==========================================
-  // SCREEN 2: CHAPTERS & TOPICS SELECTION (Exact Replica)
+  // SCREEN 2: CHAPTERS & TOPICS SELECTION (Exact Replica & Dynamic PCM/PCB)
   // ==========================================
   Widget _buildScreen2ChaptersAndTopics() {
-    final allSubjectTabsSelected = _selectedSubjectTabs.length == 3;
-    final allChaptersInPhysicsSelected = _screen2ChaptersList.every((c) => c['isSelected'] == true);
+    final isJee = _selectedExam.toUpperCase().contains('JEE');
+    final activeSubjects = isJee
+        ? ['Physics', 'Chemistry', 'Mathematics']
+        : ['Physics', 'Chemistry', 'Biology'];
 
-    final filteredChapters = _screen2ChaptersList.where((c) {
+    final allSubjectTabsSelected = activeSubjects.every((s) => _selectedSubjectTabs.contains(s));
+
+    // Ensure active subject tab is valid and currently selected
+    if (!_selectedSubjectTabs.contains(_activeSubjectTab)) {
+      if (_selectedSubjectTabs.isNotEmpty) {
+        _activeSubjectTab = _selectedSubjectTabs.first;
+      } else {
+        _activeSubjectTab = activeSubjects.first;
+      }
+    }
+
+    final activeChaptersList = _subjectChaptersMap[_activeSubjectTab] ?? [];
+    final allChaptersInActiveSubjectSelected = activeChaptersList.every((c) => c['isSelected'] == true);
+
+    final filteredChapters = activeChaptersList.where((c) {
       if (_chapterSearchQuery.isEmpty) return true;
       final query = _chapterSearchQuery.toLowerCase();
       final nameMatches = (c['name'] as String).toLowerCase().contains(query);
       final subMatches = (c['subtopics'] as List).any((s) => (s['name'] as String).toLowerCase().contains(query));
       return nameMatches || subMatches;
     }).toList();
+
+    String statsText = '68 Chapters • 182 Topics';
+    if (_activeSubjectTab == 'Chemistry') statsText = '62 Chapters • 165 Topics';
+    if (_activeSubjectTab == 'Biology') statsText = '89 Chapters • 240 Topics';
+    if (_activeSubjectTab == 'Mathematics') statsText = '75 Chapters • 198 Topics';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1071,7 +1266,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                   if (allSubjectTabsSelected) {
                     _selectedSubjectTabs.clear();
                   } else {
-                    _selectedSubjectTabs.addAll(['Physics', 'Chemistry', 'Biology']);
+                    _selectedSubjectTabs.addAll(activeSubjects);
                   }
                 });
               },
@@ -1089,7 +1284,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
 
         const SizedBox(height: 12),
 
-        // 3 Subject Cards Side by Side (Physics, Chemistry, Biology)
+        // 3 Subject Cards Side by Side (Physics, Chemistry, Biology/Mathematics)
         Row(
           children: [
             // Physics Card
@@ -1111,6 +1306,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                       _selectedSubjectTabs.remove('Physics');
                     } else {
                       _selectedSubjectTabs.add('Physics');
+                      _activeSubjectTab = 'Physics';
                     }
                   });
                 },
@@ -1137,6 +1333,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                       _selectedSubjectTabs.remove('Chemistry');
                     } else {
                       _selectedSubjectTabs.add('Chemistry');
+                      _activeSubjectTab = 'Chemistry';
                     }
                   });
                 },
@@ -1144,30 +1341,54 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
             ),
             const SizedBox(width: 10),
 
-            // Biology Card
-            Expanded(
-              child: _buildSubjectSelectCard(
-                title: 'Biology',
-                count: '89',
-                bgColor: const Color(0xFFF0FDF4),
-                borderColor: const Color(0xFFBBF7D0),
-                iconAvatarColor: const Color(0xFFDCFCE7),
-                iconWidget: CustomPaint(
-                  size: const Size(20, 20),
-                  painter: LeafIconPainter(color: const Color(0xFF16A34A)),
+            // 3rd Subject Card: Biology (NEET) or Mathematics (JEE)
+            if (isJee)
+              Expanded(
+                child: _buildSubjectSelectCard(
+                  title: 'Mathematics',
+                  count: '75',
+                  bgColor: const Color(0xFFFEF3C7),
+                  borderColor: const Color(0xFFFDE68A),
+                  iconAvatarColor: const Color(0xFFFEF3C7),
+                  iconWidget: const Icon(Icons.functions_rounded, color: Color(0xFFD97706), size: 20),
+                  isSelected: _selectedSubjectTabs.contains('Mathematics'),
+                  onTap: () {
+                    setState(() {
+                      if (_selectedSubjectTabs.contains('Mathematics')) {
+                        _selectedSubjectTabs.remove('Mathematics');
+                      } else {
+                        _selectedSubjectTabs.add('Mathematics');
+                        _activeSubjectTab = 'Mathematics';
+                      }
+                    });
+                  },
                 ),
-                isSelected: _selectedSubjectTabs.contains('Biology'),
-                onTap: () {
-                  setState(() {
-                    if (_selectedSubjectTabs.contains('Biology')) {
-                      _selectedSubjectTabs.remove('Biology');
-                    } else {
-                      _selectedSubjectTabs.add('Biology');
-                    }
-                  });
-                },
+              )
+            else
+              Expanded(
+                child: _buildSubjectSelectCard(
+                  title: 'Biology',
+                  count: '89',
+                  bgColor: const Color(0xFFF0FDF4),
+                  borderColor: const Color(0xFFBBF7D0),
+                  iconAvatarColor: const Color(0xFFDCFCE7),
+                  iconWidget: CustomPaint(
+                    size: const Size(20, 20),
+                    painter: LeafIconPainter(color: const Color(0xFF16A34A)),
+                  ),
+                  isSelected: _selectedSubjectTabs.contains('Biology'),
+                  onTap: () {
+                    setState(() {
+                      if (_selectedSubjectTabs.contains('Biology')) {
+                        _selectedSubjectTabs.remove('Biology');
+                      } else {
+                        _selectedSubjectTabs.add('Biology');
+                        _activeSubjectTab = 'Biology';
+                      }
+                    });
+                  },
+                ),
               ),
-            ),
           ],
         ),
 
@@ -1191,6 +1412,34 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // If multiple subjects selected, show Subject Tab selector pills
+              if (_selectedSubjectTabs.length > 1) ...[
+                Row(
+                  children: activeSubjects.where((s) => _selectedSubjectTabs.contains(s)).map((subName) {
+                    final bool isCurrentActive = _activeSubjectTab == subName;
+                    return GestureDetector(
+                      onTap: () => setState(() => _activeSubjectTab = subName),
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8, bottom: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isCurrentActive ? const Color(0xFF4F46E5) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          subName,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: isCurrentActive ? Colors.white : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+
               // Header inside Chapters Box
               Row(
                 children: [
@@ -1203,18 +1452,18 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
-                    'Physics',
-                    style: TextStyle(
+                  Text(
+                    _activeSubjectTab,
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
                       color: Color(0xFF0F172A),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
-                    '68 Chapters • 182 Topics',
-                    style: TextStyle(
+                  Text(
+                    statsText,
+                    style: const TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w500,
                       color: Color(0xFF64748B),
@@ -1224,8 +1473,8 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                   GestureDetector(
                     onTap: () {
                       setState(() {
-                        final targetVal = !allChaptersInPhysicsSelected;
-                        for (final c in _screen2ChaptersList) {
+                        final targetVal = !allChaptersInActiveSubjectSelected;
+                        for (final c in activeChaptersList) {
                           c['isSelected'] = targetVal;
                           for (final sub in (c['subtopics'] as List)) {
                             sub['isSelected'] = targetVal;
@@ -1244,11 +1493,11 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                   ),
                   const SizedBox(width: 8),
                   _buildPurpleCheckbox(
-                    isChecked: allChaptersInPhysicsSelected,
+                    isChecked: allChaptersInActiveSubjectSelected,
                     onTap: () {
                       setState(() {
-                        final targetVal = !allChaptersInPhysicsSelected;
-                        for (final c in _screen2ChaptersList) {
+                        final targetVal = !allChaptersInActiveSubjectSelected;
+                        for (final c in activeChaptersList) {
                           c['isSelected'] = targetVal;
                           for (final sub in (c['subtopics'] as List)) {
                             sub['isSelected'] = targetVal;
