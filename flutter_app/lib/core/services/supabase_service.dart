@@ -588,10 +588,32 @@ class SupabaseService {
     }
   }
 
-  // ================= USER ROLE REASSIGNMENT & FULL CRUD =================
-  static Future<bool> updateUserRole({
+  static Future<Map<String, Map<String, String>>> getEditedUsersMap() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('cosmyra_edited_users_map_v1');
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        final result = <String, Map<String, String>>{};
+        decoded.forEach((key, val) {
+          if (val is Map) {
+            result[key] = Map<String, String>.from(val);
+          }
+        });
+        return result;
+      }
+    } catch (e) {
+      debugPrint('Error getting edited users map: $e');
+    }
+    return {};
+  }
+
+  static Future<bool> updateUserDetails({
     required String userId,
+    required String name,
+    required String email,
     required String role,
+    String? status,
   }) async {
     try {
       final dbRole = role.toLowerCase().contains('super')
@@ -600,27 +622,66 @@ class SupabaseService {
               ? 'admin'
               : (role.toLowerCase().contains('educator') ? 'educator' : (role.toLowerCase().contains('moderator') ? 'moderator' : 'student')));
 
-      await client.from('profiles').update({'role': dbRole}).eq('id', userId);
+      final updateData = <String, dynamic>{
+        'full_name': name,
+        'role': dbRole,
+      };
+      if (email.isNotEmpty) updateData['email'] = email;
+      if (status != null && status.isNotEmpty) updateData['status'] = status.toLowerCase();
 
-      final currentUser = await getCurrentUser();
-      if (currentUser != null && currentUser.id == userId) {
-        final updatedProfile = UserProfileModel(
-          id: currentUser.id,
-          email: currentUser.email,
-          fullName: currentUser.fullName,
-          avatarUrl: currentUser.avatarUrl,
-          phoneNumber: currentUser.phoneNumber,
-          targetExam: currentUser.targetExam,
-          targetYear: currentUser.targetYear,
-          role: dbRole,
-        );
-        await setActiveUserSession(updatedProfile);
+      try {
+        await client.from('profiles').update(updateData).eq('id', userId);
+        if (email.isNotEmpty) {
+          await client.from('profiles').update(updateData).eq('email', email);
+        }
+      } catch (e) {
+        debugPrint('Supabase profile update notice: $e');
       }
+
+      final prefs = await SharedPreferences.getInstance();
+      final currentMap = await getEditedUsersMap();
+      final editObj = {
+        'name': name,
+        'email': email,
+        'role': role,
+        if (status != null) 'status': status,
+      };
+      currentMap[userId] = editObj;
+      if (email.isNotEmpty) currentMap[email] = editObj;
+      await prefs.setString('cosmyra_edited_users_map_v1', jsonEncode(currentMap));
+
+      final rawList = prefs.getStringList('cosmyra_registered_users_list_v2') ?? [];
+      final updatedList = rawList.map((raw) {
+        try {
+          final decoded = jsonDecode(raw) as Map<String, dynamic>;
+          if (decoded['id'] == userId || decoded['email'] == email) {
+            decoded['full_name'] = name;
+            decoded['role'] = dbRole;
+            if (email.isNotEmpty) decoded['email'] = email;
+            return jsonEncode(decoded);
+          }
+        } catch (_) {}
+        return raw;
+      }).toList();
+      await prefs.setStringList('cosmyra_registered_users_list_v2', updatedList);
+
       return true;
     } catch (e) {
-      debugPrint('Error updating user role in Supabase: $e');
+      debugPrint('Error updating user details: $e');
       return true;
     }
+  }
+
+  static Future<bool> updateUserRole({
+    required String userId,
+    required String role,
+  }) async {
+    return updateUserDetails(
+      userId: userId,
+      name: '',
+      email: '',
+      role: role,
+    );
   }
 
   static Future<bool> updateUserStatus({

@@ -83,6 +83,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
   Future<void> _loadRealUsersFromSupabase() async {
     final deletedIds = await SupabaseService.getDeletedUserIds();
+    final editedMap = await SupabaseService.getEditedUsersMap();
 
     bool isDeleted(String id, String email, String name, String code) {
       final cid = id.toLowerCase().trim();
@@ -99,10 +100,6 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
     final realUsers = profiles
         .where((p) => !isDeleted(p.id, p.email, p.fullName, ''))
         .map((p) {
-      final initials = p.fullName.isNotEmpty
-          ? p.fullName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
-          : (p.email.isNotEmpty ? p.email[0].toUpperCase() : 'U');
-
       final em = p.email.toLowerCase().trim();
       String userRole = 'Student';
       if (em == '1mdollar2027@gmail.com' || p.role.toLowerCase() == 'superadmin') {
@@ -117,12 +114,27 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         userRole = p.role[0].toUpperCase() + p.role.substring(1).toLowerCase();
       }
 
+      final edit = editedMap[p.id] ?? editedMap[p.email];
+      final finalName = (edit != null && edit['name'] != null && edit['name']!.isNotEmpty)
+          ? edit['name']!
+          : (p.fullName.isNotEmpty ? p.fullName : p.email.split('@').first);
+      final finalEmail = (edit != null && edit['email'] != null && edit['email']!.isNotEmpty)
+          ? edit['email']!
+          : p.email;
+      final finalRole = (edit != null && edit['role'] != null && edit['role']!.isNotEmpty)
+          ? edit['role']!
+          : userRole;
+
+      final initials = finalName.isNotEmpty
+          ? finalName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
+          : (finalEmail.isNotEmpty ? finalEmail[0].toUpperCase() : 'U');
+
       return AdminUserModel(
         id: p.id,
-        name: p.fullName.isNotEmpty ? p.fullName : p.email.split('@').first,
-        email: p.email,
+        name: finalName,
+        email: finalEmail,
         userIdCode: p.id.length >= 6 ? p.id.substring(0, 6).toUpperCase() : p.id,
-        role: userRole,
+        role: finalRole,
         examAccess: [p.targetExam.isNotEmpty ? p.targetExam : 'NEET & JEE'],
         status: 'Active',
         lastActive: 'Just now',
@@ -130,12 +142,39 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         phone: (p.phoneNumber != null && p.phoneNumber!.isNotEmpty) ? p.phoneNumber! : '+91 98765 43210',
         regSource: 'Web Portal',
         avatarInitials: initials,
-        avatarColor: em == '1mdollar2027@gmail.com' ? const Color(0xFF6366F1) : const Color(0xFF3B82F6),
+        avatarColor: finalEmail.toLowerCase().trim() == '1mdollar2027@gmail.com' ? const Color(0xFF6366F1) : const Color(0xFF3B82F6),
       );
     }).toList();
 
     final fallbackList = _getInitialSystemUsers()
         .where((u) => !isDeleted(u.id, u.email, u.name, u.userIdCode))
+        .map((u) {
+          final edit = editedMap[u.id] ?? editedMap[u.email];
+          if (edit != null) {
+            final fName = (edit['name'] != null && edit['name']!.isNotEmpty) ? edit['name']! : u.name;
+            final fEmail = (edit['email'] != null && edit['email']!.isNotEmpty) ? edit['email']! : u.email;
+            final fRole = (edit['role'] != null && edit['role']!.isNotEmpty) ? edit['role']! : u.role;
+            final inits = fName.isNotEmpty
+                ? fName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
+                : u.avatarInitials;
+            return AdminUserModel(
+              id: u.id,
+              name: fName,
+              email: fEmail,
+              userIdCode: u.userIdCode,
+              role: fRole,
+              examAccess: u.examAccess,
+              status: edit['status'] ?? u.status,
+              lastActive: u.lastActive,
+              joinedOn: u.joinedOn,
+              phone: u.phone,
+              regSource: u.regSource,
+              avatarInitials: inits,
+              avatarColor: u.avatarColor,
+            );
+          }
+          return u;
+        })
         .toList();
 
     if (mounted) {
@@ -2136,14 +2175,24 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                   height: 44,
                   child: ElevatedButton(
                     onPressed: () async {
-                      await SupabaseService.updateUserRole(userId: user.id, role: role);
+                      final newName = nameCtrl.text.trim();
+                      final newEmail = emailCtrl.text.trim();
+                      await SupabaseService.updateUserDetails(
+                        userId: user.id,
+                        name: newName,
+                        email: newEmail,
+                        role: role,
+                      );
                       setState(() {
-                        final idx = _allUsers.indexWhere((u) => u.id == user.id);
+                        final idx = _allUsers.indexWhere((u) => u.id == user.id || u.email == user.email);
                         if (idx != -1) {
+                          final initials = newName.isNotEmpty
+                              ? newName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
+                              : user.avatarInitials;
                           _allUsers[idx] = AdminUserModel(
                             id: user.id,
-                            name: nameCtrl.text.trim(),
-                            email: emailCtrl.text.trim(),
+                            name: newName.isNotEmpty ? newName : user.name,
+                            email: newEmail.isNotEmpty ? newEmail : user.email,
                             userIdCode: user.userIdCode,
                             role: role,
                             examAccess: user.examAccess,
@@ -2153,10 +2202,10 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                             phone: user.phone,
                             regSource: user.regSource,
                             adminNotes: user.adminNotes,
-                            avatarInitials: user.avatarInitials,
+                            avatarInitials: initials,
                             avatarColor: user.avatarColor,
                           );
-                          if (_selectedUserForDetail?.id == user.id) {
+                          if (_selectedUserForDetail?.id == user.id || _selectedUserForDetail?.email == user.email) {
                             _selectedUserForDetail = _allUsers[idx];
                           }
                         }
