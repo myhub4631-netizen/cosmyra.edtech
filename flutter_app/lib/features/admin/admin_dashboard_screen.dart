@@ -639,6 +639,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               ),
             ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pushNamed(context, '/admin/sections'),
+              icon: const Icon(Icons.dashboard_customize_rounded, size: 16, color: Colors.white),
+              label: const Text('Dashboard Layout', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                elevation: 0,
+              ),
+            ),
           ],
         ),
       ],
@@ -1199,6 +1211,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [
+            _buildQuickActionCard('Dashboard Layout', 'Manage banners, stats & sections', Icons.dashboard_customize_rounded, const Color(0xFF4F46E5), () => Navigator.pushNamed(context, '/admin/sections')),
             _buildQuickActionCard('Add New Question', 'Create single question', Icons.add_circle_outline_rounded, const Color(0xFF6366F1), () => _openQuestionEditor()),
             _buildQuickActionCard('Bulk Import Questions', 'Upload via CSV/Excel', Icons.cloud_upload_outlined, const Color(0xFF10B981), _pickAndValidateCSV),
             _buildQuickActionCard('Manage Topics', 'Create & organize topics', Icons.folder_open_outlined, const Color(0xFFF59E0B), () {}),
