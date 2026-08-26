@@ -282,7 +282,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     );
   }
 
-  // 3. Mobile 2x2 Metrics Cards Grid
+  // 3. Mobile Metrics Cards (4 Horizontal Rectangle Cards)
   Widget _buildMobileKpiGrid() {
     final metrics = [
       {
@@ -290,32 +290,23 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         'value': '1,248',
         'sub': '↑ 18% vs last 7 days',
         'icon': Icons.edit_document,
-        'cardBg': const Color(0xFFF0FDF4),
-        'borderColor': const Color(0xFFDCFCE7),
-        'titleColor': const Color(0xFF166534),
-        'iconBg': const Color(0xFFDCFCE7),
-        'iconColor': const Color(0xFF16A34A),
+        'iconBg': const Color(0xFFEFF6FF),
+        'iconColor': const Color(0xFF2563EB),
       },
       {
         'title': 'Accuracy',
         'value': '72.4%',
         'sub': '↑ 6.3% vs last 7 days',
         'icon': Icons.track_changes_rounded,
-        'cardBg': const Color(0xFFEFF6FF),
-        'borderColor': const Color(0xFFDBEAFE),
-        'titleColor': const Color(0xFF1E40AF),
-        'iconBg': const Color(0xFFDBEAFE),
-        'iconColor': const Color(0xFF2563EB),
+        'iconBg': const Color(0xFFDCFCE7),
+        'iconColor': const Color(0xFF16A34A),
       },
       {
         'title': 'Tests Completed',
         'value': '28',
         'sub': '↑ 4 vs last 7 days',
         'icon': Icons.assignment_turned_in_rounded,
-        'cardBg': const Color(0xFFF5F3FF),
-        'borderColor': const Color(0xFFDDD6FE),
-        'titleColor': const Color(0xFF5B21B6),
-        'iconBg': const Color(0xFFDDD6FE),
+        'iconBg': const Color(0xFFF5F3FF),
         'iconColor': const Color(0xFF7C3AED),
       },
       {
@@ -323,75 +314,69 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         'value': '12 Days',
         'sub': 'Best: 32 Days',
         'icon': Icons.local_fire_department_rounded,
-        'cardBg': const Color(0xFFFFF7ED),
-        'borderColor': const Color(0xFFFFEDD5),
-        'titleColor': const Color(0xFF9A3412),
-        'iconBg': const Color(0xFFFFEDD5),
+        'iconBg': const Color(0xFFFFF7ED),
         'iconColor': const Color(0xFFEA580C),
       },
     ];
 
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(child: _buildMobileMiniKpiCard(metrics[0])),
-            const SizedBox(width: 12),
-            Expanded(child: _buildMobileMiniKpiCard(metrics[1])),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: _buildMobileMiniKpiCard(metrics[2])),
-            const SizedBox(width: 12),
-            Expanded(child: _buildMobileMiniKpiCard(metrics[3])),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMobileMiniKpiCard(Map<String, dynamic> m) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: m['cardBg'] as Color,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: m['borderColor'] as Color),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: m['iconBg'] as Color,
-                  shape: BoxShape.circle,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: metrics.map((m) {
+          return Container(
+            width: 145,
+            margin: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFF1F5F9)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
                 ),
-                child: Icon(m['icon'] as IconData, color: m['iconColor'] as Color, size: 16),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            m['title'] as String,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: m['titleColor'] as Color),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            m['value'] as String,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.4),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            m['sub'] as String,
-            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-          ),
-        ],
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: m['iconBg'] as Color,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(m['icon'] as IconData, color: m['iconColor'] as Color, size: 18),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  m['title'] as String,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  m['value'] as String,
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.4),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  m['sub'] as String,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: (m['sub'] as String).contains('Best')
+                        ? const Color(0xFF64748B)
+                        : const Color(0xFF16A34A),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
