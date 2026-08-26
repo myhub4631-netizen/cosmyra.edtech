@@ -469,10 +469,11 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
   }
 
   // ==========================================
-  // SCREEN 1: EXAM & SUBJECTS (Exact Replica)
+  // SCREEN 1: EXAMS & SUBJECTS SELECTION (Exact Replica)
   // ==========================================
   Widget _buildScreen1ExamAndSubjects() {
-    final allSelected = _availableSubjects.isNotEmpty && _selectedSubjectIds.length == _availableSubjects.length;
+    final allSelected = _availableSubjects.isNotEmpty &&
+        _selectedSubjectIds.length == _availableSubjects.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -481,42 +482,42 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
         const Text(
           'Step 1 of 4',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w500,
             color: Color(0xFF64748B),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         const Text(
           'Select Exam & Subjects',
           style: TextStyle(
-            fontSize: 22,
+            fontSize: 20,
             fontWeight: FontWeight.w800,
             color: Color(0xFF0F172A),
             letterSpacing: -0.3,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         const Text(
           'Choose the exam you\'re preparing for and select the subjects you want to practice.',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 13.5,
             color: Color(0xFF64748B),
-            height: 1.4,
+            height: 1.35,
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 18),
 
         // Section 1: Select Exam
         const Text(
           'Select Exam',
           style: TextStyle(
-            fontSize: 17,
+            fontSize: 16,
             fontWeight: FontWeight.w700,
             color: Color(0xFF0F172A),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
 
         // 2 Exam Cards Side by Side
         Row(
@@ -528,7 +529,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                 isSelected: _selectedExam == 'NEET',
                 iconBgColor: const Color(0xFFEEF2FF),
                 iconWidget: CustomPaint(
-                  size: const Size(26, 26),
+                  size: const Size(24, 24),
                   painter: StethoscopeIconPainter(color: const Color(0xFF4F46E5)),
                 ),
                 onTap: () {
@@ -537,7 +538,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                 },
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             // JEE Card
             Expanded(
               child: _buildExamCard(
@@ -545,7 +546,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                 isSelected: _selectedExam == 'JEE',
                 iconBgColor: const Color(0xFFE6F4EA),
                 iconWidget: CustomPaint(
-                  size: const Size(26, 26),
+                  size: const Size(24, 24),
                   painter: DraftingCompassPainter(color: const Color(0xFF16A34A)),
                 ),
                 onTap: () {
@@ -557,7 +558,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
           ],
         ),
 
-        const SizedBox(height: 28),
+        const SizedBox(height: 22),
 
         // Section 2: Select Subjects
         Row(
@@ -566,7 +567,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
             const Text(
               'Select Subjects',
               style: TextStyle(
-                fontSize: 17,
+                fontSize: 16,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF0F172A),
               ),
@@ -576,7 +577,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
               child: Text(
                 allSelected ? 'Deselect All' : 'Select All',
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF4F46E5),
                 ),
@@ -584,15 +585,15 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
             ),
           ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         const Text(
           'Choose one or more subjects',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 13,
             color: Color(0xFF64748B),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
 
         // Subject Cards List
         if (_availableSubjects.isEmpty)
@@ -605,33 +606,33 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                 desc: 'Explore concepts of matter, energy and motion',
                 iconBgColor: const Color(0xFFEEF2FF),
                 iconWidget: CustomPaint(
-                  size: const Size(24, 24),
+                  size: const Size(22, 22),
                   painter: AtomIconPainter(color: const Color(0xFF6366F1)),
                 ),
                 isSelected: true,
                 onChanged: (v) {},
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               _buildSubjectCard(
                 id: 'chem',
                 name: 'Chemistry',
                 desc: 'Structure of matter and chemical reactions',
                 iconBgColor: const Color(0xFFE0F2FE),
                 iconWidget: CustomPaint(
-                  size: const Size(24, 24),
+                  size: const Size(22, 22),
                   painter: FlaskIconPainter(color: const Color(0xFF0284C7)),
                 ),
                 isSelected: true,
                 onChanged: (v) {},
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               _buildSubjectCard(
                 id: 'bio',
                 name: 'Biology',
                 desc: 'Living organisms and life processes',
                 iconBgColor: const Color(0xFFDCFCE7),
                 iconWidget: CustomPaint(
-                  size: const Size(24, 24),
+                  size: const Size(22, 22),
                   painter: LeafIconPainter(color: const Color(0xFF16A34A)),
                 ),
                 isSelected: true,
@@ -646,7 +647,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
 
               Color iconBg = const Color(0xFFEEF2FF);
               Widget painterWidget = CustomPaint(
-                size: const Size(24, 24),
+                size: const Size(22, 22),
                 painter: AtomIconPainter(color: const Color(0xFF6366F1)),
               );
               String desc = 'Explore subject concepts and topics';
@@ -654,32 +655,32 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
               if (sub.name.toLowerCase().contains('physics')) {
                 iconBg = const Color(0xFFEEF2FF);
                 painterWidget = CustomPaint(
-                  size: const Size(24, 24),
+                  size: const Size(22, 22),
                   painter: AtomIconPainter(color: const Color(0xFF6366F1)),
                 );
                 desc = 'Explore concepts of matter, energy and motion';
               } else if (sub.name.toLowerCase().contains('chem')) {
                 iconBg = const Color(0xFFE0F2FE);
                 painterWidget = CustomPaint(
-                  size: const Size(24, 24),
+                  size: const Size(22, 22),
                   painter: FlaskIconPainter(color: const Color(0xFF0284C7)),
                 );
                 desc = 'Structure of matter and chemical reactions';
               } else if (sub.name.toLowerCase().contains('bio')) {
                 iconBg = const Color(0xFFDCFCE7);
                 painterWidget = CustomPaint(
-                  size: const Size(24, 24),
+                  size: const Size(22, 22),
                   painter: LeafIconPainter(color: const Color(0xFF16A34A)),
                 );
                 desc = 'Living organisms and life processes';
               } else if (sub.name.toLowerCase().contains('math')) {
                 iconBg = const Color(0xFFFEF3C7);
-                painterWidget = const Icon(Icons.functions_rounded, color: Color(0xFFD97706), size: 24);
+                painterWidget = const Icon(Icons.functions_rounded, color: Color(0xFFD97706), size: 22);
                 desc = 'Algebra, calculus, geometry and vectors';
               }
 
               return Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
+                padding: const EdgeInsets.only(bottom: 10.0),
                 child: _buildSubjectCard(
                   id: sub.id,
                   name: sub.name,
