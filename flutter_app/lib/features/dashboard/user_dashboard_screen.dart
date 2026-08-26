@@ -249,247 +249,35 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   Widget _buildMobileBannerCarousel() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF4338CA)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF312E81).withValues(alpha: 0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: const Color(0xFF1E1B4B).withValues(alpha: 0.25),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Left Content Area
-              Expanded(
-                flex: 65,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Limited Time Offer Badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF7C3AED),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Text(
-                        'Limited Time Offer',
-                        style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-
-                    // Title
-                    RichText(
-                      text: const TextSpan(
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white, height: 1.15),
-                        children: [
-                          TextSpan(text: 'Unlock Your '),
-                          TextSpan(text: 'Full Potential', style: TextStyle(color: Color(0xFFFACC15))),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    const Text(
-                      'Premium plans for serious aspirants',
-                      style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 10, fontWeight: FontWeight.w400),
-                    ),
-                    const SizedBox(height: 6),
-
-                    // Compact Feature List
-                    const Wrap(
-                      spacing: 6,
-                      runSpacing: 2,
-                      children: [
-                        Text('♾️ Unlimited Tests', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
-                        Text('📊 Analytics', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
-                        Text('🏆 AIR', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Yellow Action CTA Button
-                    InkWell(
-                      onTap: () {},
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFACC15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'View Plans',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                            ),
-                            SizedBox(width: 2),
-                            Icon(Icons.chevron_right_rounded, size: 14, color: Color(0xFF0F172A)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // Right Graphic: Sleek Pricing Tiers & Crown Gift Box
-              Expanded(
-                flex: 35,
-                child: SizedBox(
-                  height: 135,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Background Starter Card (Left Offset)
-                      Positioned(
-                        left: 0,
-                        top: 22,
-                        child: Container(
-                          width: 54,
-                          padding: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
-                          ),
-                          child: const Column(
-                            children: [
-                              Text('Starter', style: TextStyle(fontSize: 7, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
-                              Text('₹149', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                              Text('100 Tests', style: TextStyle(fontSize: 6, color: Color(0xFF94A3B8))),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Background Premium Card (Right Offset)
-                      Positioned(
-                        right: 0,
-                        top: 22,
-                        child: Container(
-                          width: 54,
-                          padding: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
-                          ),
-                          child: const Column(
-                            children: [
-                              Text('Premium', style: TextStyle(fontSize: 7, fontWeight: FontWeight.w600, color: Color(0xFF7C3AED))),
-                              Text('₹499', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                              Text('All Features', style: TextStyle(fontSize: 6, color: Color(0xFF94A3B8))),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Foreground Pro Card (Elevated Middle)
-                      Positioned(
-                        top: 4,
-                        child: Container(
-                          width: 68,
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFF43F5E), width: 1.5),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 4)),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF43F5E),
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                                child: const Text(
-                                  'POPULAR',
-                                  style: TextStyle(color: Colors.white, fontSize: 6, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              const Text('Pro', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF7C3AED))),
-                              const Text('₹299', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-                              const Text('/month', style: TextStyle(fontSize: 6, color: Color(0xFF64748B))),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // Crown Gift Tag Badge (Bottom Right Overlay)
-                      Positioned(
-                        bottom: 0,
-                        right: 2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFACC15),
-                            borderRadius: BorderRadius.circular(6),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 4, offset: const Offset(0, 2)),
-                            ],
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text('👑 ', style: TextStyle(fontSize: 8)),
-                              Text(
-                                'UP TO 40% OFF',
-                                style: TextStyle(fontSize: 7, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // Pagination Dots Indicator
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(5, (index) {
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: AspectRatio(
+          aspectRatio: 2.7,
+          child: Image.asset(
+            'assets/images/promo_banner.png',
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
               return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                width: index == 1 ? 14 : 4,
-                height: 3,
-                decoration: BoxDecoration(
-                  color: index == 1 ? Colors.white : Colors.white38,
-                  borderRadius: BorderRadius.circular(2),
+                color: const Color(0xFF1E1B4B),
+                alignment: Alignment.center,
+                child: const Text(
+                  'Unlock Your Full Potential',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
               );
-            }),
+            },
           ),
-        ],
+        ),
       ),
     );
   }
