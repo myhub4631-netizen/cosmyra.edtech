@@ -28,11 +28,70 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
   final Set<String> _selectedChapterIds = {};
 
   // Screen 2 specific selection states matching exact screenshot
-  final Set<String> _selectedChapterNames = {'Mechanics', 'Thermodynamics', 'Optics'};
-  bool _showMoreChapters = false;
+  final TextEditingController _chapterSearchController = TextEditingController();
+  String _chapterSearchQuery = '';
+  final Set<int> _expandedChapterIndices = {1}; // Chapter 1 expanded by default
+  final Set<String> _selectedSubjectTabs = {'Physics', 'Chemistry', 'Biology'};
 
+  final List<Map<String, dynamic>> _screen2ChaptersList = [
+    {
+      'number': 1,
+      'name': 'Physical World and Measurement',
+      'topicsCountText': '6 Topics Selected',
+      'isSelected': true,
+      'subtopics': [
+        {'id': '1.1', 'name': 'Units and Measurements', 'isSelected': true},
+        {'id': '1.2', 'name': 'Dimensional Analysis', 'isSelected': true},
+        {'id': '1.3', 'name': 'Error Analysis', 'isSelected': true},
+        {'id': '1.4', 'name': 'Significant Figures', 'isSelected': false},
+        {'id': '1.5', 'name': 'Vector and Scalars', 'isSelected': true},
+        {'id': '1.6', 'name': 'Measurement of Physical Quantities', 'isSelected': false},
+      ],
+    },
+    {
+      'number': 2,
+      'name': 'Kinematics',
+      'topicsCountText': '8 Topics Selected',
+      'isSelected': true,
+      'subtopics': <Map<String, dynamic>>[
+        {'id': '2.1', 'name': 'Motion in a Straight Line', 'isSelected': true},
+        {'id': '2.2', 'name': 'Motion in a Plane', 'isSelected': true},
+      ],
+    },
+    {
+      'number': 3,
+      'name': 'Laws of Motion',
+      'topicsCountText': '7 Topics Selected',
+      'isSelected': true,
+      'subtopics': <Map<String, dynamic>>[
+        {'id': '3.1', 'name': 'Newton\'s First Law', 'isSelected': true},
+        {'id': '3.2', 'name': 'Momentum and Impulse', 'isSelected': true},
+      ],
+    },
+    {
+      'number': 4,
+      'name': 'Work, Energy and Power',
+      'topicsCountText': '3 Topics Selected',
+      'isSelected': false,
+      'subtopics': <Map<String, dynamic>>[
+        {'id': '4.1', 'name': 'Work Done by Constant Force', 'isSelected': false},
+        {'id': '4.2', 'name': 'Kinetic and Potential Energy', 'isSelected': false},
+      ],
+    },
+    {
+      'number': 5,
+      'name': 'Motion of System of Particles',
+      'topicsCountText': '0 Topic Selected',
+      'isSelected': false,
+      'subtopics': <Map<String, dynamic>>[
+        {'id': '5.1', 'name': 'Center of Mass', 'isSelected': false},
+        {'id': '5.2', 'name': 'Rigid Body Rotation', 'isSelected': false},
+      ],
+    },
+  ];
+
+  final Set<String> _selectedChapterNames = {'Mechanics', 'Thermodynamics', 'Optics'};
   final Set<String> _selectedTopicNames = {'Laws of Motion', 'Work, Energy & Power', 'Gravitation'};
-  bool _showMoreTopics = false;
 
   final Set<String> _selectedSources = {'PYQ', 'NTA', 'Practice'};
   String _selectedSource = 'PYQ';
@@ -878,397 +937,594 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
   // ==========================================
   // SCREEN 2: CHAPTERS & TOPICS SELECTION (Exact Replica)
   // ==========================================
+  // ==========================================
+  // SCREEN 2: CHAPTERS & TOPICS SELECTION (Exact Replica)
+  // ==========================================
   Widget _buildScreen2ChaptersAndTopics() {
-    final chaptersList = ['Mechanics', 'Thermodynamics', 'Electromagnetism', 'Optics'];
-    final extraChaptersList = ['Waves & Oscillations', 'Modern Physics', 'Fluid Mechanics', 'Electrostatics'];
+    final allSubjectTabsSelected = _selectedSubjectTabs.length == 3;
+    final allChaptersInPhysicsSelected = _screen2ChaptersList.every((c) => c['isSelected'] == true);
 
-    final topicsList = ['Laws of Motion', 'Work, Energy & Power', 'Rotational Motion', 'Gravitation'];
-    final extraTopicsList = ['Friction & Circular Motion', 'Center of Mass & Collisions', 'Kepler\'s Laws', 'Simple Harmonic Motion'];
-
-    final allChapters = [...chaptersList, if (_showMoreChapters) ...extraChaptersList];
-    final allTopics = [...topicsList, if (_showMoreTopics) ...extraTopicsList];
-
-    final allChaptersSelected = allChapters.every((ch) => _selectedChapterNames.contains(ch));
-    final allTopicsSelected = allTopics.every((tp) => _selectedTopicNames.contains(tp));
+    final filteredChapters = _screen2ChaptersList.where((c) {
+      if (_chapterSearchQuery.isEmpty) return true;
+      final query = _chapterSearchQuery.toLowerCase();
+      final nameMatches = (c['name'] as String).toLowerCase().contains(query);
+      final subMatches = (c['subtopics'] as List).any((s) => (s['name'] as String).toLowerCase().contains(query));
+      return nameMatches || subMatches;
+    }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Subheader step text
         const Text(
           'Step 2 of 4',
           style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF64748B),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF635BFF),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         const Text(
           'Select Chapters & Topics',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF0F172A),
+            color: Color(0xFF1E1B4B),
             letterSpacing: -0.3,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         const Text(
           'Choose the chapters and topics you want to include in your practice.',
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 13.5,
             color: Color(0xFF64748B),
-            height: 1.4,
+            height: 1.35,
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 18),
 
-        // Section 1: Select Chapters Header
+        // Selected Exam Card Container
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
+            boxShadow: const [
+              BoxShadow(
+                color: Color.fromRGBO(0, 0, 0, 0.02),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Selected Exam',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _selectedExam,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF2A1B69),
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _currentStep = 0; // Go back to exam selection screen
+                  });
+                },
+                icon: const Icon(Icons.swap_horiz_rounded, size: 18, color: Color(0xFF5E46E4)),
+                label: const Text(
+                  'Change Exam',
+                  style: TextStyle(
+                    color: Color(0xFF5E46E4),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  side: const BorderSide(color: Color(0xFFD1D5DB), width: 1.0),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  backgroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // Subjects Section Header
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Select Chapters',
+              'Subjects',
               style: TextStyle(
                 fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E1B4B),
               ),
             ),
             GestureDetector(
               onTap: () {
                 setState(() {
-                  if (allChaptersSelected) {
-                    _selectedChapterNames.clear();
+                  if (allSubjectTabsSelected) {
+                    _selectedSubjectTabs.clear();
                   } else {
-                    _selectedChapterNames.addAll(allChapters);
+                    _selectedSubjectTabs.addAll(['Physics', 'Chemistry', 'Biology']);
                   }
                 });
               },
               child: const Text(
-                'Select All',
+                'Select All Subjects',
                 style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF4F46E5),
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF5E46E4),
                 ),
               ),
             ),
           ],
         ),
+
         const SizedBox(height: 12),
 
-        // Main Chapter Cards
-        ...chaptersList.map((chName) => _buildChapterCard(
-              name: chName,
-              isSelected: _selectedChapterNames.contains(chName),
-              onTap: (selected) {
-                setState(() {
-                  if (selected) {
-                    _selectedChapterNames.add(chName);
-                  } else {
-                    _selectedChapterNames.remove(chName);
-                  }
-                });
-              },
-            )),
-
-        // Extra Chapters if expanded
-        if (_showMoreChapters)
-          ...extraChaptersList.map((chName) => _buildChapterCard(
-                name: chName,
-                isSelected: _selectedChapterNames.contains(chName),
-                onTap: (selected) {
-                  setState(() {
-                    if (selected) {
-                      _selectedChapterNames.add(chName);
-                    } else {
-                      _selectedChapterNames.remove(chName);
-                    }
-                  });
-                },
-              )),
-
-        // Expandable "+ Add more chapters" Card
-        _buildExpandableAddCard(
-          title: 'Add more chapters',
-          isExpanded: _showMoreChapters,
-          onTap: () => setState(() => _showMoreChapters = !_showMoreChapters),
-        ),
-
-        const SizedBox(height: 28),
-
-        // Section 2: Select Topics Header
+        // 3 Subject Cards Side by Side (Physics, Chemistry, Biology)
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Select Topics',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A),
+            // Physics Card
+            Expanded(
+              child: _buildSubjectSelectCard(
+                title: 'Physics',
+                count: '68',
+                bgColor: const Color(0xFFF5F3FF),
+                borderColor: const Color(0xFFC7D2FE),
+                iconAvatarColor: const Color(0xFFEEF2FF),
+                iconWidget: CustomPaint(
+                  size: const Size(20, 20),
+                  painter: AtomIconPainter(color: const Color(0xFF6366F1)),
+                ),
+                isSelected: _selectedSubjectTabs.contains('Physics'),
+                onTap: () {
+                  setState(() {
+                    if (_selectedSubjectTabs.contains('Physics')) {
+                      _selectedSubjectTabs.remove('Physics');
+                    } else {
+                      _selectedSubjectTabs.add('Physics');
+                    }
+                  });
+                },
               ),
             ),
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  if (allTopicsSelected) {
-                    _selectedTopicNames.clear();
-                  } else {
-                    _selectedTopicNames.addAll(allTopics);
-                  }
-                });
-              },
-              child: const Text(
-                'Select All',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF4F46E5),
+            const SizedBox(width: 10),
+
+            // Chemistry Card
+            Expanded(
+              child: _buildSubjectSelectCard(
+                title: 'Chemistry',
+                count: '62',
+                bgColor: const Color(0xFFF0F9FF),
+                borderColor: const Color(0xFFBAE6FD),
+                iconAvatarColor: const Color(0xFFE0F2FE),
+                iconWidget: CustomPaint(
+                  size: const Size(20, 20),
+                  painter: FlaskIconPainter(color: const Color(0xFF0284C7)),
                 ),
+                isSelected: _selectedSubjectTabs.contains('Chemistry'),
+                onTap: () {
+                  setState(() {
+                    if (_selectedSubjectTabs.contains('Chemistry')) {
+                      _selectedSubjectTabs.remove('Chemistry');
+                    } else {
+                      _selectedSubjectTabs.add('Chemistry');
+                    }
+                  });
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+
+            // Biology Card
+            Expanded(
+              child: _buildSubjectSelectCard(
+                title: 'Biology',
+                count: '89',
+                bgColor: const Color(0xFFF0FDF4),
+                borderColor: const Color(0xFFBBF7D0),
+                iconAvatarColor: const Color(0xFFDCFCE7),
+                iconWidget: CustomPaint(
+                  size: const Size(20, 20),
+                  painter: LeafIconPainter(color: const Color(0xFF16A34A)),
+                ),
+                isSelected: _selectedSubjectTabs.contains('Biology'),
+                onTap: () {
+                  setState(() {
+                    if (_selectedSubjectTabs.contains('Biology')) {
+                      _selectedSubjectTabs.remove('Biology');
+                    } else {
+                      _selectedSubjectTabs.add('Biology');
+                    }
+                  });
+                },
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
 
-        // Main Topic Cards
-        ...topicsList.map((tpName) => _buildTopicCard(
-              name: tpName,
-              isSelected: _selectedTopicNames.contains(tpName),
-              onTap: (selected) {
-                setState(() {
-                  if (selected) {
-                    _selectedTopicNames.add(tpName);
-                  } else {
-                    _selectedTopicNames.remove(tpName);
-                  }
-                });
-              },
-            )),
+        const SizedBox(height: 20),
 
-        // Extra Topics if expanded
-        if (_showMoreTopics)
-          ...extraTopicsList.map((tpName) => _buildTopicCard(
-                name: tpName,
-                isSelected: _selectedTopicNames.contains(tpName),
-                onTap: (selected) {
-                  setState(() {
-                    if (selected) {
-                      _selectedTopicNames.add(tpName);
-                    } else {
-                      _selectedTopicNames.remove(tpName);
-                    }
-                  });
-                },
-              )),
+        // Outer Chapters & Topics White Container Box
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
+            boxShadow: const [
+              BoxShadow(
+                color: Color.fromRGBO(0, 0, 0, 0.02),
+                blurRadius: 10,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header inside Chapters Box
+              Row(
+                children: [
+                  Container(
+                    width: 3.5,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4F46E5),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Physics',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    '68 Chapters • 182 Topics',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        final targetVal = !allChaptersInPhysicsSelected;
+                        for (final c in _screen2ChaptersList) {
+                          c['isSelected'] = targetVal;
+                          for (final sub in (c['subtopics'] as List)) {
+                            sub['isSelected'] = targetVal;
+                          }
+                        }
+                      });
+                    },
+                    child: const Text(
+                      'Select All Chapters',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF5E46E4),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildPurpleCheckbox(
+                    isChecked: allChaptersInPhysicsSelected,
+                    onTap: () {
+                      setState(() {
+                        final targetVal = !allChaptersInPhysicsSelected;
+                        for (final c in _screen2ChaptersList) {
+                          c['isSelected'] = targetVal;
+                          for (final sub in (c['subtopics'] as List)) {
+                            sub['isSelected'] = targetVal;
+                          }
+                        }
+                      });
+                    },
+                  ),
+                ],
+              ),
 
-        // Expandable "+ Add more topics" Card
-        _buildExpandableAddCard(
-          title: 'Add more topics',
-          isExpanded: _showMoreTopics,
-          onTap: () => setState(() => _showMoreTopics = !_showMoreTopics),
+              const SizedBox(height: 14),
+
+              // Search Bar Input
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFAFAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: TextField(
+                  controller: _chapterSearchController,
+                  onChanged: (val) {
+                    setState(() => _chapterSearchQuery = val);
+                  },
+                  style: const TextStyle(fontSize: 13.5, color: Color(0xFF0F172A)),
+                  decoration: const InputDecoration(
+                    hintText: 'Search chapters',
+                    hintStyle: TextStyle(fontSize: 13.5, color: Color(0xFF94A3B8)),
+                    prefixIcon: Icon(Icons.search_rounded, size: 20, color: Color(0xFF94A3B8)),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Chapters Accordion List
+              ...filteredChapters.map((ch) {
+                final int chNum = ch['number'];
+                final bool isExpanded = _expandedChapterIndices.contains(chNum);
+                final bool isChSelected = ch['isSelected'] ?? false;
+                final List subtopics = ch['subtopics'] ?? [];
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isExpanded ? const Color(0xFFC7D2FE) : const Color(0xFFE5E7EB),
+                      width: isExpanded ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      // Accordion Header
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            if (isExpanded) {
+                              _expandedChapterIndices.remove(chNum);
+                            } else {
+                              _expandedChapterIndices.add(chNum);
+                            }
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                          child: Row(
+                            children: [
+                              _buildPurpleCheckbox(
+                                isChecked: isChSelected,
+                                onTap: () {
+                                  setState(() {
+                                    final newVal = !isChSelected;
+                                    ch['isSelected'] = newVal;
+                                    for (final sub in subtopics) {
+                                      sub['isSelected'] = newVal;
+                                    }
+                                  });
+                                },
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  '$chNum. ${ch['name']}',
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${ch['topicsCountText']}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF5E46E4),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Icon(
+                                isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                size: 20,
+                                color: const Color(0xFF64748B),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Expanded Subtopics List
+                      if (isExpanded && subtopics.isNotEmpty) ...[
+                        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        ...subtopics.map((sub) {
+                          final bool isSubSelected = sub['isSelected'] ?? false;
+                          return Column(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                                child: Row(
+                                  children: [
+                                    const SizedBox(width: 12),
+                                    _buildPurpleCheckbox(
+                                      isChecked: isSubSelected,
+                                      onTap: () {
+                                        setState(() {
+                                          sub['isSelected'] = !isSubSelected;
+                                          final selectedCount = subtopics.where((s) => s['isSelected'] == true).length;
+                                          ch['topicsCountText'] = '$selectedCount Topics Selected';
+                                          ch['isSelected'] = selectedCount > 0;
+                                        });
+                                      },
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      '${sub['id']}',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        '${sub['name']}',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: isSubSelected ? FontWeight.w600 : FontWeight.w400,
+                                          color: const Color(0xFF1E293B),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (sub != subtopics.last)
+                                const Divider(height: 1, color: Color(0xFFF8FAFC), indent: 44),
+                            ],
+                          );
+                        }),
+                      ],
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
         ),
       ],
     );
   }
 
-  // Chapter Card Widget with vertical purple accent line on left
-  Widget _buildChapterCard({
-    required String name,
-    required bool isSelected,
-    required ValueChanged<bool> onTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
-        boxShadow: const [
-          BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.02),
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: InkWell(
-        onTap: () => onTap(!isSelected),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              // Left Vertical Accent Bar
-              Container(
-                width: 3,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4F46E5),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 14),
-
-              // Chapter Title
-              Expanded(
-                child: Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
-                    letterSpacing: -0.2,
-                  ),
-                ),
-              ),
-
-              // Right Purple Checkbox
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF4F46E5) : Colors.white,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
-                    width: 1.5,
-                  ),
-                ),
-                child: isSelected
-                    ? const Icon(Icons.check, size: 16, color: Colors.white)
-                    : null,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Topic Card Widget with right chevron icon on left
-  Widget _buildTopicCard({
-    required String name,
-    required bool isSelected,
-    required ValueChanged<bool> onTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
-        boxShadow: const [
-          BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.02),
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: InkWell(
-        onTap: () => onTap(!isSelected),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              // Left Chevron Right Icon
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: Color(0xFF4F46E5),
-                size: 22,
-              ),
-              const SizedBox(width: 10),
-
-              // Topic Title
-              Expanded(
-                child: Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
-                    letterSpacing: -0.2,
-                  ),
-                ),
-              ),
-
-              // Right Purple Checkbox
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF4F46E5) : Colors.white,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
-                    width: 1.5,
-                  ),
-                ),
-                child: isSelected
-                    ? const Icon(Icons.check, size: 16, color: Colors.white)
-                    : null,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Expandable Add More Card Widget
-  Widget _buildExpandableAddCard({
+  // Reusable subject card widget for Screen 2 (Physics, Chemistry, Biology)
+  Widget _buildSubjectSelectCard({
     required String title,
-    required bool isExpanded,
+    required String count,
+    required Color bgColor,
+    required Color borderColor,
+    required Color iconAvatarColor,
+    required Widget iconWidget,
+    required bool isSelected,
     required VoidCallback onTap,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
-        boxShadow: const [
-          BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.02),
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.add_rounded,
-                size: 18,
-                color: Color(0xFF475569),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              const Spacer(),
-              Icon(
-                isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                size: 22,
-                color: const Color(0xFF64748B),
-              ),
-            ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? borderColor : const Color(0xFFE2E8F0),
+            width: isSelected ? 1.5 : 1.0,
           ),
         ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: iconAvatarColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(child: iconWidget),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4F46E5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    count,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                _buildPurpleCheckbox(
+                  isChecked: isSelected,
+                  onTap: onTap,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Standardized Purple Checkbox matching screenshot
+  Widget _buildPurpleCheckbox({required bool isChecked, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 22,
+        height: 22,
+        decoration: BoxDecoration(
+          color: isChecked ? const Color(0xFF4F46E5) : Colors.white,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isChecked ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
+            width: 1.5,
+          ),
+        ),
+        child: isChecked
+            ? const Icon(Icons.check_rounded, size: 15, color: Colors.white)
+            : null,
       ),
     );
   }
