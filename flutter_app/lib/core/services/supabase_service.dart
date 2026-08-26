@@ -30,6 +30,14 @@ class SupabaseService {
     }
   }
 
+  static final List<UserProfileModel> _localRegisteredUsers = [];
+
+  static void addLocalUser(UserProfileModel user) {
+    if (!_localRegisteredUsers.any((u) => u.email.toLowerCase() == user.email.toLowerCase())) {
+      _localRegisteredUsers.insert(0, user);
+    }
+  }
+
   // ================= AUTHENTICATION =================
   static Future<UserProfileModel> signUp({
     required String email,
@@ -68,27 +76,28 @@ class SupabaseService {
         rank: 0,
       );
 
-      if (res.user != null) {
-        try {
-          await client.from('profiles').upsert({
-            'id': userId,
-            'email': email,
-            'full_name': fullName,
-            'phone': phone,
-            'phone_number': phone,
-            'target_exam': targetExam,
-            'target_year': targetYear,
-            'role': role,
-            'study_streak': 1,
-            'questions_attempted': 0,
-            'total_correct': 0,
-            'accuracy': 0.0,
-            'rank': 0,
-          });
-        } catch (pe) {
-          debugPrint('Profile upsert warning: $pe');
-        }
+      addLocalUser(realProfile);
+
+      try {
+        await client.from('profiles').upsert({
+          'id': userId,
+          'email': email,
+          'full_name': fullName,
+          'phone': phone,
+          'phone_number': phone,
+          'target_exam': targetExam,
+          'target_year': targetYear,
+          'role': role,
+          'study_streak': 1,
+          'questions_attempted': 0,
+          'total_correct': 0,
+          'accuracy': 0.0,
+          'rank': 0,
+        });
+      } catch (pe) {
+        debugPrint('Profile upsert warning: $pe');
       }
+
       return realProfile;
     } catch (e) {
       debugPrint('Error signing up: $e');
@@ -141,14 +150,26 @@ class SupabaseService {
   }
 
   static Future<List<UserProfileModel>> fetchAllProfiles() async {
+    List<UserProfileModel> remoteProfiles = [];
     try {
       final response = await client.from('profiles').select('*').order('created_at', ascending: false);
-      final List<dynamic> data = response as List<dynamic>;
-      return data.map((json) => UserProfileModel.fromJson(json)).toList();
+      final data = response as List<dynamic>;
+      remoteProfiles = data.map((json) => UserProfileModel.fromJson(json as Map<String, dynamic>)).toList();
     } catch (e) {
       debugPrint('Error fetching all profiles from Supabase: $e');
-      return [];
     }
+
+    final combined = <UserProfileModel>[];
+    final seenEmails = <String>{};
+
+    for (final p in [...remoteProfiles, ..._localRegisteredUsers]) {
+      if (!seenEmails.contains(p.email.toLowerCase())) {
+        seenEmails.add(p.email.toLowerCase());
+        combined.add(p);
+      }
+    }
+
+    return combined;
   }
 
   static UserProfileModel getMockProfile({String role = 'student'}) {

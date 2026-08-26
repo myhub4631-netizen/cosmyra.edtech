@@ -601,6 +601,29 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         ),
         Row(
           children: [
+            // Refresh Data Button
+            OutlinedButton.icon(
+              onPressed: () {
+                _loadRealUsersFromSupabase();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Refreshing live user profiles from Supabase...'),
+                    duration: Duration(seconds: 2),
+                    backgroundColor: Color(0xFF6366F1),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.refresh_rounded, size: 16, color: Color(0xFF6366F1)),
+              label: const Text('Refresh', style: TextStyle(color: Color(0xFF6366F1), fontSize: 13, fontWeight: FontWeight.w600)),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(width: 10),
+
             // Import Users Button
             OutlinedButton.icon(
               onPressed: _showImportUsersModal,
