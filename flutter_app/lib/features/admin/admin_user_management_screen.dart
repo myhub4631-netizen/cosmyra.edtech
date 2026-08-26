@@ -1489,7 +1489,68 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
           // Detail Properties List
           _buildDetailRow(Icons.phone_outlined, 'Phone', u.phone),
-          _buildDetailRow(Icons.person_outline, 'Role', u.role),
+          
+          const SizedBox(height: 12),
+          const Text('Reassign Role', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+          const SizedBox(height: 6),
+          Container(
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF2FF),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFC7D2FE)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: ['Student', 'Educator', 'Administrator', 'Super Administrator', 'Content Moderator'].contains(u.role)
+                    ? u.role
+                    : 'Student',
+                isExpanded: true,
+                style: const TextStyle(fontSize: 13, color: Color(0xFF4338CA), fontWeight: FontWeight.bold),
+                items: ['Student', 'Educator', 'Administrator', 'Super Administrator', 'Content Moderator']
+                    .map((rl) => DropdownMenuItem(value: rl, child: Text(rl)))
+                    .toList(),
+                onChanged: (newRole) async {
+                  if (newRole != null) {
+                    await SupabaseService.updateUserRole(userId: u.id, role: newRole);
+                    setState(() {
+                      final idx = _allUsers.indexWhere((item) => item.id == u.id);
+                      if (idx != -1) {
+                        _allUsers[idx] = AdminUserModel(
+                          id: u.id,
+                          name: u.name,
+                          email: u.email,
+                          userIdCode: u.userIdCode,
+                          role: newRole,
+                          examAccess: u.examAccess,
+                          status: u.status,
+                          lastActive: u.lastActive,
+                          joinedOn: u.joinedOn,
+                          phone: u.phone,
+                          regSource: u.regSource,
+                          adminNotes: u.adminNotes,
+                          avatarInitials: u.avatarInitials,
+                          avatarColor: u.avatarColor,
+                        );
+                        _selectedUserForDetail = _allUsers[idx];
+                      }
+                    });
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Role successfully updated to [$newRole] for ${u.name}!'),
+                          backgroundColor: const Color(0xFF10B981),
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
           _buildDetailRow(Icons.calendar_today_outlined, 'Registered On', u.joinedOn),
           _buildDetailRow(Icons.schedule_outlined, 'Last Active', u.lastActive),
 
@@ -1531,10 +1592,10 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                 isExpanded: true,
                 style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
                 items: ['Active', 'Suspended', 'Pending', 'Blocked'].map((st) => DropdownMenuItem(value: st, child: Text(st))).toList(),
-                onChanged: (val) {
+                onChanged: (val) async {
                   if (val != null) {
+                    await SupabaseService.updateUserStatus(userId: u.id, status: val);
                     setState(() {
-                      // Update user status
                       final idx = _allUsers.indexWhere((item) => item.id == u.id);
                       if (idx != -1) {
                         _allUsers[idx] = AdminUserModel(
@@ -1556,6 +1617,14 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                         _selectedUserForDetail = _allUsers[idx];
                       }
                     });
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Status updated to [$val] for ${u.name}!'),
+                          backgroundColor: const Color(0xFF6366F1),
+                        ),
+                      );
+                    }
                   }
                 },
               ),
@@ -1784,7 +1853,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                 DropdownButtonFormField<String>(
                   value: role,
                   decoration: const InputDecoration(labelText: 'Role', border: OutlineInputBorder()),
-                  items: ['Student', 'Educator', 'Administrator'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
+                  items: ['Student', 'Educator', 'Administrator', 'Super Administrator', 'Content Moderator'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
                   onChanged: (val) => setDialogState(() => role = val!),
                 ),
                 const SizedBox(height: 20),
@@ -1838,74 +1907,89 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   void _showEditUserModal(AdminUserModel user) {
     final nameCtrl = TextEditingController(text: user.name);
     final emailCtrl = TextEditingController(text: user.email);
-    String role = user.role;
+    String role = ['Student', 'Educator', 'Administrator', 'Super Administrator', 'Content Moderator'].contains(user.role)
+        ? user.role
+        : 'Student';
 
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          width: 500,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Edit User: ${user.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder())),
-              const SizedBox(height: 12),
-              TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder())),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: role,
-                decoration: const InputDecoration(labelText: 'Role', border: OutlineInputBorder()),
-                items: ['Student', 'Educator', 'Administrator'].map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
-                onChanged: (val) => role = val!,
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      final idx = _allUsers.indexWhere((u) => u.id == user.id);
-                      if (idx != -1) {
-                        _allUsers[idx] = AdminUserModel(
-                          id: user.id,
-                          name: nameCtrl.text.trim(),
-                          email: emailCtrl.text.trim(),
-                          userIdCode: user.userIdCode,
-                          role: role,
-                          examAccess: user.examAccess,
-                          status: user.status,
-                          lastActive: user.lastActive,
-                          joinedOn: user.joinedOn,
-                          phone: user.phone,
-                          regSource: user.regSource,
-                          adminNotes: user.adminNotes,
-                          avatarInitials: user.avatarInitials,
-                          avatarColor: user.avatarColor,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            width: 500,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Edit User & Reassign Role: ${user.name}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder())),
+                const SizedBox(height: 12),
+                TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder())),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: role,
+                  decoration: const InputDecoration(labelText: 'Reassign User Role', border: OutlineInputBorder()),
+                  items: ['Student', 'Educator', 'Administrator', 'Super Administrator', 'Content Moderator']
+                      .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                      .toList(),
+                  onChanged: (val) => setDialogState(() => role = val!),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await SupabaseService.updateUserRole(userId: user.id, role: role);
+                      setState(() {
+                        final idx = _allUsers.indexWhere((u) => u.id == user.id);
+                        if (idx != -1) {
+                          _allUsers[idx] = AdminUserModel(
+                            id: user.id,
+                            name: nameCtrl.text.trim(),
+                            email: emailCtrl.text.trim(),
+                            userIdCode: user.userIdCode,
+                            role: role,
+                            examAccess: user.examAccess,
+                            status: user.status,
+                            lastActive: user.lastActive,
+                            joinedOn: user.joinedOn,
+                            phone: user.phone,
+                            regSource: user.regSource,
+                            adminNotes: user.adminNotes,
+                            avatarInitials: user.avatarInitials,
+                            avatarColor: user.avatarColor,
+                          );
+                          if (_selectedUserForDetail?.id == user.id) {
+                            _selectedUserForDetail = _allUsers[idx];
+                          }
+                        }
+                      });
+                      if (mounted) {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('User ${nameCtrl.text} role updated to [$role]!'),
+                            backgroundColor: const Color(0xFF10B981),
+                          ),
                         );
                       }
-                    });
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('User updated successfully!'), backgroundColor: Color(0xFF10B981)),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5)),
-                  child: const Text('Save Changes', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5)),
+                    child: const Text('Save & Apply Role', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

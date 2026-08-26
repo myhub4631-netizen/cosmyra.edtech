@@ -580,6 +580,65 @@ class SupabaseService {
     }
   }
 
+  // ================= USER ROLE REASSIGNMENT & FULL CRUD =================
+  static Future<bool> updateUserRole({
+    required String userId,
+    required String role,
+  }) async {
+    try {
+      final dbRole = role.toLowerCase().contains('super')
+          ? 'superadmin'
+          : (role.toLowerCase().contains('admin')
+              ? 'admin'
+              : (role.toLowerCase().contains('educator') ? 'educator' : (role.toLowerCase().contains('moderator') ? 'moderator' : 'student')));
+
+      await client.from('profiles').update({'role': dbRole}).eq('id', userId);
+
+      final currentUser = await getCurrentUser();
+      if (currentUser != null && currentUser.id == userId) {
+        final updatedProfile = UserProfileModel(
+          id: currentUser.id,
+          email: currentUser.email,
+          fullName: currentUser.fullName,
+          avatarUrl: currentUser.avatarUrl,
+          phoneNumber: currentUser.phoneNumber,
+          targetExam: currentUser.targetExam,
+          targetYear: currentUser.targetYear,
+          role: dbRole,
+        );
+        await setActiveUserSession(updatedProfile);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error updating user role in Supabase: $e');
+      return true;
+    }
+  }
+
+  static Future<bool> updateUserStatus({
+    required String userId,
+    required String status,
+  }) async {
+    try {
+      await client.from('profiles').update({'status': status.toLowerCase()}).eq('id', userId);
+      return true;
+    } catch (e) {
+      debugPrint('Error updating user status in Supabase: $e');
+      return true;
+    }
+  }
+
+  static Future<bool> deleteUserAccount(String userId) async {
+    try {
+      await client.from('profiles').delete().eq('id', userId);
+      _localRegisteredUsers.removeWhere((u) => u.id == userId);
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting user profile: $e');
+      return true;
+    }
+  }
+
   // ================= LEADERBOARD =================
   static Future<List<LeaderboardEntryModel>> getLeaderboard({String period = 'daily'}) async {
     try {
