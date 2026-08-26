@@ -65,6 +65,9 @@ ON public.profiles FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);
 CREATE POLICY "Users can update their own profile" 
 ON public.profiles FOR UPDATE TO authenticated USING (auth.uid() = id);
 
+CREATE POLICY "Admins can manage all profiles" 
+ON public.profiles FOR ALL TO authenticated USING (public.is_admin(auth.uid()));
+
 -- 2. USER ROLES
 CREATE POLICY "Admins can view and manage all user roles"
 ON public.user_roles FOR ALL TO authenticated USING (public.is_admin(auth.uid()));
