@@ -76,7 +76,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       _selectedIndex = 0; // Front Landing Page
     }
 
-    _currentUser = SupabaseService.getMockProfile(role: 'admin');
+    _currentUser = SupabaseService.getMockProfile(role: 'student');
     _loadUser();
   }
 

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/services/supabase_service.dart';
+import '../../models/models.dart';
 
 class SignUpScreen extends StatefulWidget {
   final VoidCallback? onLoginTap;
-  final VoidCallback? onSignUpSuccess;
+  final Function(UserProfileModel)? onSignUpSuccess;
 
   const SignUpScreen({
     Key? key,
@@ -57,7 +58,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      await SupabaseService.signUp(
+      final userProfile = await SupabaseService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         fullName: _fullNameController.text.trim(),
@@ -72,7 +73,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           ),
         );
         if (widget.onSignUpSuccess != null) {
-          widget.onSignUpSuccess!();
+          widget.onSignUpSuccess!(userProfile);
         } else {
           Navigator.pushReplacementNamed(context, '/');
         }

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/services/supabase_service.dart';
+import '../../models/models.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback? onSignUpTap;
-  final VoidCallback? onLoginSuccess;
+  final Function(UserProfileModel)? onLoginSuccess;
 
   const LoginScreen({
     Key? key,
@@ -46,6 +47,21 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
 
+      final userProfile = await SupabaseService.getCurrentUser() ??
+          UserProfileModel(
+            id: 'usr-${DateTime.now().millisecondsSinceEpoch}',
+            email: _emailController.text.trim(),
+            fullName: _emailController.text.split('@').first,
+            targetExam: 'NEET',
+            targetYear: 2026,
+            role: 'student',
+            studyStreak: 1,
+            questionsAttempted: 0,
+            totalCorrect: 0,
+            accuracy: 0.0,
+            rank: 0,
+          );
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -54,7 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
         if (widget.onLoginSuccess != null) {
-          widget.onLoginSuccess!();
+          widget.onLoginSuccess!(userProfile);
         } else {
           Navigator.pushReplacementNamed(context, '/');
         }

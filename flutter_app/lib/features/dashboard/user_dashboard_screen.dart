@@ -215,13 +215,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: Colors.amber.withOpacity(0.3)),
                           ),
-                          child: const Row(
+                          child: Row(
                             children: [
-                              Icon(Icons.local_fire_department_rounded, size: 14, color: Colors.amber),
-                              SizedBox(width: 4),
+                              const Icon(Icons.local_fire_department_rounded, size: 14, color: Colors.amber),
+                              const SizedBox(width: 4),
                               Text(
-                                '12 Day Streak',
-                                style: TextStyle(
+                                '${widget.userProfile.studyStreak} Day Streak',
+                                style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.amber,
@@ -259,23 +259,25 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                             width: 80,
                             height: 80,
                             child: CircularProgressIndicator(
-                              value: 0.70,
+                              value: widget.userProfile.questionsAttempted > 0
+                                  ? ((widget.userProfile.questionsAttempted % 50) / 50.0).clamp(0.1, 1.0)
+                                  : 0.0,
                               strokeWidth: 8,
                               backgroundColor: Colors.white.withOpacity(0.1),
                               valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
                             ),
                           ),
-                          const Column(
+                          Column(
                             children: [
                               Text(
-                                '35 / 50',
-                                style: TextStyle(
+                                '${widget.userProfile.questionsAttempted % 50} / 50',
+                                style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
                                   color: Colors.white,
                                 ),
                               ),
-                              Text(
+                              const Text(
                                 'Questions',
                                 style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
                               ),
@@ -288,18 +290,20 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                         width: 100,
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(4),
-                          child: const LinearProgressIndicator(
-                            value: 0.70,
+                          child: LinearProgressIndicator(
+                            value: widget.userProfile.questionsAttempted > 0
+                                ? ((widget.userProfile.questionsAttempted % 50) / 50.0).clamp(0.0, 1.0)
+                                : 0.0,
                             minHeight: 6,
-                            backgroundColor: Color(0xFF334155),
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+                            backgroundColor: const Color(0xFF334155),
+                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
                           ),
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        '70%',
-                        style: TextStyle(fontSize: 10, color: Color(0xFF10B981), fontWeight: FontWeight.w700),
+                      Text(
+                        '${(((widget.userProfile.questionsAttempted % 50) / 50.0) * 100).toInt()}%',
+                        style: const TextStyle(fontSize: 10, color: Color(0xFF10B981), fontWeight: FontWeight.w700),
                       ),
                     ],
                   ),
@@ -317,8 +321,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     final metrics = [
       {
         'title': 'Questions Attempted',
-        'value': '1,420',
-        'sub': '+48 today',
+        'value': '${widget.userProfile.questionsAttempted}',
+        'sub': widget.userProfile.questionsAttempted > 0 ? '+${widget.userProfile.questionsAttempted} solved' : '0 today',
         'icon': Icons.bolt_rounded,
         'iconBg': const Color(0xFFEEF2FF),
         'iconColor': const Color(0xFF6366F1),
@@ -326,8 +330,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       },
       {
         'title': 'Accuracy Rate',
-        'value': '84.5%',
-        'sub': '+2.3%',
+        'value': '${widget.userProfile.accuracy.toStringAsFixed(1)}%',
+        'sub': widget.userProfile.accuracy > 0 ? '${widget.userProfile.accuracy.toStringAsFixed(1)}%' : '0.0%',
         'icon': Icons.track_changes_rounded,
         'iconBg': const Color(0xFFECFDF5),
         'iconColor': const Color(0xFF10B981),
@@ -335,8 +339,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       },
       {
         'title': 'Tests Completed',
-        'value': '24',
-        'sub': '+3 this week',
+        'value': '${(widget.userProfile.questionsAttempted / 20).floor()}',
+        'sub': '${(widget.userProfile.questionsAttempted / 20).floor()} tests',
         'icon': Icons.description_outlined,
         'iconBg': const Color(0xFFEFF6FF),
         'iconColor': const Color(0xFF3B82F6),
@@ -344,8 +348,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       },
       {
         'title': 'Average Test Score',
-        'value': '560 / 720',
-        'sub': '+34 this week',
+        'value': '${widget.userProfile.totalCorrect * 4} / 720',
+        'sub': '${widget.userProfile.totalCorrect} correct',
         'icon': Icons.workspace_premium_rounded,
         'iconBg': const Color(0xFFF3E8FF),
         'iconColor': const Color(0xFFA855F7),

@@ -31,11 +31,14 @@ class SupabaseService {
   }
 
   // ================= AUTHENTICATION =================
-  static Future<AuthResponse?> signUp({
+  static Future<UserProfileModel> signUp({
     required String email,
     required String password,
     required String fullName,
     required String phone,
+    String targetExam = 'NEET',
+    int targetYear = 2026,
+    String role = 'student',
   }) async {
     try {
       final res = await client.auth.signUp(
@@ -44,22 +47,49 @@ class SupabaseService {
         data: {
           'full_name': fullName,
           'phone': phone,
+          'target_exam': targetExam,
         },
       );
+
+      final userId = res.user?.id ?? 'usr-${DateTime.now().millisecondsSinceEpoch}';
+
+      final realProfile = UserProfileModel(
+        id: userId,
+        email: email,
+        fullName: fullName,
+        phoneNumber: phone,
+        targetExam: targetExam,
+        targetYear: targetYear,
+        role: role,
+        studyStreak: 1,
+        questionsAttempted: 0,
+        totalCorrect: 0,
+        accuracy: 0.0,
+        rank: 0,
+      );
+
       if (res.user != null) {
         try {
           await client.from('profiles').upsert({
-            'id': res.user!.id,
+            'id': userId,
             'email': email,
             'full_name': fullName,
             'phone': phone,
-            'role': 'student',
+            'phone_number': phone,
+            'target_exam': targetExam,
+            'target_year': targetYear,
+            'role': role,
+            'study_streak': 1,
+            'questions_attempted': 0,
+            'total_correct': 0,
+            'accuracy': 0.0,
+            'rank': 0,
           });
         } catch (pe) {
           debugPrint('Profile upsert warning: $pe');
         }
       }
-      return res;
+      return realProfile;
     } catch (e) {
       debugPrint('Error signing up: $e');
       rethrow;
@@ -84,7 +114,7 @@ class SupabaseService {
   static Future<UserProfileModel?> getCurrentUser() async {
     try {
       final user = client.auth.currentUser;
-      if (user == null) return getMockProfile();
+      if (user == null) return null;
 
       final res = await client.from('profiles').select('*').eq('id', user.id).maybeSingle();
       if (res != null) {
@@ -92,13 +122,21 @@ class SupabaseService {
       }
       return UserProfileModel(
         id: user.id,
-        email: user.email ?? 'student@cosmyra.edu',
-        fullName: user.userMetadata?['full_name'] ?? 'Aspirant',
+        email: user.email ?? '',
+        fullName: user.userMetadata?['full_name'] ?? 'Student',
+        phoneNumber: user.userMetadata?['phone'],
+        targetExam: user.userMetadata?['target_exam'] ?? 'NEET',
+        targetYear: 2026,
         role: 'student',
+        studyStreak: 1,
+        questionsAttempted: 0,
+        totalCorrect: 0,
+        accuracy: 0.0,
+        rank: 0,
       );
     } catch (e) {
       debugPrint('Error getting profile: $e');
-      return getMockProfile();
+      return null;
     }
   }
 

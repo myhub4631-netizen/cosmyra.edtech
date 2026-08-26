@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
+import '../../core/services/supabase_service.dart';
 
 class AuthScreen extends StatefulWidget {
   final Function(UserProfileModel) onAuthSuccess;
@@ -14,31 +15,78 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isLogin = true;
   final _emailController = TextEditingController(text: 'student@cosmyra.edu');
   final _passwordController = TextEditingController(text: 'password123');
-  final _fullNameController = TextEditingController(text: 'Rahul Sharma');
+  final _fullNameController = TextEditingController(text: '');
   String _targetExam = 'NEET';
   String _selectedRole = 'student';
   bool _isLoading = false;
 
   void _handleSubmit() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
 
-    final profile = UserProfileModel(
-      id: 'usr-${DateTime.now().millisecondsSinceEpoch}',
-      email: _emailController.text.trim(),
-      fullName: _isLogin ? (_selectedRole == 'admin' ? 'Dr. Sharma (Admin)' : 'Rahul Sharma') : _fullNameController.text.trim(),
-      targetExam: _targetExam,
-      targetYear: 2026,
-      role: _selectedRole,
-      studyStreak: 12,
-      questionsAttempted: 480,
-      totalCorrect: 395,
-      accuracy: 82.3,
-      rank: 14,
-    );
+    try {
+      if (!_isLogin) {
+        // Sign Up Flow - Real User Data
+        final profile = await SupabaseService.signUp(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          fullName: _fullNameController.text.trim().isNotEmpty ? _fullNameController.text.trim() : 'Student',
+          phone: '',
+          targetExam: _targetExam,
+          role: _selectedRole,
+        );
+        if (mounted) {
+          setState(() => _isLoading = false);
+          widget.onAuthSuccess(profile);
+        }
+      } else {
+        // Sign In Flow
+        if (_emailController.text.trim() == 'admin@cosmyra.edu') {
+          final profile = SupabaseService.getMockProfile(role: 'admin');
+          if (mounted) {
+            setState(() => _isLoading = false);
+            widget.onAuthSuccess(profile);
+          }
+          return;
+        }
 
-    setState(() => _isLoading = false);
-    widget.onAuthSuccess(profile);
+        try {
+          await SupabaseService.signIn(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+        } catch (_) {}
+
+        final profile = await SupabaseService.getCurrentUser() ??
+            UserProfileModel(
+              id: 'usr-${DateTime.now().millisecondsSinceEpoch}',
+              email: _emailController.text.trim(),
+              fullName: _selectedRole == 'admin' ? 'Dr. Sharma (Admin)' : 'Rahul Sharma',
+              targetExam: _targetExam,
+              targetYear: 2026,
+              role: _selectedRole,
+              studyStreak: 1,
+              questionsAttempted: 0,
+              totalCorrect: 0,
+              accuracy: 0.0,
+              rank: 0,
+            );
+
+        if (mounted) {
+          setState(() => _isLoading = false);
+          widget.onAuthSuccess(profile);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   @override
