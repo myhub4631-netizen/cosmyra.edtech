@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../../models/models.dart';
+import '../../core/services/supabase_service.dart';
 
 class AdminQuestionBuilderScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -169,6 +170,7 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
       'isDraft': isDraft,
     };
 
+    SupabaseService.saveQuestionMap(newQuestion);
     _saveToPrefs(newQuestion);
 
     if (widget.onQuestionSaved != null) {

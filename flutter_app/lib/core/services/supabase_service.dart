@@ -619,6 +619,69 @@ class SupabaseService {
   }
 
   // ================= ADMIN MANAGEMENT =================
+  static Future<bool> saveQuestionMap(Map<String, dynamic> qMap) async {
+    try {
+      final qData = {
+        'id': qMap['id'],
+        'question_text': qMap['questionText'],
+        'subject': qMap['subject'],
+        'chapter': qMap['chapter'],
+        'topic': qMap['topic'],
+        'sub_topic': qMap['subTopic'],
+        'source_type': qMap['sourceType'],
+        'difficulty': qMap['difficulty'],
+        'question_type': qMap['questionType'],
+        'marks': int.tryParse(qMap['marks']?.toString() ?? '4') ?? 4,
+        'negative_marks': int.tryParse(qMap['negativeMarks']?.toString() ?? '1') ?? 1,
+        'options': qMap['options'],
+        'correct_answer': qMap['correctAnswer'],
+        'explanation': qMap['explanation'],
+        'tags': qMap['tags'],
+        'used_in': qMap['usedIn'],
+        'added_on': qMap['addedOn'],
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      await client.from('questions').upsert(qData);
+      return true;
+    } catch (e) {
+      debugPrint('Supabase saveQuestion error (will fallback to local): $e');
+      return false;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchAllQuestionsFromSupabase() async {
+    try {
+      final res = await client.from('questions').select().order('created_at', ascending: false);
+      if (res != null && (res as List).isNotEmpty) {
+        return (res as List).map((row) {
+          final item = Map<String, dynamic>.from(row as Map);
+          return {
+            'id': item['id'] ?? 'Q123456',
+            'questionText': item['question_text'] ?? item['questionText'] ?? '',
+            'subject': item['subject'] ?? 'Physics',
+            'chapter': item['chapter'] ?? 'Laws of Motion',
+            'topic': item['topic'] ?? '',
+            'subTopic': item['sub_topic'] ?? '',
+            'sourceType': item['source_type'] ?? item['sourceType'] ?? 'NTA',
+            'difficulty': item['difficulty'] ?? 'Medium',
+            'questionType': item['question_type'] ?? 'Single Choice (MCQ)',
+            'marks': item['marks']?.toString() ?? '4',
+            'negativeMarks': item['negative_marks']?.toString() ?? '1',
+            'tags': item['tags'] is List ? List<String>.from(item['tags']) : ['General'],
+            'usedIn': item['used_in'] is List ? List<String>.from(item['used_in']) : ['Custom Practice'],
+            'addedOn': item['added_on'] ?? 'Just now',
+            'options': item['options'] is List ? List<String>.from(item['options']) : [],
+            'correctAnswer': item['correct_answer'] ?? item['correctAnswer'] ?? '',
+            'explanation': item['explanation'] ?? '',
+          };
+        }).toList();
+      }
+    } catch (e) {
+      debugPrint('Supabase fetchAllQuestions notice: $e');
+    }
+    return [];
+  }
+
   static Future<bool> saveQuestion(QuestionModel question) async {
     try {
       final qData = question.toJson();

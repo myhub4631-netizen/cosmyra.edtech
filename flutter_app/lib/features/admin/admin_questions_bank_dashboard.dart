@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import 'dart:convert';
 import '../../models/models.dart';
+import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/latex_view.dart';
 import '../../shared/utils/smooth_page_route.dart';
 import 'admin_question_builder_screen.dart';
@@ -32,6 +33,18 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
 
   Future<void> _loadSavedCustomQuestions() async {
     try {
+      // 1. Fetch from Supabase questions table
+      final supabaseQs = await SupabaseService.fetchAllQuestionsFromSupabase();
+      for (var q in supabaseQs) {
+        final existingIdx = _sharedQuestionsBankList.indexWhere((item) => item['id'] == q['id']);
+        if (existingIdx != -1) {
+          _sharedQuestionsBankList[existingIdx] = q;
+        } else {
+          _sharedQuestionsBankList.insert(0, q);
+        }
+      }
+
+      // 2. Fetch from SharedPreferences local storage
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
       if (jsonStr != null && jsonStr.isNotEmpty) {
@@ -47,9 +60,10 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
             _sharedQuestionsBankList.insert(0, q);
           }
         }
-        if (mounted) {
-          setState(() {});
-        }
+      }
+
+      if (mounted) {
+        setState(() {});
       }
     } catch (e) {
       debugPrint('Error loading saved questions: $e');
