@@ -363,11 +363,11 @@ class _AdminHierarchyScreenState extends State<AdminHierarchyScreen> {
                 _buildSidebarTile('Mistake Book', Icons.menu_book_outlined, false),
                 _buildSidebarTile('Bookmarks', Icons.bookmark_outline_rounded, false),
                 _buildSidebarTile('Reported Questions', Icons.flag_outlined, false),
-                _buildSidebarTile('User Management', Icons.people_outline_rounded, false),
+                _buildSidebarTile('User Management', Icons.people_outline_rounded, false, onTap: () => Navigator.pushNamed(context, '/admin/users')),
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('USERS & ROLES'),
-                _buildSidebarTile('Users', Icons.person_outline, false),
+                _buildSidebarTile('Users', Icons.person_outline, false, onTap: () => Navigator.pushNamed(context, '/admin/users')),
                 _buildSidebarTile('Roles & Permissions', Icons.security_outlined, false),
                 _buildSidebarTile('Activity Logs', Icons.history_rounded, false),
 

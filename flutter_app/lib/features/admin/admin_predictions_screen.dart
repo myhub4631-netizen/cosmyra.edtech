@@ -350,6 +350,7 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
                 _buildNavItem(Icons.account_tree_outlined, 'Exam Hierarchy', false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
                 _buildNavItem(Icons.sell_outlined, 'Pricing & Plans', false, onTap: () => Navigator.pushNamed(context, '/admin/pricing')),
                 _buildNavItem(Icons.leaderboard_outlined, 'Leaderboard', false, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),
+                _buildNavItem(Icons.people_outline_rounded, 'User Management', false, onTap: () => Navigator.pushNamed(context, '/admin/users')),
                 _buildNavItem(Icons.play_circle_outline, 'Practice', false),
 
                 // Active Accordion: Paper Prediction

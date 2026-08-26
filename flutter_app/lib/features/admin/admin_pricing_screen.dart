@@ -236,7 +236,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                 _buildSidebarTile('Dashboard', Icons.dashboard_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin')),
                 _buildSidebarTile('Paper Prediction', Icons.note_alt_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
                 _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
-                _buildSidebarTile('Users', Icons.people_outline_rounded, false),
+                _buildSidebarTile('Users', Icons.people_outline_rounded, false, onTap: () => Navigator.pushNamed(context, '/admin/users')),
                 _buildSidebarTile('Exams', Icons.assignment_outlined, false),
                 _buildSidebarTile('Subjects', Icons.book_outlined, false),
                 _buildSidebarTile('Chapters', Icons.folder_open_outlined, false),

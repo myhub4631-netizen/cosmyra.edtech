@@ -272,7 +272,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                 _buildSidebarTile('Reported Questions', Icons.flag_outlined, false),
                 _buildSidebarTile('PYQs & Papers', Icons.auto_stories_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
                 _buildSidebarTile('Leaderboard', Icons.emoji_events_outlined, true, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),
-                _buildSidebarTile('User Management', Icons.people_outline_rounded, false),
+                _buildSidebarTile('User Management', Icons.people_outline_rounded, false, onTap: () => Navigator.pushNamed(context, '/admin/users')),
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('REPORTS & ANALYTICS'),

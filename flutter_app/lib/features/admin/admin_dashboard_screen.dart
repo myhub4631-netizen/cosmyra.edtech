@@ -344,7 +344,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('USERS & ROLES'),
-                _buildSidebarTile('User Management', Icons.people_outline_rounded, false),
+                _buildSidebarTile('User Management', Icons.people_outline_rounded, false, onTap: () => Navigator.pushNamed(context, '/admin/users')),
                 _buildSidebarTile('Roles & Permissions', Icons.admin_panel_settings_outlined, false),
                 _buildSidebarTile('Activity Logs', Icons.list_alt_rounded, false),
 

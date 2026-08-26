@@ -488,6 +488,13 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
           setState(() {
             _activeSidebarItem = title;
           });
+          if (title.contains('Overview') || title.contains('Dashboard')) {
+            Navigator.pushNamed(context, '/admin');
+          } else if (title.contains('Hierarchy')) {
+            Navigator.pushNamed(context, '/admin/hierarchy');
+          } else if (title.contains('Leaderboard')) {
+            Navigator.pushNamed(context, '/admin/leaderboard');
+          }
         },
       ),
     );
