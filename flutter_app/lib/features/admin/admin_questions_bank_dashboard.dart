@@ -9,6 +9,7 @@ import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/latex_view.dart';
 import '../../shared/utils/smooth_page_route.dart';
 import 'admin_question_builder_screen.dart';
+import 'admin_pdf_import_screen.dart';
 
 class AdminQuestionsBankDashboard extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -263,8 +264,10 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                   title: 'Questions Bank',
                   subItems: [
                     'All Questions',
-                    'Add Question',
+                    'Add New Question',
                     'Import Questions',
+                    'PDF Import',
+                    'Bulk Import',
                     'Question Tags',
                     'Question Sets',
                   ],
@@ -460,8 +463,15 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                 return InkWell(
                   onTap: () {
                     setState(() => _activeSubNav = item);
-                    if (item == 'Add Question') _openAddQuestionDialog();
-                    if (item == 'Import Questions') _openImportQuestionsDialog();
+                    if (item == 'Add Question' || item == 'Add New Question') _openAddQuestionDialog();
+                    if (item == 'Import Questions' || item == 'PDF Import') {
+                      Navigator.push(
+                        context,
+                        SmoothPageRoute(
+                          child: AdminPdfImportScreen(userProfile: widget.userProfile),
+                        ),
+                      );
+                    }
                   },
                   borderRadius: BorderRadius.circular(6),
                   child: Padding(
@@ -1605,7 +1615,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
       builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Container(
-          width: 550,
+          width: 520,
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1613,44 +1623,86 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Import Questions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                  const Text('Select Question Import Engine', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                   IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx)),
                 ],
               ),
               const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFC7D2FE), style: BorderStyle.solid),
-                ),
-                child: Column(
-                  children: [
-                    const Icon(Icons.cloud_upload_outlined, size: 48, color: Color(0xFF4F46E5)),
-                    const SizedBox(height: 12),
-                    const Text('Click or drag CSV file to upload questions', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    const Text('Supports .csv file format with columns: Question, A, B, C, D, Answer, Subject', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['csv']);
-                        if (result != null && result.files.single.bytes != null) {
-                          final csvString = utf8.decode(result.files.single.bytes!);
-                          final List<List<dynamic>> fields = const CsvToListConverter().convert(csvString);
-                          Navigator.pop(ctx);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Imported ${fields.length - 1} questions successfully!'), backgroundColor: const Color(0xFF16A34A)),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.file_present_rounded, color: Colors.white, size: 18),
-                      label: const Text('Browse Files', style: TextStyle(color: Colors.white)),
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5)),
+              InkWell(
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    SmoothPageRoute(
+                      child: AdminPdfImportScreen(userProfile: widget.userProfile),
                     ),
-                  ],
+                  );
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF4F46E5)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF4F46E5), size: 36),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text('Advanced PDF Import Engine', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A))),
+                            SizedBox(height: 2),
+                            Text('Extract NEET/JEE papers with Text, OCR, LaTeX, Diagrams & Side-by-Side Review', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF4F46E5)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: () async {
+                  final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['csv']);
+                  if (result != null && result.files.single.bytes != null) {
+                    final csvString = utf8.decode(result.files.single.bytes!);
+                    final List<List<dynamic>> fields = const CsvToListConverter().convert(csvString);
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Imported ${fields.length - 1} questions successfully!'), backgroundColor: const Color(0xFF16A34A)),
+                    );
+                  }
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.table_chart_outlined, color: Color(0xFF64748B), size: 36),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text('Bulk CSV Import', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A))),
+                            SizedBox(height: 2),
+                            Text('Quick import from standard CSV spreadsheet files', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF64748B)),
+                    ],
+                  ),
                 ),
               ),
             ],
