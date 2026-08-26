@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../auth/login_screen.dart';
+import '../admin/admin_dashboard_sections_screen.dart';
 
 class UserDashboardScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -34,6 +35,16 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   String _leaderboardTab = 'Daily';
   int _activeSidebarIndex = 0;
   int _mobileBottomNavIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final uriPath = Uri.base.path.toLowerCase();
+    final uriFragment = Uri.base.fragment.toLowerCase();
+    if (uriPath.contains('sections') || uriFragment.contains('sections')) {
+      _activeSidebarIndex = 1;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -110,32 +121,34 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
                     // Main Scrollable Content Body
                     Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(28.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Welcome Banner Header Row
-                            _buildWelcomeHeader(displayName),
-                            const SizedBox(height: 24),
+                      child: _activeSidebarIndex == 1
+                          ? AdminDashboardSectionsScreen(userProfile: widget.userProfile)
+                          : SingleChildScrollView(
+                              padding: const EdgeInsets.all(28.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Welcome Banner Header Row
+                                  _buildWelcomeHeader(displayName),
+                                  const SizedBox(height: 24),
 
-                            // Top 4 KPI Metrics Grid Row
-                            _buildKpiMetricsGrid(),
-                            const SizedBox(height: 28),
+                                  // Top 4 KPI Metrics Grid Row
+                                  _buildKpiMetricsGrid(),
+                                  const SizedBox(height: 28),
 
-                            // Middle Section Row: Continue Where You Left Off + Today's Progress
-                            _buildMiddleSectionRow(),
-                            const SizedBox(height: 28),
+                                  // Middle Section Row: Continue Where You Left Off + Today's Progress
+                                  _buildMiddleSectionRow(),
+                                  const SizedBox(height: 28),
 
-                            // Quick Start Section Header + 5 Cards Grid Row
-                            _buildQuickStartSection(),
-                            const SizedBox(height: 28),
+                                  // Quick Start Section Header + 5 Cards Grid Row
+                                  _buildQuickStartSection(),
+                                  const SizedBox(height: 28),
 
-                            // Bottom Section Row: Performance Overview Line Chart + Leaderboard
-                            _buildBottomSectionRow(displayName),
-                          ],
-                        ),
-                      ),
+                                  // Bottom Section Row: Performance Overview Line Chart + Leaderboard
+                                  _buildBottomSectionRow(displayName),
+                                ],
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -1045,7 +1058,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     onTap: () async {
                       setState(() => _activeSidebarIndex = index);
                       if (item['label'] == 'Layout Management') {
-                        Navigator.pushNamed(context, '/admin/sections');
+                        setState(() => _activeSidebarIndex = 1);
                         return;
                       }
                       if (item['label'] == 'Logout') {
