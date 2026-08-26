@@ -519,16 +519,20 @@ class SupabaseService {
 
       final res = await req.limit(limit);
       if (res != null && (res as List).isNotEmpty) {
-        return (res as List).map((q) => QuestionModel.fromJson(q)).toList();
+        final dbList = (res as List).map((q) => QuestionModel.fromJson(q)).toList();
+        if (dbList.length >= limit) {
+          return dbList.sublist(0, limit);
+        }
+        return getSampleQuestions(count: limit);
       }
     } catch (e) {
       debugPrint('Error fetching questions: $e');
     }
-    return getSampleQuestions();
+    return getSampleQuestions(count: limit);
   }
 
-  static List<QuestionModel> getSampleQuestions() {
-    return [
+  static List<QuestionModel> getSampleQuestions({int count = 50}) {
+    final basePool = [
       QuestionModel(
         id: 'd1111111-1111-1111-1111-111111111111',
         examId: '11111111-1111-1111-1111-111111111111',
@@ -616,6 +620,60 @@ class SupabaseService {
         options: [],
       ),
     ];
+
+    if (count <= basePool.length) {
+      return basePool.sublist(0, count);
+    }
+
+    final result = List<QuestionModel>.from(basePool);
+    final topics = [
+      {'sub': 'Physics', 'q': r'A particle moves along a straight line with velocity $v(t) = (3t^2 + 2t) \text{ m/s}$. Find the displacement of the particle between $t = 0\text{ s}$ and $t = 2\text{ s}$.', 'ans': r'$12\text{ m}$', 'opts': [r'$8\text{ m}$', r'$10\text{ m}$', r'$12\text{ m}$', r'$14\text{ m}$'], 'corr': 2, 'exp': r'Integrate velocity $v(t)$: $s = \int_0^2 (3t^2 + 2t)dt = [t^3 + t^2]_0^2 = 8 + 4 = 12\text{ m}$.'},
+      {'sub': 'Chemistry', 'q': r'What is the oxidation number of Nitrogen in Nitric Acid ($HNO_3$)?', 'ans': '+5', 'opts': ['+3', '+4', '+5', '+6'], 'corr': 2, 'exp': r'In $HNO_3$: $(+1) + x + 3(-2) = 0 \implies x = +5$.'},
+      {'sub': 'Biology', 'q': 'Which organelle is known as the powerhouse of the cell?', 'ans': 'Mitochondria', 'opts': ['Ribosome', 'Golgi Apparatus', 'Mitochondria', 'Lysosome'], 'corr': 2, 'exp': 'Mitochondria produce ATP through oxidative phosphorylation.'},
+      {'sub': 'Mathematics', 'q': r'Find the derivative of $y = \ln(x^2 + 1)$ with respect to $x$.', 'ans': r'$\frac{2x}{x^2 + 1}$', 'opts': [r'$\frac{1}{x^2+1}$', r'$\frac{2x}{x^2+1}$', r'$\frac{x}{x^2+1}$', r'$2x\ln(x^2+1)$'], 'corr': 1, 'exp': r'Using chain rule: $\frac{d}{dx}\ln(u) = \frac{1}{u}\cdot u^\prime = \frac{2x}{x^2+1}$.'},
+      {'sub': 'Physics', 'q': r'Two capacitors of capacitance $C_1 = 6\ \mu\text{F}$ and $C_2 = 3\ \mu\text{F}$ are connected in series. The equivalent capacitance of the combination is:', 'ans': r'$2\ \mu\text{F}$', 'opts': [r'$9\ \mu\text{F}$', r'$4.5\ \mu\text{F}$', r'$2\ \mu\text{F}$', r'$1.5\ \mu\text{F}$'], 'corr': 2, 'exp': r'$C_{\text{eq}} = \frac{C_1 C_2}{C_1 + C_2} = \frac{18}{9} = 2\ \mu\text{F}$.'},
+      {'sub': 'Chemistry', 'q': 'Which of the following compounds exhibits optical isomerism?', 'ans': '2-Chlorobutane', 'opts': ['1-Chlorobutane', '2-Chlorobutane', '2-Chloropropane', '1-Chloropropane'], 'corr': 1, 'exp': '2-Chlorobutane has a chiral carbon atom bonded to 4 different groups.'},
+      {'sub': 'Biology', 'q': 'The functional unit of human kidney is called:', 'ans': 'Nephron', 'opts': ['Neuron', 'Nephron', 'Alveoli', 'Glomerulus'], 'corr': 1, 'exp': 'Each kidney contains about 1 million functional units called nephrons.'},
+      {'sub': 'Mathematics', 'q': r'Evaluate the integral $\int \cos(3x) dx$.', 'ans': r'$\frac{1}{3}\sin(3x) + C$', 'opts': [r'$-\frac{1}{3}\sin(3x) + C$', r'$\frac{1}{3}\sin(3x) + C$', r'$3\sin(3x) + C$', r'$-3\sin(3x) + C$'], 'corr': 1, 'exp': r'$\int \cos(ax)dx = \frac{1}{a}\sin(ax) + C$.'},
+      {'sub': 'Physics', 'q': r'An ideal gas undergoes an isothermal expansion at temperature $T$. The work done by the gas in expanding from volume $V_1$ to $V_2$ is:', 'ans': r'$nRT \ln\left(\frac{V_2}{V_1}\right)$', 'opts': [r'$nRT (V_2 - V_1)$', r'$nRT \ln\left(\frac{V_2}{V_1}\right)$', r'$\frac{nRT}{V_2 - V_1}$', r'$nR (V_2 - V_1) T$'], 'corr': 1, 'exp': r'For isothermal process, $W = nRT \int \frac{dV}{V} = nRT \ln(V_2/V_1)$.'},
+      {'sub': 'Chemistry', 'q': 'Which gas is liberated when sodium metal reacts with water?', 'ans': r'Hydrogen ($H_2$)', 'opts': [r'Oxygen ($O_2$)', r'Hydrogen ($H_2$)', r'Nitrogen ($N_2$)', r'Carbon Dioxide ($CO_2$)'], 'corr': 1, 'exp': r'$2\text{Na} + 2\text{H}_2\text{O} \to 2\text{NaOH} + \text{H}_2\uparrow$.'},
+    ];
+
+    int idx = 0;
+    while (result.length < count) {
+      final t = topics[idx % topics.length];
+      final qNum = result.length + 1;
+      result.add(
+        QuestionModel(
+          id: 'generated_q_${qNum}_${DateTime.now().millisecondsSinceEpoch}',
+          examId: '11111111-1111-1111-1111-111111111111',
+          subjectId: t['sub'] == 'Physics' ? 'a1111111' : (t['sub'] == 'Chemistry' ? 'a2222222' : 'a3333333'),
+          chapterId: 'b1111111',
+          questionText: '${t['q']}',
+          qType: 'single_correct',
+          difficulty: qNum % 3 == 0 ? 'hard' : (qNum % 2 == 0 ? 'medium' : 'easy'),
+          source: qNum % 2 == 0 ? 'nta' : 'pyq',
+          sourceName: 'Practice Question Bank',
+          year: 2024,
+          marks: 4.0,
+          negativeMarks: 1.0,
+          explanation: t['exp'] as String,
+          solution: t['exp'] as String,
+          options: (t['opts'] as List<String>).asMap().entries.map((entry) {
+            return QuestionOptionModel(
+              id: 'opt_${qNum}_${entry.key}',
+              questionId: 'generated_q_$qNum',
+              optionIndex: entry.key,
+              optionText: entry.value,
+              isCorrect: entry.key == (t['corr'] as int),
+            );
+          }).toList(),
+        ),
+      );
+      idx++;
+    }
+
+    return result;
   }
 
   // ================= ADMIN MANAGEMENT =================
