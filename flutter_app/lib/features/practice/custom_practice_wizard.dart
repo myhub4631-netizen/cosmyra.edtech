@@ -4,11 +4,13 @@ import '../../core/services/supabase_service.dart';
 
 class CustomPracticeWizardModal extends StatefulWidget {
   final String initialExam;
+  final VoidCallback? onClose;
   final Function(List<QuestionModel> questions, int timerMinutes) onStartPractice;
 
   const CustomPracticeWizardModal({
     super.key,
     required this.initialExam,
+    this.onClose,
     required this.onStartPractice,
   });
 
@@ -204,53 +206,50 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 850),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFAFAFC),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 24,
-              offset: Offset(0, 10),
-            )
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Column(
-            children: [
-              // 1. Top Header Bar
-              _buildTopHeader(),
+    return Scaffold(
+      backgroundColor: const Color(0xFFFAFAFC),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // 1. Top Header Bar
+            _buildTopHeader(),
 
-              // 2. Step Progress Indicator (1: Exam & Subjects, 2: Chapters & Topics, 3: Practice Settings, 4: Overview)
-              _buildStepIndicator(),
+            // 2. Step Progress Indicator (1: Exam & Subjects, 2: Chapters & Topics, 3: Practice Settings, 4: Overview)
+            _buildStepIndicator(),
 
-              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
 
-              // 3. Scrollable Main Content Body
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 300,
-                          child: Center(
-                            child: CircularProgressIndicator(color: Color(0xFF4F46E5)),
-                          ),
-                        )
-                      : _buildCurrentStepBody(),
+            // 3. Scrollable Main Content Body
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+                child: Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 640),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 300,
+                            child: Center(
+                              child: CircularProgressIndicator(color: Color(0xFF4F46E5)),
+                            ),
+                          )
+                        : _buildCurrentStepBody(),
+                  ),
                 ),
               ),
+            ),
 
-              // 4. Bottom Sticky Action Navigation Bar
-              _buildBottomActionBar(),
-            ],
-          ),
+            // 4. Bottom Sticky Action Navigation Bar
+            Container(
+              color: Colors.white,
+              child: Center(
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: _buildBottomActionBar(),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -259,67 +258,76 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
   // Header Bar matching exact layout and My Presets button
   Widget _buildTopHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       color: Colors.white,
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A), size: 22),
-            onPressed: () {
-              if (_currentStep > 0) {
-                setState(() => _currentStep--);
-              } else {
-                Navigator.of(context).pop();
-              }
-            },
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Custom Practice',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Build your personalized practice',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF64748B),
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          OutlinedButton.icon(
-            onPressed: _showPresetsDialog,
-            icon: const Icon(Icons.bookmark_border_rounded, size: 18, color: Color(0xFF4F46E5)),
-            label: const Text(
-              'My Presets',
-              style: TextStyle(
-                color: Color(0xFF4F46E5),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A), size: 22),
+                onPressed: () {
+                  if (_currentStep > 0) {
+                    setState(() => _currentStep--);
+                  } else {
+                    if (widget.onClose != null) {
+                      widget.onClose!();
+                    } else if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    }
+                  }
+                },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
-            ),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              side: const BorderSide(color: Color(0xFFC7D2FE), width: 1.2),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              backgroundColor: const Color(0xFFF5F3FF),
-            ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Custom Practice',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Build your personalized practice',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: _showPresetsDialog,
+                icon: const Icon(Icons.bookmark_border_rounded, size: 18, color: Color(0xFF4F46E5)),
+                label: const Text(
+                  'My Presets',
+                  style: TextStyle(
+                    color: Color(0xFF4F46E5),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  side: const BorderSide(color: Color(0xFFC7D2FE), width: 1.2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  backgroundColor: const Color(0xFFF5F3FF),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -336,8 +344,11 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Row(
-        children: List.generate(steps.length, (index) {
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: Row(
+            children: List.generate(steps.length, (index) {
           final isCurrent = _currentStep == index;
           final isCompleted = _currentStep > index;
 
@@ -429,7 +440,9 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
           );
         }),
       ),
-    );
+    ),
+  ),
+);
   }
 
   // Switch between 4 Screens

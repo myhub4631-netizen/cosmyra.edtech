@@ -123,16 +123,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   void _openCustomPracticeWizard() {
-    showDialog(
-      context: context,
-      builder: (ctx) => CustomPracticeWizardModal(
-        initialExam: _activeExam,
-        onStartPractice: (questions, timerMins) {
-          setState(() {
-            _activePracticeQuestions = questions;
-            _activePracticeTimerMinutes = timerMins;
-          });
-        },
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) => CustomPracticeWizardModal(
+          initialExam: _activeExam,
+          onClose: () {
+            if (Navigator.of(ctx).canPop()) {
+              Navigator.of(ctx).pop();
+            } else {
+              setState(() => _selectedIndex = 0);
+            }
+          },
+          onStartPractice: (questions, timerMins) {
+            if (Navigator.of(ctx).canPop()) {
+              Navigator.of(ctx).pop();
+            }
+            setState(() {
+              _activePracticeQuestions = questions;
+              _activePracticeTimerMinutes = timerMins;
+            });
+          },
+        ),
       ),
     );
   }
@@ -273,18 +284,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           },
         );
       case 1:
-        return Scaffold(
-          body: Center(
-            child: CustomPracticeWizardModal(
-              initialExam: _activeExam,
-              onStartPractice: (questions, timerMins) {
-                setState(() {
-                  _activePracticeQuestions = questions;
-                  _activePracticeTimerMinutes = timerMins;
-                });
-              },
-            ),
-          ),
+        return CustomPracticeWizardModal(
+          initialExam: _activeExam,
+          onClose: () {
+            setState(() => _selectedIndex = 0);
+          },
+          onStartPractice: (questions, timerMins) {
+            setState(() {
+              _activePracticeQuestions = questions;
+              _activePracticeTimerMinutes = timerMins;
+            });
+          },
         );
       case 2:
         return MockTestsScreen(
