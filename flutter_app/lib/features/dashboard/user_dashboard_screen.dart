@@ -319,65 +319,79 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       },
     ];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: metrics.map((m) {
-          return Container(
-            width: 145,
-            margin: const EdgeInsets.only(right: 12),
-            padding: const EdgeInsets.all(14),
+    return Row(
+      children: metrics.map((m) {
+        final isLast = m == metrics.last;
+        return Expanded(
+          child: Container(
+            margin: EdgeInsets.only(right: isLast ? 0 : 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFF1F5F9)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 6,
+                  blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
               ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     color: m['iconBg'] as Color,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(m['icon'] as IconData, color: m['iconColor'] as Color, size: 18),
+                  child: Icon(m['icon'] as IconData, color: m['iconColor'] as Color, size: 14),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
                   m['title'] as String,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF334155),
+                    height: 1.15,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  m['value'] as String,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                    letterSpacing: -0.4,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  m['value'] as String,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.4),
-                ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
                   m['sub'] as String,
                   style: TextStyle(
-                    fontSize: 9,
+                    fontSize: 7.5,
                     fontWeight: FontWeight.w600,
                     color: (m['sub'] as String).contains('Best')
                         ? const Color(0xFF64748B)
                         : const Color(0xFF16A34A),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-          );
-        }).toList(),
-      ),
+          ),
+        );
+      }).toList(),
     );
   }
 
