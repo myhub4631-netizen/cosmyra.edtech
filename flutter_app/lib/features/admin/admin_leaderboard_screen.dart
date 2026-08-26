@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../models/models.dart';
+import '../../shared/utils/smooth_page_route.dart';
+import 'admin_dashboard_screen.dart';
 import 'admin_user_management_screen.dart';
 
 class AdminLeaderboardScreen extends StatefulWidget {
@@ -264,7 +266,9 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
                 _buildSidebarSectionLabel('MAIN NAVIGATION'),
-                _buildSidebarTile('Dashboard', Icons.dashboard_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin')),
+                _buildSidebarTile('Dashboard', Icons.dashboard_outlined, false, onTap: () {
+                  Navigator.of(context).push(SmoothPageRoute(child: AdminDashboardScreen(userProfile: widget.userProfile)));
+                }),
                 _buildSidebarTile('Paper Predictions', Icons.note_alt_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
                 _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
                 _buildSidebarTile('Pricing & Plans', Icons.sell_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/pricing')),
@@ -272,9 +276,9 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                 _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false),
                 _buildSidebarTile('Reported Questions', Icons.flag_outlined, false),
                 _buildSidebarTile('PYQs & Papers', Icons.auto_stories_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
-                _buildSidebarTile('Leaderboard', Icons.emoji_events_outlined, true, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),
+                _buildSidebarTile('Leaderboard', Icons.emoji_events_outlined, true),
                 _buildSidebarTile('User Management', Icons.people_outline_rounded, false, onTap: () {
-                  Navigator.of(context).push(MaterialPageRoute(builder: (context) => AdminUserManagementScreen(userProfile: widget.userProfile)));
+                  Navigator.of(context).push(SmoothPageRoute(child: AdminUserManagementScreen(userProfile: widget.userProfile)));
                 }),
 
                 const SizedBox(height: 16),

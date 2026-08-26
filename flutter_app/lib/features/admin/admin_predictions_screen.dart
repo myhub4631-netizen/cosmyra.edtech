@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
+import '../../shared/utils/smooth_page_route.dart';
+import 'admin_dashboard_screen.dart';
 import 'admin_user_management_screen.dart';
 
 class AdminPredictionsScreen extends StatefulWidget {
@@ -347,12 +349,14 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
                   padding: EdgeInsets.only(left: 12, bottom: 8),
                   child: Text('MAIN', style: TextStyle(color: Color(0xFF475569), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
                 ),
-                _buildNavItem(Icons.dashboard_outlined, 'Dashboard', false, onTap: () => Navigator.pushNamed(context, '/admin')),
+                _buildNavItem(Icons.dashboard_outlined, 'Dashboard', false, onTap: () {
+                  Navigator.of(context).push(SmoothPageRoute(child: AdminDashboardScreen(userProfile: widget.userProfile)));
+                }),
                 _buildNavItem(Icons.account_tree_outlined, 'Exam Hierarchy', false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
                 _buildNavItem(Icons.sell_outlined, 'Pricing & Plans', false, onTap: () => Navigator.pushNamed(context, '/admin/pricing')),
                 _buildNavItem(Icons.leaderboard_outlined, 'Leaderboard', false, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),
                 _buildNavItem(Icons.people_outline_rounded, 'User Management', false, onTap: () {
-                  Navigator.of(context).push(MaterialPageRoute(builder: (context) => AdminUserManagementScreen(userProfile: widget.userProfile)));
+                  Navigator.of(context).push(SmoothPageRoute(child: AdminUserManagementScreen(userProfile: widget.userProfile)));
                 }),
                 _buildNavItem(Icons.play_circle_outline, 'Practice', false),
 

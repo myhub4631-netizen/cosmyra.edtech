@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../models/models.dart';
+import '../../shared/utils/smooth_page_route.dart';
+import 'admin_dashboard_screen.dart';
 import 'admin_user_management_screen.dart';
 
 class AdminPricingScreen extends StatefulWidget {
@@ -234,11 +236,13 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
                  _buildSidebarSectionLabel('MAIN'),
-                _buildSidebarTile('Dashboard', Icons.dashboard_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin')),
+                _buildSidebarTile('Dashboard', Icons.dashboard_outlined, false, onTap: () {
+                  Navigator.of(context).push(SmoothPageRoute(child: AdminDashboardScreen(userProfile: widget.userProfile)));
+                }),
                 _buildSidebarTile('Paper Prediction', Icons.note_alt_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
                 _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
                 _buildSidebarTile('Users', Icons.people_outline_rounded, false, onTap: () {
-                  Navigator.of(context).push(MaterialPageRoute(builder: (context) => AdminUserManagementScreen(userProfile: widget.userProfile)));
+                  Navigator.of(context).push(SmoothPageRoute(child: AdminUserManagementScreen(userProfile: widget.userProfile)));
                 }),
                 _buildSidebarTile('Exams', Icons.assignment_outlined, false),
                 _buildSidebarTile('Subjects', Icons.book_outlined, false),

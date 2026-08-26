@@ -5,6 +5,7 @@ import 'core/services/supabase_service.dart';
 import 'features/navigation/main_navigation.dart';
 import 'features/auth/signup_screen.dart';
 import 'features/auth/login_screen.dart';
+import 'shared/utils/smooth_page_route.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -74,14 +75,14 @@ class CosmyraApp extends StatelessWidget {
       onGenerateRoute: (settings) {
         final targetPath = (settings.name ?? Uri.base.path).toLowerCase();
         if (targetPath.contains('signup')) {
-          return MaterialPageRoute(builder: (context) => const SignUpScreen(), settings: settings);
+          return SmoothPageRoute(child: const SignUpScreen(), settings: settings);
         }
         if (targetPath.contains('login')) {
-          return MaterialPageRoute(builder: (context) => const LoginScreen(), settings: settings);
+          return SmoothPageRoute(child: const LoginScreen(), settings: settings);
         }
         final targetIdx = _getInitialIndexFromPath(targetPath);
-        return MaterialPageRoute(
-          builder: (context) => MainNavigationScreen(initialIndex: targetIdx),
+        return SmoothPageRoute(
+          child: MainNavigationScreen(initialIndex: targetIdx),
           settings: settings,
         );
       },

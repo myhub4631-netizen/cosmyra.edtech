@@ -6,6 +6,7 @@ import 'package:csv/csv.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/latex_view.dart';
+import '../../shared/utils/smooth_page_route.dart';
 import 'admin_user_management_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -346,7 +347,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('USERS & ROLES'),
                 _buildSidebarTile('User Management', Icons.people_outline_rounded, false, onTap: () {
-                  Navigator.of(context).push(MaterialPageRoute(builder: (context) => AdminUserManagementScreen(userProfile: widget.userProfile)));
+                  Navigator.of(context).push(SmoothPageRoute(child: AdminUserManagementScreen(userProfile: widget.userProfile)));
                 }),
                 _buildSidebarTile('Roles & Permissions', Icons.admin_panel_settings_outlined, false),
                 _buildSidebarTile('Activity Logs', Icons.list_alt_rounded, false),
@@ -1198,7 +1199,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             _buildQuickActionCard('Manage Topics', 'Create & organize topics', Icons.folder_open_outlined, const Color(0xFFF59E0B), () {}),
             _buildQuickActionCard('Paper Predictions', 'Manage prediction sets & PYQs', Icons.note_alt_outlined, const Color(0xFFEC4899), () => Navigator.pushNamed(context, '/admin/predictions')),
             _buildQuickActionCard('User Management', 'Manage students & roles', Icons.people_outline_rounded, const Color(0xFF3B82F6), () {
-              Navigator.of(context).push(MaterialPageRoute(builder: (context) => AdminUserManagementScreen(userProfile: widget.userProfile)));
+              Navigator.of(context).push(SmoothPageRoute(child: AdminUserManagementScreen(userProfile: widget.userProfile)));
             }),
             _buildQuickActionCard('Question Reports', 'View detailed reports', Icons.bar_chart_rounded, const Color(0xFF8B5CF6), () {}),
             _buildQuickActionCard('Performance Analytics', 'Detailed performance data', Icons.trending_up_rounded, const Color(0xFF0D9488), () {}),

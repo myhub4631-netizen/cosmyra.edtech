@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../shared/utils/smooth_page_route.dart';
+import 'admin_dashboard_screen.dart';
+import 'admin_hierarchy_screen.dart';
+import 'admin_leaderboard_screen.dart';
 
 class AdminUserManagementScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -489,11 +493,11 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
             _activeSidebarItem = title;
           });
           if (title.contains('Overview') || title.contains('Dashboard')) {
-            Navigator.pushNamed(context, '/admin');
+            Navigator.of(context).push(SmoothPageRoute(child: AdminDashboardScreen(userProfile: widget.userProfile)));
           } else if (title.contains('Hierarchy')) {
-            Navigator.pushNamed(context, '/admin/hierarchy');
+            Navigator.of(context).push(SmoothPageRoute(child: AdminHierarchyScreen(userProfile: widget.userProfile)));
           } else if (title.contains('Leaderboard')) {
-            Navigator.pushNamed(context, '/admin/leaderboard');
+            Navigator.of(context).push(SmoothPageRoute(child: AdminLeaderboardScreen(userProfile: widget.userProfile)));
           }
         },
       ),
