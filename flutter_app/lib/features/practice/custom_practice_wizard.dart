@@ -301,6 +301,25 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
   void initState() {
     super.initState();
     _selectedExam = widget.initialExam.contains('JEE') ? 'JEE' : 'NEET';
+    _syncSubjectTabsForExam(_selectedExam);
+    _loadSubjects();
+  }
+
+  void _syncSubjectTabsForExam(String exam) {
+    _selectedSubjectTabs.clear();
+    if (exam.toUpperCase().contains('JEE')) {
+      _selectedSubjectTabs.addAll(['Physics', 'Chemistry', 'Mathematics']);
+    } else {
+      _selectedSubjectTabs.addAll(['Physics', 'Chemistry', 'Biology']);
+    }
+    _activeSubjectTab = 'Physics';
+  }
+
+  void _selectExam(String exam) {
+    setState(() {
+      _selectedExam = exam;
+      _syncSubjectTabsForExam(exam);
+    });
     _loadSubjects();
   }
 
@@ -768,10 +787,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                   size: const Size(24, 24),
                   painter: StethoscopeIconPainter(color: const Color(0xFF4F46E5)),
                 ),
-                onTap: () {
-                  setState(() => _selectedExam = 'NEET');
-                  _loadSubjects();
-                },
+                onTap: () => _selectExam('NEET'),
               ),
             ),
             const SizedBox(width: 12),
@@ -785,10 +801,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                   size: const Size(24, 24),
                   painter: DraftingCompassPainter(color: const Color(0xFF16A34A)),
                 ),
-                onTap: () {
-                  setState(() => _selectedExam = 'JEE');
-                  _loadSubjects();
-                },
+                onTap: () => _selectExam('JEE'),
               ),
             ),
           ],
@@ -1119,6 +1132,15 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
     final activeSubjects = isJee
         ? ['Physics', 'Chemistry', 'Mathematics']
         : ['Physics', 'Chemistry', 'Biology'];
+
+    // Enforce correct subjects set for current exam (PCM for JEE, PCB for NEET)
+    if (isJee && _selectedSubjectTabs.contains('Biology')) {
+      _selectedSubjectTabs.remove('Biology');
+      _selectedSubjectTabs.add('Mathematics');
+    } else if (!isJee && _selectedSubjectTabs.contains('Mathematics')) {
+      _selectedSubjectTabs.remove('Mathematics');
+      _selectedSubjectTabs.add('Biology');
+    }
 
     final allSubjectTabsSelected = activeSubjects.every((s) => _selectedSubjectTabs.contains(s));
 
