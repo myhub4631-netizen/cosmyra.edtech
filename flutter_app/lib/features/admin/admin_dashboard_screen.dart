@@ -606,7 +606,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 ],
               ),
               const SizedBox(width: 12),
-              const SizedBox(width: 12),
               const CircleAvatar(
                 radius: 16,
                 backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=33'),

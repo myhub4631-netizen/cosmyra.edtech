@@ -1005,6 +1005,28 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(width: 14),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      await SupabaseService.logoutUserSession();
+                      if (widget.onLogout != null) widget.onLogout!();
+                      if (context.mounted) {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (context) => const LoginScreen()),
+                          (route) => false,
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.logout_rounded, size: 14, color: Colors.white),
+                    label: const Text('Logout', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEF4444),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      elevation: 0,
+                    ),
+                  ),
                 ],
               ),
             ],
