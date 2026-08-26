@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
 import '../navigation/main_navigation.dart';
+import '../dashboard/user_dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback? onSignUpTap;
@@ -26,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = true;
   bool _isLoading = false;
   String? _errorMessage;
+  UserProfileModel? _loggedInProfile;
 
   @override
   void dispose() {
@@ -49,22 +51,20 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (mounted) {
+        setState(() {
+          _loggedInProfile = userProfile;
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Login successful! Welcome back.'),
             backgroundColor: Color(0xFF10B981),
           ),
         );
+
         if (widget.onLoginSuccess != null) {
           widget.onLoginSuccess!(userProfile);
         }
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
-          ),
-          (route) => false,
-        );
       }
     } catch (e) {
       if (mounted) {
@@ -83,6 +83,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loggedInProfile != null) {
+      return UserDashboardScreen(
+        userProfile: _loggedInProfile!,
+        activeExam: 'NEET',
+        onOpenPractice: () => Navigator.pushReplacementNamed(context, '/practice'),
+        onOpenMockTests: () => Navigator.pushReplacementNamed(context, '/tests'),
+        onOpenPyqs: () => Navigator.pushReplacementNamed(context, '/pyq'),
+        onOpenMistakes: () => Navigator.pushReplacementNamed(context, '/mistakes'),
+      );
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       body: SafeArea(

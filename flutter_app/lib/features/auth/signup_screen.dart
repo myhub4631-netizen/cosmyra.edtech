@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
 import '../navigation/main_navigation.dart';
+import '../dashboard/user_dashboard_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   final VoidCallback? onLoginTap;
@@ -31,6 +32,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _agreeToTerms = true;
   bool _isLoading = false;
   String? _errorMessage;
+  UserProfileModel? _signedUpProfile;
 
   @override
   void dispose() {
@@ -82,6 +84,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
       );
 
       if (mounted) {
+        setState(() {
+          _signedUpProfile = userProfile;
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Account created successfully! Welcome to ExamPrep.'),
@@ -90,14 +96,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         );
         if (widget.onSignUpSuccess != null) {
           widget.onSignUpSuccess!(userProfile);
-        } else {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
-            ),
-            (route) => false,
-          );
         }
       }
     } catch (e) {
@@ -113,6 +111,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
         await SupabaseService.addLocalUser(fallbackProfile);
 
         if (mounted) {
+          setState(() {
+            _signedUpProfile = fallbackProfile;
+          });
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Account created successfully! Welcome to ExamPrep.'),
@@ -121,14 +123,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
           );
           if (widget.onSignUpSuccess != null) {
             widget.onSignUpSuccess!(fallbackProfile);
-          } else {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
-              ),
-              (route) => false,
-            );
           }
         }
         return;
@@ -150,6 +144,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_signedUpProfile != null) {
+      return UserDashboardScreen(
+        userProfile: _signedUpProfile!,
+        activeExam: 'NEET',
+        onOpenPractice: () => Navigator.pushReplacementNamed(context, '/practice'),
+        onOpenMockTests: () => Navigator.pushReplacementNamed(context, '/tests'),
+        onOpenPyqs: () => Navigator.pushReplacementNamed(context, '/pyq'),
+        onOpenMistakes: () => Navigator.pushReplacementNamed(context, '/mistakes'),
+      );
+    }
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 950;
 
