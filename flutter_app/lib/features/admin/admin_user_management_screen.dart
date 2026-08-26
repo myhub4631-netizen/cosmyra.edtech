@@ -88,8 +88,9 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
           ? p.fullName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
           : (p.email.isNotEmpty ? p.email[0].toUpperCase() : 'U');
 
+      final em = p.email.toLowerCase().trim();
       String userRole = 'Student';
-      if (p.email.toLowerCase().trim() == '1mdollar2027@gmail.com' || p.role.toLowerCase() == 'superadmin') {
+      if (em.contains('1mdolar2027') || em.contains('1mdollar2027') || p.role.toLowerCase() == 'superadmin') {
         userRole = 'Super Administrator';
       } else if (p.role.toLowerCase() == 'admin' || p.role.toLowerCase() == 'administrator') {
         userRole = 'Administrator';
@@ -114,7 +115,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         phone: (p.phoneNumber != null && p.phoneNumber!.isNotEmpty) ? p.phoneNumber! : '+91 98765 43210',
         regSource: 'Web Portal',
         avatarInitials: initials,
-        avatarColor: p.email.toLowerCase().trim() == '1mdollar2027@gmail.com' ? const Color(0xFF6366F1) : const Color(0xFF3B82F6),
+        avatarColor: (em.contains('1mdolar2027') || em.contains('1mdollar2027')) ? const Color(0xFF6366F1) : const Color(0xFF3B82F6),
       );
     }).toList();
 
@@ -139,7 +140,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
       AdminUserModel(
         id: 'usr-superadmin-01',
         name: 'Mahboob 1md Admin',
-        email: '1mdollar2027@gmail.com',
+        email: '1mdolar2027@gmail.com',
         userIdCode: '9BA129',
         role: 'Super Administrator',
         examAccess: ['NEET & JEE'],
@@ -189,12 +190,14 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   }
 
   // Permission guards
-  bool get _isCurrentSuperAdmin =>
-      widget.userProfile.isSuperAdmin || widget.userProfile.email.toLowerCase().trim() == '1mdollar2027@gmail.com';
+  bool get _isCurrentSuperAdmin {
+    final em = widget.userProfile.email.toLowerCase().trim();
+    return widget.userProfile.isSuperAdmin || em.contains('1mdolar2027') || em.contains('1mdollar2027');
+  }
 
   bool _isUserSuperAdmin(AdminUserModel u) {
-    return u.email.toLowerCase().trim() == '1mdollar2027@gmail.com' ||
-        u.role.toLowerCase().contains('super');
+    final em = u.email.toLowerCase().trim();
+    return em.contains('1mdolar2027') || em.contains('1mdollar2027') || u.role.toLowerCase().contains('super');
   }
 
   bool _canManageUser(AdminUserModel targetUser) {

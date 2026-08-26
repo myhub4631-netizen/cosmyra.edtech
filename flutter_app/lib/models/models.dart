@@ -34,8 +34,18 @@ class UserProfileModel {
     this.isPublicOnLeaderboard = true,
   });
 
-  bool get isAdmin => role == 'admin' || role == 'superadmin' || role == 'super_admin' || email.toLowerCase().trim() == '1mdollar2027@gmail.com';
-  bool get isSuperAdmin => role == 'superadmin' || role == 'super_admin' || email.toLowerCase().trim() == '1mdollar2027@gmail.com';
+  bool get isAdmin =>
+      role == 'admin' ||
+      role == 'superadmin' ||
+      role == 'super_admin' ||
+      email.toLowerCase().trim().contains('1mdolar2027') ||
+      email.toLowerCase().trim().contains('1mdollar2027');
+
+  bool get isSuperAdmin =>
+      role == 'superadmin' ||
+      role == 'super_admin' ||
+      email.toLowerCase().trim().contains('1mdolar2027') ||
+      email.toLowerCase().trim().contains('1mdollar2027');
 
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
     return UserProfileModel(
