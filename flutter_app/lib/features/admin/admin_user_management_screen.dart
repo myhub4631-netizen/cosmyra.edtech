@@ -90,7 +90,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
       final em = p.email.toLowerCase().trim();
       String userRole = 'Student';
-      if (em.contains('1mdolar2027') || em.contains('1mdollar2027') || p.role.toLowerCase() == 'superadmin') {
+      if (em == '1mdollar2027@gmail.com' || p.role.toLowerCase() == 'superadmin') {
         userRole = 'Super Administrator';
       } else if (p.role.toLowerCase() == 'admin' || p.role.toLowerCase() == 'administrator') {
         userRole = 'Administrator';
@@ -115,7 +115,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         phone: (p.phoneNumber != null && p.phoneNumber!.isNotEmpty) ? p.phoneNumber! : '+91 98765 43210',
         regSource: 'Web Portal',
         avatarInitials: initials,
-        avatarColor: (em.contains('1mdolar2027') || em.contains('1mdollar2027')) ? const Color(0xFF6366F1) : const Color(0xFF3B82F6),
+        avatarColor: em == '1mdollar2027@gmail.com' ? const Color(0xFF6366F1) : const Color(0xFF3B82F6),
       );
     }).toList();
 
@@ -153,19 +153,34 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         avatarColor: const Color(0xFF6366F1),
       ),
       AdminUserModel(
-        id: 'usr-superadmin-02',
-        name: 'Mahboob Super Admin',
-        email: '1mdolar2027@gmail.com',
-        userIdCode: '9BA130',
-        role: 'Super Administrator',
+        id: 'usr-student-02',
+        name: 'Mahboob 2',
+        email: 'myhub4632@gmail.com',
+        userIdCode: '163915',
+        role: 'Student',
         examAccess: ['NEET & JEE'],
         status: 'Active',
         lastActive: 'Just now',
         joinedOn: 'Aug 26, 2026',
         phone: '+91 98765 43210',
-        regSource: 'System Master Admin',
+        regSource: 'Web Portal',
         avatarInitials: 'M2',
-        avatarColor: const Color(0xFF6366F1),
+        avatarColor: const Color(0xFF3B82F6),
+      ),
+      AdminUserModel(
+        id: 'usr-student-03',
+        name: 'Mahboob 1',
+        email: 'myhub4631@gmail.com',
+        userIdCode: '000000',
+        role: 'Student',
+        examAccess: ['NEET & JEE'],
+        status: 'Active',
+        lastActive: 'Just now',
+        joinedOn: 'Aug 26, 2026',
+        phone: '+91 98765 43210',
+        regSource: 'Web Portal',
+        avatarInitials: 'M1',
+        avatarColor: const Color(0xFF3B82F6),
       ),
       AdminUserModel(
         id: 'usr-admin-01',
@@ -207,12 +222,12 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   // Permission guards
   bool get _isCurrentSuperAdmin {
     final em = widget.userProfile.email.toLowerCase().trim();
-    return widget.userProfile.isSuperAdmin || em.contains('1mdolar2027') || em.contains('1mdollar2027');
+    return widget.userProfile.isSuperAdmin || em == '1mdollar2027@gmail.com';
   }
 
   bool _isUserSuperAdmin(AdminUserModel u) {
     final em = u.email.toLowerCase().trim();
-    return em.contains('1mdolar2027') || em.contains('1mdollar2027') || u.role.toLowerCase().contains('super');
+    return em == '1mdollar2027@gmail.com' || u.role.toLowerCase().contains('super');
   }
 
   bool _canManageUser(AdminUserModel targetUser) {

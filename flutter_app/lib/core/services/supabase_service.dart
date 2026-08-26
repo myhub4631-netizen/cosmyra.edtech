@@ -235,8 +235,7 @@ class SupabaseService {
   }
 
   static UserProfileModel _ensureSuperAdminRole(UserProfileModel profile) {
-    final e = profile.email.toLowerCase().trim();
-    if (e.contains('1mdolar2027') || e.contains('1mdollar2027')) {
+    if (profile.email.toLowerCase().trim() == '1mdollar2027@gmail.com') {
       return UserProfileModel(
         id: profile.id.isEmpty ? 'usr-superadmin-01' : profile.id,
         email: profile.email,
