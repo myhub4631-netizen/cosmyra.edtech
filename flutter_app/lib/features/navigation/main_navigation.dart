@@ -214,8 +214,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       );
     }
 
-    // 4. Standalone Admin Screens
-    // 4. Standalone Admin Screens
+    // 0. AUTHENTICATION GUARD: If user is NOT logged in, ANY route or URL MUST render LandingPageScreen
+    if (!_isLoggedIn) {
+      return LandingPageScreen(
+        onStartPracticing: _openCustomPracticeWizard,
+        onExploreTests: _startCustomTest,
+        onSignUp: _openAuthModal,
+        onLogIn: _openAuthModal,
+      );
+    }
+
+    // 4. Standalone Admin Screens (Only accessible when _isLoggedIn is true)
     if (_selectedIndex == 8 || _selectedIndex == 15) {
       return AdminDashboardScreen(userProfile: _currentUser);
     }
@@ -238,48 +247,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       return AdminDashboardSectionsScreen(userProfile: _currentUser);
     }
 
-    // 5. Root Landing Page for Non-Logged-In Users on neet-jee.in
-    if (_selectedIndex == -1) {
-      if (!_isLoggedIn) {
-        return LandingPageScreen(
-          onStartPracticing: _openCustomPracticeWizard,
-          onExploreTests: _startCustomTest,
-          onSignUp: _openAuthModal,
-          onLogIn: _openAuthModal,
-        );
-      }
-      if (_currentUser.isSuperAdmin || _currentUser.isAdmin) {
-        return AdminDashboardScreen(userProfile: _currentUser);
-      }
-      return UserDashboardScreen(
-        userProfile: _currentUser,
-        activeExam: _activeExam,
-        onOpenPractice: () => setState(() => _selectedIndex = 1),
-        onOpenMockTests: () => setState(() => _selectedIndex = 2),
-        onOpenPyqs: () => setState(() => _selectedIndex = 3),
-        onOpenMistakes: () => setState(() => _selectedIndex = 4),
-      );
-    }
-
-    // 6. User Dashboard Screen for /dashboard
-    if (_selectedIndex == 0) {
-      if (_currentUser.isSuperAdmin || _currentUser.isAdmin) {
-        return AdminDashboardScreen(userProfile: _currentUser);
-      }
-      return UserDashboardScreen(
-        userProfile: _currentUser,
-        activeExam: _activeExam,
-        onOpenPractice: () => setState(() => _selectedIndex = 1),
-        onOpenMockTests: () => setState(() => _selectedIndex = 2),
-        onOpenPyqs: () => setState(() => _selectedIndex = 3),
-        onOpenMistakes: () => setState(() => _selectedIndex = 4),
-        onLogout: () {
-          setState(() {
-            _isLoggedIn = false;
-            _selectedIndex = -1;
-          });
-        },
-      );
+    // 5. Root / Dashboard handling for authenticated users
+    if (_currentUser.isSuperAdmin || _currentUser.isAdmin) {
+      return AdminDashboardScreen(userProfile: _currentUser);
     }
 
     return UserDashboardScreen(
@@ -292,7 +262,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       onLogout: () {
         setState(() {
           _isLoggedIn = false;
-          _selectedIndex = 0;
+          _selectedIndex = -1;
         });
       },
     );
