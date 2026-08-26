@@ -62,6 +62,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     final uriPath = Uri.base.path;
     final uriFragment = Uri.base.fragment;
+    final isSuperAdminRoute = uriPath.contains('superadmin') || uriFragment.contains('superadmin');
     final isSectionsRoute = uriPath.contains('sections') || uriFragment.contains('sections');
     final isUsersRoute = uriPath.contains('users') || uriFragment.contains('users');
     final isPredictionsRoute = uriPath.contains('predictions') || uriFragment.contains('predictions');
@@ -71,12 +72,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final isAdminRoute = uriPath.contains('admin') || uriFragment.contains('admin');
     final isDashboardRoute = uriPath.contains('dashboard') || uriFragment.contains('dashboard');
 
-    if (isDashboardRoute || widget.forceDashboard) {
-      _isLoggedIn = true;
-    }
-
     if (widget.initialIndex != null) {
       _selectedIndex = widget.initialIndex!;
+    } else if (isSuperAdminRoute) {
+      _selectedIndex = 15;
     } else if (isSectionsRoute) {
       _selectedIndex = 14;
     } else if (isUsersRoute) {
@@ -91,8 +90,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       _selectedIndex = 9;
     } else if (isAdminRoute) {
       _selectedIndex = 8;
-    } else {
+    } else if (isDashboardRoute) {
       _selectedIndex = 0;
+    } else {
+      _selectedIndex = -1;
     }
 
     _currentUser = SupabaseService.getMockProfile(role: 'student');
@@ -207,7 +208,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     }
 
     // 4. Standalone Admin Screens
-    if (_selectedIndex == 8) {
+    // 4. Standalone Admin Screens
+    if (_selectedIndex == 8 || _selectedIndex == 15) {
       return AdminDashboardScreen(userProfile: _currentUser);
     }
     if (_selectedIndex == 9) {
@@ -229,20 +231,48 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       return AdminDashboardSectionsScreen(userProfile: _currentUser);
     }
 
-    // 5. Explicit Public Landing Page (Only if route is explicitly /landing)
-    final uriPath = Uri.base.path;
-    if (_selectedIndex == 0 && uriPath.contains('/landing')) {
-      return LandingPageScreen(
-        onStartPracticing: _openCustomPracticeWizard,
-        onExploreTests: _startCustomTest,
-        onSignUp: _openAuthModal,
-        onLogIn: _openAuthModal,
+    // 5. Root Landing Page for Non-Logged-In Users on neet-jee.in
+    if (_selectedIndex == -1) {
+      if (!_isLoggedIn) {
+        return LandingPageScreen(
+          onStartPracticing: _openCustomPracticeWizard,
+          onExploreTests: _startCustomTest,
+          onSignUp: _openAuthModal,
+          onLogIn: _openAuthModal,
+        );
+      }
+      if (_currentUser.isSuperAdmin || _currentUser.isAdmin) {
+        return AdminDashboardScreen(userProfile: _currentUser);
+      }
+      return UserDashboardScreen(
+        userProfile: _currentUser,
+        activeExam: _activeExam,
+        onOpenPractice: () => setState(() => _selectedIndex = 1),
+        onOpenMockTests: () => setState(() => _selectedIndex = 2),
+        onOpenPyqs: () => setState(() => _selectedIndex = 3),
+        onOpenMistakes: () => setState(() => _selectedIndex = 4),
       );
     }
 
-    // 6. User Dashboard or Admin Dashboard Screen
-    if (_currentUser.isAdmin || _currentUser.isSuperAdmin) {
-      return AdminDashboardScreen(userProfile: _currentUser);
+    // 6. User Dashboard Screen for /dashboard
+    if (_selectedIndex == 0) {
+      if (_currentUser.isSuperAdmin || _currentUser.isAdmin) {
+        return AdminDashboardScreen(userProfile: _currentUser);
+      }
+      return UserDashboardScreen(
+        userProfile: _currentUser,
+        activeExam: _activeExam,
+        onOpenPractice: () => setState(() => _selectedIndex = 1),
+        onOpenMockTests: () => setState(() => _selectedIndex = 2),
+        onOpenPyqs: () => setState(() => _selectedIndex = 3),
+        onOpenMistakes: () => setState(() => _selectedIndex = 4),
+        onLogout: () {
+          setState(() {
+            _isLoggedIn = false;
+            _selectedIndex = -1;
+          });
+        },
+      );
     }
 
     return UserDashboardScreen(

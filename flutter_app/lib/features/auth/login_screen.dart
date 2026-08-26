@@ -52,10 +52,6 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (mounted) {
-        setState(() {
-          _loggedInProfile = userProfile;
-        });
-
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Login successful! Welcome back.'),
@@ -65,6 +61,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
         if (widget.onLoginSuccess != null) {
           widget.onLoginSuccess!(userProfile);
+        } else {
+          if (userProfile.isSuperAdmin) {
+            Navigator.pushReplacementNamed(context, '/superadmin');
+          } else if (userProfile.isAdmin) {
+            Navigator.pushReplacementNamed(context, '/admin');
+          } else {
+            Navigator.pushReplacementNamed(context, '/dashboard');
+          }
         }
       }
     } catch (e) {

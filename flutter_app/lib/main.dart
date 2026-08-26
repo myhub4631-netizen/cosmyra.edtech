@@ -18,7 +18,8 @@ class CosmyraApp extends StatelessWidget {
   const CosmyraApp({Key? key}) : super(key: key);
 
   int _getInitialIndexFromPath(String path) {
-    final cleanPath = path.toLowerCase();
+    final cleanPath = path.toLowerCase().trim();
+    if (cleanPath.contains('superadmin')) return 15;
     if (cleanPath.contains('sections')) return 14;
     if (cleanPath.contains('users')) return 13;
     if (cleanPath.contains('predictions')) return 12;
@@ -33,13 +34,13 @@ class CosmyraApp extends StatelessWidget {
     if (cleanPath.contains('pyq') || cleanPath.contains('nta')) return 3;
     if (cleanPath.contains('tests') || cleanPath.contains('mock')) return 2;
     if (cleanPath.contains('practice')) return 1;
-    return 0;
+    if (cleanPath.contains('dashboard')) return 0;
+    return -1; // root / landing page for non-logged in users
   }
 
   @override
   Widget build(BuildContext context) {
     final currentPath = Uri.base.path;
-    final initialIdx = _getInitialIndexFromPath(currentPath);
 
     return MaterialApp(
       title: 'Cosmyra Edu - NEET & JEE Exam Platform',
@@ -49,8 +50,8 @@ class CosmyraApp extends StatelessWidget {
       themeMode: ThemeMode.light,
       initialRoute: currentPath.isEmpty || currentPath == '/' ? '/' : currentPath,
       routes: {
-        '/': (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
-        '/landing': (context) => const MainNavigationScreen(initialIndex: 0),
+        '/': (context) => const MainNavigationScreen(initialIndex: -1),
+        '/landing': (context) => const MainNavigationScreen(initialIndex: -1),
         '/dashboard': (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
         '/user/dashboard': (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
         '/signup': (context) => const SignUpScreen(),
@@ -76,6 +77,7 @@ class CosmyraApp extends StatelessWidget {
         '/users': (context) => const MainNavigationScreen(initialIndex: 13),
         '/admin/sections': (context) => const MainNavigationScreen(initialIndex: 14),
         '/sections': (context) => const MainNavigationScreen(initialIndex: 14),
+        '/superadmin': (context) => const MainNavigationScreen(initialIndex: 15),
       },
       onGenerateRoute: (settings) {
         final targetPath = (settings.name ?? Uri.base.path).toLowerCase();
