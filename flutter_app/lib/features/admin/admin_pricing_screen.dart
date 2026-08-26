@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../models/models.dart';
+import 'admin_user_management_screen.dart';
 
 class AdminPricingScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -236,7 +237,9 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                 _buildSidebarTile('Dashboard', Icons.dashboard_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin')),
                 _buildSidebarTile('Paper Prediction', Icons.note_alt_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
                 _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
-                _buildSidebarTile('Users', Icons.people_outline_rounded, false, onTap: () => Navigator.pushNamed(context, '/admin/users')),
+                _buildSidebarTile('Users', Icons.people_outline_rounded, false, onTap: () {
+                  Navigator.of(context).push(MaterialPageRoute(builder: (context) => AdminUserManagementScreen(userProfile: widget.userProfile)));
+                }),
                 _buildSidebarTile('Exams', Icons.assignment_outlined, false),
                 _buildSidebarTile('Subjects', Icons.book_outlined, false),
                 _buildSidebarTile('Chapters', Icons.folder_open_outlined, false),

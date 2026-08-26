@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../models/models.dart';
+import 'admin_user_management_screen.dart';
 
 class AdminLeaderboardScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -272,7 +273,9 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                 _buildSidebarTile('Reported Questions', Icons.flag_outlined, false),
                 _buildSidebarTile('PYQs & Papers', Icons.auto_stories_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
                 _buildSidebarTile('Leaderboard', Icons.emoji_events_outlined, true, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),
-                _buildSidebarTile('User Management', Icons.people_outline_rounded, false, onTap: () => Navigator.pushNamed(context, '/admin/users')),
+                _buildSidebarTile('User Management', Icons.people_outline_rounded, false, onTap: () {
+                  Navigator.of(context).push(MaterialPageRoute(builder: (context) => AdminUserManagementScreen(userProfile: widget.userProfile)));
+                }),
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('REPORTS & ANALYTICS'),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
+import 'admin_user_management_screen.dart';
 
 class AdminPredictionsScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -350,7 +351,9 @@ class _AdminPredictionsScreenState extends State<AdminPredictionsScreen> {
                 _buildNavItem(Icons.account_tree_outlined, 'Exam Hierarchy', false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
                 _buildNavItem(Icons.sell_outlined, 'Pricing & Plans', false, onTap: () => Navigator.pushNamed(context, '/admin/pricing')),
                 _buildNavItem(Icons.leaderboard_outlined, 'Leaderboard', false, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),
-                _buildNavItem(Icons.people_outline_rounded, 'User Management', false, onTap: () => Navigator.pushNamed(context, '/admin/users')),
+                _buildNavItem(Icons.people_outline_rounded, 'User Management', false, onTap: () {
+                  Navigator.of(context).push(MaterialPageRoute(builder: (context) => AdminUserManagementScreen(userProfile: widget.userProfile)));
+                }),
                 _buildNavItem(Icons.play_circle_outline, 'Practice', false),
 
                 // Active Accordion: Paper Prediction

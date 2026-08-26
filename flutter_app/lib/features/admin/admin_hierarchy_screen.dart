@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../models/models.dart';
+import 'admin_user_management_screen.dart';
 
 class AdminHierarchyScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -363,11 +364,15 @@ class _AdminHierarchyScreenState extends State<AdminHierarchyScreen> {
                 _buildSidebarTile('Mistake Book', Icons.menu_book_outlined, false),
                 _buildSidebarTile('Bookmarks', Icons.bookmark_outline_rounded, false),
                 _buildSidebarTile('Reported Questions', Icons.flag_outlined, false),
-                _buildSidebarTile('User Management', Icons.people_outline_rounded, false, onTap: () => Navigator.pushNamed(context, '/admin/users')),
+                _buildSidebarTile('User Management', Icons.people_outline_rounded, false, onTap: () {
+                  Navigator.of(context).push(MaterialPageRoute(builder: (context) => AdminUserManagementScreen(userProfile: widget.userProfile)));
+                }),
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('USERS & ROLES'),
-                _buildSidebarTile('Users', Icons.person_outline, false, onTap: () => Navigator.pushNamed(context, '/admin/users')),
+                _buildSidebarTile('Users', Icons.person_outline, false, onTap: () {
+                  Navigator.of(context).push(MaterialPageRoute(builder: (context) => AdminUserManagementScreen(userProfile: widget.userProfile)));
+                }),
                 _buildSidebarTile('Roles & Permissions', Icons.security_outlined, false),
                 _buildSidebarTile('Activity Logs', Icons.history_rounded, false),
 
