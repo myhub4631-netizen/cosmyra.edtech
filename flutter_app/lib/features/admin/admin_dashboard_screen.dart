@@ -338,6 +338,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('CONTENT MANAGEMENT'),
+                _buildSidebarTile('Dashboard Sections', Icons.dashboard_customize_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/sections')),
                 _buildSidebarTile('Paper Predictions', Icons.note_alt_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
                 _buildSidebarTile('Question Bank', Icons.quiz_outlined, false, hasDropdown: true),
                 _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false, onTap: _pickAndValidateCSV),

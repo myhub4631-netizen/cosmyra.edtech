@@ -24,6 +24,8 @@ import '../admin/admin_user_management_screen.dart';
 
 import '../dashboard/user_dashboard_screen.dart';
 
+import '../admin/admin_dashboard_sections_screen.dart';
+
 class MainNavigationScreen extends StatefulWidget {
   final int? initialIndex;
   final bool forceDashboard;
@@ -60,6 +62,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     final uriPath = Uri.base.path;
     final uriFragment = Uri.base.fragment;
+    final isSectionsRoute = uriPath.contains('sections') || uriFragment.contains('sections');
     final isUsersRoute = uriPath.contains('users') || uriFragment.contains('users');
     final isPredictionsRoute = uriPath.contains('predictions') || uriFragment.contains('predictions');
     final isLeaderboardRoute = uriPath.contains('leaderboard') || uriFragment.contains('leaderboard');
@@ -74,6 +77,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     if (widget.initialIndex != null) {
       _selectedIndex = widget.initialIndex!;
+    } else if (isSectionsRoute) {
+      _selectedIndex = 14;
     } else if (isUsersRoute) {
       _selectedIndex = 13;
     } else if (isPredictionsRoute) {
@@ -316,6 +321,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         return AdminPredictionsScreen(userProfile: _currentUser);
       case 13:
         return AdminUserManagementScreen(userProfile: _currentUser);
+      case 14:
+        return AdminDashboardSectionsScreen(userProfile: _currentUser);
       default:
         return const SizedBox.shrink();
     }
