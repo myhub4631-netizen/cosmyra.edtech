@@ -87,10 +87,19 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
       final initials = p.fullName.isNotEmpty
           ? p.fullName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
           : (p.email.isNotEmpty ? p.email[0].toUpperCase() : 'U');
-      
-      final userRole = p.role.isEmpty
-          ? 'Student'
-          : (p.role.toLowerCase() == 'admin' ? 'Administrator' : p.role[0].toUpperCase() + p.role.substring(1).toLowerCase());
+
+      String userRole = 'Student';
+      if (p.email.toLowerCase().trim() == '1mdollar2027@gmail.com' || p.role.toLowerCase() == 'superadmin') {
+        userRole = 'Super Administrator';
+      } else if (p.role.toLowerCase() == 'admin' || p.role.toLowerCase() == 'administrator') {
+        userRole = 'Administrator';
+      } else if (p.role.toLowerCase() == 'educator') {
+        userRole = 'Educator';
+      } else if (p.role.toLowerCase() == 'moderator') {
+        userRole = 'Content Moderator';
+      } else if (p.role.isNotEmpty) {
+        userRole = p.role[0].toUpperCase() + p.role.substring(1).toLowerCase();
+      }
 
       return AdminUserModel(
         id: p.id,
@@ -98,14 +107,14 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         email: p.email,
         userIdCode: p.id.length >= 6 ? p.id.substring(0, 6).toUpperCase() : p.id,
         role: userRole,
-        examAccess: [p.targetExam.isNotEmpty ? p.targetExam : 'NEET'],
+        examAccess: [p.targetExam.isNotEmpty ? p.targetExam : 'NEET & JEE'],
         status: 'Active',
         lastActive: 'Just now',
         joinedOn: 'Aug 26, 2026',
         phone: (p.phoneNumber != null && p.phoneNumber!.isNotEmpty) ? p.phoneNumber! : '+91 98765 43210',
         regSource: 'Web Portal',
         avatarInitials: initials,
-        avatarColor: const Color(0xFF6366F1),
+        avatarColor: p.email.toLowerCase().trim() == '1mdollar2027@gmail.com' ? const Color(0xFF6366F1) : const Color(0xFF3B82F6),
       );
     }).toList();
 
@@ -127,6 +136,21 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
   List<AdminUserModel> _getInitialSystemUsers() {
     return [
+      AdminUserModel(
+        id: 'usr-superadmin-01',
+        name: 'Mahboob 1md Admin',
+        email: '1mdollar2027@gmail.com',
+        userIdCode: '9BA129',
+        role: 'Super Administrator',
+        examAccess: ['NEET & JEE'],
+        status: 'Active',
+        lastActive: 'Just now',
+        joinedOn: 'Aug 26, 2026',
+        phone: '+91 98765 43210',
+        regSource: 'System Master Admin',
+        avatarInitials: 'M1',
+        avatarColor: const Color(0xFF6366F1),
+      ),
       AdminUserModel(
         id: 'usr-admin-01',
         name: 'Dr. Sharma (Admin)',
@@ -162,6 +186,21 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
   void _initSampleUserData() {
     _allUsers = _getInitialSystemUsers();
+  }
+
+  // Permission guards
+  bool get _isCurrentSuperAdmin =>
+      widget.userProfile.isSuperAdmin || widget.userProfile.email.toLowerCase().trim() == '1mdollar2027@gmail.com';
+
+  bool _isUserSuperAdmin(AdminUserModel u) {
+    return u.email.toLowerCase().trim() == '1mdollar2027@gmail.com' ||
+        u.role.toLowerCase().contains('super');
+  }
+
+  bool _canManageUser(AdminUserModel targetUser) {
+    if (_isCurrentSuperAdmin) return true;
+    if (_isUserSuperAdmin(targetUser)) return false;
+    return true;
   }
 
   // Filtered users calculation
@@ -1327,16 +1366,49 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                       IconButton(
                         icon: const Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF64748B)),
                         onPressed: () => setState(() => _selectedUserForDetail = u),
-                        tooltip: 'View User',
+                        tooltip: 'View User Details',
                       ),
                       IconButton(
                         icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF64748B)),
-                        onPressed: () => _showEditUserModal(u),
-                        tooltip: 'Edit User',
+                        onPressed: () {
+                          if (!_canManageUser(u)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Access Denied: Admin cannot edit Master/Super Admin accounts.'),
+                                backgroundColor: Color(0xFFEF4444),
+                              ),
+                            );
+                            return;
+                          }
+                          _showEditUserModal(u);
+                        },
+                        tooltip: 'Edit & Reassign Role',
                       ),
-                      IconButton(
+                      PopupMenuButton<String>(
                         icon: const Icon(Icons.more_vert, size: 16, color: Color(0xFF64748B)),
-                        onPressed: () {},
+                        onSelected: (val) {
+                          if (val == 'view') {
+                            setState(() => _selectedUserForDetail = u);
+                          } else if (val == 'edit') {
+                            if (!_canManageUser(u)) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Access Denied: Admin cannot edit Master/Super Admin accounts.'),
+                                  backgroundColor: Color(0xFFEF4444),
+                                ),
+                              );
+                              return;
+                            }
+                            _showEditUserModal(u);
+                          } else if (val == 'delete') {
+                            _confirmDeleteUser(u);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(value: 'view', child: Row(children: [Icon(Icons.visibility_outlined, size: 16), SizedBox(width: 8), Text('View Details')])),
+                          const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Edit & Reassign Role')])),
+                          const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('Delete Account', style: TextStyle(color: Colors.red))])),
+                        ],
                       ),
                     ],
                   ),
@@ -1344,6 +1416,64 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
               ],
             );
           }).toList(),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteUser(AdminUserModel user) {
+    if (!_canManageUser(user)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Access Denied: Only Super Administrators can delete Super Admin accounts.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 24),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Delete User: ${user.name}?')),
+          ],
+        ),
+        content: Text('Are you sure you want to permanently delete user "${user.name}" (${user.email})? This action will remove their account from Supabase.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await SupabaseService.deleteUserAccount(user.id);
+              setState(() {
+                _allUsers.removeWhere((u) => u.id == user.id);
+                if (_selectedUserForDetail?.id == user.id) {
+                  _selectedUserForDetail = _allUsers.isNotEmpty ? _allUsers.first : null;
+                }
+              });
+              if (mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('User "${user.name}" has been deleted.'),
+                    backgroundColor: const Color(0xFFEF4444),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Delete Permanently', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
         ],
       ),
     );
@@ -1369,6 +1499,12 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
     } else if (role == 'Administrator') {
       bg = const Color(0xFFF3E8FF);
       text = const Color(0xFF7E22CE);
+    } else if (role == 'Super Administrator') {
+      bg = const Color(0xFFEEF2FF);
+      text = const Color(0xFF4338CA);
+    } else if (role == 'Content Moderator') {
+      bg = const Color(0xFFEFF6FF);
+      text = const Color(0xFF1D4ED8);
     }
 
     return Container(
@@ -1512,7 +1648,25 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                     .map((rl) => DropdownMenuItem(value: rl, child: Text(rl)))
                     .toList(),
                 onChanged: (newRole) async {
+                  if (!_canManageUser(u)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Access Denied: Admin cannot modify or reassign Master/Super Admin roles.'),
+                        backgroundColor: Color(0xFFEF4444),
+                      ),
+                    );
+                    return;
+                  }
                   if (newRole != null) {
+                    if (!_isCurrentSuperAdmin && newRole == 'Super Administrator') {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Access Denied: Only Super Administrators can grant Super Admin role.'),
+                          backgroundColor: Color(0xFFEF4444),
+                        ),
+                      );
+                      return;
+                    }
                     await SupabaseService.updateUserRole(userId: u.id, role: newRole);
                     setState(() {
                       final idx = _allUsers.indexWhere((item) => item.id == u.id);
