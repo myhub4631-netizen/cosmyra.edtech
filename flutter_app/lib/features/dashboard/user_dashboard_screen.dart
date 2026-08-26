@@ -33,58 +33,768 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   String _performanceTab = 'Questions';
   String _leaderboardTab = 'Daily';
   int _activeSidebarIndex = 0;
+  int _mobileBottomNavIndex = 0;
 
   @override
   Widget build(BuildContext context) {
-    final displayName = widget.userProfile.fullName.isNotEmpty
-        ? widget.userProfile.fullName
-        : 'Aman Kumar';
+    final displayName = widget.userProfile.fullName.trim().isNotEmpty
+        ? widget.userProfile.fullName.trim()
+        : (widget.userProfile.email.contains('@')
+            ? widget.userProfile.email.split('@').first
+            : 'Aman Kumar');
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. LEFT SIDEBAR NAVIGATION
-          _buildSidebar(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 850;
 
-          // 2. MAIN CONTENT AREA
-          Expanded(
-            child: Column(
+        if (isMobile) {
+          return Scaffold(
+            backgroundColor: const Color(0xFFFAFAFA),
+            body: SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 1. Mobile Top Header
+                    _buildMobileHeader(displayName),
+                    const SizedBox(height: 18),
+
+                    // 2. Mobile Banner Carousel Card (Unlock Your Full Potential)
+                    _buildMobileBannerCarousel(),
+                    const SizedBox(height: 20),
+
+                    // 3. Mobile 2x2 Metrics Cards Grid
+                    _buildMobileKpiGrid(),
+                    const SizedBox(height: 22),
+
+                    // 4. Mobile Continue Where You Left Off Card
+                    _buildMobileContinueCard(),
+                    const SizedBox(height: 22),
+
+                    // 5. Mobile Quick Actions Horizontal Row
+                    _buildMobileQuickActions(),
+                    const SizedBox(height: 22),
+
+                    // 6. Mobile Performance Overview (3 Mini Trend Charts)
+                    _buildMobilePerformanceOverview(),
+                    const SizedBox(height: 22),
+
+                    // 7. Mobile Subject Strength Card
+                    _buildMobileSubjectStrength(),
+                    const SizedBox(height: 80), // Padding for bottom navbar
+                  ],
+                ),
+              ),
+            ),
+            bottomNavigationBar: _buildMobileBottomNavBar(),
+          );
+        }
+
+        // DESKTOP LAYOUT
+        return Scaffold(
+          backgroundColor: const Color(0xFFFAFAFA),
+          body: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. LEFT SIDEBAR NAVIGATION
+              _buildSidebar(),
+
+              // 2. MAIN CONTENT AREA
+              Expanded(
+                child: Column(
+                  children: [
+                    // Top Header Navbar
+                    _buildTopNavbar(displayName),
+
+                    // Main Scrollable Content Body
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(28.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Welcome Banner Header Row
+                            _buildWelcomeHeader(displayName),
+                            const SizedBox(height: 24),
+
+                            // Top 4 KPI Metrics Grid Row
+                            _buildKpiMetricsGrid(),
+                            const SizedBox(height: 28),
+
+                            // Middle Section Row: Continue Where You Left Off + Today's Progress
+                            _buildMiddleSectionRow(),
+                            const SizedBox(height: 28),
+
+                            // Quick Start Section Header + 5 Cards Grid Row
+                            _buildQuickStartSection(),
+                            const SizedBox(height: 28),
+
+                            // Bottom Section Row: Performance Overview Line Chart + Leaderboard
+                            _buildBottomSectionRow(displayName),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ================= MOBILE COMPONENTS =================
+
+  // 1. Mobile Top Header (Hi, Aman 👋 + Subtitle & Right Streak / Notification)
+  Widget _buildMobileHeader(String displayName) {
+    final firstName = displayName.split(" ").first;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                // Top Header Navbar
-                _buildTopNavbar(displayName),
+                Text(
+                  'Hi, $firstName',
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.4),
+                ),
+                const SizedBox(width: 6),
+                const Text('👋', style: TextStyle(fontSize: 20)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "Let's achieve your ${widget.activeExam} ${widget.userProfile.targetYear} goal!",
+              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
 
-                // Main Scrollable Content Body
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(28.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Welcome Banner Header Row
-                        _buildWelcomeHeader(displayName),
-                        const SizedBox(height: 24),
+        // Right Streak & Notification Bell
+        Row(
+          children: [
+            // Streak Badge Pill
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFFFEDD5)),
+              ),
+              child: const Row(
+                children: [
+                  Text('🔥', style: TextStyle(fontSize: 14)),
+                  SizedBox(width: 4),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('12', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFFEA580C))),
+                      Text('Day Streak', style: TextStyle(fontSize: 8, color: Color(0xFFC2410C), fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
 
-                        // Top 4 KPI Metrics Grid Row
-                        _buildKpiMetricsGrid(),
-                        const SizedBox(height: 28),
+            const SizedBox(width: 10),
 
-                        // Middle Section Row: Continue Where You Left Off + Today's Progress
-                        _buildMiddleSectionRow(),
-                        const SizedBox(height: 28),
-
-                        // Quick Start Section Header + 5 Cards Grid Row
-                        _buildQuickStartSection(),
-                        const SizedBox(height: 28),
-
-                        // Bottom Section Row: Performance Overview Line Chart + Leaderboard
-                        _buildBottomSectionRow(displayName),
-                      ],
+            // Notification Bell with Count Badge
+            Stack(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFF1F5F9)),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+                    ],
+                  ),
+                  child: const Icon(Icons.notifications_none_rounded, color: Color(0xFF64748B), size: 20),
+                ),
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF4444),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Text(
+                      '3',
+                      style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // 2. Mobile Banner Carousel Card (Unlock Your Full Potential)
+  Widget _buildMobileBannerCarousel() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF4338CA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF312E81).withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Limited Time Offer Badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF7C3AED),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              'Limited Time Offer',
+              style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left Content Column
+              Expanded(
+                flex: 6,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RichText(
+                      text: const TextSpan(
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white, height: 1.2),
+                        children: [
+                          TextSpan(text: 'Unlock Your\n'),
+                          TextSpan(text: 'Full Potential', style: TextStyle(color: Color(0xFFFACC15))),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Premium plans for serious aspirants',
+                      style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Feature bullets
+                    const Row(
+                      children: [
+                        Text('♾️ ', style: TextStyle(fontSize: 10)),
+                        Text('Unlimited Tests  ', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+                        Text('📊 ', style: TextStyle(fontSize: 10)),
+                        Text('Detailed Analytics', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Row(
+                      children: [
+                        Text('🏆 ', style: TextStyle(fontSize: 10)),
+                        Text('All India Rank', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Yellow Action CTA Button
+                    ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFACC15),
+                        foregroundColor: const Color(0xFF0F172A),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('View Plans', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          SizedBox(width: 4),
+                          Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF0F172A)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 10),
+
+              // Right Graphic Preview Cards
+              Expanded(
+                flex: 5,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withOpacity(0.12)),
+                  ),
+                  child: Column(
+                    children: [
+                      // Pro Card Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF43F5E),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text('MOST POPULAR', style: TextStyle(color: Colors.white, fontSize: 7, fontWeight: FontWeight.bold)),
+                            ),
+                            const SizedBox(height: 2),
+                            const Text('Pro', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                            const Text('₹299/month', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+
+                      // Gift Tag Badge UP TO 40% OFF
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFACC15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('👑 ', style: TextStyle(fontSize: 10)),
+                            Text('UP TO 40% OFF', style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          // Pagination Dots Indicator
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(5, (index) {
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                width: index == 1 ? 16 : 4,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: index == 1 ? Colors.white : Colors.white38,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 3. Mobile 2x2 Metrics Cards Grid
+  Widget _buildMobileKpiGrid() {
+    final metrics = [
+      {
+        'title': 'Questions Attempted',
+        'value': '1,248',
+        'sub': '↑ 18% vs last 7 days',
+        'icon': Icons.edit_document,
+        'cardBg': const Color(0xFFF0FDF4),
+        'borderColor': const Color(0xFFDCFCE7),
+        'titleColor': const Color(0xFF166534),
+        'iconBg': const Color(0xFFDCFCE7),
+        'iconColor': const Color(0xFF16A34A),
+      },
+      {
+        'title': 'Accuracy',
+        'value': '72.4%',
+        'sub': '↑ 6.3% vs last 7 days',
+        'icon': Icons.track_changes_rounded,
+        'cardBg': const Color(0xFFEFF6FF),
+        'borderColor': const Color(0xFFDBEAFE),
+        'titleColor': const Color(0xFF1E40AF),
+        'iconBg': const Color(0xFFDBEAFE),
+        'iconColor': const Color(0xFF2563EB),
+      },
+      {
+        'title': 'Tests Completed',
+        'value': '28',
+        'sub': '↑ 4 vs last 7 days',
+        'icon': Icons.assignment_turned_in_rounded,
+        'cardBg': const Color(0xFFF5F3FF),
+        'borderColor': const Color(0xFFDDD6FE),
+        'titleColor': const Color(0xFF5B21B6),
+        'iconBg': const Color(0xFFDDD6FE),
+        'iconColor': const Color(0xFF7C3AED),
+      },
+      {
+        'title': 'Study Streak',
+        'value': '12 Days',
+        'sub': 'Best: 32 Days',
+        'icon': Icons.local_fire_department_rounded,
+        'cardBg': const Color(0xFFFFF7ED),
+        'borderColor': const Color(0xFFFFEDD5),
+        'titleColor': const Color(0xFF9A3412),
+        'iconBg': const Color(0xFFFFEDD5),
+        'iconColor': const Color(0xFFEA580C),
+      },
+    ];
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: _buildMobileMiniKpiCard(metrics[0])),
+            const SizedBox(width: 12),
+            Expanded(child: _buildMobileMiniKpiCard(metrics[1])),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _buildMobileMiniKpiCard(metrics[2])),
+            const SizedBox(width: 12),
+            Expanded(child: _buildMobileMiniKpiCard(metrics[3])),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileMiniKpiCard(Map<String, dynamic> m) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: m['cardBg'] as Color,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: m['borderColor'] as Color),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: m['iconBg'] as Color,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(m['icon'] as IconData, color: m['iconColor'] as Color, size: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            m['title'] as String,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: m['titleColor'] as Color),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            m['value'] as String,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.4),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            m['sub'] as String,
+            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 4. Mobile Continue Where You Left Off Card
+  Widget _buildMobileContinueCard() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Continue Where You Left Off', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            GestureDetector(
+              onTap: widget.onOpenPractice,
+              child: const Row(
+                children: [
+                  Text('View All', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2563EB))),
+                  SizedBox(width: 2),
+                  Icon(Icons.chevron_right_rounded, size: 14, color: Color(0xFF2563EB)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 3)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // Green Illustration Container
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        const Icon(Icons.show_chart_rounded, size: 30, color: Color(0xFF16A34A)),
+                        Positioned(
+                          top: 6,
+                          left: 6,
+                          child: Text('V₀', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Custom Practice Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDCFCE7),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text('Custom Practice', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF166534))),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text('Physics • Kinematics', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Motion in a Straight Line',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Progress Bar & CTA
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: const LinearProgressIndicator(
+                            value: 0.6,
+                            minHeight: 6,
+                            backgroundColor: Color(0xFFE2E8F0),
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text('60% Completed', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+
+                  ElevatedButton.icon(
+                    onPressed: widget.onOpenPractice,
+                    icon: const Icon(Icons.play_arrow_rounded, size: 14, color: Color(0xFF4F46E5)),
+                    label: const Text('Continue', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEEF2FF),
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 5. Mobile Quick Actions Horizontal Row
+  Widget _buildMobileQuickActions() {
+    final actions = [
+      {'label': 'Custom Practice', 'icon': Icons.track_changes_rounded, 'color': const Color(0xFF16A34A), 'bg': const Color(0xFFDCFCE7), 'tap': widget.onOpenPractice},
+      {'label': 'Custom Test', 'icon': Icons.assignment_outlined, 'color': const Color(0xFF2563EB), 'bg': const Color(0xFFDBEAFE), 'tap': widget.onOpenMockTests},
+      {'label': 'PYQ Practice', 'icon': Icons.menu_book_rounded, 'color': const Color(0xFF7C3AED), 'bg': const Color(0xFFDDD6FE), 'tap': widget.onOpenPyqs},
+      {'label': 'NTA Questions', 'icon': Icons.shield_outlined, 'color': const Color(0xFFEA580C), 'bg': const Color(0xFFFFEDD5), 'tap': widget.onOpenPyqs},
+      {'label': 'Test Series', 'icon': Icons.calendar_today_outlined, 'color': const Color(0xFFDB2777), 'bg': const Color(0xFFFCE7F3), 'tap': widget.onOpenMockTests},
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Quick Actions', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        const SizedBox(height: 12),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: actions.map((act) {
+              return Container(
+                margin: const EdgeInsets.only(right: 16),
+                width: 72,
+                child: GestureDetector(
+                  onTap: act['tap'] as VoidCallback,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: act['bg'] as Color,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(act['icon'] as IconData, color: act['color'] as Color, size: 22),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        act['label'] as String,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF334155), height: 1.2),
+                        maxLines: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 6. Mobile Performance Overview (3 Mini Sparkline Cards)
+  Widget _buildMobilePerformanceOverview() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Your Performance Overview', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Row(
+                children: [
+                  Text('Last 7 Days', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                  SizedBox(width: 2),
+                  Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: Color(0xFF64748B)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            // Questions Attempted mini sparkline card
+            Expanded(
+              child: _buildMiniSparklineCard('Questions Attempted', '428', const Color(0xFF2563EB), [0.3, 0.4, 0.2, 0.5, 0.4, 0.7]),
+            ),
+            const SizedBox(width: 8),
+            // Accuracy mini sparkline card
+            Expanded(
+              child: _buildMiniSparklineCard('Accuracy', '74.6%', const Color(0xFF16A34A), [0.5, 0.6, 0.4, 0.7, 0.6, 0.8]),
+            ),
+            const SizedBox(width: 8),
+            // Time Spent mini sparkline card
+            Expanded(
+              child: _buildMiniSparklineCard('Time Spent', '6h 32m', const Color(0xFF7C3AED), [0.4, 0.3, 0.6, 0.5, 0.8, 0.6]),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniSparklineCard(String label, String value, Color color, List<double> values) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 6, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 9, color: Color(0xFF64748B), fontWeight: FontWeight.w500), maxLines: 1),
+          const SizedBox(height: 4),
+          Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 24,
+            width: double.infinity,
+            child: CustomPaint(
+              painter: MiniSparklinePainter(values: values, color: color),
             ),
           ),
         ],
@@ -92,7 +802,181 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     );
   }
 
-  // ================= 1. TOP NAVBAR HEADER =================
+  // 7. Mobile Subject Strength Card
+  Widget _buildMobileSubjectStrength() {
+    final subjects = [
+      {'name': 'Biology', 'pct': 0.78, 'pctStr': '78%', 'correct': '612', 'incorrect': '172', 'color': const Color(0xFF16A34A), 'icon': Icons.eco_rounded, 'bg': const Color(0xFFDCFCE7)},
+      {'name': 'Chemistry', 'pct': 0.65, 'pctStr': '65%', 'correct': '328', 'incorrect': '176', 'color': const Color(0xFF2563EB), 'icon': Icons.science_rounded, 'bg': const Color(0xFFDBEAFE)},
+      {'name': 'Physics', 'pct': 0.58, 'pctStr': '58%', 'correct': '286', 'incorrect': '206', 'color': const Color(0xFF7C3AED), 'icon': Icons.blur_circular_rounded, 'bg': const Color(0xFFDDD6FE)},
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Subject Strength', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            GestureDetector(
+              onTap: () {},
+              child: const Row(
+                children: [
+                  Text('View Analysis', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2563EB))),
+                  SizedBox(width: 2),
+                  Icon(Icons.arrow_forward_rounded, size: 12, color: Color(0xFF2563EB)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+            ],
+          ),
+          child: Column(
+            children: subjects.map((sub) {
+              final isLast = sub == subjects.last;
+              return Container(
+                margin: EdgeInsets.only(bottom: isLast ? 0 : 16),
+                child: Row(
+                  children: [
+                    // Icon
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: sub['bg'] as Color, shape: BoxShape.circle),
+                      child: Icon(sub['icon'] as IconData, size: 16, color: sub['color'] as Color),
+                    ),
+                    const SizedBox(width: 10),
+
+                    // Name & Progress Bar
+                    Expanded(
+                      flex: 4,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(sub['name'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: sub['pct'] as double,
+                              minHeight: 5,
+                              backgroundColor: const Color(0xFFE2E8F0),
+                              valueColor: AlwaysStoppedAnimation<Color>(sub['color'] as Color),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+
+                    // Percentage
+                    Text(sub['pctStr'] as String, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: sub['color'] as Color)),
+                    const SizedBox(width: 12),
+
+                    // Correct / Incorrect numbers
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Row(
+                          children: [
+                            const Text('Correct ', style: TextStyle(fontSize: 8, color: Color(0xFF64748B))),
+                            Text(sub['correct'] as String, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            const Text('Incorrect ', style: TextStyle(fontSize: 8, color: Color(0xFF64748B))),
+                            Text(sub['incorrect'] as String, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFEF4444))),
+                          ],
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(width: 6),
+                    const Icon(Icons.chevron_right_rounded, size: 14, color: Color(0xFF94A3B8)),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 8. Mobile Bottom Navigation Bar (5 Tabs)
+  Widget _buildMobileBottomNavBar() {
+    final navs = [
+      {'icon': Icons.home_rounded, 'label': 'Home'},
+      {'icon': Icons.track_changes_rounded, 'label': 'Practice'},
+      {'icon': Icons.assignment_outlined, 'label': 'Tests'},
+      {'icon': Icons.emoji_events_outlined, 'label': 'Leaderboard'},
+      {'icon': Icons.person_outline_rounded, 'label': 'Profile'},
+    ];
+
+    return Container(
+      height: 64,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: List.generate(navs.length, (idx) {
+          final isSelected = _mobileBottomNavIndex == idx;
+          final item = navs[idx];
+
+          return InkWell(
+            onTap: () {
+              setState(() => _mobileBottomNavIndex = idx);
+              if (idx == 1) widget.onOpenPractice();
+              if (idx == 2) widget.onOpenMockTests();
+              if (idx == 3) widget.onOpenPyqs();
+              if (idx == 4) {}
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFFF3E8FF) : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    item['icon'] as IconData,
+                    size: 20,
+                    color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    item['label'] as String,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  // ================= DESKTOP COMPONENTS =================
+
   Widget _buildTopNavbar(String displayName) {
     return Container(
       height: 70,
@@ -103,7 +987,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       ),
       child: Row(
         children: [
-          // Logo Caps & Brand Title
           Row(
             children: [
               Container(
@@ -141,10 +1024,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               ),
             ],
           ),
-
           const SizedBox(width: 32),
 
-          // Search Bar Input Field
           Expanded(
             child: Container(
               height: 42,
@@ -183,13 +1064,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               ),
             ),
           ),
-
           const SizedBox(width: 24),
 
-          // Right Header Items: Streak + Notification + User Profile Badge
           Row(
             children: [
-              // Flame Streak Counter Box
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
@@ -212,10 +1090,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   ],
                 ),
               ),
-
               const SizedBox(width: 16),
 
-              // Notification Bell Icon with Badge
               Stack(
                 children: [
                   IconButton(
@@ -239,10 +1115,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(width: 16),
 
-              // User Avatar & Name Pill
               Row(
                 children: [
                   CircleAvatar(
@@ -277,7 +1151,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     );
   }
 
-  // ================= 2. LEFT SIDEBAR NAVIGATION =================
   Widget _buildSidebar() {
     final navItems = [
       {'icon': Icons.dashboard_rounded, 'label': 'Dashboard', 'hasArrow': false},
@@ -307,7 +1180,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       child: Column(
         children: [
           const SizedBox(height: 16),
-          // Scrollable Sidebar Navigation List
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -376,7 +1248,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             ),
           ),
 
-          // Bottom Premium Promo Banner Card
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Container(
@@ -434,7 +1305,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     );
   }
 
-  // ================= 3. WELCOME HEADER ROW =================
   Widget _buildWelcomeHeader(String displayName) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -461,10 +1331,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           ],
         ),
 
-        // Right Filter Action Pills
         Row(
           children: [
-            // Exam Filter Dropdown Pill
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
@@ -487,7 +1355,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             ),
             const SizedBox(width: 12),
 
-            // Date Range Picker Pill
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
@@ -514,7 +1381,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     );
   }
 
-  // ================= 4. TOP 4 KPI METRICS GRID ROW =================
   Widget _buildKpiMetricsGrid() {
     final metrics = [
       {
@@ -608,16 +1474,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             ),
           ),
         );
-      }).toList()..removeLast(), // Clean spacing
+      }).toList(),
     );
   }
 
-  // ================= 5. MIDDLE SECTION ROW =================
   Widget _buildMiddleSectionRow() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Left Box: Continue Where You Left Off Card (Flexible width 6)
         Expanded(
           flex: 6,
           child: Column(
@@ -637,7 +1501,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 ),
                 child: Row(
                   children: [
-                    // Physics Arc Curve Illustration Box
                     Container(
                       width: 80,
                       height: 80,
@@ -659,7 +1522,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     ),
                     const SizedBox(width: 20),
 
-                    // Details & Progress Column
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -691,7 +1553,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
                     const SizedBox(width: 20),
 
-                    // Right Play Action Button
                     ElevatedButton.icon(
                       onPressed: widget.onOpenPractice,
                       icon: const Icon(Icons.play_arrow_rounded, size: 18, color: Colors.white),
@@ -712,7 +1573,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
         const SizedBox(width: 24),
 
-        // Right Box: Today's Progress Card (Flexible width 4)
         Expanded(
           flex: 4,
           child: Column(
@@ -747,7 +1607,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 ),
                 child: Row(
                   children: [
-                    // Circular Gauge Chart Widget
                     const SizedBox(
                       width: 80,
                       height: 80,
@@ -777,7 +1636,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
                     const SizedBox(width: 20),
 
-                    // Progress Data Details Column
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -834,7 +1692,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     );
   }
 
-  // ================= 6. QUICK START SECTION =================
   Widget _buildQuickStartSection() {
     final quickCards = [
       {
@@ -951,12 +1808,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     );
   }
 
-  // ================= 7. BOTTOM SECTION ROW =================
   Widget _buildBottomSectionRow(String displayName) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Left Column: Performance Overview Line Chart (Flex 6)
         Expanded(
           flex: 6,
           child: Column(
@@ -996,7 +1851,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 ),
                 child: Row(
                   children: [
-                    // Metric Selector Vertical Column
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: ['Questions', 'Accuracy', 'Time Spent', 'Tests'].map((tab) {
@@ -1025,7 +1879,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
                     const SizedBox(width: 20),
 
-                    // Custom Line Chart Graphics
                     Expanded(
                       child: SizedBox(
                         height: 180,
@@ -1043,7 +1896,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
         const SizedBox(width: 24),
 
-        // Right Column: Leaderboard (Daily) (Flex 4)
         Expanded(
           flex: 4,
           child: Column(
@@ -1078,7 +1930,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 ),
                 child: Column(
                   children: [
-                    // Time Filter Tabs Header (Daily / Weekly / Monthly)
                     Row(
                       children: ['Daily', 'Weekly', 'Monthly'].map((t) {
                         final isSelected = _leaderboardTab == t;
@@ -1109,7 +1960,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Table Columns Header Row
                     const Row(
                       children: [
                         SizedBox(width: 40, child: Text('Rank', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold))),
@@ -1120,19 +1970,15 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     ),
                     const Divider(height: 20, color: Color(0xFFF1F5F9)),
 
-                    // Rank 1 Row (Gold)
                     _buildLeaderboardRow('🥇', 'Ritik Sharma', '8,420', '93.6%', false),
                     const SizedBox(height: 10),
 
-                    // Rank 2 Row (Silver)
                     _buildLeaderboardRow('🥈', 'Ananya Singh', '7,850', '91.2%', false),
                     const SizedBox(height: 10),
 
-                    // Rank 3 Row (Bronze)
                     _buildLeaderboardRow('🥉', 'Karan Verma', '7,120', '89.4%', false),
                     const SizedBox(height: 10),
 
-                    // Current User Highlighted Row (Rank 15)
                     _buildLeaderboardRow('15', '$displayName (You)', '4,210', '72.4%', true),
                   ],
                 ),
@@ -1144,7 +1990,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     );
   }
 
-  // Helper method for Leaderboard Table Row
   Widget _buildLeaderboardRow(String rank, String name, String score, String accuracy, bool isHighlighted) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -1199,7 +2044,49 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   }
 }
 
-// Custom Painter for Smooth Blue Line Chart
+// Mini Sparkline Painter for Mobile Sparkline Cards
+class MiniSparklinePainter extends CustomPainter {
+  final List<double> values;
+  final Color color;
+
+  MiniSparklinePainter({required this.values, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.isEmpty) return;
+
+    final paintLine = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final paintDot = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    final stepX = size.width / (values.length - 1);
+
+    for (int i = 0; i < values.length; i++) {
+      final x = i * stepX;
+      final y = size.height * (1.0 - values[i]);
+
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+      canvas.drawCircle(Offset(x, y), 2.5, paintDot);
+    }
+
+    canvas.drawPath(path, paintLine);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
 class SmoothLineChartPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -1221,7 +2108,6 @@ class SmoothLineChartPainter extends CustomPainter {
       ..color = const Color(0xFFF1F5F9)
       ..strokeWidth = 1;
 
-    // Horizontal Grid Lines & Y-Axis Labels
     final yLabels = ['120', '90', '60', '0'];
     final ySteps = yLabels.length - 1;
     for (int i = 0; i <= ySteps; i++) {
@@ -1229,7 +2115,6 @@ class SmoothLineChartPainter extends CustomPainter {
       canvas.drawLine(Offset(0, y), Offset(size.width, y), paintGrid);
     }
 
-    // Line Path Points
     final points = [
       Offset(size.width * 0.05, size.height * 0.70),
       Offset(size.width * 0.20, size.height * 0.60),
@@ -1248,11 +2133,9 @@ class SmoothLineChartPainter extends CustomPainter {
 
     canvas.drawPath(path, paintLine);
 
-    // Draw Data Dots & Active Tooltip Callout
     for (int i = 0; i < points.length; i++) {
       final pt = points[i];
       if (i == 3) {
-        // Active dot with highlight
         canvas.drawCircle(pt, 6, paintLine);
         canvas.drawCircle(pt, 4, paintWhiteDot);
       } else {
