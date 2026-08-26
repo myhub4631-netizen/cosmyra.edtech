@@ -34,10 +34,11 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
   final Set<String> _selectedTopicNames = {'Laws of Motion', 'Work, Energy & Power', 'Gravitation'};
   bool _showMoreTopics = false;
 
-  String _selectedSource = 'Mixed';
-  String _selectedDifficulty = 'Mixed';
-  int _questionCount = 15;
-  int _timerMinutes = 15;
+  final Set<String> _selectedSources = {'PYQ', 'NTA', 'Practice'};
+  String _selectedSource = 'PYQ';
+  String _selectedDifficulty = 'Medium';
+  int _questionCount = 20;
+  int _timerMinutes = 30;
   bool _isLoading = false;
 
   final TextEditingController _presetNameController = TextEditingController();
@@ -1272,102 +1273,438 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
   }
 
   // ==========================================
-  // SCREEN 3: PRACTICE SETTINGS
+  // SCREEN 3: PRACTICE SETTINGS (Exact Replica)
   // ==========================================
   Widget _buildScreen3PracticeSettings() {
+    final allSourcesSelected = _selectedSources.length == 5;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Step 3 of 4', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF64748B))),
+        const Text(
+          'Step 3 of 4',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF64748B),
+          ),
+        ),
         const SizedBox(height: 4),
-        const Text('Practice Settings', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+        const Text(
+          'Practice Settings',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0F172A),
+            letterSpacing: -0.3,
+          ),
+        ),
         const SizedBox(height: 6),
-        const Text('Customize question sources, difficulty level, question quantity and timer.', style: TextStyle(fontSize: 14, color: Color(0xFF64748B))),
+        const Text(
+          'Set your preferences for a customized practice session.',
+          style: TextStyle(
+            fontSize: 14,
+            color: Color(0xFF64748B),
+            height: 1.4,
+          ),
+        ),
         const SizedBox(height: 24),
 
-        // 1. Question Source
-        const Text('Question Source', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: ['Mixed', 'PYQ (Previous Years)', 'NTA Question Bank', 'NCERT Exemplar']
-              .map((src) => ChoiceChip(
-                    label: Text(src),
-                    selected: _selectedSource == src,
-                    selectedColor: const Color(0xFFEEF2FF),
-                    labelStyle: TextStyle(
-                      color: _selectedSource == src ? const Color(0xFF4F46E5) : const Color(0xFF0F172A),
-                      fontWeight: _selectedSource == src ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    onSelected: (v) => setState(() => _selectedSource = src),
-                  ))
-              .toList(),
+        // Section 1: Select Question Source
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Select Question Source',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (allSourcesSelected) {
+                    _selectedSources.clear();
+                  } else {
+                    _selectedSources.addAll(['PYQ', 'NTA', 'NCERT', 'Practice', 'Others']);
+                  }
+                });
+              },
+              child: Text(
+                allSourcesSelected ? 'Deselect All' : 'Select All',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF4F46E5),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // 2-Column Grid of 5 Question Sources
+        Row(
+          children: [
+            Expanded(
+              child: _buildSourceCard(
+                name: 'PYQ',
+                icon: Icons.calendar_today_outlined,
+                isSelected: _selectedSources.contains('PYQ'),
+                onTap: (val) {
+                  setState(() {
+                    val ? _selectedSources.add('PYQ') : _selectedSources.remove('PYQ');
+                  });
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildSourceCard(
+                name: 'NTA',
+                icon: Icons.style_outlined,
+                isSelected: _selectedSources.contains('NTA'),
+                onTap: (val) {
+                  setState(() {
+                    val ? _selectedSources.add('NTA') : _selectedSources.remove('NTA');
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildSourceCard(
+                name: 'NCERT',
+                icon: Icons.menu_book_outlined,
+                isSelected: _selectedSources.contains('NCERT'),
+                onTap: (val) {
+                  setState(() {
+                    val ? _selectedSources.add('NCERT') : _selectedSources.remove('NCERT');
+                  });
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildSourceCard(
+                name: 'Practice',
+                icon: Icons.track_changes_rounded,
+                isSelected: _selectedSources.contains('Practice'),
+                onTap: (val) {
+                  setState(() {
+                    val ? _selectedSources.add('Practice') : _selectedSources.remove('Practice');
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildSourceCard(
+                name: 'Others',
+                icon: Icons.more_horiz_rounded,
+                isSelected: _selectedSources.contains('Others'),
+                onTap: (val) {
+                  setState(() {
+                    val ? _selectedSources.add('Others') : _selectedSources.remove('Others');
+                  });
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(child: SizedBox()),
+          ],
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 28),
 
-        // 2. Difficulty Level
-        const Text('Difficulty Level', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          children: ['Mixed', 'Easy', 'Medium', 'Hard']
-              .map((diff) => ChoiceChip(
-                    label: Text(diff),
-                    selected: _selectedDifficulty == diff,
-                    selectedColor: const Color(0xFFEEF2FF),
-                    labelStyle: TextStyle(
-                      color: _selectedDifficulty == diff ? const Color(0xFF4F46E5) : const Color(0xFF0F172A),
-                      fontWeight: _selectedDifficulty == diff ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    onSelected: (v) => setState(() => _selectedDifficulty = diff),
-                  ))
-              .toList(),
+        // Section 2: Select Difficulty
+        const Text(
+          'Select Difficulty',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSegmentedSelector<String>(
+          options: ['Easy', 'Medium', 'Hard', 'Mixed'],
+          selectedValue: _selectedDifficulty,
+          labelBuilder: (val) => val,
+          onSelected: (val) => setState(() => _selectedDifficulty = val),
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 28),
 
-        // 3. Question Quantity
-        const Text('Number of Questions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          children: [5, 10, 15, 20, 25, 30]
-              .map((cnt) => ChoiceChip(
-                    label: Text('$cnt Questions'),
-                    selected: _questionCount == cnt,
-                    selectedColor: const Color(0xFFEEF2FF),
-                    labelStyle: TextStyle(
-                      color: _questionCount == cnt ? const Color(0xFF4F46E5) : const Color(0xFF0F172A),
-                      fontWeight: _questionCount == cnt ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    onSelected: (v) => setState(() => _questionCount = cnt),
-                  ))
-              .toList(),
+        // Section 3: Number of Questions
+        const Text(
+          'Number of Questions',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSegmentedSelector<int>(
+          options: [10, 20, 30, 50, 100, -1], // -1 represents 'Custom'
+          selectedValue: [10, 20, 30, 50, 100].contains(_questionCount) ? _questionCount : -1,
+          labelBuilder: (val) => val == -1 ? 'Custom' : '$val',
+          onSelected: (val) {
+            if (val == -1) {
+              _showCustomQuestionCountDialog();
+            } else {
+              setState(() => _questionCount = val);
+            }
+          },
         ),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 28),
 
-        // 4. Timer Limit
-        const Text('Time Limit', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        // Section 4: Time Limit
+        const Text(
+          'Time Limit',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildSegmentedSelector<int>(
+          options: [0, 15, 30, 45, 60],
+          selectedValue: [0, 15, 30, 45, 60].contains(_timerMinutes) ? _timerMinutes : -1,
+          labelBuilder: (val) => val == 0 ? 'No Limit' : '$val min',
+          onSelected: (val) => setState(() => _timerMinutes = val),
+        ),
         const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          children: [0, 10, 15, 30, 45, 60]
-              .map((mins) => ChoiceChip(
-                    label: Text(mins == 0 ? 'No Timer' : '$mins Mins'),
-                    selected: _timerMinutes == mins,
-                    selectedColor: const Color(0xFFEEF2FF),
-                    labelStyle: TextStyle(
-                      color: _timerMinutes == mins ? const Color(0xFF4F46E5) : const Color(0xFF0F172A),
-                      fontWeight: _timerMinutes == mins ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    onSelected: (v) => setState(() => _timerMinutes = mins),
-                  ))
-              .toList(),
+
+        // Custom Timer Edit Button
+        OutlinedButton.icon(
+          onPressed: _showCustomTimerDialog,
+          icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF475569)),
+          label: Text(
+            _timerMinutes != 0 && ![15, 30, 45, 60].contains(_timerMinutes)
+                ? 'Custom: $_timerMinutes min'
+                : 'Custom',
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF334155),
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            backgroundColor: Colors.white,
+          ),
         ),
       ],
+    );
+  }
+
+  // Question Source Card Widget matching exact layout & colors
+  Widget _buildSourceCard({
+    required String name,
+    required IconData icon,
+    required bool isSelected,
+    required ValueChanged<bool> onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFFF5F3FF) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected ? const Color(0xFF6366F1) : const Color(0xFFE2E8F0),
+          width: isSelected ? 1.5 : 1.0,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(0, 0, 0, 0.02),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: InkWell(
+        onTap: () => onTap(!isSelected),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF4F46E5) : Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
+                    width: 1.5,
+                  ),
+                ),
+                child: isSelected
+                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    : null,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Connected Segmented Bar Selector Widget matching exact screenshot design
+  Widget _buildSegmentedSelector<T>({
+    required List<T> options,
+    required T selectedValue,
+    required String Function(T) labelBuilder,
+    required ValueChanged<T> onSelected,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(0, 0, 0, 0.02),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(11),
+        child: Row(
+          children: List.generate(options.length, (index) {
+            final option = options[index];
+            final isSelected = option == selectedValue;
+
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => onSelected(option),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
+                    border: index > 0 && !isSelected && options[index - 1] != selectedValue
+                        ? const Border(left: BorderSide(color: Color(0xFFE2E8F0), width: 1.0))
+                        : null,
+                  ),
+                  child: Text(
+                    labelBuilder(option),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected ? Colors.white : const Color(0xFF334155),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  void _showCustomTimerDialog() {
+    final controller = TextEditingController(text: _timerMinutes > 0 ? '$_timerMinutes' : '');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Custom Time Limit'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Minutes',
+            hintText: 'Enter duration in minutes (e.g. 25)',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final mins = int.tryParse(controller.text.trim());
+              if (mins != null && mins >= 0) {
+                setState(() => _timerMinutes = mins);
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Set Timer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCustomQuestionCountDialog() {
+    final controller = TextEditingController(text: _questionCount > 0 ? '$_questionCount' : '');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Custom Question Count'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Number of Questions',
+            hintText: 'Enter question count (e.g. 40)',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final cnt = int.tryParse(controller.text.trim());
+              if (cnt != null && cnt > 0) {
+                setState(() => _questionCount = cnt);
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Set Count'),
+          ),
+        ],
+      ),
     );
   }
 
