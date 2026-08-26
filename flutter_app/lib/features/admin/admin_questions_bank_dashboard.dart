@@ -33,7 +33,10 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
 
   Future<void> _loadSavedCustomQuestions() async {
     try {
-      // 1. Fetch from Supabase questions table
+      // 1. Seed & Sync all 20 real questions to Supabase
+      SupabaseService.seedRealQuestionsToSupabase();
+
+      // 2. Fetch from Supabase questions table
       final supabaseQs = await SupabaseService.fetchAllQuestionsFromSupabase();
       for (var q in supabaseQs) {
         final existingIdx = _sharedQuestionsBankList.indexWhere((item) => item['id'] == q['id']);
@@ -44,7 +47,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
         }
       }
 
-      // 2. Fetch from SharedPreferences local storage
+      // 3. Fetch from SharedPreferences local storage
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
       if (jsonStr != null && jsonStr.isNotEmpty) {
@@ -89,88 +92,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
   int _rowsPerPage = 10;
 
   // Question list state (shared across navigation)
-  static final List<Map<String, dynamic>> _sharedQuestionsBankList = [
-    {
-      'id': 'Q123456',
-      'questionText': 'A body of mass m is moving with velocity v. The kinetic energy of the body is...',
-      'subject': 'Physics',
-      'chapter': 'Laws of Motion',
-      'sourceType': 'NTA',
-      'difficulty': 'Medium',
-      'tags': ['Kinematics', 'Formula', '+2'],
-      'usedIn': ['Custom Practice', 'Custom Test', 'NTA Question Practice'],
-      'addedOn': '24 May 2024 10:30 AM',
-      'options': ['1/2 m v^2', 'm v^2', '1/2 m^2 v', '2 m v^2'],
-      'correctAnswer': '1/2 m v^2',
-      'explanation': 'Kinetic energy equation is KE = 1/2 m v^2.',
-    },
-    {
-      'id': 'Q123457',
-      'questionText': 'Which one of the following is not a vector quantity?',
-      'subject': 'Physics',
-      'chapter': 'Units and Measurements',
-      'sourceType': 'PYQ',
-      'difficulty': 'Easy',
-      'tags': ['Vector', 'Concept', '+1'],
-      'usedIn': ['Custom Practice', 'Custom Test', 'NTA Question Practice'],
-      'addedOn': '24 May 2024 09:15 AM',
-      'options': ['Velocity', 'Acceleration', 'Speed', 'Force'],
-      'correctAnswer': 'Speed',
-      'explanation': 'Speed is a scalar quantity as it has magnitude only.',
-    },
-    {
-      'id': 'Q123458',
-      'questionText': 'The pH value of a neutral solution at 25°C is:',
-      'subject': 'Chemistry',
-      'chapter': 'States of Matter',
-      'sourceType': 'NCERT',
-      'difficulty': 'Easy',
-      'tags': ['pH', 'Basics'],
-      'usedIn': ['Custom Practice', 'Custom Test', 'NTA Question Practice'],
-      'addedOn': '23 May 2024 04:45 PM',
-      'options': ['0', '7', '14', '1'],
-      'correctAnswer': '7',
-      'explanation': 'Pure water at 25°C has a pH of 7.',
-    },
-    {
-      'id': 'Q123459',
-      'questionText': 'Photosynthesis is a process by which:',
-      'subject': 'Biology',
-      'chapter': 'Photosynthesis',
-      'sourceType': 'Practice',
-      'difficulty': 'Medium',
-      'tags': ['Biology', 'Process', '+2'],
-      'usedIn': ['Custom Practice', 'Custom Test', 'NTA Question Practice'],
-      'addedOn': '23 May 2024 02:20 PM',
-      'options': [
-        'Plants convert light energy into chemical energy',
-        'Plants absorb oxygen and release CO2',
-        'Plants convert glucose into heat',
-        'None of the above'
-      ],
-      'correctAnswer': 'Plants convert light energy into chemical energy',
-      'explanation': 'Photosynthesis synthesizes glucose using solar energy.',
-    },
-    {
-      'id': 'Q123460',
-      'questionText': 'Assertion (A): Increasing the temperature increases the solubility of gases in liquids.',
-      'subject': 'Chemistry',
-      'chapter': 'Solutions',
-      'sourceType': 'Other',
-      'difficulty': 'Hard',
-      'tags': ['Assertion', 'Reason'],
-      'usedIn': ['Custom Practice', 'Custom Test', 'NTA Question Practice'],
-      'addedOn': '22 May 2024 11:05 AM',
-      'options': [
-        'Both A and R are true and R is correct explanation',
-        'A is false, but R is true',
-        'A is true, but R is false',
-        'Both A and R are false'
-      ],
-      'correctAnswer': 'A is false, but R is true',
-      'explanation': 'Solubility of gases in liquids decreases with increase in temperature.',
-    },
-  ];
+  static final List<Map<String, dynamic>> _sharedQuestionsBankList = SupabaseService.get20RealQuestionsMap();
 
   List<Map<String, dynamic>> get _questionsList => _sharedQuestionsBankList;
 
