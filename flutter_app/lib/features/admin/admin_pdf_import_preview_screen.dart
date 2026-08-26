@@ -180,16 +180,32 @@ class _AdminPdfImportPreviewScreenState extends State<AdminPdfImportPreviewScree
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Extracted Questions Review Table', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                        ElevatedButton.icon(
-                          onPressed: readyCount == 0 ? null : _approveAllReadyQuestions,
-                          icon: const Icon(Icons.file_download_done_rounded),
-                          label: Text('Approve & Import ($readyCount Questions)'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF16A34A),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
+                        Row(
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => _showRawPdfDiagnosticsDialog(context),
+                              icon: const Icon(Icons.bug_report_outlined, size: 16),
+                              label: const Text('View Raw PDF Extraction & Diagnostics', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF4F46E5),
+                                side: const BorderSide(color: Color(0xFF6366F1)),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            ElevatedButton.icon(
+                              onPressed: readyCount == 0 ? null : _approveAllReadyQuestions,
+                              icon: const Icon(Icons.file_download_done_rounded),
+                              label: Text('Approve & Import ($readyCount Questions)'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF16A34A),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -311,6 +327,100 @@ class _AdminPdfImportPreviewScreenState extends State<AdminPdfImportPreviewScree
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showRawPdfDiagnosticsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: 720,
+          constraints: const BoxConstraints(maxHeight: 650),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.bug_report_rounded, color: Color(0xFF4F46E5)),
+                      SizedBox(width: 8),
+                      Text('PDF Extraction Diagnostics & Raw Stream', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const Divider(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    _diagRow('Uploaded PDF File', widget.fileName),
+                    _diagRow('Job ID', widget.jobId),
+                    _diagRow('Questions Extracted', '${_extractedQuestions.length} Questions'),
+                    _diagRow('Status', _extractedQuestions.isNotEmpty ? 'SUCCESS' : 'EXTRACTION_FAILED'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Raw Extracted Text Sample (First Question):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155))),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      _extractedQuestions.isNotEmpty
+                          ? (_extractedQuestions.first['raw_extracted_text'] ?? 'No raw text')
+                          : 'PDF EXTRACTION FAILED — No usable text extracted from PDF stream.',
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFF38BDF8), height: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close Panel'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _diagRow(String label, String val) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF64748B))),
+          Text(val, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+        ],
       ),
     );
   }
