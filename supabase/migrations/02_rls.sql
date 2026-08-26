@@ -56,17 +56,12 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 1. PROFILES
-CREATE POLICY "Profiles viewable by all" 
-ON public.profiles FOR SELECT USING (true);
-
-CREATE POLICY "Profiles insertable by all" 
-ON public.profiles FOR INSERT WITH CHECK (true);
-
-CREATE POLICY "Profiles updatable by all" 
-ON public.profiles FOR UPDATE USING (true);
-
-CREATE POLICY "Profiles manageable by all" 
-ON public.profiles FOR ALL USING (true);
+ALTER TABLE public.profiles DISABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Profiles viewable by all" ON public.profiles;
+DROP POLICY IF EXISTS "Profiles insertable by all" ON public.profiles;
+DROP POLICY IF EXISTS "Profiles updatable by all" ON public.profiles;
+DROP POLICY IF EXISTS "Profiles manageable by all" ON public.profiles;
+CREATE POLICY "Profiles full public access" ON public.profiles FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- 2. USER ROLES
 CREATE POLICY "Admins can view and manage all user roles"

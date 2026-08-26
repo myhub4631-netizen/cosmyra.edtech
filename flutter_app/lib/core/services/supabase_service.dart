@@ -113,18 +113,15 @@ class SupabaseService {
     } catch (pe) {
       debugPrint('Primary profile upsert warning: $pe');
       try {
-        await client.from('profiles').upsert(
-          {
-            'email': email,
-            'full_name': fullName,
-            'phone_number': phone,
-            'target_exam': targetExam,
-            'target_year': targetYear,
-          },
-          onConflict: 'email',
-        );
+        await client.from('profiles').insert({
+          'email': email,
+          'full_name': fullName,
+          'phone_number': phone,
+          'target_exam': targetExam,
+          'target_year': targetYear,
+        });
       } catch (pe2) {
-        debugPrint('Secondary profile upsert error: $pe2');
+        debugPrint('Secondary profile insert error: $pe2');
       }
     }
 
