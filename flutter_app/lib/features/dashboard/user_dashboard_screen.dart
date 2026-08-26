@@ -1039,7 +1039,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   Widget _buildSidebar() {
     final navItems = [
       {'icon': Icons.dashboard_rounded, 'label': 'Dashboard', 'hasArrow': false},
-      {'icon': Icons.dashboard_customize_rounded, 'label': 'Layout Management', 'hasArrow': true},
       {'icon': Icons.track_changes_rounded, 'label': 'Practice', 'hasArrow': true},
       {'icon': Icons.edit_note_rounded, 'label': 'Custom Practice', 'hasArrow': false},
       {'icon': Icons.assignment_outlined, 'label': 'Custom Test', 'hasArrow': false},
@@ -1079,10 +1078,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   child: InkWell(
                     onTap: () async {
                       setState(() => _activeSidebarIndex = index);
-                      if (item['label'] == 'Layout Management') {
-                        setState(() => _activeSidebarIndex = 1);
-                        return;
-                      }
                       if (item['label'] == 'Logout') {
                         await SupabaseService.logoutUserSession();
                         if (widget.onLogout != null) {
@@ -1097,10 +1092,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                         }
                         return;
                       }
-                      if (index == 1 || index == 2) widget.onOpenPractice();
-                      if (index == 3 || index == 8) widget.onOpenMockTests();
-                      if (index == 4 || index == 5) widget.onOpenPyqs();
-                      if (index == 6 || index == 7) widget.onOpenMistakes();
+                      if (item['label'] == 'Practice' || item['label'] == 'Custom Practice') widget.onOpenPractice();
+                      if (item['label'] == 'Custom Test' || item['label'] == 'Test Series') widget.onOpenMockTests();
+                      if (item['label'] == 'PYQ' || item['label'] == 'NTA Questions') widget.onOpenPyqs();
+                      if (item['label'] == 'Bookmarks' || item['label'] == 'My Mistakes') widget.onOpenMistakes();
                     },
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
