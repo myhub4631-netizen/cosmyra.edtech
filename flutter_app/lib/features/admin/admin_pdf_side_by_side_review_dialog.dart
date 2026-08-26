@@ -200,17 +200,18 @@ class _AdminPdfSideBySideReviewDialogState extends State<AdminPdfSideBySideRevie
                                         ),
                                         const Divider(height: 16),
                                         Text(
-                                          'Q${widget.questionData['question_number'] ?? 1}. ${widget.questionData['raw_text'] ?? widget.questionData['question_text']}',
+                                          '${widget.questionData['raw_extracted_text'] ?? widget.questionData['raw_text'] ?? widget.questionData['question_text']}',
                                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A), height: 1.5),
                                         ),
                                         const SizedBox(height: 16),
-                                        const Text(r'(A) $10\text{ N}$', style: TextStyle(fontSize: 13, color: Color(0xFF334155))),
-                                        const SizedBox(height: 6),
-                                        const Text(r'(B) $15\text{ N}$', style: TextStyle(fontSize: 13, color: Color(0xFF334155))),
-                                        const SizedBox(height: 6),
-                                        const Text(r'(C) $20\text{ N}$', style: TextStyle(fontSize: 13, color: Color(0xFF334155))),
-                                        const SizedBox(height: 6),
-                                        const Text(r'(D) $25\text{ N}$', style: TextStyle(fontSize: 13, color: Color(0xFF334155))),
+                                        if (widget.questionData['options'] is List) ...[
+                                          ...(widget.questionData['options'] as List).map((opt) {
+                                            return Padding(
+                                              padding: const EdgeInsets.only(bottom: 6.0),
+                                              child: Text('$opt', style: const TextStyle(fontSize: 13, color: Color(0xFF334155))),
+                                            );
+                                          }),
+                                        ],
                                       ],
                                     ),
                                   ),
