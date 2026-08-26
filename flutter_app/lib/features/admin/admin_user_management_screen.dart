@@ -83,156 +83,46 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
   Future<void> _loadRealUsersFromSupabase() async {
     final profiles = await SupabaseService.fetchAllProfiles();
-    if (profiles.isNotEmpty) {
-      final realUsers = profiles.map((p) {
-        final initials = p.fullName.isNotEmpty
-            ? p.fullName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
-            : (p.email.isNotEmpty ? p.email[0].toUpperCase() : 'U');
-        
-        final userRole = p.role.isEmpty
-            ? 'Student'
-            : (p.role.toLowerCase() == 'admin' ? 'Administrator' : p.role[0].toUpperCase() + p.role.substring(1).toLowerCase());
+    final realUsers = profiles.map((p) {
+      final initials = p.fullName.isNotEmpty
+          ? p.fullName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
+          : (p.email.isNotEmpty ? p.email[0].toUpperCase() : 'U');
+      
+      final userRole = p.role.isEmpty
+          ? 'Student'
+          : (p.role.toLowerCase() == 'admin' ? 'Administrator' : p.role[0].toUpperCase() + p.role.substring(1).toLowerCase());
 
-        return AdminUserModel(
-          id: p.id,
-          name: p.fullName.isNotEmpty ? p.fullName : p.email.split('@').first,
-          email: p.email,
-          userIdCode: p.id.length >= 6 ? p.id.substring(0, 6).toUpperCase() : p.id,
-          role: userRole,
-          examAccess: [p.targetExam.isNotEmpty ? p.targetExam : 'NEET'],
-          status: 'Active',
-          lastActive: 'Just now',
-          joinedOn: 'Aug 26, 2026',
-          phone: (p.phoneNumber != null && p.phoneNumber!.isNotEmpty) ? p.phoneNumber! : '+91 98765 43210',
-          regSource: 'Web Portal',
-          avatarInitials: initials,
-          avatarColor: const Color(0xFF6366F1),
-        );
-      }).toList();
+      return AdminUserModel(
+        id: p.id,
+        name: p.fullName.isNotEmpty ? p.fullName : p.email.split('@').first,
+        email: p.email,
+        userIdCode: p.id.length >= 6 ? p.id.substring(0, 6).toUpperCase() : p.id,
+        role: userRole,
+        examAccess: [p.targetExam.isNotEmpty ? p.targetExam : 'NEET'],
+        status: 'Active',
+        lastActive: 'Just now',
+        joinedOn: 'Aug 26, 2026',
+        phone: (p.phoneNumber != null && p.phoneNumber!.isNotEmpty) ? p.phoneNumber! : '+91 98765 43210',
+        regSource: 'Web Portal',
+        avatarInitials: initials,
+        avatarColor: const Color(0xFF6366F1),
+      );
+    }).toList();
 
-      if (mounted) {
-        setState(() {
-          final sampleList = _allUsers.where((s) => !realUsers.any((r) => r.email.toLowerCase() == s.email.toLowerCase())).toList();
-          _allUsers = [...realUsers, ...sampleList];
-          if (_allUsers.isNotEmpty) {
-            _selectedUserForDetail = _allUsers.first;
-          }
-        });
-      }
+    if (mounted) {
+      setState(() {
+        _allUsers = realUsers;
+        if (_allUsers.isNotEmpty) {
+          _selectedUserForDetail = _allUsers.first;
+        } else {
+          _selectedUserForDetail = null;
+        }
+      });
     }
   }
 
   void _initSampleUserData() {
-    _allUsers = [
-      AdminUserModel(
-        id: 'u-1',
-        name: 'Mahboob Hasan',
-        email: 'mahboob.hasan@gmail.com',
-        userIdCode: '230145',
-        role: 'Student',
-        examAccess: ['NEET', 'JEE M', 'JEE Adv', '+1'],
-        status: 'Active',
-        lastActive: '2 min ago',
-        joinedOn: 'Aug 24, 2026 10:30 AM',
-        phone: '+91 98765 43210',
-        regSource: 'Web Portal',
-        avatarInitials: 'MS',
-        avatarColor: const Color(0xFF10B981),
-      ),
-      AdminUserModel(
-        id: 'u-2',
-        name: 'Riya Patel',
-        email: 'riya.pate@gmail.com',
-        userIdCode: '230987',
-        role: 'Student',
-        examAccess: ['NEET', 'JEE M'],
-        status: 'Active',
-        lastActive: '15 min ago',
-        joinedOn: 'Aug 24, 2026 09:15 AM',
-        phone: '+91 98123 45678',
-        regSource: 'Mobile App',
-        avatarInitials: 'RP',
-        avatarColor: const Color(0xFFF59E0B),
-      ),
-      AdminUserModel(
-        id: 'u-3',
-        name: 'Karan Singh',
-        email: 'karan.singh@gmail.com',
-        userIdCode: '231102',
-        role: 'Educator',
-        examAccess: ['NEET', 'JEE M', '+2'],
-        status: 'Active',
-        lastActive: '1 hour ago',
-        joinedOn: 'Aug 24, 2026 08:45 AM',
-        phone: '+91 97890 12345',
-        regSource: 'Admin Referral',
-        avatarInitials: 'KS',
-        avatarColor: const Color(0xFFA855F7),
-      ),
-      AdminUserModel(
-        id: 'u-4',
-        name: 'Aman Jain',
-        email: 'aman.jain@gmail.com',
-        userIdCode: '229876',
-        role: 'Student',
-        examAccess: ['NEET', 'JEE Adv'],
-        status: 'Suspended',
-        lastActive: '2 days ago',
-        joinedOn: 'Aug 22, 2026 11:20 AM',
-        phone: '+91 96543 21098',
-        regSource: 'Web Portal',
-        avatarInitials: 'AJ',
-        avatarColor: const Color(0xFF3B82F6),
-      ),
-      AdminUserModel(
-        id: 'u-5',
-        name: 'Sneha Pandey',
-        email: 'sneha.pandey@gmail.com',
-        userIdCode: '229543',
-        role: 'Student',
-        examAccess: ['NEET', 'JEE M', 'JEE Adv'],
-        status: 'Active',
-        lastActive: '3 hours ago',
-        joinedOn: 'Aug 21, 2026 04:30 PM',
-        phone: '+91 95432 10987',
-        regSource: 'Mobile App',
-        avatarInitials: 'SP',
-        avatarColor: const Color(0xFFEC4899),
-      ),
-      AdminUserModel(
-        id: 'u-6',
-        name: 'Aditi Tiwari',
-        email: 'aditi.tiwari@gmail.com',
-        userIdCode: '228765',
-        role: 'Educator',
-        examAccess: ['NEET', 'JEE M', '+1'],
-        status: 'Pending',
-        lastActive: '-',
-        joinedOn: 'Aug 21, 2026 12:10 PM',
-        phone: '+91 94321 09876',
-        regSource: 'Institution Partner',
-        avatarInitials: 'AT',
-        avatarColor: const Color(0xFF14B8A6),
-      ),
-      AdminUserModel(
-        id: 'u-7',
-        name: 'Admin Dev',
-        email: 'admin.dev@cosmyra.com',
-        userIdCode: '1001',
-        role: 'Administrator',
-        examAccess: ['All Exams'],
-        status: 'Active',
-        lastActive: 'Just now',
-        joinedOn: 'Aug 17, 2026 09:00 AM',
-        phone: '+91 91111 22222',
-        regSource: 'System Core',
-        avatarInitials: 'AD',
-        avatarColor: const Color(0xFFEF4444),
-      ),
-    ];
-
-    // Set Mahboob Hasan as default selected user in inspector panel
-    _selectedUserForDetail = _allUsers.first;
+    _allUsers = [];
   }
 
   // Filtered users calculation

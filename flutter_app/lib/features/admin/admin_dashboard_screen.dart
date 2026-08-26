@@ -31,6 +31,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   List<List<dynamic>> _csvRowsPreview = [];
   List<String> _csvImportErrors = [];
 
+  int _totalRealUsers = 0;
+
   @override
   void initState() {
     super.initState();
@@ -41,9 +43,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     setState(() => _isLoading = true);
     final questions = await SupabaseService.fetchQuestions(limit: 100);
     final reports = await SupabaseService.getReportedQuestions();
+    final profiles = await SupabaseService.fetchAllProfiles();
     setState(() {
       _questionBank = questions;
       _reports = reports;
+      _totalRealUsers = profiles.length;
       _isLoading = false;
     });
   }
@@ -655,9 +659,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           children: [
             _buildMetricCard(
               title: 'Total Students',
-              value: '24,850',
-              trend: '↑ 340 this week',
-              subtext: '12.5% vs last week',
+              value: '$_totalRealUsers',
+              trend: '↑ Live synced',
+              subtext: '100% real Supabase profiles',
               icon: Icons.people_outline_rounded,
               iconColor: const Color(0xFF6366F1),
               trendColor: const Color(0xFF10B981),
