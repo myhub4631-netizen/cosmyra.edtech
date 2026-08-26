@@ -19,7 +19,7 @@ class CustomPracticeWizardModal extends StatefulWidget {
 }
 
 class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
-  int _currentStep = 0; // 0: Exam & Subjects, 1: Chapters & Topics, 2: Practice Settings, 3: Overview
+  int _currentStep = 1; // 0: Exam & Subjects, 1: Chapters & Topics, 2: Practice Settings, 3: Overview
   late String _selectedExam;
 
   List<SubjectModel> _availableSubjects = [];
