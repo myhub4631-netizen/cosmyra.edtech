@@ -8079,7 +8079,7 @@ l=new A.fy(m,a0,a1,null,a3,a4,c,d,1,0,0,0,0,!0)
 A.bnF(l)
 p=9
 s=12
-return A.L(i.b.nU("profiles").Rp(A.a9(["id",m,"email",a0,"full_name",a1,"phone",a3,"phone_number",a3,"target_exam",a4,"target_year",c,"role",d,"study_streak",1,"questions_attempted",0,"total_correct",0,"accuracy",0,"rank",0],g,t.K)),$async$a_J)
+return A.L(i.b.nU("profiles").Rp(A.a9(["id",m,"email",a0,"full_name",a1,"phone_number",a3,"target_exam",a4,"target_year",c],g,t.K)),$async$a_J)
 case 12:p=4
 s=11
 break

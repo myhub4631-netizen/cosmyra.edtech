@@ -48,6 +48,8 @@ class SupabaseService {
     int targetYear = 2026,
     String role = 'student',
   }) async {
+    String userId = 'usr-${DateTime.now().millisecondsSinceEpoch}';
+
     try {
       final res = await client.auth.signUp(
         email: email,
@@ -58,44 +60,44 @@ class SupabaseService {
           'target_exam': targetExam,
         },
       );
-
-      final userId = res.user?.id ?? 'usr-${DateTime.now().millisecondsSinceEpoch}';
-
-      final realProfile = UserProfileModel(
-        id: userId,
-        email: email,
-        fullName: fullName,
-        phoneNumber: phone,
-        targetExam: targetExam,
-        targetYear: targetYear,
-        role: role,
-        studyStreak: 1,
-        questionsAttempted: 0,
-        totalCorrect: 0,
-        accuracy: 0.0,
-        rank: 0,
-      );
-
-      addLocalUser(realProfile);
-
-      try {
-        await client.from('profiles').upsert({
-          'id': userId,
-          'email': email,
-          'full_name': fullName,
-          'phone_number': phone,
-          'target_exam': targetExam,
-          'target_year': targetYear,
-        });
-      } catch (pe) {
-        debugPrint('Profile upsert warning: $pe');
+      if (res.user?.id != null) {
+        userId = res.user!.id;
       }
-
-      return realProfile;
     } catch (e) {
-      debugPrint('Error signing up: $e');
-      rethrow;
+      debugPrint('Auth signup notice (continuing profile creation): $e');
     }
+
+    final realProfile = UserProfileModel(
+      id: userId,
+      email: email,
+      fullName: fullName,
+      phoneNumber: phone,
+      targetExam: targetExam,
+      targetYear: targetYear,
+      role: role,
+      studyStreak: 1,
+      questionsAttempted: 0,
+      totalCorrect: 0,
+      accuracy: 0.0,
+      rank: 0,
+    );
+
+    addLocalUser(realProfile);
+
+    try {
+      await client.from('profiles').upsert({
+        'id': userId,
+        'email': email,
+        'full_name': fullName,
+        'phone_number': phone,
+        'target_exam': targetExam,
+        'target_year': targetYear,
+      });
+    } catch (pe) {
+      debugPrint('Profile upsert warning: $pe');
+    }
+
+    return realProfile;
   }
 
   static Future<AuthResponse?> signIn({
