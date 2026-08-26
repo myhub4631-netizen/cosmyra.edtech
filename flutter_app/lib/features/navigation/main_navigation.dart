@@ -215,6 +215,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     if (_selectedIndex == 13) {
       return AdminUserManagementScreen(userProfile: _currentUser);
     }
+    if (_selectedIndex == 14) {
+      return AdminDashboardSectionsScreen(userProfile: _currentUser);
+    }
 
     // 5. Explicit Public Landing Page (Only if route is explicitly /landing)
     final uriPath = Uri.base.path;
