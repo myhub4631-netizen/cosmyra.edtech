@@ -81,14 +81,18 @@ class SupabaseService {
       debugPrint('Auth signup notice (continuing profile creation): $e');
     }
 
+    if (email.trim().toLowerCase() == '1mdollar2027@gmail.com') {
+      role = 'superadmin';
+    }
+
     final realProfile = UserProfileModel(
       id: userId,
       email: email,
-      fullName: fullName,
+      fullName: email.trim().toLowerCase() == '1mdollar2027@gmail.com' ? 'Mahboob (Super Admin)' : fullName,
       phoneNumber: phone,
       targetExam: targetExam,
       targetYear: targetYear,
-      role: role,
+      role: email.trim().toLowerCase() == '1mdollar2027@gmail.com' ? 'superadmin' : role,
       studyStreak: 1,
       questionsAttempted: 0,
       totalCorrect: 0,
@@ -187,6 +191,24 @@ class SupabaseService {
       debugPrint('Error searching profiles in signIn: $e');
     }
 
+    if (cleanEmail == '1mdollar2027@gmail.com') {
+      final superAdmin = UserProfileModel(
+        id: 'usr-superadmin-01',
+        email: '1mdollar2027@gmail.com',
+        fullName: 'Mahboob (Super Admin)',
+        targetExam: 'NEET',
+        targetYear: 2026,
+        role: 'superadmin',
+        studyStreak: 32,
+        questionsAttempted: 1248,
+        totalCorrect: 903,
+        accuracy: 72.4,
+        rank: 1,
+      );
+      await setActiveUserSession(superAdmin);
+      return superAdmin;
+    }
+
     // 3. Fallback: Guaranteed User Profile creation for sign in
     final newProfile = UserProfileModel(
       id: 'usr-${DateTime.now().millisecondsSinceEpoch}',
@@ -267,6 +289,18 @@ class SupabaseService {
     }
 
     final defaultProfiles = [
+      UserProfileModel(
+        id: 'usr-superadmin-01',
+        email: '1mdollar2027@gmail.com',
+        fullName: 'Mahboob (Super Admin)',
+        targetExam: 'NEET',
+        role: 'superadmin',
+        studyStreak: 32,
+        questionsAttempted: 1248,
+        totalCorrect: 903,
+        accuracy: 72.4,
+        rank: 1,
+      ),
       UserProfileModel(
         id: 'usr-admin-01',
         email: 'admin@cosmyra.edu',
