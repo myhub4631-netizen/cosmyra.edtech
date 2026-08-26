@@ -198,25 +198,43 @@ class _AdminPdfImportPreviewScreenState extends State<AdminPdfImportPreviewScree
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: DataTable(
+                      columnSpacing: 20,
                       headingRowColor: MaterialStateProperty.all(const Color(0xFFF8FAFC)),
                       columns: const [
                         DataColumn(label: Text('#', style: TextStyle(fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text('Question Text', style: TextStyle(fontWeight: FontWeight.bold))),
+                        DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
+                        DataColumn(label: Text('Question Text (Click to Edit)', style: TextStyle(fontWeight: FontWeight.bold))),
                         DataColumn(label: Text('Subject', style: TextStyle(fontWeight: FontWeight.bold))),
                         DataColumn(label: Text('Chapter', style: TextStyle(fontWeight: FontWeight.bold))),
                         DataColumn(label: Text('Confidence', style: TextStyle(fontWeight: FontWeight.bold))),
                         DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.bold))),
-                        DataColumn(label: Text('Action', style: TextStyle(fontWeight: FontWeight.bold))),
                       ],
                       rows: _extractedQuestions.map((q) {
                         final isReady = q['status'] == 'ready' || q['status'] == 'approved';
                         return DataRow(
+                          onSelectChanged: (_) => _openSideBySideReview(q),
                           cells: [
-                            DataCell(Text('Q${q['question_number']}')),
+                            DataCell(Text('Q${q['question_number']}', style: const TextStyle(fontWeight: FontWeight.bold))),
                             DataCell(
-                              SizedBox(
-                                width: 380,
-                                child: LaTeXView(text: q['question_text']),
+                              ElevatedButton.icon(
+                                onPressed: () => _openSideBySideReview(q),
+                                icon: const Icon(Icons.edit_rounded, size: 14),
+                                label: const Text('Edit Question', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF4F46E5),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                              ),
+                            ),
+                            DataCell(
+                              InkWell(
+                                onTap: () => _openSideBySideReview(q),
+                                child: SizedBox(
+                                  width: 320,
+                                  child: LaTeXView(text: q['question_text']),
+                                ),
                               ),
                             ),
                             DataCell(Text(q['subject'])),
@@ -225,40 +243,31 @@ class _AdminPdfImportPreviewScreenState extends State<AdminPdfImportPreviewScree
                               Row(
                                 children: [
                                   SizedBox(
-                                    width: 60,
+                                    width: 50,
                                     child: LinearProgressIndicator(
                                       value: (q['confidence'] as double) / 100,
                                       backgroundColor: const Color(0xFFE2E8F0),
                                       valueColor: AlwaysStoppedAnimation<Color>(isReady ? const Color(0xFF16A34A) : const Color(0xFFF59E0B)),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 6),
                                   Text('${q['confidence']}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
                             DataCell(
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: isReady ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  isReady ? 'Ready' : 'Needs Review',
-                                  style: TextStyle(color: isReady ? const Color(0xFF15803D) : const Color(0xFFB45309), fontWeight: FontWeight.bold, fontSize: 12),
-                                ),
-                              ),
-                            ),
-                            DataCell(
-                              ElevatedButton.icon(
-                                onPressed: () => _openSideBySideReview(q),
-                                icon: const Icon(Icons.remove_red_eye_rounded, size: 14),
-                                label: const Text('Review Side-by-Side', style: TextStyle(fontSize: 12)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF4F46E5),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              InkWell(
+                                onTap: () => _openSideBySideReview(q),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: isReady ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    isReady ? 'Ready' : 'Needs Review',
+                                    style: TextStyle(color: isReady ? const Color(0xFF15803D) : const Color(0xFFB45309), fontWeight: FontWeight.bold, fontSize: 12),
+                                  ),
                                 ),
                               ),
                             ),
