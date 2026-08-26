@@ -61,7 +61,7 @@ class PdfQuestionParserEngine {
       estimatedPageCount: pageCount > 0 ? pageCount : 1,
       rawTextLength: rawText.length,
       rawTextSnippet: snippet,
-      detectedQuestionsCount: boundaryCount > 0 ? boundaryCount : 180,
+      detectedQuestionsCount: boundaryCount,
       status: rawText.length > 0 ? 'SUCCESS' : 'EXTRACTION_FAILED',
       errorMessage: rawText.length > 0 ? '' : 'No usable text extracted from PDF stream.',
     );
@@ -75,9 +75,8 @@ class PdfQuestionParserEngine {
   }
 
   /// ABSOLUTE RULE:
-  /// PDF IMPORTER MUST NEVER GENERATE QUESTION CONTENT OR SYNTHETIC OPTIONS.
-  /// NO "Option A", "Option B", "Extracted question content from PDF page X".
-  /// IF EXTRACTION FAILS, FAIL SAFELY -> status = needs_review, options = [].
+  /// PDF IMPORTER MUST NEVER GENERATE QUESTION CONTENT, PLACEHOLDERS, OR SYNTHETIC OPTIONS.
+  /// ONLY REAL, EXTRACTED QUESTION RECORDS ARE CREATED AND RETURNED.
   static List<Map<String, dynamic>> parsePdf({
     required PlatformFile pdfFile,
     required String selectedExam,
@@ -127,7 +126,7 @@ class PdfQuestionParserEngine {
             );
 
       // A question can only be READY if authentic options and valid question text exist
-      final bool isValidExtracted = isGrounded || (options.length >= 2 && !normalizedText.contains('Unable to reliably extract'));
+      final bool isValidExtracted = isGrounded || (options.length >= 2 && rawText.length >= 20);
       final String status = isValidExtracted ? 'ready' : 'needs_review';
 
       resultList.add({
@@ -179,7 +178,7 @@ class PdfQuestionParserEngine {
     }
   }
 
-  /// Detect authentic question boundaries from PDF stream for ALL 180 questions
+  /// Detect authentic question boundaries from PDF stream for ALL authentic questions
   static List<Map<String, dynamic>> _detectQuestionBlocksFromStream(String rawPdfStream, String fileName) {
     final List<Map<String, dynamic>> blocks = [];
 
@@ -198,6 +197,7 @@ class PdfQuestionParserEngine {
         // Dynamically parse question from raw stream text matching qNo
         final textFromStream = _extractTextForQuestion(qNo, rawPdfStream);
 
+        // ONLY ADD QUESTION IF AUTHENTIC TEXT WAS EXTRACTED (NO FAKE ROWS)
         if (textFromStream.isNotEmpty) {
           final extractedOpts = _extractOptionsFromText(textFromStream);
           blocks.add({
@@ -207,17 +207,6 @@ class PdfQuestionParserEngine {
             'normalized_text': _normalizeExtractedText(qNo, textFromStream),
             'options': extractedOpts,
             'correct_answer': extractedOpts.isNotEmpty ? extractedOpts.first : null,
-            'is_grounded': false,
-          });
-        } else {
-          // SAFE EXTRACTION FAIL: Zero placeholder question text, zero synthetic options!
-          blocks.add({
-            'question_number': qNo,
-            'page': page,
-            'raw_text': 'Unable to extract text stream for Question $qNo from PDF Page $page.',
-            'normalized_text': 'Unable to reliably extract Question $qNo text from PDF Page $page. Manual review required in Side-by-Side Reviewer.',
-            'options': <String>[],
-            'correct_answer': null,
             'is_grounded': false,
           });
         }
@@ -381,15 +370,13 @@ class PdfQuestionParserEngine {
     required bool hasLatexMath,
     required bool hasAnswer,
   }) {
-    if (rawText.contains('Unable to reliably extract')) return 35.0;
-
-    double score = 40.0;
-    if (rawText.length > 30) score += 25.0;
-    if (optionsCount >= 4) score += 25.0;
+    double score = 50.0;
+    if (rawText.length > 30) score += 20.0;
+    if (optionsCount >= 4) score += 20.0;
     else if (optionsCount >= 2) score += 10.0;
     if (hasLatexMath) score += 5.0;
     if (hasAnswer) score += 4.0;
 
-    return double.parse(score.clamp(35.0, 99.5).toStringAsFixed(1));
+    return double.parse(score.clamp(40.0, 99.5).toStringAsFixed(1));
   }
 }
