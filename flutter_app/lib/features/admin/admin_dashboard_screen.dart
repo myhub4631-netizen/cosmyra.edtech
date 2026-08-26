@@ -8,6 +8,7 @@ import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/latex_view.dart';
 import '../../shared/utils/smooth_page_route.dart';
 import 'admin_user_management_screen.dart';
+import '../auth/login_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -32,6 +33,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   List<String> _csvImportErrors = [];
 
   int _totalRealUsers = 0;
+
+  Future<void> _handleLogout() async {
+    await SupabaseService.logoutUserSession();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Logged out successfully.'),
+          backgroundColor: Color(0xFF64748B),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -423,7 +442,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             ),
           ),
 
-          // User Profile Footer
+          // User Profile Footer with Working Logout Action
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
@@ -436,16 +455,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=33'),
                 ),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Admin User', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                      Text('Super Administrator', style: TextStyle(color: Color(0xFF64748B), fontSize: 10)),
+                      Text(
+                        widget.userProfile.fullName.trim().isNotEmpty ? widget.userProfile.fullName : 'Admin User',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        widget.userProfile.isSuperAdmin ? 'Super Administrator' : 'Administrator',
+                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 10),
+                      ),
                     ],
                   ),
                 ),
-                Icon(Icons.more_vert_rounded, color: Colors.grey.shade600, size: 18),
+                IconButton(
+                  icon: const Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 18),
+                  tooltip: 'Logout',
+                  onPressed: _handleLogout,
+                ),
               ],
             ),
           ),
@@ -576,18 +606,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 ],
               ),
               const SizedBox(width: 12),
+              const SizedBox(width: 12),
               const CircleAvatar(
                 radius: 16,
                 backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=33'),
               ),
               const SizedBox(width: 8),
-              const Column(
+              Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Admin User', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  Text('Super Administrator', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                  Text(
+                    widget.userProfile.fullName.trim().isNotEmpty ? widget.userProfile.fullName : 'Admin User',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    widget.userProfile.isSuperAdmin ? 'Super Administrator' : 'Administrator',
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
                 ],
+              ),
+              const SizedBox(width: 16),
+              OutlinedButton.icon(
+                onPressed: _handleLogout,
+                icon: const Icon(Icons.logout_rounded, size: 14, color: Color(0xFFEF4444)),
+                label: const Text('Logout', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFFEE2E2)),
+                  backgroundColor: const Color(0xFFFEF2F2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                ),
               ),
             ],
           ),

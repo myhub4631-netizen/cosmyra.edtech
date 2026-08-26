@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../auth/login_screen.dart';
 
 class AdminDashboardSectionsScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -14,6 +15,24 @@ class AdminDashboardSectionsScreen extends StatefulWidget {
 class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScreen> {
   String _activeTab = 'Dashboard Sections';
   String _activeSidebar = 'Dashboard Sections';
+
+  Future<void> _handleLogout() async {
+    await SupabaseService.logoutUserSession();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Logged out successfully.'),
+          backgroundColor: Color(0xFF64748B),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    }
+  }
 
   // Section Visibility Toggles State
   final Map<String, bool> _sectionVisibility = {
@@ -337,6 +356,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
                 _buildSidebarTile('Roles & Permissions', Icons.admin_panel_settings_outlined),
                 _buildSidebarTile('Logs', Icons.list_alt_rounded),
                 _buildSidebarTile('Support Tickets', Icons.help_outline_rounded),
+                _buildSidebarTile('Logout', Icons.logout_rounded, onTap: _handleLogout),
               ],
             ),
           ),
@@ -355,7 +375,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     );
   }
 
-  Widget _buildSidebarTile(String title, IconData icon, {bool isActive = false, String? badge}) {
+  Widget _buildSidebarTile(String title, IconData icon, {bool isActive = false, String? badge, VoidCallback? onTap}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
@@ -384,11 +404,13 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
                 child: Text(badge, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
               )
             : null,
-        onTap: () {
+        onTap: onTap ?? () {
           if (title == 'Dashboard') {
             Navigator.pushNamed(context, '/admin');
           } else if (title == 'Users') {
             Navigator.pushNamed(context, '/admin/users');
+          } else if (title == 'Logout') {
+            _handleLogout();
           } else {
             setState(() => _activeSidebar = title);
           }
@@ -486,8 +508,20 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
                         widget.userProfile.fullName.isNotEmpty ? widget.userProfile.fullName : 'Admin',
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                       ),
-                      const Text('Super Admin', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                      Text(widget.userProfile.isSuperAdmin ? 'Super Admin' : 'Admin', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
                     ],
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: _handleLogout,
+                    icon: const Icon(Icons.logout_rounded, size: 14, color: Color(0xFFEF4444)),
+                    label: const Text('Logout', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFFEE2E2)),
+                      backgroundColor: const Color(0xFFFEF2F2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    ),
                   ),
                 ],
               ),
