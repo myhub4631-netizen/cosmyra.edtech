@@ -86,10 +86,13 @@ class _AdminPdfImportPreviewScreenState extends State<AdminPdfImportPreviewScree
 
   void _approveAllReadyQuestions() async {
     final readyList = _extractedQuestions.where((q) => q['status'] == 'ready' || q['status'] == 'approved').toList();
+    final startId = DateTime.now().millisecondsSinceEpoch % 100000;
 
-    for (var q in readyList) {
+    for (int i = 0; i < readyList.length; i++) {
+      final q = readyList[i];
+      final uniqueId = 'Q${140000 + startId + i}';
       final newQ = {
-        'id': 'Q${132202 + DateTime.now().millisecondsSinceEpoch % 1000}',
+        'id': uniqueId,
         'questionText': q['question_text'],
         'subject': q['subject'],
         'chapter': q['chapter'],
@@ -121,7 +124,7 @@ class _AdminPdfImportPreviewScreenState extends State<AdminPdfImportPreviewScree
     );
 
     if (mounted) {
-      Navigator.pop(context);
+      Navigator.pop(context, true);
     }
   }
 

@@ -461,16 +461,19 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
               children: subItems.map((item) {
                 final bool isSubActive = _activeSubNav == item;
                 return InkWell(
-                  onTap: () {
+                  onTap: () async {
                     setState(() => _activeSubNav = item);
                     if (item == 'Add Question' || item == 'Add New Question') _openAddQuestionDialog();
                     if (item == 'Import Questions' || item == 'PDF Import') {
-                      Navigator.push(
+                      final res = await Navigator.push(
                         context,
                         SmoothPageRoute(
                           child: AdminPdfImportScreen(userProfile: widget.userProfile),
                         ),
                       );
+                      if (res == true) {
+                        _loadSavedCustomQuestions();
+                      }
                     }
                   },
                   borderRadius: BorderRadius.circular(6),
@@ -1629,14 +1632,17 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
               ),
               const SizedBox(height: 16),
               InkWell(
-                onTap: () {
+                onTap: () async {
                   Navigator.pop(ctx);
-                  Navigator.push(
+                  final res = await Navigator.push(
                     context,
                     SmoothPageRoute(
                       child: AdminPdfImportScreen(userProfile: widget.userProfile),
                     ),
                   );
+                  if (res == true) {
+                    _loadSavedCustomQuestions();
+                  }
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(

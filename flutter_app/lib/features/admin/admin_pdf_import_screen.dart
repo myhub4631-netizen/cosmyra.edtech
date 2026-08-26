@@ -160,7 +160,7 @@ class _AdminPdfImportScreenState extends State<AdminPdfImportScreen> {
     _saveJobToHistory(jobRecord);
 
     if (mounted) {
-      Navigator.push(
+      final res = await Navigator.push(
         context,
         SmoothPageRoute(
           child: AdminPdfImportPreviewScreen(
@@ -174,6 +174,9 @@ class _AdminPdfImportScreenState extends State<AdminPdfImportScreen> {
           ),
         ),
       );
+      if (res == true && mounted) {
+        Navigator.pop(context, true);
+      }
     }
   }
 
