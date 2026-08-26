@@ -222,7 +222,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
             // 3. Scrollable Main Content Body
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 32.0),
                 child: Center(
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 640),
@@ -259,7 +259,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
   Widget _buildTopHeader() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 640),
@@ -281,25 +281,30 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
-              const SizedBox(width: 14),
-              const Expanded(
+              const SizedBox(width: 10),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
                     Text(
                       'Custom Practice',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF0F172A),
                         letterSpacing: -0.3,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    SizedBox(height: 1),
                     Text(
                       'Build your personalized practice',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 11.5,
                         color: Color(0xFF64748B),
                         fontWeight: FontWeight.w400,
                       ),
@@ -307,21 +312,22 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: _showPresetsDialog,
-                icon: const Icon(Icons.bookmark_border_rounded, size: 18, color: Color(0xFF4F46E5)),
+                icon: const Icon(Icons.bookmark_border_rounded, size: 15, color: Color(0xFF4F46E5)),
                 label: const Text(
                   'My Presets',
                   style: TextStyle(
                     color: Color(0xFF4F46E5),
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   side: const BorderSide(color: Color(0xFFC7D2FE), width: 1.2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   backgroundColor: const Color(0xFFF5F3FF),
                 ),
               ),
@@ -710,9 +716,9 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        height: 125,
+        height: 110,
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFAFAFE) : Colors.white,
+          color: isSelected ? const Color(0xFFF5F3FF) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
@@ -731,8 +737,8 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
             // Top Right Check Badge if selected
             if (isSelected)
               Positioned(
-                top: 10,
-                right: 10,
+                top: 8,
+                right: 8,
                 child: Container(
                   width: 22,
                   height: 22,
@@ -1482,7 +1488,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
   // Bottom Navigation Bar with primary purple button & proportions matching screenshot
   Widget _buildBottomActionBar() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       color: Colors.white,
       child: Row(
         children: [
