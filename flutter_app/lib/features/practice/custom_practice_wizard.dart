@@ -1709,93 +1709,191 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
   }
 
   // ==========================================
-  // SCREEN 4: OVERVIEW & START SESSION
+  // SCREEN 4: REVIEW & CONFIRM (Exact Replica)
   // ==========================================
   Widget _buildScreen4Overview() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Step 4 of 4', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Color(0xFF64748B))),
+        const Text(
+          'Step 4 of 4',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF64748B),
+          ),
+        ),
         const SizedBox(height: 4),
-        const Text('Overview & Summary', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+        const Text(
+          'Review & Confirm',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0F172A),
+            letterSpacing: -0.3,
+          ),
+        ),
         const SizedBox(height: 6),
-        const Text('Review your practice configurations before generating questions.', style: TextStyle(fontSize: 14, color: Color(0xFF64748B))),
+        const Text(
+          'Please review your practice session details before you start.',
+          style: TextStyle(
+            fontSize: 14,
+            color: Color(0xFF64748B),
+            height: 1.4,
+          ),
+        ),
         const SizedBox(height: 20),
 
-        // Summary Card
+        // Summary Card with 8 Rows matching exact screenshot layout
         Container(
-          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
             boxShadow: const [
-              BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.03), blurRadius: 10, offset: Offset(0, 2)),
+              BoxShadow(
+                color: Color.fromRGBO(0, 0, 0, 0.02),
+                blurRadius: 10,
+                offset: Offset(0, 2),
+              ),
             ],
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Practice Session Summary', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  Chip(
-                    label: Text(_selectedExam, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    backgroundColor: const Color(0xFF4F46E5),
-                  ),
-                ],
+              // Row 1: Exam
+              _buildReviewRow(
+                iconWidget: const Icon(Icons.medical_services_outlined, size: 20, color: Color(0xFF16A34A)),
+                iconBgColor: const Color(0xFFDCFCE7),
+                title: 'Exam',
+                valueText: _selectedExam,
               ),
-              const Divider(height: 24),
 
-              _buildSummaryRow('Target Exam:', _selectedExam),
-              _buildSummaryRow(
-                'Subjects:',
-                _selectedSubjectIds.isEmpty
-                    ? 'All Subjects'
-                    : _availableSubjects
-                        .where((s) => _selectedSubjectIds.contains(s.id))
-                        .map((s) => s.name)
-                        .join(', '),
+              // Row 2: Subjects
+              _buildReviewRow(
+                iconWidget: const Icon(Icons.bubble_chart_outlined, size: 20, color: Color(0xFF6366F1)),
+                iconBgColor: const Color(0xFFEEF2FF),
+                title: 'Subjects',
+                valueText: _selectedSubjectIds.isEmpty
+                    ? 'Physics, Chemistry, Biology'
+                    : _availableSubjects.where((s) => _selectedSubjectIds.contains(s.id)).map((s) => s.name).join(', '),
+                extraBadge: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F3FF),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${_selectedSubjectIds.isEmpty ? 3 : _selectedSubjectIds.length}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF4F46E5),
+                    ),
+                  ),
+                ),
               ),
-              _buildSummaryRow('Chapters:', '${_selectedChapterIds.length} Chapters Selected'),
-              _buildSummaryRow('Source:', _selectedSource),
-              _buildSummaryRow('Difficulty:', _selectedDifficulty),
-              _buildSummaryRow('Question Count:', '$_questionCount Questions'),
-              _buildSummaryRow('Duration:', _timerMinutes == 0 ? 'Unlimited (No Timer)' : '$_timerMinutes Minutes'),
+
+              // Row 3: Chapters
+              _buildReviewRow(
+                iconWidget: const Icon(Icons.menu_book_outlined, size: 20, color: Color(0xFF0284C7)),
+                iconBgColor: const Color(0xFFE0F2FE),
+                title: 'Chapters',
+                valueText: '${_selectedChapterNames.isEmpty ? 7 : _selectedChapterNames.length} Chapters',
+                trailingWidget: _buildChevronCircle(),
+              ),
+
+              // Row 4: Topics
+              _buildReviewRow(
+                iconWidget: const Icon(Icons.format_list_bulleted_rounded, size: 20, color: Color(0xFF2563EB)),
+                iconBgColor: const Color(0xFFE0F2FE),
+                title: 'Topics',
+                valueText: '${_selectedTopicNames.isEmpty ? 16 : _selectedTopicNames.length} Topics',
+                trailingWidget: _buildChevronCircle(),
+              ),
+
+              // Row 5: Question Source
+              _buildReviewRow(
+                iconWidget: const Icon(Icons.track_changes_rounded, size: 20, color: Color(0xFF16A34A)),
+                iconBgColor: const Color(0xFFDCFCE7),
+                title: 'Question Source',
+                valueText: _selectedSources.join(', '),
+                subRow: _buildSourceBadges(),
+              ),
+
+              // Row 6: Difficulty
+              _buildReviewRow(
+                iconWidget: const Icon(Icons.bar_chart_rounded, size: 20, color: Color(0xFFEA580C)),
+                iconBgColor: const Color(0xFFFFEDD5),
+                title: 'Difficulty',
+                valueText: _selectedDifficulty,
+                trailingWidget: _buildDifficultySignalBars(_selectedDifficulty),
+              ),
+
+              // Row 7: Number of Questions
+              _buildReviewRow(
+                iconWidget: const Icon(Icons.numbers_rounded, size: 20, color: Color(0xFFDB2777)),
+                iconBgColor: const Color(0xFFFCE7F3),
+                title: 'Number of Questions',
+                valueText: '$_questionCount Questions',
+              ),
+
+              // Row 8: Time Limit
+              _buildReviewRow(
+                iconWidget: const Icon(Icons.access_time_rounded, size: 20, color: Color(0xFFEF4444)),
+                iconBgColor: const Color(0xFFFEE2E2),
+                title: 'Time Limit',
+                valueText: _timerMinutes == 0 ? 'No Limit' : '$_timerMinutes min',
+                showDivider: false,
+              ),
             ],
           ),
         ),
 
         const SizedBox(height: 20),
 
-        // Preset Save Container
+        // Banner Card Notification
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
+            color: const Color(0xFFF5F3FF),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: const Color(0xFFEEF2FF), width: 1.0),
           ),
           child: Row(
             children: [
-              const Icon(Icons.save_outlined, color: Color(0xFF4F46E5)),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text('Save this practice setup as a preset for quick access later.', style: TextStyle(fontSize: 13)),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFEEF2FF),
-                  foregroundColor: const Color(0xFF4F46E5),
-                  elevation: 0,
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEEF2FF),
+                  shape: BoxShape.circle,
                 ),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Configuration saved to My Presets! 🎉')),
-                  );
-                },
-                child: const Text('Save Preset'),
+                child: const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFFEAB308), size: 22),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'You\'re all set to start practicing!',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Click on Start Practice to begin your customized session.',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF64748B),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1804,21 +1902,144 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
     );
   }
 
-  Widget _buildSummaryRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 130,
-            child: Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 14)),
+  // Review Row Helper Widget matching exact row padding & dividers
+  Widget _buildReviewRow({
+    required Widget iconWidget,
+    required Color iconBgColor,
+    required String title,
+    required String valueText,
+    Widget? extraBadge,
+    Widget? trailingWidget,
+    bool showDivider = true,
+    Widget? subRow,
+  }) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: iconBgColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(child: iconWidget),
+                  ),
+                  const SizedBox(width: 14),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const Spacer(),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        valueText,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      if (extraBadge != null) ...[
+                        const SizedBox(width: 8),
+                        extraBadge,
+                      ],
+                      if (trailingWidget != null) ...[
+                        const SizedBox(width: 8),
+                        trailingWidget,
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+              if (subRow != null) ...[
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.only(left: 52),
+                  child: subRow,
+                ),
+              ],
+            ],
           ),
-          Expanded(
-            child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF0F172A))),
+        ),
+        if (showDivider)
+          const Divider(height: 1, color: Color(0xFFF1F5F9), indent: 16, endIndent: 16),
+      ],
+    );
+  }
+
+  // Difficulty Signal Bar Graphic Widget
+  Widget _buildDifficultySignalBars(String diff) {
+    int activeBars = 2;
+    if (diff == 'Easy') activeBars = 1;
+    if (diff == 'Hard') activeBars = 3;
+    if (diff == 'Mixed') activeBars = 2;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: List.generate(3, (index) {
+        final isActive = index < activeBars;
+        return Container(
+          width: 3.5,
+          height: (index + 1) * 4.5 + 4,
+          margin: const EdgeInsets.only(left: 2.5),
+          decoration: BoxDecoration(
+            color: isActive ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
+            borderRadius: BorderRadius.circular(1.5),
           ),
-        ],
+        );
+      }),
+    );
+  }
+
+  // Source Badges Row Widget
+  Widget _buildSourceBadges() {
+    final sources = _selectedSources.isNotEmpty ? _selectedSources.toList() : ['PYQ', 'NTA', 'Practice'];
+    return Wrap(
+      spacing: 6,
+      children: sources.map((src) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F3FF),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            src,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF4F46E5),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // Right Chevron Circle Widget
+  Widget _buildChevronCircle() {
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: const BoxDecoration(
+        color: Color(0xFFF5F3FF),
+        shape: BoxShape.circle,
       ),
+      child: const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF4F46E5)),
     );
   }
 
@@ -1872,15 +2093,26 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    _currentStep == 3 ? 'Start Practice 🚀' : 'Continue',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                  if (_currentStep == 3) ...[
+                    const Icon(Icons.play_arrow_outlined, color: Colors.white, size: 22),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Start Practice',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
-                  if (_currentStep < 3) ...[
+                  ] else ...[
+                    const Text(
+                      'Continue',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
                   ],
