@@ -2089,31 +2089,23 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                   child: ElevatedButton(
                     onPressed: () async {
                       if (nameCtrl.text.isNotEmpty && emailCtrl.text.isNotEmpty) {
-                        final newUserModel = UserProfileModel(
-                          id: 'usr-${DateTime.now().millisecondsSinceEpoch}',
+                        await SupabaseService.createUserByAdmin(
                           email: emailCtrl.text.trim(),
                           fullName: nameCtrl.text.trim(),
-                          phoneNumber: phoneCtrl.text.trim().isNotEmpty ? phoneCtrl.text.trim() : '+91 98765 43210',
+                          phone: phoneCtrl.text.trim().isNotEmpty ? phoneCtrl.text.trim() : '+91 98765 43210',
+                          role: role,
                           targetExam: exams.first,
-                          role: role.toLowerCase(),
                         );
-                        await SupabaseService.addLocalUser(newUserModel);
-                        try {
-                          await SupabaseService.signUp(
-                            email: emailCtrl.text.trim(),
-                            password: 'UserPass@123!',
-                            fullName: nameCtrl.text.trim(),
-                            phone: phoneCtrl.text.trim().isNotEmpty ? phoneCtrl.text.trim() : '+91 98765 43210',
-                            role: role.toLowerCase(),
-                          );
-                        } catch (_) {}
 
                         await _loadRealUsersFromSupabase();
 
                         if (mounted) {
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('User ${nameCtrl.text} added successfully!'), backgroundColor: const Color(0xFF10B981)),
+                            SnackBar(
+                              content: Text('User "${nameCtrl.text}" created successfully!'),
+                              backgroundColor: const Color(0xFF10B981),
+                            ),
                           );
                         }
                       }

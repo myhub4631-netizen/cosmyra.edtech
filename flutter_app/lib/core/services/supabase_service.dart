@@ -133,6 +133,63 @@ class SupabaseService {
     return realProfile;
   }
 
+  static Future<UserProfileModel> createUserByAdmin({
+    required String email,
+    required String fullName,
+    required String phone,
+    required String role,
+    String targetExam = 'NEET & JEE',
+    int targetYear = 2026,
+  }) async {
+    final String cleanEmail = email.trim().toLowerCase();
+    final String cleanName = fullName.trim();
+    final String timeMs = DateTime.now().millisecondsSinceEpoch.toString();
+    final String userId = 'usr-${timeMs.substring(timeMs.length - 8)}';
+
+    final dbRole = role.toLowerCase().contains('super')
+        ? 'superadmin'
+        : (role.toLowerCase().contains('admin')
+            ? 'admin'
+            : (role.toLowerCase().contains('educator') ? 'educator' : (role.toLowerCase().contains('moderator') ? 'moderator' : 'student')));
+
+    final newProfile = UserProfileModel(
+      id: userId,
+      email: cleanEmail,
+      fullName: cleanName,
+      phoneNumber: phone,
+      targetExam: targetExam,
+      targetYear: targetYear,
+      role: dbRole,
+      studyStreak: 1,
+      questionsAttempted: 0,
+      totalCorrect: 0,
+      accuracy: 0.0,
+      rank: 0,
+    );
+
+    // Save to local registry and persistent SharedPreferences list
+    await addLocalUser(newProfile);
+
+    // Save to Supabase Cloud 'profiles' table without changing active Auth session
+    try {
+      await client.from('profiles').upsert(
+        {
+          'id': userId,
+          'email': cleanEmail,
+          'full_name': cleanName,
+          'phone_number': phone,
+          'target_exam': targetExam,
+          'role': dbRole,
+        },
+        onConflict: 'email',
+      );
+    } catch (e) {
+      debugPrint('Supabase profile creation by admin notice: $e');
+    }
+
+    return newProfile;
+  }
+
   static Future<void> setActiveUserSession(UserProfileModel profile) async {
     try {
       final prefs = await SharedPreferences.getInstance();
