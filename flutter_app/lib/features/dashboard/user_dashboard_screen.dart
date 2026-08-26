@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../auth/login_screen.dart';
-import '../admin/admin_dashboard_sections_screen.dart';
 
 class UserDashboardScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -35,16 +34,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   String _leaderboardTab = 'Daily';
   int _activeSidebarIndex = 0;
   int _mobileBottomNavIndex = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    final uriPath = Uri.base.path.toLowerCase();
-    final uriFragment = Uri.base.fragment.toLowerCase();
-    if (uriPath.contains('sections') || uriFragment.contains('sections')) {
-      _activeSidebarIndex = 1;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,34 +110,32 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
                     // Main Scrollable Content Body
                     Expanded(
-                      child: _activeSidebarIndex == 1
-                          ? AdminDashboardSectionsScreen(userProfile: widget.userProfile)
-                          : SingleChildScrollView(
-                              padding: const EdgeInsets.all(28.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Welcome Banner Header Row
-                                  _buildWelcomeHeader(displayName),
-                                  const SizedBox(height: 24),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(28.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Welcome Banner Header Row
+                            _buildWelcomeHeader(displayName),
+                            const SizedBox(height: 24),
 
-                                  // Top 4 KPI Metrics Grid Row
-                                  _buildKpiMetricsGrid(),
-                                  const SizedBox(height: 28),
+                            // Top 4 KPI Metrics Grid Row
+                            _buildKpiMetricsGrid(),
+                            const SizedBox(height: 28),
 
-                                  // Middle Section Row: Continue Where You Left Off + Today's Progress
-                                  _buildMiddleSectionRow(),
-                                  const SizedBox(height: 28),
+                            // Middle Section Row: Continue Where You Left Off + Today's Progress
+                            _buildMiddleSectionRow(),
+                            const SizedBox(height: 28),
 
-                                  // Quick Start Section Header + 5 Cards Grid Row
-                                  _buildQuickStartSection(),
-                                  const SizedBox(height: 28),
+                            // Quick Start Section Header + 5 Cards Grid Row
+                            _buildQuickStartSection(),
+                            const SizedBox(height: 28),
 
-                                  // Bottom Section Row: Performance Overview Line Chart + Leaderboard
-                                  _buildBottomSectionRow(displayName),
-                                ],
-                              ),
-                            ),
+                            // Bottom Section Row: Performance Overview Line Chart + Leaderboard
+                            _buildBottomSectionRow(displayName),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -208,18 +195,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   SizedBox(width: 2),
                   Text('Streak', style: TextStyle(fontSize: 8, color: Color(0xFFC2410C), fontWeight: FontWeight.w600)),
                 ],
-              ),
-            ),
-            GestureDetector(
-              onTap: () => Navigator.pushNamed(context, '/admin/sections'),
-              child: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEEF2FF),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFC7D2FE)),
-                ),
-                child: const Icon(Icons.dashboard_customize_rounded, color: Color(0xFF4F46E5), size: 16),
               ),
             ),
             const SizedBox(width: 8),
