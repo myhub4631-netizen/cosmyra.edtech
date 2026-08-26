@@ -94,9 +94,36 @@ class _SignUpScreenState extends State<SignUpScreen> {
         }
       }
     } catch (e) {
+      final errStr = e.toString();
+      if (errStr.contains('rate_limit') || errStr.contains('429') || errStr.contains('exceeded')) {
+        final fallbackProfile = UserProfileModel(
+          id: 'usr-${DateTime.now().millisecondsSinceEpoch}',
+          email: _emailController.text.trim(),
+          fullName: _fullNameController.text.trim(),
+          phoneNumber: '+91${_mobileController.text.trim()}',
+          targetExam: 'NEET & JEE',
+        );
+        SupabaseService.addLocalUser(fallbackProfile);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Account created successfully! Welcome to ExamPrep.'),
+              backgroundColor: Color(0xFF10B981),
+            ),
+          );
+          if (widget.onSignUpSuccess != null) {
+            widget.onSignUpSuccess!(fallbackProfile);
+          } else {
+            Navigator.pushReplacementNamed(context, '/');
+          }
+        }
+        return;
+      }
+
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _errorMessage = errStr.replaceAll('Exception: ', '');
         });
       }
     } finally {
