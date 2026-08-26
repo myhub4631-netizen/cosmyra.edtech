@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../auth/login_screen.dart';
 
 class UserDashboardScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -9,6 +10,7 @@ class UserDashboardScreen extends StatefulWidget {
   final VoidCallback onOpenMockTests;
   final VoidCallback onOpenPyqs;
   final VoidCallback onOpenMistakes;
+  final VoidCallback? onLogout;
 
   const UserDashboardScreen({
     Key? key,
@@ -18,6 +20,7 @@ class UserDashboardScreen extends StatefulWidget {
     required this.onOpenMockTests,
     required this.onOpenPyqs,
     required this.onOpenMistakes,
+    this.onLogout,
   }) : super(key: key);
 
   @override
@@ -318,10 +321,17 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   child: InkWell(
                     onTap: () async {
                       setState(() => _activeSidebarIndex = index);
-                      if (index == 15) {
+                      if (item['label'] == 'Logout' || index == 15) {
                         await SupabaseService.logoutUserSession();
+                        if (widget.onLogout != null) {
+                          widget.onLogout!();
+                        }
                         if (context.mounted) {
-                          Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (context) => const LoginScreen()),
+                            (route) => false,
+                          );
                         }
                         return;
                       }

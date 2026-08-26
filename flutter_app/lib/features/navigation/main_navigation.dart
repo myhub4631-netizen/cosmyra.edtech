@@ -230,6 +230,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       onOpenMockTests: () => setState(() => _selectedIndex = 2),
       onOpenPyqs: () => setState(() => _selectedIndex = 3),
       onOpenMistakes: () => setState(() => _selectedIndex = 4),
+      onLogout: () {
+        setState(() {
+          _isLoggedIn = false;
+          _selectedIndex = 0;
+        });
+      },
     );
   }
 
