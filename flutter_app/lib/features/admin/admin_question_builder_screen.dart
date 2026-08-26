@@ -5,12 +5,14 @@ class AdminQuestionBuilderScreen extends StatefulWidget {
   final UserProfileModel userProfile;
   final Map<String, dynamic>? initialQuestionData;
   final VoidCallback? onBack;
+  final Function(Map<String, dynamic>)? onQuestionSaved;
 
   const AdminQuestionBuilderScreen({
     Key? key,
     required this.userProfile,
     this.initialQuestionData,
     this.onBack,
+    this.onQuestionSaved,
   }) : super(key: key);
 
   @override
@@ -115,6 +117,72 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
         _correctAnswerOption = 'A';
       }
     });
+  }
+
+  void _saveAndSubmitQuestion({bool isDraft = false}) {
+    final usedIn = <String>[];
+    if (_showInCustomPractice) usedIn.add('Custom Practice');
+    if (_showInCustomTest) usedIn.add('Custom Test');
+    if (_showInPYQPractice) usedIn.add('PYQ Practice');
+    if (_showInNTAQuestionPractice) usedIn.add('NTA Question Practice');
+    if (_showInTestSeries) usedIn.add('Test Series');
+
+    final optionTexts = _optionsList.map((opt) => (opt['controller'] as TextEditingController).text).toList();
+    final correctIndex = _correctAnswerOption.codeUnitAt(0) - 65;
+    final correctVal = (correctIndex >= 0 && correctIndex < optionTexts.length)
+        ? optionTexts[correctIndex]
+        : (optionTexts.isNotEmpty ? optionTexts[0] : '');
+
+    final now = DateTime.now();
+    final day = now.day.toString().padLeft(2, '0');
+    final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final month = monthNames[now.month - 1];
+    final year = now.year;
+    final timeStr = "${now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour)}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}";
+
+    final qText = _questionTextController.text.trim().isEmpty
+        ? 'A body of mass m is moving with velocity v. The kinetic energy of the body is...'
+        : _questionTextController.text.trim();
+
+    final newQuestion = {
+      'id': widget.initialQuestionData?['id'] ?? 'Q${123461 + DateTime.now().millisecondsSinceEpoch % 10000}',
+      'questionText': qText,
+      'subject': _selectedSubject,
+      'chapter': _selectedChapter,
+      'topic': _selectedTopic,
+      'subTopic': _selectedSubTopic,
+      'sourceType': _selectedSourceType,
+      'difficulty': _selectedDifficulty,
+      'questionType': _selectedQuestionType,
+      'marks': _marksController.text,
+      'negativeMarks': _negativeMarksController.text,
+      'hasImage': _hasImageDiagram,
+      'tags': _tags.isEmpty ? [_selectedSubject, 'General'] : List<String>.from(_tags),
+      'usedIn': usedIn.isEmpty ? ['Custom Practice', 'Custom Test'] : usedIn,
+      'addedOn': '$day $month $year $timeStr',
+      'options': optionTexts,
+      'correctAnswer': correctVal,
+      'explanation': _explanationController.text,
+      'isActive': _isActive,
+      'isDraft': isDraft,
+    };
+
+    if (widget.onQuestionSaved != null) {
+      widget.onQuestionSaved!(newQuestion);
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(isDraft ? 'Draft saved successfully!' : 'Question added to Question Bank successfully!'),
+        backgroundColor: isDraft ? const Color(0xFF4F46E5) : const Color(0xFF16A34A),
+      ),
+    );
+
+    if (widget.onBack != null) {
+      widget.onBack!();
+    } else if (Navigator.canPop(context)) {
+      Navigator.pop(context, newQuestion);
+    }
   }
 
   @override
@@ -531,11 +599,7 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
             ),
             const SizedBox(width: 12),
             OutlinedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Draft saved successfully!'), backgroundColor: Color(0xFF4F46E5)),
-                );
-              },
+              onPressed: () => _saveAndSubmitQuestion(isDraft: true),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                 side: const BorderSide(color: Color(0xFFC7D2FE), width: 1.2),
@@ -546,16 +610,7 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
             ),
             const SizedBox(width: 12),
             ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Question saved successfully!'), backgroundColor: Color(0xFF16A34A)),
-                );
-                if (widget.onBack != null) {
-                  widget.onBack!();
-                } else if (Navigator.canPop(context)) {
-                  Navigator.pop(context);
-                }
-              },
+              onPressed: () => _saveAndSubmitQuestion(isDraft: false),
               icon: const Icon(Icons.save_outlined, size: 18, color: Colors.white),
               label: const Text('Save Question', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Colors.white)),
               style: ElevatedButton.styleFrom(

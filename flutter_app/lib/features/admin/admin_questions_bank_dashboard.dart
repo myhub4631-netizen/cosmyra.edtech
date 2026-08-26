@@ -41,8 +41,8 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
   int _currentPage = 1;
   int _rowsPerPage = 10;
 
-  // Question list state
-  List<Map<String, dynamic>> _questionsList = [
+  // Question list state (shared across navigation)
+  static final List<Map<String, dynamic>> _sharedQuestionsBankList = [
     {
       'id': 'Q123456',
       'questionText': 'A body of mass m is moving with velocity v. The kinetic energy of the body is...',
@@ -124,6 +124,8 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
       'explanation': 'Solubility of gases in liquids decreases with increase in temperature.',
     },
   ];
+
+  List<Map<String, dynamic>> get _questionsList => _sharedQuestionsBankList;
 
   @override
   Widget build(BuildContext context) {
@@ -1590,15 +1592,38 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
   // ==========================================
   // 9. MODALS: ADD, IMPORT, VIEW, EDIT QUESTION
   // ==========================================
-  void _openAddQuestionDialog({Map<String, dynamic>? initialData}) {
-    Navigator.of(context).push(
+  void _openAddQuestionDialog({Map<String, dynamic>? initialData}) async {
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
       SmoothPageRoute(
         child: AdminQuestionBuilderScreen(
           userProfile: widget.userProfile,
           initialQuestionData: initialData,
+          onQuestionSaved: (savedQ) {
+            setState(() {
+              if (initialData != null) {
+                final idx = _sharedQuestionsBankList.indexWhere((q) => q['id'] == initialData['id']);
+                if (idx != -1) {
+                  _sharedQuestionsBankList[idx] = savedQ;
+                }
+              } else {
+                _sharedQuestionsBankList.insert(0, savedQ);
+              }
+            });
+          },
         ),
       ),
     );
+
+    if (result != null) {
+      setState(() {
+        final existingIdx = _sharedQuestionsBankList.indexWhere((q) => q['id'] == result['id']);
+        if (existingIdx != -1) {
+          _sharedQuestionsBankList[existingIdx] = result;
+        } else {
+          _sharedQuestionsBankList.insert(0, result);
+        }
+      });
+    }
   }
 
   void _openEditQuestionDialog(Map<String, dynamic> q) {
