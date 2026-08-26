@@ -3,15 +3,16 @@
 .AppleDouble
 .LSOverride
 
-build/app/
-build/ios/
-build/android/
-!flutter_app/build/web/
+.agents/
 .dart_tool/
 .idea/
 .vscode/
 *.iml
 node_modules/
+
+# Flutter build outputs
+flutter_app/build/
+build/
 
 # Environment secrets
 .env
