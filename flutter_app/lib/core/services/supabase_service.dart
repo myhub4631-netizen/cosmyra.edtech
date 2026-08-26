@@ -345,11 +345,15 @@ class SupabaseService {
     final seenEmails = <String>{};
 
     for (final p in [..._localRegisteredUsers, ...persistedUsers, ...remoteProfiles, ...defaultProfiles]) {
-      if (deletedIds.contains(p.id) || deletedIds.contains(p.email)) {
+      final pid = p.id.toLowerCase().trim();
+      final pemail = p.email.toLowerCase().trim();
+      final pname = p.fullName.toLowerCase().trim();
+
+      if (deletedIds.contains(pid) || deletedIds.contains(pemail) || deletedIds.contains(pname)) {
         continue;
       }
-      if (p.email.isNotEmpty && !seenEmails.contains(p.email.toLowerCase())) {
-        seenEmails.add(p.email.toLowerCase());
+      if (p.email.isNotEmpty && !seenEmails.contains(pemail)) {
+        seenEmails.add(pemail);
         combined.add(p);
       }
     }
@@ -632,39 +636,61 @@ class SupabaseService {
     }
   }
 
+  static final Set<String> _deletedIdentifiersInMemory = {};
+
   static Future<Set<String>> getDeletedUserIds() async {
+    final set = <String>{..._deletedIdentifiersInMemory};
     try {
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList('cosmyra_deleted_user_ids_v1') ?? [];
-      return list.toSet();
+      for (final item in list) {
+        final clean = item.toLowerCase().trim();
+        if (clean.isNotEmpty) {
+          set.add(clean);
+          _deletedIdentifiersInMemory.add(clean);
+        }
+      }
     } catch (e) {
-      return {};
+      debugPrint('Error getting deleted user IDs: $e');
     }
+    return set;
   }
 
-  static Future<bool> deleteUserAccount(String userId) async {
+  static Future<bool> deleteUserAccount(String identifier) async {
+    if (identifier.isEmpty) return true;
+    final clean = identifier.toLowerCase().trim();
+    _deletedIdentifiersInMemory.add(clean);
+
     try {
-      await client.from('profiles').delete().eq('id', userId);
+      await client.from('profiles').delete().eq('id', identifier);
+      await client.from('profiles').delete().eq('email', identifier);
     } catch (e) {
       debugPrint('Error deleting user profile from Supabase: $e');
     }
 
-    _localRegisteredUsers.removeWhere((u) => u.id == userId);
+    _localRegisteredUsers.removeWhere((u) =>
+      u.id.toLowerCase().trim() == clean ||
+      u.email.toLowerCase().trim() == clean ||
+      u.fullName.toLowerCase().trim() == clean
+    );
 
     try {
+      final current = await getDeletedUserIds();
+      current.add(clean);
+      final list = current.toList();
+
       final prefs = await SharedPreferences.getInstance();
-      final deleted = prefs.getStringList('cosmyra_deleted_user_ids_v1') ?? [];
-      if (!deleted.contains(userId)) {
-        deleted.add(userId);
-        await prefs.setStringList('cosmyra_deleted_user_ids_v1', deleted);
-      }
+      await prefs.setStringList('cosmyra_deleted_user_ids_v1', list);
 
       // Clean from persisted registered users list
       final rawList = prefs.getStringList('cosmyra_registered_users_list_v2') ?? [];
       final updatedList = rawList.where((raw) {
         try {
           final decoded = jsonDecode(raw) as Map<String, dynamic>;
-          return decoded['id'] != userId && decoded['email'] != userId;
+          final id = (decoded['id'] ?? '').toString().toLowerCase().trim();
+          final email = (decoded['email'] ?? '').toString().toLowerCase().trim();
+          final name = (decoded['full_name'] ?? decoded['fullName'] ?? '').toString().toLowerCase().trim();
+          return id != clean && email != clean && name != clean;
         } catch (_) {
           return true;
         }

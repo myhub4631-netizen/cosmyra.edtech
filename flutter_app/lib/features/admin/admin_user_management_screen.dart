@@ -77,15 +77,27 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   @override
   void initState() {
     super.initState();
-    _initSampleUserData();
+    _allUsers = [];
     _loadRealUsersFromSupabase();
   }
 
   Future<void> _loadRealUsersFromSupabase() async {
     final deletedIds = await SupabaseService.getDeletedUserIds();
+
+    bool isDeleted(String id, String email, String name, String code) {
+      final cid = id.toLowerCase().trim();
+      final cem = email.toLowerCase().trim();
+      final cname = name.toLowerCase().trim();
+      final ccode = code.toLowerCase().trim();
+      return deletedIds.contains(cid) ||
+          deletedIds.contains(cem) ||
+          deletedIds.contains(cname) ||
+          (ccode.isNotEmpty && deletedIds.contains(ccode));
+    }
+
     final profiles = await SupabaseService.fetchAllProfiles();
     final realUsers = profiles
-        .where((p) => !deletedIds.contains(p.id) && !deletedIds.contains(p.email))
+        .where((p) => !isDeleted(p.id, p.email, p.fullName, ''))
         .map((p) {
       final initials = p.fullName.isNotEmpty
           ? p.fullName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
@@ -122,9 +134,12 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
       );
     }).toList();
 
+    final fallbackList = _getInitialSystemUsers()
+        .where((u) => !isDeleted(u.id, u.email, u.name, u.userIdCode))
+        .toList();
+
     if (mounted) {
       setState(() {
-        final fallbackList = _getInitialSystemUsers().where((u) => !deletedIds.contains(u.id) && !deletedIds.contains(u.email)).toList();
         if (realUsers.isNotEmpty) {
           _allUsers = realUsers;
         } else {
@@ -1489,12 +1504,20 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
           ElevatedButton(
             onPressed: () async {
               await SupabaseService.deleteUserAccount(user.id);
-              if (user.email.isNotEmpty) {
-                await SupabaseService.deleteUserAccount(user.email);
-              }
+              if (user.email.isNotEmpty) await SupabaseService.deleteUserAccount(user.email);
+              if (user.name.isNotEmpty) await SupabaseService.deleteUserAccount(user.name);
+              if (user.userIdCode.isNotEmpty) await SupabaseService.deleteUserAccount(user.userIdCode);
+
               setState(() {
-                _allUsers.removeWhere((u) => u.id == user.id || u.email == user.email);
-                if (_selectedUserForDetail?.id == user.id || _selectedUserForDetail?.email == user.email) {
+                _allUsers.removeWhere((u) =>
+                  u.id == user.id ||
+                  u.email == user.email ||
+                  u.name == user.name ||
+                  u.userIdCode == user.userIdCode
+                );
+                if (_selectedUserForDetail?.id == user.id ||
+                    _selectedUserForDetail?.email == user.email ||
+                    _selectedUserForDetail?.name == user.name) {
                   _selectedUserForDetail = _allUsers.isNotEmpty ? _allUsers.first : null;
                 }
               });
