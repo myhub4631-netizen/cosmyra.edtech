@@ -83,16 +83,9 @@ class SupabaseService {
           'id': userId,
           'email': email,
           'full_name': fullName,
-          'phone': phone,
           'phone_number': phone,
           'target_exam': targetExam,
           'target_year': targetYear,
-          'role': role,
-          'study_streak': 1,
-          'questions_attempted': 0,
-          'total_correct': 0,
-          'accuracy': 0.0,
-          'rank': 0,
         });
       } catch (pe) {
         debugPrint('Profile upsert warning: $pe');
