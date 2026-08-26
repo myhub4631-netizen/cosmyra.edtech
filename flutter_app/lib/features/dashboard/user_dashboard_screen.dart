@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
+import '../../core/services/supabase_service.dart';
 
 class UserDashboardScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -315,8 +316,15 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 2),
                   child: InkWell(
-                    onTap: () {
+                    onTap: () async {
                       setState(() => _activeSidebarIndex = index);
+                      if (index == 15) {
+                        await SupabaseService.logoutUserSession();
+                        if (context.mounted) {
+                          Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                        }
+                        return;
+                      }
                       if (index == 1 || index == 2) widget.onOpenPractice();
                       if (index == 3 || index == 8) widget.onOpenMockTests();
                       if (index == 4 || index == 5) widget.onOpenPyqs();

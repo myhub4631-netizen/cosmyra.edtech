@@ -125,7 +125,29 @@ class SupabaseService {
       }
     }
 
+    await setActiveUserSession(realProfile);
     return realProfile;
+  }
+
+  static Future<void> setActiveUserSession(UserProfileModel profile) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_active_user_session', jsonEncode(profile.toJson()));
+      debugPrint('Active user session persisted: ${profile.fullName} (${profile.email})');
+    } catch (e) {
+      debugPrint('Error saving active user session: $e');
+    }
+  }
+
+  static Future<void> logoutUserSession() async {
+    try {
+      await client.auth.signOut();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('cosmyra_active_user_session');
+      debugPrint('Active user session cleared.');
+    } catch (e) {
+      debugPrint('Error logging out session: $e');
+    }
   }
 
   static Future<UserProfileModel> signIn({
@@ -142,7 +164,10 @@ class SupabaseService {
       );
       if (res.user != null) {
         final profile = await getCurrentUser();
-        if (profile != null) return profile;
+        if (profile != null) {
+          await setActiveUserSession(profile);
+          return profile;
+        }
       }
     } catch (e) {
       debugPrint('Supabase Auth signIn notice: $e');
@@ -155,6 +180,7 @@ class SupabaseService {
       if (matchIndex != -1) {
         final matchedProfile = profiles[matchIndex];
         debugPrint('Successfully authenticated via profile match: ${matchedProfile.email}');
+        await setActiveUserSession(matchedProfile);
         return matchedProfile;
       }
     } catch (e) {
@@ -182,32 +208,36 @@ class SupabaseService {
       debugPrint('Error adding local user: $e');
     }
 
+    await setActiveUserSession(newProfile);
     return newProfile;
   }
 
   static Future<UserProfileModel?> getCurrentUser() async {
     try {
       final user = client.auth.currentUser;
-      if (user == null) return null;
-
-      final res = await client.from('profiles').select('*').eq('id', user.id).maybeSingle();
-      if (res != null) {
-        return UserProfileModel.fromJson(res);
+      if (user != null) {
+        final res = await client.from('profiles').select('*').eq('id', user.id).maybeSingle();
+        if (res != null) {
+          final profile = UserProfileModel.fromJson(res);
+          await setActiveUserSession(profile);
+          return profile;
+        }
       }
-      return UserProfileModel(
-        id: user.id,
-        email: user.email ?? '',
-        fullName: user.userMetadata?['full_name'] ?? 'Student',
-        phoneNumber: user.userMetadata?['phone'],
-        targetExam: user.userMetadata?['target_exam'] ?? 'NEET',
-        targetYear: 2026,
-        role: 'student',
-        studyStreak: 1,
-        questionsAttempted: 0,
-        totalCorrect: 0,
-        accuracy: 0.0,
-        rank: 0,
-      );
+
+      // Check active user session in SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final rawActiveUser = prefs.getString('cosmyra_active_user_session');
+      if (rawActiveUser != null && rawActiveUser.isNotEmpty) {
+        final decoded = jsonDecode(rawActiveUser) as Map<String, dynamic>;
+        return UserProfileModel.fromJson(decoded);
+      }
+
+      // Fallback to latest registered user
+      if (_localRegisteredUsers.isNotEmpty) {
+        return _localRegisteredUsers.last;
+      }
+
+      return null;
     } catch (e) {
       debugPrint('Error getting profile: $e');
       return null;
