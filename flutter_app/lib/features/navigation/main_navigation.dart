@@ -20,6 +20,7 @@ import '../admin/admin_pricing_screen.dart';
 import '../admin/admin_hierarchy_screen.dart';
 import '../admin/admin_leaderboard_screen.dart';
 import '../admin/admin_predictions_screen.dart';
+import '../admin/admin_user_management_screen.dart';
 
 import '../dashboard/user_dashboard_screen.dart';
 
@@ -54,6 +55,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     // Check URL path or fragment
     final uriPath = Uri.base.path;
     final uriFragment = Uri.base.fragment;
+    final isUsersRoute = uriPath.contains('users') || uriFragment.contains('users');
     final isPredictionsRoute = uriPath.contains('predictions') || uriFragment.contains('predictions');
     final isLeaderboardRoute = uriPath.contains('leaderboard') || uriFragment.contains('leaderboard');
     final isHierarchyRoute = uriPath.contains('hierarchy') || uriFragment.contains('hierarchy');
@@ -62,6 +64,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     if (widget.initialIndex != null) {
       _selectedIndex = widget.initialIndex!;
+    } else if (isUsersRoute) {
+      _selectedIndex = 13;
     } else if (isPredictionsRoute) {
       _selectedIndex = 12;
     } else if (isLeaderboardRoute) {
@@ -191,6 +195,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     if (_selectedIndex == 12) {
       return AdminPredictionsScreen(userProfile: _currentUser);
     }
+    if (_selectedIndex == 13) {
+      return AdminUserManagementScreen(userProfile: _currentUser);
+    }
 
     // 5. Front Website Landing Page (Index 0)
     if (_selectedIndex == 0) {
@@ -288,6 +295,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         return AdminLeaderboardScreen(userProfile: _currentUser);
       case 12:
         return AdminPredictionsScreen(userProfile: _currentUser);
+      case 13:
+        return AdminUserManagementScreen(userProfile: _currentUser);
       default:
         return const SizedBox.shrink();
     }

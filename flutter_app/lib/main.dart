@@ -18,6 +18,7 @@ class CosmyraApp extends StatelessWidget {
 
   int _getInitialIndexFromPath(String path) {
     final cleanPath = path.toLowerCase();
+    if (cleanPath.contains('users')) return 13;
     if (cleanPath.contains('predictions')) return 12;
     if (cleanPath.contains('admin/leaderboard')) return 11;
     if (cleanPath.contains('hierarchy')) return 10;
@@ -67,6 +68,8 @@ class CosmyraApp extends StatelessWidget {
         '/admin/leaderboard': (context) => const MainNavigationScreen(initialIndex: 11),
         '/admin/predictions': (context) => const MainNavigationScreen(initialIndex: 12),
         '/predictions': (context) => const MainNavigationScreen(initialIndex: 12),
+        '/admin/users': (context) => const MainNavigationScreen(initialIndex: 13),
+        '/users': (context) => const MainNavigationScreen(initialIndex: 13),
       },
       onGenerateRoute: (settings) {
         final targetPath = (settings.name ?? Uri.base.path).toLowerCase();
