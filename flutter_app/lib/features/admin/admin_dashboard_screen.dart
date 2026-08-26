@@ -8,6 +8,7 @@ import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/latex_view.dart';
 import '../../shared/utils/smooth_page_route.dart';
 import 'admin_user_management_screen.dart';
+import 'admin_questions_bank_dashboard.dart';
 import '../auth/login_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -1259,9 +1260,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [
+            _buildQuickActionCard('Questions Bank', 'Manage & organize all question modules', Icons.quiz_outlined, const Color(0xFF4F46E5), () {
+              Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
+            }),
             _buildQuickActionCard('Dashboard Layout', 'Manage banners, stats & sections', Icons.dashboard_customize_rounded, const Color(0xFF4F46E5), () => Navigator.pushNamed(context, '/admin/sections')),
-            _buildQuickActionCard('Add New Question', 'Create single question', Icons.add_circle_outline_rounded, const Color(0xFF6366F1), () => _openQuestionEditor()),
-            _buildQuickActionCard('Bulk Import Questions', 'Upload via CSV/Excel', Icons.cloud_upload_outlined, const Color(0xFF10B981), _pickAndValidateCSV),
+            _buildQuickActionCard('Add New Question', 'Create single question', Icons.add_circle_outline_rounded, const Color(0xFF6366F1), () {
+              Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
+            }),
+            _buildQuickActionCard('Bulk Import Questions', 'Upload via CSV/Excel', Icons.cloud_upload_outlined, const Color(0xFF10B981), () {
+              Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
+            }),
             _buildQuickActionCard('Manage Topics', 'Create & organize topics', Icons.folder_open_outlined, const Color(0xFFF59E0B), () {}),
             _buildQuickActionCard('Paper Predictions', 'Manage prediction sets & PYQs', Icons.note_alt_outlined, const Color(0xFFEC4899), () => Navigator.pushNamed(context, '/admin/predictions')),
             _buildQuickActionCard('User Management', 'Manage students & roles', Icons.people_outline_rounded, const Color(0xFF3B82F6), () {
