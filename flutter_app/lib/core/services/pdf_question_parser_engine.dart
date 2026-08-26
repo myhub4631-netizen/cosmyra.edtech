@@ -74,7 +74,7 @@ class PdfQuestionParserEngine {
     return _extractPdfStreamText(bytes);
   }
 
-  /// ABSOLUTE RULE:
+  /// ABSOLUTE ARCHITECTURAL RULE:
   /// PDF IMPORTER MUST NEVER GENERATE QUESTION CONTENT, PLACEHOLDERS, OR SYNTHETIC OPTIONS.
   /// ONLY REAL, EXTRACTED QUESTION RECORDS ARE CREATED AND RETURNED.
   static List<Map<String, dynamic>> parsePdf({
