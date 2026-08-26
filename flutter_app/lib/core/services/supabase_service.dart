@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/models.dart';
 
@@ -32,9 +34,20 @@ class SupabaseService {
 
   static final List<UserProfileModel> _localRegisteredUsers = [];
 
-  static void addLocalUser(UserProfileModel user) {
+  static Future<void> addLocalUser(UserProfileModel user) async {
     if (!_localRegisteredUsers.any((u) => u.email.toLowerCase() == user.email.toLowerCase())) {
       _localRegisteredUsers.insert(0, user);
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final currentList = prefs.getStringList('cosmyra_registered_users_list_v2') ?? [];
+      final encoded = jsonEncode(user.toJson());
+      if (!currentList.contains(encoded)) {
+        currentList.insert(0, encoded);
+        await prefs.setStringList('cosmyra_registered_users_list_v2', currentList);
+      }
+    } catch (e) {
+      debugPrint('Error storing user to SharedPreferences: $e');
     }
   }
 
@@ -83,7 +96,7 @@ class SupabaseService {
       rank: 0,
     );
 
-    addLocalUser(realProfile);
+    await addLocalUser(realProfile);
 
     try {
       await client.from('profiles').upsert({
@@ -157,6 +170,18 @@ class SupabaseService {
       debugPrint('Error fetching all profiles from Supabase: $e');
     }
 
+    List<UserProfileModel> persistedUsers = [];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawList = prefs.getStringList('cosmyra_registered_users_list_v2') ?? [];
+      for (final raw in rawList) {
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        persistedUsers.add(UserProfileModel.fromJson(decoded));
+      }
+    } catch (e) {
+      debugPrint('Error loading persisted users: $e');
+    }
+
     final defaultProfiles = [
       UserProfileModel(
         id: 'usr-admin-01',
@@ -177,7 +202,7 @@ class SupabaseService {
     final combined = <UserProfileModel>[];
     final seenEmails = <String>{};
 
-    for (final p in [..._localRegisteredUsers, ...remoteProfiles, ...defaultProfiles]) {
+    for (final p in [..._localRegisteredUsers, ...persistedUsers, ...remoteProfiles, ...defaultProfiles]) {
       if (p.email.isNotEmpty && !seenEmails.contains(p.email.toLowerCase())) {
         seenEmails.add(p.email.toLowerCase());
         combined.add(p);

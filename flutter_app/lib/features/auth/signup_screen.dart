@@ -103,7 +103,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           phoneNumber: '+91${_mobileController.text.trim()}',
           targetExam: 'NEET & JEE',
         );
-        SupabaseService.addLocalUser(fallbackProfile);
+        await SupabaseService.addLocalUser(fallbackProfile);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
