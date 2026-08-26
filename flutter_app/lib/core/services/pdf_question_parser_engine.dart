@@ -74,9 +74,11 @@ class PdfQuestionParserEngine {
     return _extractPdfStreamText(bytes);
   }
 
-  /// ABSOLUTE ARCHITECTURAL RULE:
-  /// PDF IMPORTER MUST NEVER GENERATE QUESTION CONTENT, PLACEHOLDERS, OR SYNTHETIC OPTIONS.
-  /// ONLY REAL, EXTRACTED QUESTION RECORDS ARE CREATED AND RETURNED.
+  /// ABSOLUTE NON-NEGOTIABLE RULE:
+  /// PDF IMPORTER IS 100% DYNAMIC AND SOURCE-GROUNDED.
+  /// ZERO HARDCODED MOCK DICTIONARIES.
+  /// ZERO SYNTHETIC FALLBACK STRINGS.
+  /// ONLY REAL, DYNAMICALLY EXTRACTED QUESTION RECORDS ARE RETURNED.
   static List<Map<String, dynamic>> parsePdf({
     required PlatformFile pdfFile,
     required String selectedExam,
@@ -93,7 +95,7 @@ class PdfQuestionParserEngine {
     final String fileName = pdfFile.name;
     final isNeet = selectedExam.toUpperCase().contains('NEET');
 
-    // Parse authentic question blocks detected from raw text stream
+    // Parse authentic question blocks detected from raw text stream dynamically
     final detectedBlocks = _detectQuestionBlocksFromStream(rawPdfStream, fileName);
 
     if (detectedBlocks.isEmpty) {
@@ -110,23 +112,20 @@ class PdfQuestionParserEngine {
       final normalizedText = block['normalized_text'] as String;
       final options = List<String>.from(block['options'] ?? []);
       final page = block['page'] as int;
-      final isGrounded = block['is_grounded'] == true;
 
       // Classification MUST be executed AFTER question text is extracted
       final classification = _classifyExtractedQuestion(normalizedText, selectedSubject, isNeet, qNo);
 
       // Confidence is dynamically calculated from actual extraction metrics
-      final double confidence = isGrounded
-          ? 98.8
-          : _calculateExtractionConfidence(
-              rawText: rawText,
-              optionsCount: options.length,
-              hasLatexMath: normalizedText.contains(r'$'),
-              hasAnswer: block['correct_answer'] != null,
-            );
+      final double confidence = _calculateExtractionConfidence(
+        rawText: rawText,
+        optionsCount: options.length,
+        hasLatexMath: normalizedText.contains(r'$'),
+        hasAnswer: block['correct_answer'] != null,
+      );
 
       // A question can only be READY if authentic options and valid question text exist
-      final bool isValidExtracted = isGrounded || (options.length >= 2 && rawText.length >= 20);
+      final bool isValidExtracted = options.length >= 2 && rawText.length >= 20;
       final String status = isValidExtracted ? 'ready' : 'needs_review';
 
       resultList.add({
@@ -178,38 +177,26 @@ class PdfQuestionParserEngine {
     }
   }
 
-  /// Detect authentic question boundaries from PDF stream for ALL authentic questions
+  /// Detect authentic question boundaries dynamically from PDF stream
   static List<Map<String, dynamic>> _detectQuestionBlocksFromStream(String rawPdfStream, String fileName) {
     final List<Map<String, dynamic>> blocks = [];
 
-    // Map of grounded high-precision questions for PW AITS / NEET papers
-    final groundedMap = <int, Map<String, dynamic>>{};
-    _addGroundedPwAitsQuestions(groundedMap);
+    // Dynamically scan for question boundary numbers across the raw stream
+    for (int qNo = 1; qNo <= 200; qNo++) {
+      final page = (qNo / 7.5).ceil();
+      final textFromStream = _extractTextForQuestion(qNo, rawPdfStream);
 
-    // Process ALL 180 questions in the paper across all pages
-    for (int qNo = 1; qNo <= 180; qNo++) {
-      if (groundedMap.containsKey(qNo)) {
-        final item = Map<String, dynamic>.from(groundedMap[qNo]!);
-        item['is_grounded'] = true;
-        blocks.add(item);
-      } else {
-        final page = (qNo / 7.5).ceil();
-        // Dynamically parse question from raw stream text matching qNo
-        final textFromStream = _extractTextForQuestion(qNo, rawPdfStream);
-
-        // ONLY ADD QUESTION IF AUTHENTIC TEXT WAS EXTRACTED (NO FAKE ROWS)
-        if (textFromStream.isNotEmpty) {
-          final extractedOpts = _extractOptionsFromText(textFromStream);
-          blocks.add({
-            'question_number': qNo,
-            'page': page,
-            'raw_text': textFromStream,
-            'normalized_text': _normalizeExtractedText(qNo, textFromStream),
-            'options': extractedOpts,
-            'correct_answer': extractedOpts.isNotEmpty ? extractedOpts.first : null,
-            'is_grounded': false,
-          });
-        }
+      // ONLY ADD QUESTION IF AUTHENTIC TEXT WAS EXTRACTED DYNAMICALLY (NO HARDCODED MOCKS)
+      if (textFromStream.isNotEmpty) {
+        final extractedOpts = _extractOptionsFromText(textFromStream);
+        blocks.add({
+          'question_number': qNo,
+          'page': page,
+          'raw_text': textFromStream,
+          'normalized_text': _normalizeExtractedText(qNo, textFromStream),
+          'options': extractedOpts,
+          'correct_answer': extractedOpts.isNotEmpty ? extractedOpts.first : null,
+        });
       }
     }
 
@@ -247,82 +234,6 @@ class PdfQuestionParserEngine {
     return rawText.replaceAll('kg-m²', r'$kg\cdot m^2$')
                   .replaceAll('m/s²', r'$m/s^2$')
                   .replaceAll('rad/s', r'$rad/s$');
-  }
-
-  /// Grounded Questions extracted from PW AITS.pdf (All India Test Series DROPPER NEET)
-  static void _addGroundedPwAitsQuestions(Map<int, Map<String, dynamic>> groundedMap) {
-    groundedMap[23] = {
-      'question_number': 23,
-      'page': 4,
-      'raw_text': '23. A rotating table completes one rotation in 10 sec and its moment of inertia is 100 kg-m². If a person of mass 50 kg stands at the outer edge of diameter 2 m, the new angular velocity will be:',
-      'normalized_text': '23. A rotating table completes one rotation in \$10\\text{ s}\$ and its moment of inertia is \$100\\text{ kg}\\cdot\\text{m}^2\$. If a person of mass \$50\\text{ kg}\$ stands at the outer edge of diameter \$2\\text{ m}\$, the new angular velocity will be:',
-      'options': [r'(1) $0.5\text{ rad/s}$', r'(2) $0.314\text{ rad/s}$', r'(3) $0.628\text{ rad/s}$', r'(4) $1.25\text{ rad/s}$'],
-      'correct_answer': r'(2) $0.314\text{ rad/s}$',
-      'explanation': r'Initial angular momentum $L_1 = I_1 \omega_1 = 100 \times \frac{2\pi}{10} = 20\pi$. New moment of inertia $I_2 = 100 + m r^2 = 100 + 50(1)^2 = 150\text{ kg}\cdot\text{m}^2$. By conservation of angular momentum: $I_1 \omega_1 = I_2 \omega_2 \implies \omega_2 = \frac{20\pi}{150} = \frac{2\pi}{15} \approx 0.314\text{ rad/s}$.',
-    };
-    groundedMap[24] = {
-      'question_number': 24,
-      'page': 4,
-      'raw_text': '24. Copper of fixed volume V is drawn into wire of length l. When this wire is subjected to a constant force F, the extension produced in the wire is Δl. Which of the following graphs is a straight line?',
-      'normalized_text': r'24. Copper of fixed volume $V$ is drawn into wire of length $l$. When this wire is subjected to a constant force $F$, the extension produced in the wire is $\Delta l$. Which of the following graphs is a straight line?',
-      'options': [r'(1) $\Delta l$ vs $1/l$', r'(2) $\Delta l$ vs $l^2$', r'(3) $\Delta l$ vs $1/l^2$', r'(4) $\Delta l$ vs $l$'],
-      'correct_answer': r'(2) $\Delta l$ vs $l^2$',
-      'explanation': r"Young's Modulus $Y = \frac{F l}{A \Delta l} \implies \Delta l = \frac{F l}{A Y}$. Since volume $V = A \cdot l \implies A = V/l$. Substituting $A$ gives $\Delta l = \frac{F l^2}{V Y} \propto l^2$. Therefore, the graph of $\Delta l$ vs $l^2$ is a straight line.",
-    };
-    groundedMap[25] = {
-      'question_number': 25,
-      'page': 4,
-      'raw_text': '25. The rotational kinetic energy of a rigid body of moment of inertia 5 kg-m² is 10 joules. Its angular momentum about the axis of rotation is:',
-      'normalized_text': r'25. The rotational kinetic energy of a rigid body of moment of inertia $5\text{ kg}\cdot\text{m}^2$ is $10\text{ J}$. Its angular momentum about the axis of rotation is:',
-      'options': [r'(1) $10\text{ kg}\cdot\text{m}^2/\text{s}$', r'(2) $100\text{ kg}\cdot\text{m}^2/\text{s}$', r'(3) $50\text{ kg}\cdot\text{m}^2/\text{s}$', r'(4) $5\text{ kg}\cdot\text{m}^2/\text{s}$'],
-      'correct_answer': r'(1) $10\text{ kg}\cdot\text{m}^2/\text{s}$',
-      'explanation': r'Rotational kinetic energy $K_{rot} = \frac{L^2}{2I} \implies L = \sqrt{2 I K_{rot}} = \sqrt{2 \times 5 \times 10} = \sqrt{100} = 10\text{ kg}\cdot\text{m}^2/\text{s}$.',
-    };
-    groundedMap[26] = {
-      'question_number': 26,
-      'page': 4,
-      'raw_text': '26. Two point objects of mass 2x and 3x are separated by a distance r. The distance of center of mass from mass 2x is:',
-      'normalized_text': r'26. Two point objects of mass $2x$ and $3x$ are separated by a distance $r$. The distance of center of mass from mass $2x$ is:',
-      'options': [r'(1) $3r/5$', r'(2) $2r/5$', r'(3) $r/5$', r'(4) $4r/5$'],
-      'correct_answer': r'(1) $3r/5$',
-      'explanation': r'Position of center of mass from mass $m_1 = 2x$ is $r_{cm} = \frac{m_2 r}{m_1 + m_2} = \frac{3x \cdot r}{2x + 3x} = \frac{3r}{5}$.',
-    };
-    groundedMap[27] = {
-      'question_number': 27,
-      'page': 4,
-      'raw_text': '27. A block of mass ‘m’ hangs from a uniform wire of length L and mass M. The speed of transverse wave at the middle point of wire is:',
-      'normalized_text': r'27. A block of mass $m$ hangs from a uniform wire of length $L$ and mass $M$. The speed of transverse wave at the middle point of wire is:',
-      'options': [r'(1) $\sqrt{(m + M/2)gL/M}$', r'(2) $\sqrt{(m + M)gL/M}$', r'(3) $\sqrt{mgL/M}$', r'(4) $\sqrt{(M/2)gL/m}$'],
-      'correct_answer': r'(1) $\sqrt{(m + M/2)gL/M}$',
-      'explanation': r'Tension at the midpoint of wire $T = (m + M/2)g$. Mass per unit length $\mu = M/L$. Wave speed $v = \sqrt{T/\mu} = \sqrt{\frac{(m + M/2)g}{M/L}} = \sqrt{\frac{(m + M/2)gL}{M}}$.',
-    };
-    groundedMap[28] = {
-      'question_number': 28,
-      'page': 5,
-      'raw_text': '28. In an experiment (Case A), a steel wire of length L is suspended from the ceiling. A load W is attached to its lower end. In Case B, the same wire is passed over a frictionless pulley with load W at each end. The elongation of wire in Case B compared to Case A is:',
-      'normalized_text': r'28. In an experiment (Case A), a steel wire of length $L$ is suspended from the ceiling. A load $W$ is attached to its lower end. In Case B, the same wire is passed over a frictionless pulley with load $W$ at each end. The elongation of wire in Case B compared to Case A is:',
-      'options': [r'(1) Same', r'(2) Double', r'(3) Half', r'(4) Four times'],
-      'correct_answer': r'(1) Same',
-      'explanation': r'In Case A, tension in wire is $T = W$. In Case B, tension throughout the wire passed over the pulley is also $T = W$. Since tension $T$, length $L$, and area $A$ are identical in both cases, the elongation is the same.',
-    };
-    groundedMap[29] = {
-      'question_number': 29,
-      'page': 5,
-      'raw_text': '29. A particle of mass 2 kg is projected at an angle of 60° above the horizontal with speed 20 m/s. The magnitude of angular momentum of particle about point of projection when it is at maximum height is (g = 10 m/s²):',
-      'normalized_text': r'29. A particle of mass $2\text{ kg}$ is projected at an angle of $60^\circ$ above the horizontal with speed $20\text{ m/s}$. The magnitude of angular momentum of particle about point of projection when it is at maximum height is ($g = 10\text{ m/s}^2$):',
-      'options': [r'(1) $200\sqrt{3}\text{ J}\cdot\text{s}$', r'(2) $100\sqrt{3}\text{ J}\cdot\text{s}$', r'(3) $300\text{ J}\cdot\text{s}$', r'(4) $400\text{ J}\cdot\text{s}$'],
-      'correct_answer': r'(3) $300\text{ J}\cdot\text{s}$',
-      'explanation': r'At maximum height, velocity is horizontal $v_h = u \cos 60^\circ = 20 \times 1/2 = 10\text{ m/s}$. Maximum height $H = \frac{u^2 \sin^2 60^\circ}{2g} = \frac{400 \times 3/4}{20} = 15\text{ m}$. Angular momentum about origin $L = m v_h H = 2 \times 10 \times 15 = 300\text{ J}\cdot\text{s}$.',
-    };
-    groundedMap[30] = {
-      'question_number': 30,
-      'page': 5,
-      'raw_text': '30. A satellite of mass m is orbiting around the Earth at a height R above the surface. Potential energy of satellite is:',
-      'normalized_text': r'30. A satellite of mass $m$ is orbiting around the Earth at a height $R$ above the surface. Potential energy of satellite is:',
-      'options': [r'(1) $-mgR/2$', r'(2) $-mgR$', r'(3) $-2mgR$', r'(4) $-mgR/4$'],
-      'correct_answer': r'(1) $-mgR/2$',
-      'explanation': r'Distance from center of Earth $r = R + R = 2R$. Potential energy $U = -\frac{G M m}{r} = -\frac{G M m}{2R} = -\frac{g R^2 m}{2R} = -\frac{mgR}{2}$.',
-    };
   }
 
   /// Classify extracted question text AFTER question text is extracted
