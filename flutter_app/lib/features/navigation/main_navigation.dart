@@ -252,20 +252,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       return AdminDashboardScreen(userProfile: _currentUser);
     }
 
-    return UserDashboardScreen(
-      userProfile: _currentUser,
-      activeExam: _activeExam,
-      onOpenPractice: () => setState(() => _selectedIndex = 1),
-      onOpenMockTests: () => setState(() => _selectedIndex = 2),
-      onOpenPyqs: () => setState(() => _selectedIndex = 3),
-      onOpenMistakes: () => setState(() => _selectedIndex = 4),
-      onLogout: () {
-        setState(() {
-          _isLoggedIn = false;
-          _selectedIndex = -1;
-        });
-      },
-    );
+    return _buildCurrentTab();
   }
 
   Widget _buildCurrentTab() {
@@ -274,29 +261,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         return UserDashboardScreen(
           userProfile: _currentUser,
           activeExam: _activeExam,
-          onOpenPractice: () => setState(() => _selectedIndex = 1),
+          onOpenPractice: _openCustomPracticeWizard,
           onOpenMockTests: () => setState(() => _selectedIndex = 2),
           onOpenPyqs: () => setState(() => _selectedIndex = 3),
           onOpenMistakes: () => setState(() => _selectedIndex = 4),
+          onLogout: () {
+            setState(() {
+              _isLoggedIn = false;
+              _selectedIndex = -1;
+            });
+          },
         );
       case 1:
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.play_circle_fill_rounded, size: 64, color: Colors.blue),
-              const SizedBox(height: 16),
-              const Text('Question Practice Engine', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text('Start a practice session with immediate step-by-step solutions.', style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _openCustomPracticeWizard,
-                icon: const Icon(Icons.tune_rounded),
-                label: const Text('Open Custom Practice Wizard'),
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
-              ),
-            ],
+        return Scaffold(
+          body: Center(
+            child: CustomPracticeWizardModal(
+              initialExam: _activeExam,
+              onStartPractice: (questions, timerMins) {
+                setState(() {
+                  _activePracticeQuestions = questions;
+                  _activePracticeTimerMinutes = timerMins;
+                });
+              },
+            ),
           ),
         );
       case 2:
@@ -348,7 +335,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       case 14:
         return AdminDashboardSectionsScreen(userProfile: _currentUser);
       default:
-        return const SizedBox.shrink();
+        return UserDashboardScreen(
+          userProfile: _currentUser,
+          activeExam: _activeExam,
+          onOpenPractice: _openCustomPracticeWizard,
+          onOpenMockTests: () => setState(() => _selectedIndex = 2),
+          onOpenPyqs: () => setState(() => _selectedIndex = 3),
+          onOpenMistakes: () => setState(() => _selectedIndex = 4),
+          onLogout: () {
+            setState(() {
+              _isLoggedIn = false;
+              _selectedIndex = -1;
+            });
+          },
+        );
     }
   }
 }
