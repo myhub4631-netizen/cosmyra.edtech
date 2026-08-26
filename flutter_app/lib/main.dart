@@ -48,7 +48,7 @@ class CosmyraApp extends StatelessWidget {
       themeMode: ThemeMode.light,
       initialRoute: currentPath.isEmpty || currentPath == '/' ? '/' : currentPath,
       routes: {
-        '/': (context) => MainNavigationScreen(initialIndex: initialIdx),
+        '/': (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
         '/landing': (context) => const MainNavigationScreen(initialIndex: 0),
         '/dashboard': (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
         '/user/dashboard': (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),

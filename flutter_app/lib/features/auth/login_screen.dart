@@ -57,15 +57,14 @@ class _LoginScreenState extends State<LoginScreen> {
         );
         if (widget.onLoginSuccess != null) {
           widget.onLoginSuccess!(userProfile);
-        } else {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
-            ),
-            (route) => false,
-          );
         }
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
+          ),
+          (route) => false,
+        );
       }
     } catch (e) {
       if (mounted) {

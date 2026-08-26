@@ -211,8 +211,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       return AdminUserManagementScreen(userProfile: _currentUser);
     }
 
-    // 5. Front Website Landing Page (Index 0 when logged out)
-    if (_selectedIndex == 0 && !_isLoggedIn && !widget.forceDashboard) {
+    // 5. Explicit Public Landing Page (Only if route is explicitly /landing)
+    final uriPath = Uri.base.path;
+    if (_selectedIndex == 0 && uriPath.contains('/landing')) {
       return LandingPageScreen(
         onStartPracticing: _openCustomPracticeWizard,
         onExploreTests: _startCustomTest,
@@ -221,7 +222,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       );
     }
 
-    // 6. User Dashboard Screen for Signed-In Students
+    // 6. User Dashboard Screen (Default for all Student User Sign-Ins)
     return UserDashboardScreen(
       userProfile: _currentUser,
       activeExam: _activeExam,
