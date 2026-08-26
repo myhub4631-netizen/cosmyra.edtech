@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
@@ -23,6 +24,38 @@ class AdminQuestionsBankDashboard extends StatefulWidget {
 }
 
 class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboard> {
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCustomQuestions();
+  }
+
+  Future<void> _loadSavedCustomQuestions() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(jsonStr);
+        final List<Map<String, dynamic>> savedQuestions =
+            decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
+        for (var q in savedQuestions) {
+          final existingIdx = _sharedQuestionsBankList.indexWhere((item) => item['id'] == q['id']);
+          if (existingIdx != -1) {
+            _sharedQuestionsBankList[existingIdx] = q;
+          } else {
+            _sharedQuestionsBankList.insert(0, q);
+          }
+        }
+        if (mounted) {
+          setState(() {});
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading saved questions: $e');
+    }
+  }
+
   // Sidebar state
   String _activeSidebarNav = 'Questions Bank';
   String _activeSubNav = 'All Questions';

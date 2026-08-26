@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../../models/models.dart';
 
 class AdminQuestionBuilderScreen extends StatefulWidget {
@@ -167,6 +169,8 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
       'isDraft': isDraft,
     };
 
+    _saveToPrefs(newQuestion);
+
     if (widget.onQuestionSaved != null) {
       widget.onQuestionSaved!(newQuestion);
     }
@@ -182,6 +186,27 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
       widget.onBack!();
     } else if (Navigator.canPop(context)) {
       Navigator.pop(context, newQuestion);
+    }
+  }
+
+  Future<void> _saveToPrefs(Map<String, dynamic> newQuestion) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
+      List<Map<String, dynamic>> list = [];
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(jsonStr);
+        list = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+      final idx = list.indexWhere((q) => q['id'] == newQuestion['id']);
+      if (idx != -1) {
+        list[idx] = newQuestion;
+      } else {
+        list.insert(0, newQuestion);
+      }
+      await prefs.setString('cosmyra_saved_custom_questions', jsonEncode(list));
+    } catch (e) {
+      debugPrint('Error saving question to prefs: $e');
     }
   }
 
