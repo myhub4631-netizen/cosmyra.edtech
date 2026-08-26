@@ -982,6 +982,29 @@ class SupabaseService {
     String? query,
     int limit = 50,
   }) async {
+    final allMaps = List<Map<String, dynamic>>.from(get20RealQuestionsMap());
+
+    // Merge custom saved questions from SharedPreferences
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(jsonStr);
+        final saved = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        for (var q in saved) {
+          final idx = allMaps.indexWhere((m) => m['id'] == q['id']);
+          if (idx != -1) {
+            allMaps[idx] = q;
+          } else {
+            allMaps.insert(0, q);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error merging saved questions: $e');
+    }
+
+    // Try fetching from Supabase DB questions table
     try {
       var req = client.from('questions').select('*, options:question_options(*)');
       if (examId != null && examId.isNotEmpty) req = req.eq('exam_id', examId);
@@ -993,20 +1016,34 @@ class SupabaseService {
       final res = await req.limit(limit);
       if (res != null && (res as List).isNotEmpty) {
         final dbList = (res as List).map((q) => QuestionModel.fromJson(q)).toList();
-        if (dbList.length >= limit) {
-          return dbList.sublist(0, limit);
+        for (var dbQ in dbList) {
+          if (!allMaps.any((m) => m['id'] == dbQ.id)) {
+            allMaps.insert(0, {
+              'id': dbQ.id,
+              'questionText': dbQ.questionText,
+              'subject': dbQ.subjectId ?? 'Physics',
+              'chapter': dbQ.chapterId ?? 'General',
+              'sourceType': dbQ.source ?? 'NTA',
+              'difficulty': dbQ.difficulty ?? 'Medium',
+              'marks': dbQ.marks.toString(),
+              'negativeMarks': dbQ.negativeMarks.toString(),
+              'options': dbQ.options.map((o) => o.optionText).toList(),
+              'correctAnswer': dbQ.options.isNotEmpty ? dbQ.options.firstWhere((o) => o.isCorrect, orElse: () => dbQ.options[0]).optionText : '',
+              'explanation': dbQ.explanation ?? '',
+            });
+          }
         }
       }
     } catch (e) {
       debugPrint('Error fetching questions from Supabase: $e');
     }
 
-    final realMaps = get20RealQuestionsMap();
-    final models = realMaps.map((map) {
-      final opts = (map['options'] as List<String>).asMap().entries.map((e) {
+    final models = allMaps.map((map) {
+      final optsRaw = map['options'] is List ? List<String>.from(map['options']) : <String>[];
+      final opts = optsRaw.asMap().entries.map((e) {
         return QuestionOptionModel(
           id: 'opt_${map['id']}_${e.key}',
-          questionId: map['id'],
+          questionId: map['id']?.toString() ?? '',
           optionIndex: e.key,
           optionText: e.value,
           isCorrect: e.value == map['correctAnswer'],
@@ -1014,20 +1051,20 @@ class SupabaseService {
       }).toList();
 
       return QuestionModel(
-        id: map['id'],
+        id: map['id']?.toString() ?? '',
         examId: '11111111-1111-1111-1111-111111111111',
         subjectId: map['subject'] == 'Physics' ? 'a1111111' : (map['subject'] == 'Chemistry' ? 'a2222222' : 'a3333333'),
         chapterId: 'b1111111',
-        questionText: map['questionText'],
+        questionText: map['questionText']?.toString() ?? '',
         qType: 'single_correct',
-        difficulty: (map['difficulty'] as String).toLowerCase(),
-        source: (map['sourceType'] as String).toLowerCase(),
-        sourceName: map['sourceType'],
+        difficulty: (map['difficulty']?.toString() ?? 'medium').toLowerCase(),
+        source: (map['sourceType']?.toString() ?? 'nta').toLowerCase(),
+        sourceName: map['sourceType']?.toString() ?? 'Practice Question',
         year: 2024,
-        marks: 4.0,
-        negativeMarks: 1.0,
-        explanation: map['explanation'],
-        solution: map['explanation'],
+        marks: double.tryParse(map['marks']?.toString() ?? '4') ?? 4.0,
+        negativeMarks: double.tryParse(map['negativeMarks']?.toString() ?? '1') ?? 1.0,
+        explanation: map['explanation']?.toString() ?? '',
+        solution: map['explanation']?.toString() ?? '',
         options: opts,
       );
     }).toList();

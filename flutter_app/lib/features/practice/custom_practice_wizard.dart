@@ -390,6 +390,15 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
     );
     setState(() => _isLoading = false);
     if (mounted) {
+      if (questions.length < _questionCount) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Notice: Only ${questions.length} questions are currently available for this selection. All ${questions.length} questions loaded.'),
+            backgroundColor: const Color(0xFF4F46E5),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
       Navigator.of(context).pop();
       widget.onStartPractice(questions, _timerMinutes);
     }
