@@ -50,6 +50,8 @@ class CosmyraApp extends StatelessWidget {
       routes: {
         '/': (context) => MainNavigationScreen(initialIndex: initialIdx),
         '/landing': (context) => const MainNavigationScreen(initialIndex: 0),
+        '/dashboard': (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
+        '/user/dashboard': (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
         '/signup': (context) => const SignUpScreen(),
         '/login': (context) => const LoginScreen(),
         '/practice': (context) => const MainNavigationScreen(initialIndex: 1),

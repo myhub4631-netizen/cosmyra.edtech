@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
+import '../navigation/main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback? onSignUpTap;
@@ -57,7 +58,13 @@ class _LoginScreenState extends State<LoginScreen> {
         if (widget.onLoginSuccess != null) {
           widget.onLoginSuccess!(userProfile);
         } else {
-          Navigator.pushReplacementNamed(context, '/');
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
+            ),
+            (route) => false,
+          );
         }
       }
     } catch (e) {

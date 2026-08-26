@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
+import '../navigation/main_navigation.dart';
 
 class SignUpScreen extends StatefulWidget {
   final VoidCallback? onLoginTap;
@@ -90,7 +91,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
         if (widget.onSignUpSuccess != null) {
           widget.onSignUpSuccess!(userProfile);
         } else {
-          Navigator.pushReplacementNamed(context, '/');
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
+            ),
+            (route) => false,
+          );
         }
       }
     } catch (e) {
@@ -115,7 +122,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
           if (widget.onSignUpSuccess != null) {
             widget.onSignUpSuccess!(fallbackProfile);
           } else {
-            Navigator.pushReplacementNamed(context, '/');
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const MainNavigationScreen(initialIndex: 0, forceDashboard: true),
+              ),
+              (route) => false,
+            );
           }
         }
         return;

@@ -26,8 +26,13 @@ import '../dashboard/user_dashboard_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final int? initialIndex;
+  final bool forceDashboard;
 
-  const MainNavigationScreen({Key? key, this.initialIndex}) : super(key: key);
+  const MainNavigationScreen({
+    Key? key,
+    this.initialIndex,
+    this.forceDashboard = false,
+  }) : super(key: key);
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -37,6 +42,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   late UserProfileModel _currentUser;
   bool _showAuthModal = false;
   late int _selectedIndex;
+  bool _isLoggedIn = false;
   String _activeExam = 'NEET';
 
   // Active Practice Engine State
@@ -52,7 +58,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void initState() {
     super.initState();
 
-    // Check URL path or fragment
     final uriPath = Uri.base.path;
     final uriFragment = Uri.base.fragment;
     final isUsersRoute = uriPath.contains('users') || uriFragment.contains('users');
@@ -61,6 +66,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final isHierarchyRoute = uriPath.contains('hierarchy') || uriFragment.contains('hierarchy');
     final isPricingRoute = uriPath.contains('pricing') || uriFragment.contains('pricing');
     final isAdminRoute = uriPath.contains('admin') || uriFragment.contains('admin');
+    final isDashboardRoute = uriPath.contains('dashboard') || uriFragment.contains('dashboard');
+
+    if (isDashboardRoute || widget.forceDashboard) {
+      _isLoggedIn = true;
+    }
 
     if (widget.initialIndex != null) {
       _selectedIndex = widget.initialIndex!;
@@ -77,7 +87,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     } else if (isAdminRoute) {
       _selectedIndex = 8;
     } else {
-      _selectedIndex = 0; // Front Landing Page
+      _selectedIndex = 0;
     }
 
     _currentUser = SupabaseService.getMockProfile(role: 'student');
@@ -89,6 +99,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     if (profile != null) {
       setState(() {
         _currentUser = profile;
+        _isLoggedIn = true;
       });
     }
   }
@@ -127,6 +138,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         onAuthSuccess: (profile) {
           setState(() {
             _currentUser = profile;
+            _isLoggedIn = true;
             _showAuthModal = false;
           });
         },
@@ -199,8 +211,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       return AdminUserManagementScreen(userProfile: _currentUser);
     }
 
-    // 5. Front Website Landing Page (Index 0)
-    if (_selectedIndex == 0) {
+    // 5. Front Website Landing Page (Index 0 when logged out)
+    if (_selectedIndex == 0 && !_isLoggedIn && !widget.forceDashboard) {
       return LandingPageScreen(
         onStartPracticing: _openCustomPracticeWizard,
         onExploreTests: _startCustomTest,
@@ -209,14 +221,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       );
     }
 
-    // 6. Student Dashboard Navigation Shell
-    return ResponsiveLayoutShell(
-      selectedIndex: _selectedIndex,
-      onDestinationSelected: (idx) => setState(() => _selectedIndex = idx),
-      activeExam: _activeExam,
-      onExamChanged: (newExam) => setState(() => _activeExam = newExam),
+    // 6. User Dashboard Screen for Signed-In Students
+    return UserDashboardScreen(
       userProfile: _currentUser,
-      body: _buildCurrentTab(),
+      activeExam: _activeExam,
+      onOpenPractice: () => setState(() => _selectedIndex = 1),
+      onOpenMockTests: () => setState(() => _selectedIndex = 2),
+      onOpenPyqs: () => setState(() => _selectedIndex = 3),
+      onOpenMistakes: () => setState(() => _selectedIndex = 4),
     );
   }
 
