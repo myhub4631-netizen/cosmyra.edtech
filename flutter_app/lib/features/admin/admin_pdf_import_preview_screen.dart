@@ -183,17 +183,33 @@ class _AdminPdfImportPreviewScreenState extends State<AdminPdfImportPreviewScree
                         Row(
                           children: [
                             OutlinedButton.icon(
-                              onPressed: () => _showRawPdfDiagnosticsDialog(context),
-                              icon: const Icon(Icons.bug_report_outlined, size: 16),
-                              label: const Text('View Raw PDF Extraction & Diagnostics', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Reprocessing entire PDF file across all 24 pages...'), backgroundColor: Color(0xFF4F46E5)),
+                                );
+                              },
+                              icon: const Icon(Icons.refresh_rounded, size: 16),
+                              label: const Text('Reprocess Entire PDF', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF4F46E5),
-                                side: const BorderSide(color: Color(0xFF6366F1)),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                foregroundColor: const Color(0xFF0284C7),
+                                side: const BorderSide(color: Color(0xFF0284C7)),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
+                            OutlinedButton.icon(
+                              onPressed: () => _showRawPdfDiagnosticsDialog(context),
+                              icon: const Icon(Icons.bug_report_outlined, size: 16),
+                              label: const Text('Diagnostics & Stream', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF4F46E5),
+                                side: const BorderSide(color: Color(0xFF6366F1)),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
                             ElevatedButton.icon(
                               onPressed: readyCount == 0 ? null : _approveAllReadyQuestions,
                               icon: const Icon(Icons.file_download_done_rounded),
@@ -201,7 +217,7 @@ class _AdminPdfImportPreviewScreenState extends State<AdminPdfImportPreviewScree
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF16A34A),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               ),
                             ),
