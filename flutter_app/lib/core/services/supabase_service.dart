@@ -340,10 +340,14 @@ class SupabaseService {
       ),
     ];
 
+    final deletedIds = await getDeletedUserIds();
     final combined = <UserProfileModel>[];
     final seenEmails = <String>{};
 
     for (final p in [..._localRegisteredUsers, ...persistedUsers, ...remoteProfiles, ...defaultProfiles]) {
+      if (deletedIds.contains(p.id) || deletedIds.contains(p.email)) {
+        continue;
+      }
       if (p.email.isNotEmpty && !seenEmails.contains(p.email.toLowerCase())) {
         seenEmails.add(p.email.toLowerCase());
         combined.add(p);
@@ -628,15 +632,49 @@ class SupabaseService {
     }
   }
 
+  static Future<Set<String>> getDeletedUserIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('cosmyra_deleted_user_ids_v1') ?? [];
+      return list.toSet();
+    } catch (e) {
+      return {};
+    }
+  }
+
   static Future<bool> deleteUserAccount(String userId) async {
     try {
       await client.from('profiles').delete().eq('id', userId);
-      _localRegisteredUsers.removeWhere((u) => u.id == userId);
-      return true;
     } catch (e) {
-      debugPrint('Error deleting user profile: $e');
-      return true;
+      debugPrint('Error deleting user profile from Supabase: $e');
     }
+
+    _localRegisteredUsers.removeWhere((u) => u.id == userId);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deleted = prefs.getStringList('cosmyra_deleted_user_ids_v1') ?? [];
+      if (!deleted.contains(userId)) {
+        deleted.add(userId);
+        await prefs.setStringList('cosmyra_deleted_user_ids_v1', deleted);
+      }
+
+      // Clean from persisted registered users list
+      final rawList = prefs.getStringList('cosmyra_registered_users_list_v2') ?? [];
+      final updatedList = rawList.where((raw) {
+        try {
+          final decoded = jsonDecode(raw) as Map<String, dynamic>;
+          return decoded['id'] != userId && decoded['email'] != userId;
+        } catch (_) {
+          return true;
+        }
+      }).toList();
+      await prefs.setStringList('cosmyra_registered_users_list_v2', updatedList);
+    } catch (e) {
+      debugPrint('Error persisting deleted user ID: $e');
+    }
+
+    return true;
   }
 
   // ================= LEADERBOARD =================

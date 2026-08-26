@@ -82,8 +82,11 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   }
 
   Future<void> _loadRealUsersFromSupabase() async {
+    final deletedIds = await SupabaseService.getDeletedUserIds();
     final profiles = await SupabaseService.fetchAllProfiles();
-    final realUsers = profiles.map((p) {
+    final realUsers = profiles
+        .where((p) => !deletedIds.contains(p.id) && !deletedIds.contains(p.email))
+        .map((p) {
       final initials = p.fullName.isNotEmpty
           ? p.fullName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
           : (p.email.isNotEmpty ? p.email[0].toUpperCase() : 'U');
@@ -121,10 +124,11 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
     if (mounted) {
       setState(() {
+        final fallbackList = _getInitialSystemUsers().where((u) => !deletedIds.contains(u.id) && !deletedIds.contains(u.email)).toList();
         if (realUsers.isNotEmpty) {
           _allUsers = realUsers;
         } else {
-          _allUsers = _getInitialSystemUsers();
+          _allUsers = fallbackList;
         }
         if (_allUsers.isNotEmpty) {
           _selectedUserForDetail = _allUsers.first;
@@ -1485,9 +1489,12 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
           ElevatedButton(
             onPressed: () async {
               await SupabaseService.deleteUserAccount(user.id);
+              if (user.email.isNotEmpty) {
+                await SupabaseService.deleteUserAccount(user.email);
+              }
               setState(() {
-                _allUsers.removeWhere((u) => u.id == user.id);
-                if (_selectedUserForDetail?.id == user.id) {
+                _allUsers.removeWhere((u) => u.id == user.id || u.email == user.email);
+                if (_selectedUserForDetail?.id == user.id || _selectedUserForDetail?.email == user.email) {
                   _selectedUserForDetail = _allUsers.isNotEmpty ? _allUsers.first : null;
                 }
               });
@@ -1495,7 +1502,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                 Navigator.pop(ctx);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('User "${user.name}" has been deleted.'),
+                    content: Text('User "${user.name}" has been permanently deleted.'),
                     backgroundColor: const Color(0xFFEF4444),
                   ),
                 );
