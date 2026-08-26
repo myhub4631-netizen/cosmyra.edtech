@@ -246,7 +246,13 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
                 if (isDesktop) ...[
                   const SizedBox(width: 6),
                   OutlinedButton(
-                    onPressed: widget.onLogIn,
+                    onPressed: () {
+                      if (widget.onLogIn != null) {
+                        widget.onLogIn!();
+                      } else {
+                        Navigator.pushNamed(context, '/login');
+                      }
+                    },
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0xFFCBD5E1)),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -256,7 +262,13 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
                   ),
                   const SizedBox(width: 10),
                   ElevatedButton(
-                    onPressed: widget.onSignUp,
+                    onPressed: () {
+                      if (widget.onSignUp != null) {
+                        widget.onSignUp!();
+                      } else {
+                        Navigator.pushNamed(context, '/signup');
+                      }
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4F46E5),
                       foregroundColor: Colors.white,
