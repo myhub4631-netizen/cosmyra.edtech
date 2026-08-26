@@ -157,11 +157,28 @@ class SupabaseService {
       debugPrint('Error fetching all profiles from Supabase: $e');
     }
 
+    final defaultProfiles = [
+      UserProfileModel(
+        id: 'usr-admin-01',
+        email: 'admin@cosmyra.edu',
+        fullName: 'Dr. Sharma (Admin)',
+        targetExam: 'NEET',
+        role: 'admin',
+      ),
+      UserProfileModel(
+        id: 'usr-student-01',
+        email: 'student@cosmyra.edu',
+        fullName: 'Rahul Sharma',
+        targetExam: 'NEET',
+        role: 'student',
+      ),
+    ];
+
     final combined = <UserProfileModel>[];
     final seenEmails = <String>{};
 
-    for (final p in [...remoteProfiles, ..._localRegisteredUsers]) {
-      if (!seenEmails.contains(p.email.toLowerCase())) {
+    for (final p in [..._localRegisteredUsers, ...remoteProfiles, ...defaultProfiles]) {
+      if (p.email.isNotEmpty && !seenEmails.contains(p.email.toLowerCase())) {
         seenEmails.add(p.email.toLowerCase());
         combined.add(p);
       }

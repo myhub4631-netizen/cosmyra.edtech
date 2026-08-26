@@ -996,7 +996,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                     ),
                     child: const Row(
                       children: [
-                        Text('Aug 17, 2026 - Aug 24, 2026', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                        Text('Aug 01, 2026 - Aug 31, 2026', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
                         SizedBox(width: 8),
                         Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFF64748B)),
                       ],
@@ -1110,7 +1110,9 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
     return Row(
       children: tabs.map((tab) {
-        final isSelected = _selectedStatusTab == tab;
+        final tabPrefix = tab.split(' ').first;
+        final selectedPrefix = _selectedStatusTab.split(' ').first;
+        final isSelected = selectedPrefix == tabPrefix;
         return GestureDetector(
           onTap: () => setState(() => _selectedStatusTab = tab),
           child: Container(
