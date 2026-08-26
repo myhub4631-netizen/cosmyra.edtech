@@ -111,7 +111,11 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
     if (mounted) {
       setState(() {
-        _allUsers = realUsers;
+        if (realUsers.isNotEmpty) {
+          _allUsers = realUsers;
+        } else {
+          _allUsers = _getInitialSystemUsers();
+        }
         if (_allUsers.isNotEmpty) {
           _selectedUserForDetail = _allUsers.first;
         } else {
@@ -121,8 +125,43 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
     }
   }
 
+  List<AdminUserModel> _getInitialSystemUsers() {
+    return [
+      AdminUserModel(
+        id: 'usr-admin-01',
+        name: 'Dr. Sharma (Admin)',
+        email: 'admin@cosmyra.edu',
+        userIdCode: 'ADM001',
+        role: 'Administrator',
+        examAccess: ['NEET', 'JEE Main'],
+        status: 'Active',
+        lastActive: 'Just now',
+        joinedOn: 'Aug 01, 2026',
+        phone: '+91 98765 43210',
+        regSource: 'System Admin',
+        avatarInitials: 'DS',
+        avatarColor: const Color(0xFFEF4444),
+      ),
+      AdminUserModel(
+        id: 'usr-student-01',
+        name: 'Rahul Sharma',
+        email: 'student@cosmyra.edu',
+        userIdCode: 'STU001',
+        role: 'Student',
+        examAccess: ['NEET UG'],
+        status: 'Active',
+        lastActive: '10 mins ago',
+        joinedOn: 'Aug 15, 2026',
+        phone: '+91 91234 56789',
+        regSource: 'Web Portal',
+        avatarInitials: 'RS',
+        avatarColor: const Color(0xFF6366F1),
+      ),
+    ];
+  }
+
   void _initSampleUserData() {
-    _allUsers = [];
+    _allUsers = _getInitialSystemUsers();
   }
 
   // Filtered users calculation

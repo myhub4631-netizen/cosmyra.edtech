@@ -39,7 +39,7 @@ CREATE TYPE report_status AS ENUM ('open', 'under_review', 'resolved', 'rejected
 
 -- 1. USERS & PROFILES
 CREATE TABLE IF NOT EXISTS public.profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   email TEXT NOT NULL UNIQUE,
   full_name TEXT NOT NULL,
   avatar_url TEXT,

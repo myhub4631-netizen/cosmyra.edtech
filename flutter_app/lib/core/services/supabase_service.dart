@@ -48,7 +48,8 @@ class SupabaseService {
     int targetYear = 2026,
     String role = 'student',
   }) async {
-    String userId = 'usr-${DateTime.now().millisecondsSinceEpoch}';
+    final String timeMs = DateTime.now().millisecondsSinceEpoch.toString();
+    String userId = '00000000-0000-4000-a000-${timeMs.padLeft(12, '0')}';
 
     try {
       final res = await client.auth.signUp(
@@ -60,7 +61,7 @@ class SupabaseService {
           'target_exam': targetExam,
         },
       );
-      if (res.user?.id != null) {
+      if (res.user?.id != null && res.user!.id.length >= 30) {
         userId = res.user!.id;
       }
     } catch (e) {
@@ -90,8 +91,10 @@ class SupabaseService {
         'email': email,
         'full_name': fullName,
         'phone_number': phone,
+        'phone': phone,
         'target_exam': targetExam,
         'target_year': targetYear,
+        'role': role,
       });
     } catch (pe) {
       debugPrint('Profile upsert warning: $pe');
