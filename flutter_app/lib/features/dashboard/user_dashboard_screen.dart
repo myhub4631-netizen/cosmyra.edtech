@@ -53,37 +53,37 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             backgroundColor: const Color(0xFFFAFAFA),
             body: SafeArea(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 1. Mobile Top Header
                     _buildMobileHeader(displayName),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 8),
 
-                    // 2. Mobile Banner Carousel Card (Unlock Your Full Potential)
+                    // 2. Offer Banner
                     _buildMobileBannerCarousel(),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 8),
 
-                    // 3. Mobile 2x2 Metrics Cards Grid
+                    // 3. Quick Stats Cards (4 Horizontal Rectangles)
                     _buildMobileKpiGrid(),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 8),
 
-                    // 4. Mobile Continue Where You Left Off Card
+                    // 4. Continue Where You Left Off Card
                     _buildMobileContinueCard(),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 8),
 
-                    // 5. Mobile Quick Actions Horizontal Row
+                    // 5. Quick Actions Row
                     _buildMobileQuickActions(),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 12),
 
-                    // 6. Mobile Performance Overview (3 Mini Trend Charts)
+                    // 6. Performance Overview (Mini Trend Charts)
                     _buildMobilePerformanceOverview(),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 12),
 
-                    // 7. Mobile Subject Strength Card
+                    // 7. Subject Strength Card
                     _buildMobileSubjectStrength(),
-                    const SizedBox(height: 80), // Padding for bottom navbar
+                    const SizedBox(height: 60), // Padding for bottom navbar
                   ],
                 ),
               ),
@@ -155,7 +155,6 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,16 +163,16 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               children: [
                 Text(
                   'Hi, $firstName',
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.4),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.3),
                 ),
-                const SizedBox(width: 6),
-                const Text('👋', style: TextStyle(fontSize: 20)),
+                const SizedBox(width: 4),
+                const Text('👋', style: TextStyle(fontSize: 16)),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               "Let's achieve your ${widget.activeExam} ${widget.userProfile.targetYear} goal!",
-              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
             ),
           ],
         ),
@@ -181,59 +180,48 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         // Right Streak & Notification Bell
         Row(
           children: [
-            // Streak Badge Pill
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: const Color(0xFFFFF7ED),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFFFEDD5)),
               ),
               child: const Row(
                 children: [
-                  Text('🔥', style: TextStyle(fontSize: 14)),
-                  SizedBox(width: 4),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('12', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFFEA580C))),
-                      Text('Day Streak', style: TextStyle(fontSize: 8, color: Color(0xFFC2410C), fontWeight: FontWeight.w600)),
-                    ],
-                  ),
+                  Text('🔥', style: TextStyle(fontSize: 12)),
+                  SizedBox(width: 3),
+                  Text('12', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFFEA580C))),
+                  SizedBox(width: 2),
+                  Text('Streak', style: TextStyle(fontSize: 8, color: Color(0xFFC2410C), fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
 
-            const SizedBox(width: 10),
-
-            // Notification Bell with Count Badge
             Stack(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
                     border: Border.all(color: const Color(0xFFF1F5F9)),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
-                    ],
                   ),
-                  child: const Icon(Icons.notifications_none_rounded, color: Color(0xFF64748B), size: 20),
+                  child: const Icon(Icons.notifications_none_rounded, color: Color(0xFF64748B), size: 16),
                 ),
                 Positioned(
-                  right: 4,
-                  top: 4,
+                  right: 2,
+                  top: 2,
                   child: Container(
-                    padding: const EdgeInsets.all(3),
+                    padding: const EdgeInsets.all(2.5),
                     decoration: const BoxDecoration(
                       color: Color(0xFFEF4444),
                       shape: BoxShape.circle,
                     ),
                     child: const Text(
                       '3',
-                      style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: Colors.white, fontSize: 7, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ),
@@ -250,19 +238,19 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1E1B4B).withValues(alpha: 0.25),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
+            color: const Color(0xFF1E1B4B).withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: AspectRatio(
-          aspectRatio: 2.7,
+          aspectRatio: 3.1,
           child: Image.asset(
             'assets/images/promo_banner.png',
             fit: BoxFit.cover,
@@ -272,7 +260,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 alignment: Alignment.center,
                 child: const Text(
                   'Unlock Your Full Potential',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                 ),
               );
             },
@@ -288,7 +276,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       {
         'title': 'Questions Attempted',
         'value': '1,248',
-        'sub': '↑ 18% vs last 7 days',
+        'sub': '↑ 18% vs 7d',
         'icon': Icons.edit_document,
         'iconBg': const Color(0xFFEFF6FF),
         'iconColor': const Color(0xFF2563EB),
@@ -296,7 +284,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       {
         'title': 'Accuracy',
         'value': '72.4%',
-        'sub': '↑ 6.3% vs last 7 days',
+        'sub': '↑ 6.3% vs 7d',
         'icon': Icons.track_changes_rounded,
         'iconBg': const Color(0xFFDCFCE7),
         'iconColor': const Color(0xFF16A34A),
@@ -304,7 +292,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       {
         'title': 'Tests Completed',
         'value': '28',
-        'sub': '↑ 4 vs last 7 days',
+        'sub': '↑ 4 vs 7d',
         'icon': Icons.assignment_turned_in_rounded,
         'iconBg': const Color(0xFFF5F3FF),
         'iconColor': const Color(0xFF7C3AED),
@@ -312,7 +300,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       {
         'title': 'Study Streak',
         'value': '12 Days',
-        'sub': 'Best: 32 Days',
+        'sub': 'Best: 32d',
         'icon': Icons.local_fire_department_rounded,
         'iconBg': const Color(0xFFFFF7ED),
         'iconColor': const Color(0xFFEA580C),
@@ -324,17 +312,17 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         final isLast = m == metrics.last;
         return Expanded(
           child: Container(
-            margin: EdgeInsets.only(right: isLast ? 0 : 6),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            margin: EdgeInsets.only(right: isLast ? 0 : 5),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFF1F5F9)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.02),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
+                  blurRadius: 3,
+                  offset: const Offset(0, 1),
                 ),
               ],
             ),
@@ -343,42 +331,42 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(5),
                   decoration: BoxDecoration(
                     color: m['iconBg'] as Color,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(m['icon'] as IconData, color: m['iconColor'] as Color, size: 14),
+                  child: Icon(m['icon'] as IconData, color: m['iconColor'] as Color, size: 12),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   m['title'] as String,
                   style: const TextStyle(
-                    fontSize: 9.5,
+                    fontSize: 8.5,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF334155),
-                    height: 1.15,
+                    height: 1.1,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   m['value'] as String,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF0F172A),
-                    letterSpacing: -0.4,
+                    letterSpacing: -0.3,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   m['sub'] as String,
                   style: TextStyle(
-                    fontSize: 7.5,
+                    fontSize: 7,
                     fontWeight: FontWeight.w600,
                     color: (m['sub'] as String).contains('Best')
                         ? const Color(0xFF64748B)
@@ -403,28 +391,28 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Continue Where You Left Off', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            const Text('Continue Where You Left Off', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
             GestureDetector(
               onTap: widget.onOpenPractice,
               child: const Row(
                 children: [
-                  Text('View All', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2563EB))),
-                  SizedBox(width: 2),
-                  Icon(Icons.chevron_right_rounded, size: 14, color: Color(0xFF2563EB)),
+                  Text('View All', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF2563EB))),
+                  SizedBox(width: 1),
+                  Icon(Icons.chevron_right_rounded, size: 12, color: Color(0xFF2563EB)),
                 ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: const Color(0xFFF1F5F9)),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 3)),
+              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
             ],
           ),
           child: Column(
@@ -432,90 +420,84 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             children: [
               Row(
                 children: [
-                  // Green Illustration Container
                   Container(
-                    width: 60,
-                    height: 60,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        const Icon(Icons.show_chart_rounded, size: 30, color: Color(0xFF16A34A)),
+                        const Icon(Icons.show_chart_rounded, size: 20, color: Color(0xFF16A34A)),
                         Positioned(
-                          top: 6,
-                          left: 6,
-                          child: Text('V₀', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
+                          top: 3,
+                          left: 3,
+                          child: Text('V₀', style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 10),
 
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Custom Practice Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                           decoration: BoxDecoration(
                             color: const Color(0xFFDCFCE7),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text('Custom Practice', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF166534))),
+                          child: const Text('Custom Practice', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF166534))),
                         ),
-                        const SizedBox(height: 4),
-                        const Text('Physics • Kinematics', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
                         const SizedBox(height: 2),
+                        const Text('Physics • Kinematics', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
+                        const SizedBox(height: 1),
                         const Text(
                           'Motion in a Straight Line',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 14),
 
-              // Progress Bar & CTA
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: const LinearProgressIndicator(
-                            value: 0.6,
-                            minHeight: 6,
-                            backgroundColor: Color(0xFFE2E8F0),
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text('60% Completed', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 8),
 
                   ElevatedButton.icon(
                     onPressed: widget.onOpenPractice,
-                    icon: const Icon(Icons.play_arrow_rounded, size: 14, color: Color(0xFF4F46E5)),
-                    label: const Text('Continue', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                    icon: const Icon(Icons.play_arrow_rounded, size: 12, color: Color(0xFF4F46E5)),
+                    label: const Text('Continue', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFEEF2FF),
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                     ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 6),
+
+              // Progress Bar
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: const LinearProgressIndicator(
+                        value: 0.6,
+                        minHeight: 4,
+                        backgroundColor: Color(0xFFE2E8F0),
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('60% Completed', style: TextStyle(fontSize: 8.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
                 ],
               ),
             ],
@@ -538,34 +520,35 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Quick Actions', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-        const SizedBox(height: 12),
+        const Text('Quick Actions', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        const SizedBox(height: 6),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
             children: actions.map((act) {
               return Container(
-                margin: const EdgeInsets.only(right: 16),
-                width: 72,
+                margin: const EdgeInsets.only(right: 12),
+                width: 60,
                 child: GestureDetector(
                   onTap: act['tap'] as VoidCallback,
                   child: Column(
                     children: [
                       Container(
-                        width: 52,
-                        height: 52,
+                        width: 38,
+                        height: 38,
                         decoration: BoxDecoration(
                           color: act['bg'] as Color,
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(act['icon'] as IconData, color: act['color'] as Color, size: 22),
+                        child: Icon(act['icon'] as IconData, color: act['color'] as Color, size: 16),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text(
                         act['label'] as String,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF334155), height: 1.2),
+                        style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.w600, color: Color(0xFF334155), height: 1.1),
                         maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
