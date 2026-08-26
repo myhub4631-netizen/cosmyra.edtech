@@ -3,6 +3,7 @@ import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
 import '../navigation/main_navigation.dart';
 import '../dashboard/user_dashboard_screen.dart';
+import '../admin/admin_dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback? onSignUpTap;
@@ -84,6 +85,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loggedInProfile != null) {
+      if (_loggedInProfile!.isAdmin || _loggedInProfile!.isSuperAdmin) {
+        return AdminDashboardScreen(userProfile: _loggedInProfile!);
+      }
       return UserDashboardScreen(
         userProfile: _loggedInProfile!,
         activeExam: 'NEET',

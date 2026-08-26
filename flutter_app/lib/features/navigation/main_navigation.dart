@@ -105,6 +105,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       setState(() {
         _currentUser = profile;
         _isLoggedIn = true;
+        if (profile.isAdmin || profile.isSuperAdmin) {
+          if (_selectedIndex == 0) {
+            _selectedIndex = 8;
+          }
+        }
       });
     }
   }
@@ -124,16 +129,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
-  void _startCustomTest() async {
-    final questions = await SupabaseService.fetchQuestions(examId: _activeExam, limit: 10);
+  void _startCustomTest() {
     setState(() {
-      _activeTestQuestions = questions;
-      _lastTestAttemptResult = null;
+      _activeTestQuestions = SupabaseService.getSampleQuestions();
     });
   }
 
   void _openAuthModal() {
-    setState(() => _showAuthModal = true);
+    setState(() {
+      _showAuthModal = true;
+    });
   }
 
   @override
@@ -145,6 +150,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             _currentUser = profile;
             _isLoggedIn = true;
             _showAuthModal = false;
+            if (profile.isAdmin || profile.isSuperAdmin) {
+              _selectedIndex = 8;
+            } else {
+              _selectedIndex = 0;
+            }
           });
         },
       );
