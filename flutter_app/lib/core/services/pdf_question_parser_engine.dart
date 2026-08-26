@@ -211,69 +211,31 @@ class PdfQuestionParserEngine {
       };
     }
 
-    // Default Real Extraction for remaining NEET / JEE questions
-    return _generateDynamicExtractedQuestion(qNo, subject, chapter, isNeet);
+    // If question text is unverified from raw stream, mark strictly as NEEDS_REVIEW without generating artificial text
+    return _markUnverifiedQuestionAsNeedsReview(qNo, subject, chapter);
   }
 
-  static Map<String, dynamic> _generateDynamicExtractedQuestion(
+  static Map<String, dynamic> _markUnverifiedQuestionAsNeedsReview(
     int qNo,
     String subject,
     String chapter,
-    bool isNeet,
   ) {
-    final page = (qNo / 7.5).ceil();
+    final page = (qNo / 8).ceil();
 
-    if (subject == 'Physics') {
-      return {
-        'page': page,
-        'raw_text': 'Q$qNo. A uniform rod of length L and mass M is pivoted at one end. A horizontal force F is applied at the free end. Find the angular acceleration of the rod:',
-        'normalized_text': 'Q$qNo. A uniform rod of length \$L\$ and mass \$M\$ is pivoted at one end. A horizontal force \$F\$ is applied at the free end. Find the angular acceleration of the rod:',
-        'subject': 'Physics',
-        'chapter': chapter,
-        'topic': 'Torque & Angular Acceleration',
-        'difficulty': (qNo % 3 == 0) ? 'Hard' : 'Medium',
-        'options': [r'(1) $3F/(2ML)$', r'(2) $3F/(ML)$', r'(3) $F/(ML)$', r'(4) $2F/(3ML)$'],
-        'correct_answer': r'(2) $3F/(ML)$',
-        'explanation': r'Torque $\tau = F \cdot L$. Moment of inertia about pivot $I = \frac{1}{3} M L^2$. Angular acceleration $\alpha = \tau / I = \frac{F L}{\frac{1}{3} M L^2} = \frac{3F}{M L}$.',
-        'confidence': double.parse((95.0 + (qNo % 4) * 1.1).toStringAsFixed(1)),
-        'status': (qNo % 20 == 0) ? 'needs_review' : 'ready',
-      };
-    } else if (subject == 'Chemistry') {
-      return {
-        'page': page,
-        'raw_text': 'Q$qNo. Which of the following organic compounds will give a positive Idoform test upon reaction with I2 and NaOH?',
-        'normalized_text': r'Q$qNo. Which of the following organic compounds will give a positive Iodoform test upon reaction with $\text{I}_2$ and $\text{NaOH}$?',
-        'subject': 'Chemistry',
-        'chapter': chapter,
-        'topic': 'Iodoform Test & Methyl Ketones',
-        'difficulty': 'Easy',
-        'options': [r'(1) Ethanol', r'(2) Methanol', r'(3) Diethyl ether', r'(4) Benzophenone'],
-        'correct_answer': r'(1) Ethanol',
-        'explanation': r'Ethanol ($\text{CH}_3\text{CH}_2\text{OH}$) is oxidized by $\text{I}_2/\text{NaOH}$ to acetaldehyde ($\text{CH}_3\text{CHO}$), which contains the $\text{CH}_3\text{C=O}$ group and gives yellow precipitate of Iodoform ($\text{CHI}_3$).',
-        'confidence': double.parse((96.2 + (qNo % 3) * 1.0).toStringAsFixed(1)),
-        'status': 'ready',
-      };
-    } else {
-      return {
-        'page': page,
-        'raw_text': 'Q$qNo. Identify the correct statement regarding double fertilization in angiosperms:',
-        'normalized_text': r'Q$qNo. Identify the correct statement regarding double fertilization in angiosperms:',
-        'subject': 'Biology',
-        'chapter': chapter,
-        'topic': 'Angiosperm Reproduction',
-        'difficulty': 'Easy',
-        'options': [
-          r'(1) One male gamete fuses with egg cell and other with secondary nucleus',
-          r'(2) Both male gametes fuse with secondary nucleus',
-          r'(3) Syngamy produces endosperm nucleus',
-          r'(4) Triple fusion produces diploid zygote'
-        ],
-        'correct_answer': r'(1) One male gamete fuses with egg cell and other with secondary nucleus',
-        'explanation': r'In double fertilization, syngamy (fusion of 1st male gamete with egg cell) forms diploid zygote, while triple fusion (fusion of 2nd male gamete with secondary nucleus) forms triploid primary endosperm nucleus (PEN).',
-        'confidence': double.parse((97.0 + (qNo % 3) * 0.8).toStringAsFixed(1)),
-        'status': 'ready',
-      };
-    }
+    return {
+      'page': page,
+      'raw_text': 'Q$qNo. [Unverified Raw PDF Stream Block for Question $qNo]',
+      'normalized_text': 'Q$qNo. [Extraction Pending / Needs Review — Verify against original PDF Page $page]',
+      'subject': subject,
+      'chapter': chapter,
+      'topic': 'Pending Verification',
+      'difficulty': 'Medium',
+      'options': <String>[],
+      'correct_answer': null,
+      'explanation': 'Text extraction from PDF stream required manual verification in Side-by-Side Reviewer.',
+      'confidence': 45.0,
+      'status': 'needs_review',
+    };
   }
 
   static String _getPhysicsChapter(int qNo) {
