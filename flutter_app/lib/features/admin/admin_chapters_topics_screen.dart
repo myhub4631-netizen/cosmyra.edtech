@@ -175,16 +175,16 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                               border: Border.all(color: const Color(0xFFE2E8F0)),
                             ),
                             child: Row(
-                              children: const [
-                                Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
-                                SizedBox(width: 8),
-                                Expanded(
+                              children: [
+                                const Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
+                                const SizedBox(width: 8),
+                                const Expanded(
                                   child: Text('Search chapters or topics...', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
                                 ),
                                 Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: Color(0xFFF1F5F9), borderRadius: BorderRadius.all(Radius.circular(4))),
-                                  child: Text('Ctrl + K', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: const BoxDecoration(color: Color(0xFFF1F5F9), borderRadius: BorderRadius.all(Radius.circular(4))),
+                                  child: const Text('Ctrl + K', style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
                                 ),
                               ],
                             ),
@@ -692,7 +692,7 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.extrabold, color: Color(0xFF0F172A))),
+                Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
                 Text(subtitle, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
               ],
             ),

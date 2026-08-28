@@ -10,6 +10,7 @@ import '../../shared/utils/smooth_page_route.dart';
 import 'admin_user_management_screen.dart';
 import 'admin_questions_bank_dashboard.dart';
 import 'admin_question_builder_screen.dart';
+import 'admin_chapters_topics_screen.dart';
 import '../auth/login_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -369,6 +370,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 }),
                 _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
                 _buildSidebarTile('Pricing & Plans', Icons.sell_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/pricing')),
+                _buildSidebarTile('Chapters & Topics', Icons.auto_stories_rounded, false, onTap: () {
+                  Navigator.of(context).push(SmoothPageRoute(child: const AdminChaptersTopicsScreen()));
+                }),
                 _buildSidebarTile('Tags & Topics', Icons.label_outline_rounded, false),
                 _buildSidebarTile('PYQs & Papers', Icons.description_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
                 _buildSidebarTile('Mistake Book', Icons.history_edu_outlined, false),

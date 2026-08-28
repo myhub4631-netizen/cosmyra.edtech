@@ -21,6 +21,7 @@ import '../admin/admin_hierarchy_screen.dart';
 import '../admin/admin_leaderboard_screen.dart';
 import '../admin/admin_predictions_screen.dart';
 import '../admin/admin_user_management_screen.dart';
+import '../admin/admin_chapters_topics_screen.dart';
 
 import '../dashboard/user_dashboard_screen.dart';
 
@@ -300,6 +301,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     }
     if (_selectedIndex == 14) {
       return AdminDashboardSectionsScreen(userProfile: _currentUser);
+    }
+    if (_selectedIndex == 16) {
+      return const AdminChaptersTopicsScreen();
     }
 
     // 5. Root / Dashboard handling for authenticated users
