@@ -150,6 +150,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
+  void _startPYQSession(List<QuestionModel> questions, int timerMins, bool isTestMode) {
+    if (isTestMode) {
+      setState(() {
+        _activeTestQuestions = questions;
+        _activeTestDurationMinutes = timerMins;
+      });
+    } else {
+      setState(() {
+        _activePracticeQuestions = questions;
+        _activePracticeTimerMinutes = 0;
+      });
+    }
+  }
+
   void _startCustomTest() {
     _openCustomTestWizard();
   }
@@ -334,6 +348,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       case 3:
         return PyqNtaScreen(
           activeExam: _activeExam,
+          onStartSession: _startPYQSession,
           onStartPractice: (questions) {
             setState(() {
               _activePracticeQuestions = questions;
