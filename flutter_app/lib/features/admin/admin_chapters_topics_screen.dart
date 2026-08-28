@@ -290,112 +290,126 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
     );
   }
 
+  Widget _buildSidebar() {
+    return Container(
+      width: 250,
+      color: const Color(0xFF0B132B),
+      child: Column(
+        children: [
+          const SizedBox(height: 24),
+          // Logo & Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF7C3AED),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.school_rounded, color: Colors.white, size: 20),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text('Cosmyra Edu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text('Admin Panel', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // Navigation Items
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', false),
+                _buildSidebarItem(Icons.people_outline, 'Users Management', false),
+                _buildSidebarItem(Icons.menu_book_outlined, 'Courses', false),
+                _buildSidebarItem(Icons.assignment_outlined, 'Exams', false),
+                _buildSidebarItem(Icons.science_outlined, 'Subjects', false),
+                _buildSidebarItem(Icons.auto_stories_rounded, 'Chapters & Topics', true),
+                _buildSidebarItem(Icons.help_outline_rounded, 'Questions', false),
+                _buildSidebarItem(Icons.insert_drive_file_outlined, 'PYQ Papers', false),
+                _buildSidebarItem(Icons.timer_outlined, 'Test Series', false),
+                _buildSidebarItem(Icons.video_call_outlined, 'Live Classes', false),
+                _buildSidebarItem(Icons.analytics_outlined, 'Reports & Analytics', false),
+                _buildSidebarItem(Icons.notifications_none_rounded, 'Notifications', false),
+                _buildSidebarItem(Icons.confirmation_number_outlined, 'Support Tickets', false),
+                _buildSidebarItem(Icons.settings_outlined, 'System Settings', false),
+              ],
+            ),
+          ),
+
+          // User Footer
+          Container(
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Color(0xFF7C3AED),
+                  child: Text('A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text('Admin User', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                      Text('Super Admin', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.keyboard_arrow_down, color: Color(0xFF94A3B8), size: 18),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredChapters = _searchChapterQuery.isEmpty
         ? _chaptersList
         : _chaptersList.where((c) => (c['name'] as String).toLowerCase().contains(_searchChapterQuery.toLowerCase())).toList();
 
+    final isMobile = MediaQuery.of(context).size.width < 900;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      drawer: isMobile ? Drawer(child: _buildSidebar()) : null,
+      appBar: isMobile
+          ? AppBar(
+              backgroundColor: const Color(0xFF0B132B),
+              iconTheme: const IconThemeData(color: Colors.white),
+              title: const Text('Chapters & Topics', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              elevation: 0,
+            )
+          : null,
       body: Row(
         children: [
-          // 1. Dark Navy Admin Sidebar
-          Container(
-            width: 250,
-            color: const Color(0xFF0B132B),
-            child: Column(
-              children: [
-                const SizedBox(height: 24),
-                // Logo & Header
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF7C3AED),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Center(
-                          child: Icon(Icons.school_rounded, color: Colors.white, size: 20),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text('Cosmyra Edu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                          Text('Admin Panel', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Navigation Items
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    children: [
-                      _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', false),
-                      _buildSidebarItem(Icons.people_outline, 'Users Management', false),
-                      _buildSidebarItem(Icons.menu_book_outlined, 'Courses', false),
-                      _buildSidebarItem(Icons.assignment_outlined, 'Exams', false),
-                      _buildSidebarItem(Icons.science_outlined, 'Subjects', false),
-                      _buildSidebarItem(Icons.auto_stories_rounded, 'Chapters & Topics', true),
-                      _buildSidebarItem(Icons.help_outline_rounded, 'Questions', false),
-                      _buildSidebarItem(Icons.insert_drive_file_outlined, 'PYQ Papers', false),
-                      _buildSidebarItem(Icons.timer_outlined, 'Test Series', false),
-                      _buildSidebarItem(Icons.video_call_outlined, 'Live Classes', false),
-                      _buildSidebarItem(Icons.analytics_outlined, 'Reports & Analytics', false),
-                      _buildSidebarItem(Icons.notifications_none_rounded, 'Notifications', false),
-                      _buildSidebarItem(Icons.confirmation_number_outlined, 'Support Tickets', false),
-                      _buildSidebarItem(Icons.settings_outlined, 'System Settings', false),
-                    ],
-                  ),
-                ),
-
-                // User Footer
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  margin: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E293B),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 16,
-                        backgroundColor: Color(0xFF7C3AED),
-                        child: Text('A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text('Admin User', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                            Text('Super Admin', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.keyboard_arrow_down, color: Color(0xFF94A3B8), size: 18),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          if (!isMobile) _buildSidebar(),
 
           // 2. Main Admin Dashboard Area
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(28),
+              padding: EdgeInsets.all(isMobile ? 12 : 28),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -490,44 +504,48 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                   const SizedBox(height: 24),
 
                   // Stat Cards (Top Row - 4 Cards)
-                  Row(
-                    children: [
-                      _buildMetricCard(
-                        icon: Icons.menu_book_rounded,
-                        iconBg: const Color(0xFFEEF2FF),
-                        iconColor: const Color(0xFF6366F1),
-                        title: 'Total Chapters',
-                        value: '324',
-                        subtitle: 'Across all exams',
-                      ),
-                      const SizedBox(width: 16),
-                      _buildMetricCard(
-                        icon: Icons.style_outlined,
-                        iconBg: const Color(0xFFEFF6FF),
-                        iconColor: const Color(0xFF3B82F6),
-                        title: 'Total Topics',
-                        value: '1,256',
-                        subtitle: 'Across all chapters',
-                      ),
-                      const SizedBox(width: 16),
-                      _buildMetricCard(
-                        icon: Icons.check_circle_outline_rounded,
-                        iconBg: const Color(0xFFECFDF5),
-                        iconColor: const Color(0xFF10B981),
-                        title: 'Active Chapters',
-                        value: '298',
-                        subtitle: '92.0% Active',
-                      ),
-                      const SizedBox(width: 16),
-                      _buildMetricCard(
-                        icon: Icons.grid_view_outlined,
-                        iconBg: const Color(0xFFFFF7ED),
-                        iconColor: const Color(0xFFF97316),
-                        title: 'Active Topics',
-                        value: '1,142',
-                        subtitle: '90.9% Active',
-                      ),
-                    ],
+                  // Metric Cards Bar (Responsive)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildMetricCard(
+                          icon: Icons.menu_book_rounded,
+                          iconBg: const Color(0xFFEEF2FF),
+                          iconColor: const Color(0xFF6366F1),
+                          title: 'Total Chapters',
+                          value: '324',
+                          subtitle: 'Across all exams',
+                        ),
+                        const SizedBox(width: 16),
+                        _buildMetricCard(
+                          icon: Icons.style_outlined,
+                          iconBg: const Color(0xFFEFF6FF),
+                          iconColor: const Color(0xFF3B82F6),
+                          title: 'Total Topics',
+                          value: '1,256',
+                          subtitle: 'Across all chapters',
+                        ),
+                        const SizedBox(width: 16),
+                        _buildMetricCard(
+                          icon: Icons.check_circle_outline_rounded,
+                          iconBg: const Color(0xFFECFDF5),
+                          iconColor: const Color(0xFF10B981),
+                          title: 'Active Chapters',
+                          value: '298',
+                          subtitle: '92.0% Active',
+                        ),
+                        const SizedBox(width: 16),
+                        _buildMetricCard(
+                          icon: Icons.grid_view_outlined,
+                          iconBg: const Color(0xFFFFF7ED),
+                          iconColor: const Color(0xFFF97316),
+                          title: 'Active Topics',
+                          value: '1,142',
+                          subtitle: '90.9% Active',
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 24),
 

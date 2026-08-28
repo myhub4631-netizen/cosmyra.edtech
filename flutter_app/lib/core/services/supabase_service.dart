@@ -514,6 +514,39 @@ class SupabaseService {
     }
   }
 
+  static Future<void> syncTaxonomyToCloud() async {
+    try {
+      final jsonStr = jsonEncode(_dynamicTaxonomyStore);
+      await client.from('system_config').upsert({
+        'key': 'canonical_taxonomy_store',
+        'value': jsonStr,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'key');
+    } catch (e) {
+      debugPrint('Notice upserting taxonomy cloud config: $e');
+    }
+  }
+
+  static Future<void> syncTaxonomyFromCloud() async {
+    try {
+      final res = await client.from('system_config').select('value').eq('key', 'canonical_taxonomy_store').maybeSingle();
+      if (res != null && res['value'] != null) {
+        final jsonStr = res['value'].toString();
+        if (jsonStr.isNotEmpty) {
+          final Map<String, dynamic> decoded = jsonDecode(jsonStr);
+          decoded.forEach((key, val) {
+            if (val is List) {
+              _dynamicTaxonomyStore[key] = (val as List).map((item) => Map<String, dynamic>.from(item as Map)).toList();
+            }
+          });
+          await _saveTaxonomyToLocalStorage();
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice loading taxonomy cloud config: $e');
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> fetchTaxonomyForSubject({
     required String exam,
     required String subject,
@@ -522,10 +555,13 @@ class SupabaseService {
   }) async {
     final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
 
-    // 1. Ensure memory store is initialized from local storage or seed data if not present
-    if (_dynamicTaxonomyStore.isEmpty) {
+    // 1. Always attempt cloud sync to load latest data across devices
+    if (_dynamicTaxonomyStore.isEmpty || forceRefresh) {
       await _loadTaxonomyFromLocalStorage();
+      await syncTaxonomyFromCloud();
     }
+
+    // 2. Ensure memory store is initialized with seed chapters if not present
     if (!_dynamicTaxonomyStore.containsKey(storeKey) || _dynamicTaxonomyStore[storeKey]!.isEmpty) {
       _dynamicTaxonomyStore[storeKey] = _getSeedChaptersForSubject(exam, subject);
       await _saveTaxonomyToLocalStorage();
@@ -906,6 +942,7 @@ class SupabaseService {
     current.add(newChapter);
     _dynamicTaxonomyStore[storeKey] = current;
     await _saveTaxonomyToLocalStorage();
+    await syncTaxonomyToCloud();
     return finalChapterId;
   }
 
@@ -940,6 +977,7 @@ class SupabaseService {
     }
     _dynamicTaxonomyStore[storeKey] = current;
     await _saveTaxonomyToLocalStorage();
+    await syncTaxonomyToCloud();
     return true;
   }
 
@@ -1005,6 +1043,7 @@ class SupabaseService {
     }
     _dynamicTaxonomyStore[storeKey] = current;
     await _saveTaxonomyToLocalStorage();
+    await syncTaxonomyToCloud();
     return true;
   }
 
@@ -1046,6 +1085,7 @@ class SupabaseService {
     }
     _dynamicTaxonomyStore[storeKey] = current;
     await _saveTaxonomyToLocalStorage();
+    await syncTaxonomyToCloud();
     return true;
   }
 
