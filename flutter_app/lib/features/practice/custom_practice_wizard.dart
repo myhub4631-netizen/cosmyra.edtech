@@ -360,6 +360,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
       final rawChapters = await SupabaseService.fetchTaxonomyForSubject(
         exam: examCode,
         subject: sub,
+        forceRefresh: true,
         includeInactive: false,
       );
 

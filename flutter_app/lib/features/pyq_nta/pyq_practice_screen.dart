@@ -106,6 +106,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
       final rawChapters = await SupabaseService.fetchTaxonomyForSubject(
         exam: examCode,
         subject: sub,
+        forceRefresh: true,
         includeInactive: false,
       );
 

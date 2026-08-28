@@ -25,7 +25,7 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
     _loadTaxonomyFromService();
   }
 
-  Future<void> _loadTaxonomyFromService({bool forceRefresh = false}) async {
+  Future<void> _loadTaxonomyFromService({bool forceRefresh = true}) async {
     setState(() => _isLoading = true);
     final chapters = await SupabaseService.fetchTaxonomyForSubject(
       exam: _selectedExam,

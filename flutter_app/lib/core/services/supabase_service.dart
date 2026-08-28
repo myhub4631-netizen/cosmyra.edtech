@@ -555,35 +555,20 @@ class SupabaseService {
   }) async {
     final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
 
-    // 1. Always attempt cloud sync to load latest data across devices
-    if (_dynamicTaxonomyStore.isEmpty || forceRefresh) {
+    // 1. Load memory store from local storage if empty
+    if (_dynamicTaxonomyStore.isEmpty) {
       await _loadTaxonomyFromLocalStorage();
-      await syncTaxonomyFromCloud();
     }
 
-    // 2. Ensure memory store is initialized with seed chapters if not present
+    // 2. Initialize with seed data if key is missing
     if (!_dynamicTaxonomyStore.containsKey(storeKey) || _dynamicTaxonomyStore[storeKey]!.isEmpty) {
       _dynamicTaxonomyStore[storeKey] = _getSeedChaptersForSubject(exam, subject);
-      await _saveTaxonomyToLocalStorage();
     }
 
-    // 2. If not forcing refresh, return memory store contents directly
-    if (!forceRefresh) {
-      final cached = _dynamicTaxonomyStore[storeKey]!;
-      if (!includeInactive) {
-        return cached.where((c) => c['status'] == 'Active').map((c) {
-          final copy = Map<String, dynamic>.from(c);
-          if (copy['topicsList'] is List) {
-            copy['topicsList'] = (copy['topicsList'] as List).where((t) => t['status'] == 'Active').toList();
-          }
-          return copy;
-        }).toList();
-      }
-      return cached;
-    }
+    // 3. Fetch live Cloud Config (system_config)
+    await syncTaxonomyFromCloud();
 
-    // 3. If forceRefresh is requested, query Supabase DB and merge DB results into memory store
-    List<Map<String, dynamic>> dbChapters = [];
+    // 4. Query live Supabase DB chapters & topics tables
     try {
       final res = await client
           .from('chapters')
@@ -593,10 +578,10 @@ class SupabaseService {
           .order('display_order', ascending: true);
 
       if (res != null && (res as List).isNotEmpty) {
-        dbChapters = (res as List).map<Map<String, dynamic>>((e) {
+        final List<Map<String, dynamic>> dbChapters = (res as List).map<Map<String, dynamic>>((e) {
           final topicsList = (e['topics'] as List?)?.map<Map<String, dynamic>>((t) {
             return {
-              'id': t['id'] ?? '',
+              'id': t['id']?.toString() ?? '',
               'name': t['name'] ?? '',
               'code': t['code'] ?? '',
               'questions': t['questions_count'] ?? 0,
@@ -605,7 +590,7 @@ class SupabaseService {
           }).toList() ?? [];
 
           return {
-            'id': e['id'] ?? '',
+            'id': e['id']?.toString() ?? '',
             'name': e['name'] ?? '',
             'code': e['code'] ?? '',
             'topics': topicsList.length,
@@ -614,28 +599,43 @@ class SupabaseService {
             'status': (e['is_active'] ?? true) ? 'Active' : 'Inactive',
           };
         }).toList();
-      }
-    } catch (e) {
-      debugPrint('Notice loading chapters from Supabase: $e');
-    }
 
-    if (dbChapters.isNotEmpty) {
-      final currentStore = _dynamicTaxonomyStore[storeKey] ?? [];
-      final mergedMap = <String, Map<String, dynamic>>{};
-      for (var ch in dbChapters) {
-        mergedMap[ch['id'].toString()] = ch;
-      }
-      for (var ch in currentStore) {
-        if (!mergedMap.containsKey(ch['id'].toString())) {
-          mergedMap[ch['id'].toString()] = ch;
+        if (dbChapters.isNotEmpty) {
+          final currentStore = _dynamicTaxonomyStore[storeKey] ?? [];
+          final mergedMap = <String, Map<String, dynamic>>{};
+
+          // Add seed/local chapters first
+          for (var ch in currentStore) {
+            mergedMap[ch['id'].toString()] = ch;
+          }
+
+          // Overwrite/add remote DB chapters
+          for (var ch in dbChapters) {
+            mergedMap[ch['id'].toString()] = ch;
+          }
+
+          // Deduplicate by ID
+          final uniqueChapters = <Map<String, dynamic>>[];
+          final seenIds = <String>{};
+          for (var ch in mergedMap.values) {
+            final idStr = ch['id'].toString();
+            if (!seenIds.contains(idStr)) {
+              seenIds.add(idStr);
+              uniqueChapters.add(ch);
+            }
+          }
+
+          _dynamicTaxonomyStore[storeKey] = uniqueChapters;
+          await _saveTaxonomyToLocalStorage();
         }
       }
-      _dynamicTaxonomyStore[storeKey] = mergedMap.values.toList();
+    } catch (e) {
+      debugPrint('Notice loading chapters from Supabase DB: $e');
     }
 
-    final finalStore = _dynamicTaxonomyStore[storeKey]!;
+    final cached = _dynamicTaxonomyStore[storeKey] ?? _getSeedChaptersForSubject(exam, subject);
     if (!includeInactive) {
-      return finalStore.where((c) => c['status'] == 'Active').map((c) {
+      return cached.where((c) => c['status'] == 'Active').map((c) {
         final copy = Map<String, dynamic>.from(c);
         if (copy['topicsList'] is List) {
           copy['topicsList'] = (copy['topicsList'] as List).where((t) => t['status'] == 'Active').toList();
@@ -643,8 +643,7 @@ class SupabaseService {
         return copy;
       }).toList();
     }
-
-    return finalStore;
+    return cached;
   }
 
   static List<Map<String, dynamic>> _getSeedChaptersForSubject(String exam, String subject) {
