@@ -364,7 +364,9 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
         includeInactive: false,
       );
 
-      final formattedList = rawChapters.map((c) {
+      final formattedList = rawChapters.asMap().entries.map((entry) {
+        final idx = entry.key;
+        final c = entry.value;
         final rawTopics = (c['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         final subtopics = rawTopics.map((t) {
           return {
@@ -375,8 +377,9 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
         }).toList();
 
         return {
-          'number': c['id'],
-          'name': c['name'],
+          'id': c['id'] ?? '',
+          'number': idx + 1,
+          'name': c['name'] ?? '',
           'topicsCountText': '${subtopics.length} Topics Selected',
           'isSelected': true,
           'subtopics': subtopics,
@@ -1648,7 +1651,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  '$chNum. ${ch['name']}',
+                                  '${ch['name']}',
                                   style: const TextStyle(
                                     fontSize: 13.5,
                                     fontWeight: FontWeight.w700,
@@ -1700,15 +1703,6 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                                       },
                                     ),
                                     const SizedBox(width: 12),
-                                    Text(
-                                      '${sub['id']}',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                        color: Color(0xFF64748B),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
                                         '${sub['name']}',
