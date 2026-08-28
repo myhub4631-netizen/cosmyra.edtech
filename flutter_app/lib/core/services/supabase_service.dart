@@ -662,7 +662,19 @@ class SupabaseService {
         }).toList();
 
         if (dbChapters.isNotEmpty) {
-          _dynamicTaxonomyStore[storeKey] = dbChapters;
+          final existing = _dynamicTaxonomyStore[storeKey] ?? [];
+          final Map<String, Map<String, dynamic>> map = {};
+          
+          for (var c in existing) {
+            final key = c['id']?.toString() ?? c['name']?.toString() ?? '';
+            if (key.isNotEmpty) map[key] = Map<String, dynamic>.from(c);
+          }
+          for (var c in dbChapters) {
+            final key = c['id']?.toString() ?? c['name']?.toString() ?? '';
+            if (key.isNotEmpty) map[key] = Map<String, dynamic>.from(c);
+          }
+
+          _dynamicTaxonomyStore[storeKey] = map.values.toList();
           await _saveTaxonomyToLocalStorage();
         }
       }
