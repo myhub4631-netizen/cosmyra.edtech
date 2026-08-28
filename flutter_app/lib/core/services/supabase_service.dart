@@ -567,17 +567,21 @@ class SupabaseService {
       final subjectId = _getSubjectId(exam, subject);
       final res = await client
           .from('chapters')
-          .select('id')
-          .eq('subject_id', subjectId)
-          .limit(1);
+          .select('id, name')
+          .eq('subject_id', subjectId);
 
-      if (res == null || (res as List).isEmpty) {
-        debugPrint('Seeding remote Supabase database for $exam - $subject (subjectId: $subjectId)...');
-        final seeds = _getSeedChaptersForSubject(exam, subject);
-        int order = 1;
-        for (var seed in seeds) {
+      final existingChapterNames = (res as List?)
+          ?.map((e) => (e['name'] ?? '').toString().trim().toLowerCase())
+          .toSet() ?? {};
+
+      final seeds = _getSeedChaptersForSubject(exam, subject);
+      int order = 1;
+      for (var seed in seeds) {
+        final cName = (seed['name'] ?? '').toString().trim();
+        final cNameLower = cName.toLowerCase();
+
+        if (!existingChapterNames.contains(cNameLower)) {
           final cId = seed['id']?.toString() ?? 'b_${DateTime.now().millisecondsSinceEpoch}_$order';
-          final cName = seed['name'] ?? '';
           final cCode = seed['code'] ?? '';
 
           try {
@@ -589,24 +593,25 @@ class SupabaseService {
               'is_active': seed['status'] == 'Active',
               'display_order': order++,
             });
+            existingChapterNames.add(cNameLower);
+
+            final topicsList = (seed['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+            for (var t in topicsList) {
+              final tId = t['id']?.toString() ?? 't_${DateTime.now().millisecondsSinceEpoch}';
+              try {
+                await client.from('topics').insert({
+                  'id': tId,
+                  'chapter_id': cId,
+                  'name': t['name'] ?? '',
+                  'code': t['code'] ?? '',
+                  'is_active': t['status'] == 'Active',
+                });
+              } catch (e) {
+                debugPrint('Notice seeding topic row: $e');
+              }
+            }
           } catch (e) {
             debugPrint('Notice seeding chapter row: $e');
-          }
-
-          final topicsList = (seed['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-          for (var t in topicsList) {
-            final tId = t['id']?.toString() ?? 't_${DateTime.now().millisecondsSinceEpoch}';
-            try {
-              await client.from('topics').insert({
-                'id': tId,
-                'chapter_id': cId,
-                'name': t['name'] ?? '',
-                'code': t['code'] ?? '',
-                'is_active': t['status'] == 'Active',
-              });
-            } catch (e) {
-              debugPrint('Notice seeding topic row: $e');
-            }
           }
         }
       }
@@ -626,10 +631,7 @@ class SupabaseService {
     // 1. Ensure remote database has canonical seed rows for this exam & subject
     await _ensureRemoteDatabaseSeeded(exam, subject);
 
-    // 2. Fetch live Cloud Config if available
-    await syncTaxonomyFromCloud();
-
-    // 3. Query live Supabase DB chapters & topics tables
+    // 2. Query live Supabase DB chapters & topics tables directly
     try {
       final subjectId = _getSubjectId(exam, subject);
       final res = await client
@@ -662,20 +664,19 @@ class SupabaseService {
         }).toList();
 
         if (dbChapters.isNotEmpty) {
-          final existing = _dynamicTaxonomyStore[storeKey] ?? [];
-          final Map<String, Map<String, dynamic>> map = {};
-          
-          for (var c in existing) {
-            final key = c['id']?.toString() ?? c['name']?.toString() ?? '';
-            if (key.isNotEmpty) map[key] = Map<String, dynamic>.from(c);
-          }
-          for (var c in dbChapters) {
-            final key = c['id']?.toString() ?? c['name']?.toString() ?? '';
-            if (key.isNotEmpty) map[key] = Map<String, dynamic>.from(c);
-          }
-
-          _dynamicTaxonomyStore[storeKey] = map.values.toList();
+          _dynamicTaxonomyStore[storeKey] = dbChapters;
           await _saveTaxonomyToLocalStorage();
+
+          if (!includeInactive) {
+            return dbChapters.where((c) => c['status'] == 'Active').map((c) {
+              final copy = Map<String, dynamic>.from(c);
+              if (copy['topicsList'] is List) {
+                copy['topicsList'] = (copy['topicsList'] as List).where((t) => t['status'] == 'Active').toList();
+              }
+              return copy;
+            }).toList();
+          }
+          return dbChapters;
         }
       }
     } catch (e) {
