@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
-import '../../models/pyq_models.dart';
 import '../../core/services/supabase_service.dart';
+
+enum PYQPracticeMode { chapterWise, yearWise }
 
 class ChapterItem {
   final String id;
@@ -52,19 +53,28 @@ class PYQPracticeScreen extends StatefulWidget {
 }
 
 class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
-  int _currentStep = 1; // 1 = Select Subject, 2 = Select Chapters & Topics
+  int _currentStep = 1; // 1 = Select Subject & Options, 2 = Select Chapters & Topics
 
   late String _selectedExam;
-  String _selectedSubject = 'Physics';
+  late Set<String> _selectedSubjects;
+  PYQPracticeMode _selectedMode = PYQPracticeMode.chapterWise;
   
+  bool _allYears = true;
+  Set<int> _selectedYears = {2025};
+  
+  int _questionCount = 20;
+  String _difficulty = 'Medium';
+
   bool _isLoadingStats = true;
   bool _isStarting = false;
 
   int _availableQuestionsCount = 1248;
   int _availablePapersCount = 98;
   double _userAccuracy = 72.4;
-  int _timeSpentSeconds = 101700;
+  int _timeSpentSeconds = 101700; // 28h 15m default
   Map<String, int> _subjectPYQCounts = {};
+
+  final List<int> _availableYearsList = [2025, 2024, 2023, 2022, 2021, 2020];
 
   String _searchQuery = '';
   int _activeViewTab = 0; // 0 = Chapters, 1 = Topics
@@ -74,13 +84,16 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
   void initState() {
     super.initState();
     _selectedExam = widget.activeExam.contains('JEE') ? 'JEE Main 2026' : 'NEET 2026';
-    _selectedSubject = 'Physics';
+    _selectedSubjects = _selectedExam.contains('NEET')
+        ? {'Physics', 'Chemistry', 'Biology'}
+        : {'Physics', 'Chemistry', 'Mathematics'};
     _loadStats();
     _initChapters();
   }
 
   void _initChapters() {
-    if (_selectedSubject == 'Physics') {
+    final activeSubject = _selectedSubjects.isNotEmpty ? _selectedSubjects.first : 'Physics';
+    if (activeSubject == 'Physics') {
       _chapters = [
         ChapterItem(
           id: 'c1',
@@ -139,7 +152,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
           ],
         ),
       ];
-    } else if (_selectedSubject == 'Chemistry') {
+    } else if (activeSubject == 'Chemistry') {
       _chapters = [
         ChapterItem(
           id: 'cc1',
@@ -171,7 +184,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
           ],
         ),
       ];
-    } else if (_selectedSubject == 'Biology') {
+    } else if (activeSubject == 'Biology') {
       _chapters = [
         ChapterItem(
           id: 'bc1',
@@ -259,18 +272,25 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     setState(() {
       _selectedExam = newExam;
       if (newExam.contains('NEET')) {
-        _selectedSubject = 'Physics';
+        _selectedSubjects = {'Physics', 'Chemistry', 'Biology'};
       } else {
-        _selectedSubject = 'Physics';
+        _selectedSubjects = {'Physics', 'Chemistry', 'Mathematics'};
       }
       _initChapters();
     });
     _loadStats();
   }
 
-  void _selectSubject(String subName) {
+  void _toggleSelectAllSubjects() {
     setState(() {
-      _selectedSubject = subName;
+      final all = _selectedExam.contains('NEET')
+          ? {'Physics', 'Chemistry', 'Biology'}
+          : {'Physics', 'Chemistry', 'Mathematics'};
+      if (_selectedSubjects.length == all.length) {
+        _selectedSubjects = {all.first};
+      } else {
+        _selectedSubjects = Set.from(all);
+      }
       _initChapters();
     });
   }
@@ -302,10 +322,10 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
   }
 
   Future<void> _startPYQSession(bool isTestMode) async {
-    if (_totalSelectedTopicsCount == 0) {
+    if (_selectedSubjects.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Select at least one chapter or topic to continue.'),
+          content: Text('Please select at least one subject to start.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -316,8 +336,10 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
 
     final questions = await SupabaseService.fetchPYQQuestions(
       exam: _selectedExam,
-      subjects: [_selectedSubject],
-      limit: 20,
+      subjects: _selectedSubjects.toList(),
+      years: _allYears ? null : _selectedYears.toList(),
+      difficulty: _difficulty,
+      limit: _questionCount,
     );
 
     setState(() => _isStarting = false);
@@ -327,14 +349,14 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     if (questions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No PYQs available for the selected topics.'),
+          content: Text('No PYQs available for the selected filters.'),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
 
-    final timerMins = isTestMode ? 30 : 0;
+    final timerMins = isTestMode ? (_questionCount * 1.5).ceil() : 0;
 
     if (widget.onStartPYQSession != null) {
       widget.onStartPYQSession!(questions, timerMins, isTestMode);
@@ -351,7 +373,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         backgroundColor: Colors.white,
         elevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF7C3AED)),
           onPressed: () {
             if (_currentStep == 2) {
               setState(() => _currentStep = 1);
@@ -380,7 +402,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
               },
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF7C3AED),
-                side: const BorderSide(color: Color(0xFFDDD6FE)),
+                side: const BorderSide(color: Color(0xFF7C3AED), width: 1.2),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
@@ -400,7 +422,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
               children: [
                 Text(
                   _currentStep == 1
-                      ? 'Practice previous year questions chapter-wise and year-wise to ace NEET & JEE'
+                      ? 'Practice previous year questions chapter-wise and year-wise to ace NEET'
                       : 'Practice previous year questions chapter-wise and topic-wise',
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
@@ -438,7 +460,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
           width: 28,
           height: 28,
           decoration: BoxDecoration(
-            color: _currentStep > 1 ? const Color(0xFFDCFCE7) : const Color(0xFF7C3AED),
+            color: _currentStep > 1 ? const Color(0xFFDCFCE7) : Colors.white,
             shape: BoxShape.circle,
             border: Border.all(
               color: _currentStep > 1 ? const Color(0xFF16A34A) : const Color(0xFF7C3AED),
@@ -448,7 +470,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
           child: Center(
             child: _currentStep > 1
                 ? const Icon(Icons.check, size: 16, color: Color(0xFF16A34A))
-                : const Text('1', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                : const Text('1', style: TextStyle(color: Color(0xFF7C3AED), fontWeight: FontWeight.bold, fontSize: 13)),
           ),
         ),
         const SizedBox(width: 8),
@@ -472,7 +494,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
           width: 60,
           height: 2,
           margin: const EdgeInsets.symmetric(horizontal: 14),
-          color: _currentStep > 1 ? const Color(0xFF16A34A) : const Color(0xFFCBD5E1),
+          color: _currentStep > 1 ? const Color(0xFF7C3AED) : const Color(0xFFCBD5E1),
         ),
 
         // Step 2 Circle
@@ -517,11 +539,12 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     );
   }
 
-  // ================= STEP 1 VIEW =================
+  // ================= STEP 1 VIEW (EXACT MATCH TO SCREENSHOT 1) =================
 
   Widget _buildStep1View() {
     final isNeet = _selectedExam.contains('NEET');
     final availableSubjects = isNeet ? ['Physics', 'Chemistry', 'Biology'] : ['Physics', 'Chemistry', 'Mathematics'];
+    final allSelected = _selectedSubjects.length == availableSubjects.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -529,11 +552,10 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         // Top Exam Selector Dropdown Pill
         Center(
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
+              color: const Color(0xFFF3E8FF),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
@@ -550,7 +572,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                         const SizedBox(width: 6),
                         Text(
                           e,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF7C3AED)),
                         ),
                       ],
                     ),
@@ -565,7 +587,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         ),
         const SizedBox(height: 20),
 
-        // Real-time Stat Cards
+        // 4 Real-time Stat Cards (Matching Screenshot)
         _isLoadingStats
             ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
             : LayoutBuilder(
@@ -613,16 +635,28 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
               ),
         const SizedBox(height: 24),
 
-        // Section 1: Select Subject
-        const Text(
-          '1. Select Subject',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        // Section 1: Select Subjects
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              '1. Select Subjects',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
+            GestureDetector(
+              onTap: _toggleSelectAllSubjects,
+              child: Text(
+                allSelected ? 'Deselect All' : 'Select All',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF7C3AED)),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         Row(
           children: availableSubjects.map((subName) {
-            final isSelected = _selectedSubject == subName;
-            final count = _subjectPYQCounts[subName] ?? (subName == 'Physics' ? 486 : (subName == 'Chemistry' ? 436 : (isNeet ? 292 : 480)));
+            final isSelected = _selectedSubjects.contains(subName);
+            final count = _subjectPYQCounts[subName] ?? (subName == 'Physics' ? 520 : (subName == 'Chemistry' ? 436 : (isNeet ? 292 : 480)));
 
             IconData iconData = Icons.science_outlined;
             Color themeColor = const Color(0xFF7C3AED);
@@ -646,40 +680,62 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
                 child: GestureDetector(
-                  onTap: () => _selectSubject(subName),
+                  onTap: () {
+                    setState(() {
+                      if (isSelected) {
+                        if (_selectedSubjects.length > 1) {
+                          _selectedSubjects.remove(subName);
+                        }
+                      } else {
+                        _selectedSubjects.add(subName);
+                      }
+                      _initChapters();
+                    });
+                  },
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
                     decoration: BoxDecoration(
-                      color: isSelected ? themeColor.withOpacity(0.06) : Colors.white,
+                      color: isSelected ? themeColor.withOpacity(0.05) : Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: isSelected ? themeColor : const Color(0xFFE2E8F0),
-                        width: isSelected ? 2.5 : 1,
+                        width: isSelected ? 2 : 1,
                       ),
-                      boxShadow: [
-                        if (isSelected)
-                          BoxShadow(color: themeColor.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3)),
-                      ],
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: Stack(
                       children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-                          child: Icon(iconData, color: themeColor, size: 24),
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+                              child: Icon(iconData, color: themeColor, size: 24),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              subName,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$count PYQs',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 10),
-                        Text(
-                          subName,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$count PYQs',
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                        ),
+                        if (isSelected)
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: Container(
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(color: themeColor, shape: BoxShape.circle),
+                              child: const Icon(Icons.check, color: Colors.white, size: 12),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -688,18 +744,212 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
             );
           }).toList(),
         ),
-        const SizedBox(height: 32),
+        const SizedBox(height: 24),
 
-        // Action Button to proceed to Step 2
+        // Section 2: Choose Practice Mode
+        const Text(
+          '2. Choose Practice Mode',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildModeCard(
+                mode: PYQPracticeMode.chapterWise,
+                icon: Icons.calendar_today_outlined,
+                title: 'Chapter-wise',
+                subtitle: 'Practice PYQs by specific chapters and topics',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildModeCard(
+                mode: PYQPracticeMode.yearWise,
+                icon: Icons.edit_calendar_outlined,
+                title: 'Year-wise',
+                subtitle: 'Practice PYQs from specific years',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+
+        // Section 3: Select Year Range (Optional)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              '3. Select Year Range (Optional)',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
+            Row(
+              children: [
+                const Text('All Years', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                const SizedBox(width: 4),
+                Switch(
+                  value: _allYears,
+                  activeThumbColor: const Color(0xFF7C3AED),
+                  onChanged: (val) {
+                    setState(() {
+                      _allYears = val;
+                      if (val) _selectedYears = Set.from(_availableYearsList);
+                    });
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: _availableYearsList.map((y) {
+              final isSel = _allYears || _selectedYears.contains(y);
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: FilterChip(
+                  selected: isSel,
+                  showCheckmark: true,
+                  avatar: isSel ? const Icon(Icons.check_box, size: 16, color: Colors.white) : const Icon(Icons.check_box_outline_blank, size: 16, color: Color(0xFF94A3B8)),
+                  label: Text('$y${y == 2025 ? '\n(Latest)' : ''}'),
+                  selectedColor: const Color(0xFF7C3AED),
+                  checkmarkColor: Colors.white,
+                  backgroundColor: Colors.white,
+                  side: BorderSide(color: isSel ? const Color(0xFF7C3AED) : const Color(0xFFE2E8F0)),
+                  labelStyle: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                    color: isSel ? Colors.white : const Color(0xFF1E293B),
+                  ),
+                  onSelected: (selected) {
+                    setState(() {
+                      _allYears = false;
+                      if (selected) {
+                        _selectedYears.add(y);
+                      } else {
+                        if (_selectedYears.length > 1) {
+                          _selectedYears.remove(y);
+                        }
+                      }
+                    });
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Section 4: Number of Questions & Difficulty
+        const Text(
+          '4. Number of Questions & Difficulty',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Number of Questions', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        value: _questionCount,
+                        isExpanded: true,
+                        items: [10, 20, 30, 50, 100].map((c) {
+                          return DropdownMenuItem<int>(
+                            value: c,
+                            child: Text('$c Questions', style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B))),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _questionCount = val);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Difficulty Level', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _difficulty,
+                        isExpanded: true,
+                        items: ['Mixed', 'Easy', 'Medium', 'Hard'].map((d) {
+                          return DropdownMenuItem<String>(
+                            value: d,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: d == 'Easy'
+                                        ? Colors.green
+                                        : (d == 'Medium' ? Colors.orange : (d == 'Hard' ? Colors.red : Colors.purple)),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(d, style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B))),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _difficulty = val);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 28),
+
+        // Action Button to proceed to Step 2 (Select Chapters & Topics)
         SizedBox(
           width: double.infinity,
           height: 52,
           child: ElevatedButton(
             onPressed: () {
+              if (_selectedSubjects.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please select at least one subject to continue.')),
+                );
+                return;
+              }
               setState(() => _currentStep = 2);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF7C3AED),
+              backgroundColor: const Color(0xFF4F46E5),
               elevation: 2,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             ),
@@ -707,8 +957,8 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Continue to Select Chapters & Topics →',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                  '🎯 Start PYQ Practice',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
               ],
             ),
@@ -719,10 +969,11 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     );
   }
 
-  // ================= STEP 2 VIEW (EXACT SCREENSHOT DESIGN) =================
+  // ================= STEP 2 VIEW (EXACT MATCH TO SCREENSHOT 2) =================
 
   Widget _buildStep2View() {
-    final availablePyqs = _subjectPYQCounts[_selectedSubject] ?? 486;
+    final activeSubject = _selectedSubjects.isNotEmpty ? _selectedSubjects.first : 'Physics';
+    final availablePyqs = _subjectPYQCounts[activeSubject] ?? 486;
 
     final filteredChapters = _searchQuery.isEmpty
         ? _chapters
@@ -755,11 +1006,11 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      _selectedSubject == 'Chemistry'
+                      activeSubject == 'Chemistry'
                           ? Icons.science_rounded
-                          : (_selectedSubject == 'Biology'
+                          : (activeSubject == 'Biology'
                               ? Icons.coronavirus_outlined
-                              : (_selectedSubject == 'Mathematics' ? Icons.calculate_outlined : Icons.science_outlined)),
+                              : (activeSubject == 'Mathematics' ? Icons.calculate_outlined : Icons.science_outlined)),
                       color: const Color(0xFF7C3AED),
                       size: 24,
                     ),
@@ -770,7 +1021,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _selectedSubject,
+                          activeSubject,
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                         ),
                         const SizedBox(height: 2),
@@ -1093,7 +1344,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     );
   }
 
-  // ================= STICKY BOTTOM ACTION BAR (MATCHING SCREENSHOT) =================
+  // ================= STICKY BOTTOM ACTION BAR (MATCHING SCREENSHOT 2) =================
 
   Widget _buildStickyBottomBarStep2() {
     return Container(
@@ -1244,6 +1495,63 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildModeCard({
+    required PYQPracticeMode mode,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    final isSelected = _selectedMode == mode;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedMode = mode),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFEEF2FF) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFFE2E8F0),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFFDDD6FE) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B), size: 18),
+                ),
+                Icon(
+                  isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                  color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFFCBD5E1),
+                  size: 20,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), height: 1.2),
+            ),
+          ],
+        ),
       ),
     );
   }
