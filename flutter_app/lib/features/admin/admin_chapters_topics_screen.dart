@@ -384,15 +384,25 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
-                _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', false),
-                _buildSidebarItem(Icons.people_outline, 'Users Management', false),
+                _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', false, onTap: () {
+                  Navigator.pushReplacementNamed(context, '/admin');
+                }),
+                _buildSidebarItem(Icons.people_outline, 'Users Management', false, onTap: () {
+                  Navigator.pushReplacementNamed(context, '/admin/users');
+                }),
                 _buildSidebarItem(Icons.menu_book_outlined, 'Courses', false),
                 _buildSidebarItem(Icons.assignment_outlined, 'Exams', false),
                 _buildSidebarItem(Icons.science_outlined, 'Subjects', false),
                 _buildSidebarItem(Icons.auto_stories_rounded, 'Chapters & Topics', true),
-                _buildSidebarItem(Icons.help_outline_rounded, 'Questions', false),
-                _buildSidebarItem(Icons.insert_drive_file_outlined, 'PYQ Papers', false),
-                _buildSidebarItem(Icons.timer_outlined, 'Test Series', false),
+                _buildSidebarItem(Icons.help_outline_rounded, 'Questions', false, onTap: () {
+                  Navigator.pushReplacementNamed(context, '/admin/questions');
+                }),
+                _buildSidebarItem(Icons.insert_drive_file_outlined, 'PYQ Papers', false, onTap: () {
+                  Navigator.pushReplacementNamed(context, '/admin/questions');
+                }),
+                _buildSidebarItem(Icons.timer_outlined, 'Test Series', false, onTap: () {
+                  Navigator.pushReplacementNamed(context, '/admin/tests');
+                }),
                 _buildSidebarItem(Icons.video_call_outlined, 'Live Classes', false),
                 _buildSidebarItem(Icons.analytics_outlined, 'Reports & Analytics', false),
                 _buildSidebarItem(Icons.notifications_none_rounded, 'Notifications', false),
@@ -939,8 +949,8 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                                     ],
                                   ),
                                   Row(
-                                    children: const [
-                                      Text('NEET → Physics', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF6366F1))),
+                                    children: [
+                                      Text('$_selectedExam → $_selectedSubject', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF6366F1))),
                                     ],
                                   ),
                                 ],
@@ -950,17 +960,25 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                                 scrollDirection: Axis.horizontal,
                                 child: Row(
                                   children: [
-                                    _buildNodeItem('1. Mechanics', '8 Topics', true),
+                                    _buildNodeItem(_selectedExam, 'Exam', true),
                                     _buildNodeArrow(),
-                                    _buildNodeItem('2. Thermodynamics', '6 Topics', false),
-                                    _buildNodeArrow(),
-                                    _buildNodeItem('3. Oscillations', '5 Topics', false),
-                                    _buildNodeArrow(),
-                                    _buildNodeItem('4. Waves', '7 Topics', false),
-                                    _buildNodeArrow(),
-                                    _buildNodeItem('5. Electromagnetism', '12 Topics', false),
-                                    _buildNodeArrow(),
-                                    _buildNodeItem('6. Optics', '9 Topics', false),
+                                    _buildNodeItem(_selectedSubject, 'Subject', true),
+                                    if (_chaptersList.isEmpty) ...[
+                                      _buildNodeArrow(),
+                                      _buildNodeItem('No Chapters', '0 Topics', false),
+                                    ] else ...[
+                                      for (int i = 0; i < _chaptersList.length; i++) ...[
+                                        _buildNodeArrow(),
+                                        InkWell(
+                                          onTap: () => _onSelectChapter(_chaptersList[i]),
+                                          child: _buildNodeItem(
+                                            _chaptersList[i]['name'] ?? '',
+                                            '${_chaptersList[i]['topics'] ?? 0} Topics',
+                                            _chaptersList[i]['name'] == _selectedChapterForTopics,
+                                          ),
+                                        ),
+                                      ]
+                                    ]
                                   ],
                                 ),
                               ),
@@ -1005,7 +1023,7 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
     );
   }
 
-  Widget _buildSidebarItem(IconData icon, String label, bool isActive) {
+  Widget _buildSidebarItem(IconData icon, String label, bool isActive, {VoidCallback? onTap}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
@@ -1023,7 +1041,7 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
             fontSize: 13,
           ),
         ),
-        onTap: () {},
+        onTap: onTap ?? () {},
       ),
     );
   }
