@@ -731,6 +731,41 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
             ),
           ],
         ),
+        const SizedBox(height: 28),
+
+        // Action Button to proceed to Step 2
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton(
+            onPressed: () {
+              if (_selectedSubjects.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please select at least one subject to continue.')),
+                );
+                return;
+              }
+              setState(() => _currentStep = 2);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF7C3AED),
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Continue to Attempt Mode (Step 2)',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                SizedBox(width: 8),
+                Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
       ],
     );
   }
