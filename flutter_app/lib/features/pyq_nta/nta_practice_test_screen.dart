@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import 'pyq_practice_screen.dart';
+import 'nta_paper_wise_screen.dart';
 
 class NtaPracticeTestScreen extends StatefulWidget {
   final String activeExam;
@@ -117,6 +118,18 @@ class _NtaPracticeTestScreenState extends State<NtaPracticeTestScreen> {
   @override
   Widget build(BuildContext context) {
     if (_showSubScreen) {
+      if (_currentMode == 'paper_wise') {
+        return NtaPaperWiseScreen(
+          activeExam: _selectedExam,
+          onBack: () => setState(() => _showSubScreen = false),
+          onStartSession: (questions, timerMins, isTestMode) {
+            if (widget.onStartSession != null) {
+              widget.onStartSession!(questions, timerMins, isTestMode);
+            }
+          },
+        );
+      }
+
       return Scaffold(
         appBar: AppBar(
           backgroundColor: Colors.white,
@@ -125,9 +138,9 @@ class _NtaPracticeTestScreenState extends State<NtaPracticeTestScreen> {
             icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
             onPressed: () => setState(() => _showSubScreen = false),
           ),
-          title: Text(
-            _currentMode == 'chapter_topic' ? 'Chapter & Topic-wise Practice' : 'NTA Mock Papers',
-            style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 16),
+          title: const Text(
+            'Chapter & Topic-wise Practice',
+            style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 16),
           ),
         ),
         body: PYQPracticeScreen(
