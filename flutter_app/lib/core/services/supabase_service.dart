@@ -940,26 +940,39 @@ class SupabaseService {
     bool isActive = true,
   }) async {
     final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
+    final subjectId = _getSubjectId(exam, subject);
+    final trimmedName = name.trim();
+    final trimmedCode = code.trim().toUpperCase().isEmpty 
+        ? trimmedName.toUpperCase().replaceAll(' ', '_') 
+        : code.trim().toUpperCase();
+
+    // 1. Prevent duplicate chapter creation for the same Exam + Subject
+    try {
+      final existing = await client
+          .from('chapters')
+          .select('id')
+          .eq('subject_id', subjectId)
+          .ilike('name', trimmedName);
+      if (existing != null && (existing as List).isNotEmpty) {
+        final existingId = existing.first['id']?.toString() ?? '';
+        if (existingId.isNotEmpty) {
+          debugPrint('Chapter "$trimmedName" already exists in DB with ID: $existingId');
+          _dynamicTaxonomyStore.remove(storeKey);
+          return existingId;
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice checking duplicate chapter in DB: $e');
+    }
+
     String finalChapterId = 'c_${DateTime.now().millisecondsSinceEpoch}';
 
-    final newChapter = {
-      'id': finalChapterId,
-      'name': name.trim(),
-      'code': code.trim().toUpperCase(),
-      'topics': 0,
-      'questions': 0,
-      'status': isActive ? 'Active' : 'Inactive',
-      'topicsList': <Map<String, dynamic>>[],
-    };
-
-    final subjectId = _getSubjectId(exam, subject);
-
-    // 1. Remote Supabase Database Insert with fallback
+    // 2. Remote Supabase Database Insert with fallback
     try {
       final res = await client.from('chapters').insert({
         'subject_id': subjectId,
-        'name': name.trim(),
-        'code': code.trim().toUpperCase(),
+        'name': trimmedName,
+        'code': trimmedCode,
         'is_active': isActive,
         'display_order': 99,
       }).select();
@@ -968,7 +981,6 @@ class SupabaseService {
         final dbId = res.first['id']?.toString();
         if (dbId != null && dbId.isNotEmpty) {
           finalChapterId = dbId;
-          newChapter['id'] = dbId;
         }
       }
     } catch (e) {
@@ -977,8 +989,8 @@ class SupabaseService {
         await client.from('chapters').insert({
           'id': finalChapterId,
           'subject_id': subjectId,
-          'name': name.trim(),
-          'code': code.trim().toUpperCase(),
+          'name': trimmedName,
+          'code': trimmedCode,
           'is_active': isActive,
           'display_order': 99,
         });
@@ -987,11 +999,11 @@ class SupabaseService {
       }
     }
 
-    final current = _dynamicTaxonomyStore[storeKey] ?? _getSeedChaptersForSubject(exam, subject);
-    current.add(newChapter);
-    _dynamicTaxonomyStore[storeKey] = current;
+    // 3. Invalidate cache so next fetch gets fresh rows from DB
+    _dynamicTaxonomyStore.remove(storeKey);
     await _saveTaxonomyToLocalStorage();
     await syncTaxonomyToCloud();
+
     return finalChapterId;
   }
 
