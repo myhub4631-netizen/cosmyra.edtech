@@ -567,6 +567,8 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
             Navigator.of(context).push(SmoothPageRoute(child: AdminDashboardScreen(userProfile: widget.userProfile)));
           } else if (title.contains('Hierarchy')) {
             Navigator.of(context).push(SmoothPageRoute(child: AdminHierarchyScreen(userProfile: widget.userProfile)));
+          } else if (title.contains('Chapters') || title.contains('Topics')) {
+            Navigator.pushNamed(context, '/admin/chapters');
           } else if (title.contains('Leaderboard')) {
             Navigator.of(context).push(SmoothPageRoute(child: AdminLeaderboardScreen(userProfile: widget.userProfile)));
           }

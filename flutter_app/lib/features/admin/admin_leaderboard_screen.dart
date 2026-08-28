@@ -271,6 +271,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                 }),
                 _buildSidebarTile('Paper Predictions', Icons.note_alt_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
                 _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
+                _buildSidebarTile('Chapters & Topics', Icons.auto_stories_rounded, false, onTap: () => Navigator.pushNamed(context, '/admin/chapters')),
                 _buildSidebarTile('Pricing & Plans', Icons.sell_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/pricing')),
                 _buildSidebarTile('Question Bank', Icons.quiz_outlined, false),
                 _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false),
