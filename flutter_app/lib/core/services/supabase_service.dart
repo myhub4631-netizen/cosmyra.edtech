@@ -547,6 +547,60 @@ class SupabaseService {
     }
   }
 
+  static Future<void> _ensureRemoteDatabaseSeeded(String exam, String subject) async {
+    try {
+      final res = await client
+          .from('chapters')
+          .select('id')
+          .eq('exam', exam)
+          .eq('subject', subject)
+          .limit(1);
+
+      if (res == null || (res as List).isEmpty) {
+        debugPrint('Seeding remote Supabase database for $exam - $subject...');
+        final seeds = _getSeedChaptersForSubject(exam, subject);
+        int order = 1;
+        for (var seed in seeds) {
+          final cId = seed['id']?.toString() ?? 'c_${DateTime.now().millisecondsSinceEpoch}';
+          final cName = seed['name'] ?? '';
+          final cCode = seed['code'] ?? '';
+
+          try {
+            await client.from('chapters').insert({
+              'id': cId,
+              'exam': exam,
+              'subject': subject,
+              'name': cName,
+              'code': cCode,
+              'is_active': seed['status'] == 'Active',
+              'display_order': order++,
+            });
+          } catch (e) {
+            debugPrint('Notice seeding chapter row: $e');
+          }
+
+          final topicsList = (seed['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          for (var t in topicsList) {
+            final tId = t['id']?.toString() ?? 't_${DateTime.now().millisecondsSinceEpoch}';
+            try {
+              await client.from('topics').insert({
+                'id': tId,
+                'chapter_id': cId,
+                'name': t['name'] ?? '',
+                'code': t['code'] ?? '',
+                'is_active': t['status'] == 'Active',
+              });
+            } catch (e) {
+              debugPrint('Notice seeding topic row: $e');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice during remote DB seed check: $e');
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> fetchTaxonomyForSubject({
     required String exam,
     required String subject,
@@ -555,20 +609,13 @@ class SupabaseService {
   }) async {
     final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
 
-    // 1. Load memory store from local storage if empty
-    if (_dynamicTaxonomyStore.isEmpty) {
-      await _loadTaxonomyFromLocalStorage();
-    }
+    // 1. Ensure remote database has canonical seed rows for this exam & subject
+    await _ensureRemoteDatabaseSeeded(exam, subject);
 
-    // 2. Initialize with seed data if key is missing
-    if (!_dynamicTaxonomyStore.containsKey(storeKey) || _dynamicTaxonomyStore[storeKey]!.isEmpty) {
-      _dynamicTaxonomyStore[storeKey] = _getSeedChaptersForSubject(exam, subject);
-    }
-
-    // 3. Fetch live Cloud Config (system_config)
+    // 2. Fetch live Cloud Config if available
     await syncTaxonomyFromCloud();
 
-    // 4. Query live Supabase DB chapters & topics tables
+    // 3. Query live Supabase DB chapters & topics tables
     try {
       final res = await client
           .from('chapters')
@@ -601,31 +648,7 @@ class SupabaseService {
         }).toList();
 
         if (dbChapters.isNotEmpty) {
-          final currentStore = _dynamicTaxonomyStore[storeKey] ?? [];
-          final mergedMap = <String, Map<String, dynamic>>{};
-
-          // Add seed/local chapters first
-          for (var ch in currentStore) {
-            mergedMap[ch['id'].toString()] = ch;
-          }
-
-          // Overwrite/add remote DB chapters
-          for (var ch in dbChapters) {
-            mergedMap[ch['id'].toString()] = ch;
-          }
-
-          // Deduplicate by ID
-          final uniqueChapters = <Map<String, dynamic>>[];
-          final seenIds = <String>{};
-          for (var ch in mergedMap.values) {
-            final idStr = ch['id'].toString();
-            if (!seenIds.contains(idStr)) {
-              seenIds.add(idStr);
-              uniqueChapters.add(ch);
-            }
-          }
-
-          _dynamicTaxonomyStore[storeKey] = uniqueChapters;
+          _dynamicTaxonomyStore[storeKey] = dbChapters;
           await _saveTaxonomyToLocalStorage();
         }
       }

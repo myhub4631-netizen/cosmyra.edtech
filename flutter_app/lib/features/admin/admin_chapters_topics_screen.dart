@@ -587,7 +587,19 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                                           return DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)));
                                         }).toList(),
                                         onChanged: (val) {
-                                          if (val != null) setState(() => _selectedExam = val);
+                                          if (val != null) {
+                                            setState(() {
+                                              _selectedExam = val;
+                                              if (val.contains('JEE') && _selectedSubject == 'Biology') {
+                                                _selectedSubject = 'Mathematics';
+                                              } else if (val.contains('NEET') && _selectedSubject == 'Mathematics') {
+                                                _selectedSubject = 'Biology';
+                                              }
+                                              _selectedChapterId = '';
+                                              _selectedChapterForTopics = '';
+                                            });
+                                            _loadTaxonomyFromService(forceRefresh: true);
+                                          }
                                         },
                                       ),
                                     ),
@@ -606,13 +618,20 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                                       child: DropdownButton<String>(
                                         value: _selectedSubject,
                                         isDense: true,
-                                        items: ['Physics', 'Chemistry', 'Biology', 'Mathematics'].map((s) {
+                                        items: (_selectedExam.contains('JEE')
+                                                ? ['Physics', 'Chemistry', 'Mathematics']
+                                                : ['Physics', 'Chemistry', 'Biology'])
+                                            .map((s) {
                                           return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)));
                                         }).toList(),
                                         onChanged: (val) {
                                           if (val != null) {
-                                            setState(() => _selectedSubject = val);
-                                            _loadTaxonomyFromService();
+                                            setState(() {
+                                              _selectedSubject = val;
+                                              _selectedChapterId = '';
+                                              _selectedChapterForTopics = '';
+                                            });
+                                            _loadTaxonomyFromService(forceRefresh: true);
                                           }
                                         },
                                       ),
