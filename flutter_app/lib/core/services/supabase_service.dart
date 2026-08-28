@@ -547,29 +547,43 @@ class SupabaseService {
     }
   }
 
+  static String _getSubjectId(String exam, String subject) {
+    final e = exam.toUpperCase();
+    final s = subject.toUpperCase();
+    if (e.contains('NEET')) {
+      if (s.contains('PHYSICS')) return 'a1111111-1111-1111-1111-111111111111';
+      if (s.contains('CHEMISTRY')) return 'a2222222-2222-2222-2222-222222222222';
+      if (s.contains('BIOLOGY')) return 'a3333333-3333-3333-3333-333333333333';
+    } else {
+      if (s.contains('PHYSICS')) return 'a4444444-4444-4444-4444-444444444444';
+      if (s.contains('CHEMISTRY')) return 'a5555555-5555-5555-5555-555555555555';
+      if (s.contains('MATH')) return 'a6666666-6666-6666-6666-666666666666';
+    }
+    return 'a1111111-1111-1111-1111-111111111111';
+  }
+
   static Future<void> _ensureRemoteDatabaseSeeded(String exam, String subject) async {
     try {
+      final subjectId = _getSubjectId(exam, subject);
       final res = await client
           .from('chapters')
           .select('id')
-          .eq('exam', exam)
-          .eq('subject', subject)
+          .eq('subject_id', subjectId)
           .limit(1);
 
       if (res == null || (res as List).isEmpty) {
-        debugPrint('Seeding remote Supabase database for $exam - $subject...');
+        debugPrint('Seeding remote Supabase database for $exam - $subject (subjectId: $subjectId)...');
         final seeds = _getSeedChaptersForSubject(exam, subject);
         int order = 1;
         for (var seed in seeds) {
-          final cId = seed['id']?.toString() ?? 'c_${DateTime.now().millisecondsSinceEpoch}';
+          final cId = seed['id']?.toString() ?? 'b_${DateTime.now().millisecondsSinceEpoch}_$order';
           final cName = seed['name'] ?? '';
           final cCode = seed['code'] ?? '';
 
           try {
             await client.from('chapters').insert({
               'id': cId,
-              'exam': exam,
-              'subject': subject,
+              'subject_id': subjectId,
               'name': cName,
               'code': cCode,
               'is_active': seed['status'] == 'Active',
@@ -617,11 +631,11 @@ class SupabaseService {
 
     // 3. Query live Supabase DB chapters & topics tables
     try {
+      final subjectId = _getSubjectId(exam, subject);
       final res = await client
           .from('chapters')
           .select('*, topics(*)')
-          .eq('exam', exam)
-          .eq('subject', subject)
+          .eq('subject_id', subjectId)
           .order('display_order', ascending: true);
 
       if (res != null && (res as List).isNotEmpty) {
@@ -925,11 +939,12 @@ class SupabaseService {
       'topicsList': <Map<String, dynamic>>[],
     };
 
+    final subjectId = _getSubjectId(exam, subject);
+
     // 1. Remote Supabase Database Insert with fallback
     try {
       final res = await client.from('chapters').insert({
-        'exam': exam,
-        'subject': subject,
+        'subject_id': subjectId,
         'name': name.trim(),
         'code': code.trim().toUpperCase(),
         'is_active': isActive,
@@ -948,8 +963,7 @@ class SupabaseService {
       try {
         await client.from('chapters').insert({
           'id': finalChapterId,
-          'exam': exam,
-          'subject': subject,
+          'subject_id': subjectId,
           'name': name.trim(),
           'code': code.trim().toUpperCase(),
           'is_active': isActive,

@@ -78,18 +78,24 @@ CREATE POLICY "Teachers can insert and update their own application"
 ON public.teachers FOR ALL TO authenticated USING (auth.uid() = id);
 
 -- 4. TAXONOMY (Exams, Subjects, Chapters, Topics, Subtopics, Tags)
-CREATE POLICY "Taxonomy is readable by everyone" ON public.exams FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Taxonomy is readable by everyone" ON public.subjects FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Taxonomy is readable by everyone" ON public.chapters FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Taxonomy is readable by everyone" ON public.topics FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Taxonomy is readable by everyone" ON public.subtopics FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Taxonomy is readable by everyone" ON public.tags FOR SELECT TO authenticated USING (true);
+ALTER TABLE public.exams DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subjects DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chapters DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.topics DISABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Admins manage taxonomy" ON public.exams FOR ALL TO authenticated USING (public.is_admin(auth.uid()));
-CREATE POLICY "Admins manage taxonomy" ON public.subjects FOR ALL TO authenticated USING (public.is_admin(auth.uid()));
-CREATE POLICY "Admins manage taxonomy" ON public.chapters FOR ALL TO authenticated USING (public.is_admin(auth.uid()));
-CREATE POLICY "Admins manage taxonomy" ON public.topics FOR ALL TO authenticated USING (public.is_admin(auth.uid()));
-CREATE POLICY "Admins manage taxonomy" ON public.subtopics FOR ALL TO authenticated USING (public.is_admin(auth.uid()));
+DROP POLICY IF EXISTS "Taxonomy is readable by everyone" ON public.exams;
+DROP POLICY IF EXISTS "Taxonomy is readable by everyone" ON public.subjects;
+DROP POLICY IF EXISTS "Taxonomy is readable by everyone" ON public.chapters;
+DROP POLICY IF EXISTS "Taxonomy is readable by everyone" ON public.topics;
+DROP POLICY IF EXISTS "Admins manage taxonomy" ON public.exams;
+DROP POLICY IF EXISTS "Admins manage taxonomy" ON public.subjects;
+DROP POLICY IF EXISTS "Admins manage taxonomy" ON public.chapters;
+DROP POLICY IF EXISTS "Admins manage taxonomy" ON public.topics;
+
+CREATE POLICY "Taxonomy full public access" ON public.exams FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Taxonomy full public access" ON public.subjects FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Taxonomy full public access" ON public.chapters FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Taxonomy full public access" ON public.topics FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- 5. QUESTIONS & OPTIONS
 CREATE POLICY "Published questions viewable by authenticated users"
