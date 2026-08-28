@@ -973,7 +973,6 @@ class SupabaseService {
         'subject_id': subjectId,
         'name': trimmedName,
         'code': trimmedCode,
-        'is_active': isActive,
         'display_order': 99,
       }).select();
 
@@ -991,7 +990,6 @@ class SupabaseService {
           'subject_id': subjectId,
           'name': trimmedName,
           'code': trimmedCode,
-          'is_active': isActive,
           'display_order': 99,
         });
       } catch (e2) {
@@ -1020,23 +1018,13 @@ class SupabaseService {
     try {
       final updates = <String, dynamic>{'name': name.trim()};
       if (code != null) updates['code'] = code.trim().toUpperCase();
-      if (isActive != null) updates['is_active'] = isActive;
 
       await client.from('chapters').update(updates).eq('id', chapterId);
     } catch (e) {
       debugPrint('Notice updating chapter in Supabase remote DB: $e');
     }
 
-    final current = _dynamicTaxonomyStore[storeKey] ?? _getSeedChaptersForSubject(exam, subject);
-    for (var c in current) {
-      if (c['id'].toString() == chapterId.toString()) {
-        c['name'] = name.trim();
-        if (code != null) c['code'] = code.trim().toUpperCase();
-        if (isActive != null) c['status'] = isActive ? 'Active' : 'Inactive';
-        break;
-      }
-    }
-    _dynamicTaxonomyStore[storeKey] = current;
+    _dynamicTaxonomyStore.remove(storeKey);
     await _saveTaxonomyToLocalStorage();
     await syncTaxonomyToCloud();
     return true;
@@ -1053,16 +1041,9 @@ class SupabaseService {
       await client.from('chapters').delete().eq('id', chapterId);
     } catch (e) {
       debugPrint('Notice deleting chapter from Supabase DB: $e');
-      try {
-        await client.from('chapters').update({'is_active': false}).eq('id', chapterId);
-      } catch (e2) {
-        debugPrint('Fallback deactivating chapter in DB: $e2');
-      }
     }
 
-    final current = _dynamicTaxonomyStore[storeKey] ?? [];
-    current.removeWhere((c) => c['id'].toString() == chapterId.toString());
-    _dynamicTaxonomyStore[storeKey] = current;
+    _dynamicTaxonomyStore.remove(storeKey);
     await _saveTaxonomyToLocalStorage();
     await syncTaxonomyToCloud();
     return true;
@@ -1080,24 +1061,9 @@ class SupabaseService {
       await client.from('topics').delete().eq('id', topicId);
     } catch (e) {
       debugPrint('Notice deleting topic from Supabase DB: $e');
-      try {
-        await client.from('topics').update({'is_active': false}).eq('id', topicId);
-      } catch (e2) {
-        debugPrint('Fallback deactivating topic in DB: $e2');
-      }
     }
 
-    final current = _dynamicTaxonomyStore[storeKey] ?? [];
-    for (var c in current) {
-      if (c['id'].toString() == chapterId.toString()) {
-        final topicsList = (c['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-        topicsList.removeWhere((t) => t['id'].toString() == topicId.toString());
-        c['topicsList'] = topicsList;
-        c['topics'] = topicsList.length;
-        break;
-      }
-    }
-    _dynamicTaxonomyStore[storeKey] = current;
+    _dynamicTaxonomyStore.remove(storeKey);
     await _saveTaxonomyToLocalStorage();
     await syncTaxonomyToCloud();
     return true;
@@ -1114,28 +1080,18 @@ class SupabaseService {
     final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
     String finalTopicId = 't_${DateTime.now().millisecondsSinceEpoch}';
 
-    final newTopic = {
-      'id': finalTopicId,
-      'name': name.trim(),
-      'code': code.trim().toUpperCase(),
-      'questions': 0,
-      'status': isActive ? 'Active' : 'Inactive',
-    };
-
     // 1. Remote Supabase Database Insert with fallback
     try {
       final res = await client.from('topics').insert({
         'chapter_id': chapterId,
         'name': name.trim(),
         'code': code.trim().toUpperCase(),
-        'is_active': isActive,
       }).select();
 
       if (res != null && (res as List).isNotEmpty) {
         final dbId = res.first['id']?.toString();
         if (dbId != null && dbId.isNotEmpty) {
           finalTopicId = dbId;
-          newTopic['id'] = dbId;
         }
       }
     } catch (e) {
@@ -1146,24 +1102,13 @@ class SupabaseService {
           'chapter_id': chapterId,
           'name': name.trim(),
           'code': code.trim().toUpperCase(),
-          'is_active': isActive,
         });
       } catch (e2) {
         debugPrint('Supabase remote topic insert fallback notice: $e2');
       }
     }
 
-    final current = _dynamicTaxonomyStore[storeKey] ?? _getSeedChaptersForSubject(exam, subject);
-    for (var c in current) {
-      if (c['id'].toString() == chapterId.toString()) {
-        final topicsList = (c['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-        topicsList.add(newTopic);
-        c['topicsList'] = topicsList;
-        c['topics'] = topicsList.length;
-        break;
-      }
-    }
-    _dynamicTaxonomyStore[storeKey] = current;
+    _dynamicTaxonomyStore.remove(storeKey);
     await _saveTaxonomyToLocalStorage();
     await syncTaxonomyToCloud();
     return true;
@@ -1183,7 +1128,6 @@ class SupabaseService {
     try {
       final updates = <String, dynamic>{'name': name.trim()};
       if (code != null) updates['code'] = code.trim().toUpperCase();
-      if (isActive != null) updates['is_active'] = isActive;
 
       await client.from('topics').update(updates).eq('id', topicId);
     } catch (e) {
