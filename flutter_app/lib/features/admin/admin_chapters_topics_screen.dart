@@ -102,13 +102,17 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
               if (nameCtrl.text.trim().isEmpty) return;
               Navigator.pop(ctx);
               final code = codeCtrl.text.trim().isNotEmpty ? codeCtrl.text : nameCtrl.text.toUpperCase().replaceAll(' ', '_');
-              await SupabaseService.addChapterToDatabase(
+              final newId = await SupabaseService.addChapterToDatabase(
                 exam: _selectedExam,
                 subject: _selectedSubject,
                 name: nameCtrl.text,
                 code: code,
                 isActive: isActive,
               );
+              setState(() {
+                _selectedChapterId = newId;
+                _selectedChapterForTopics = nameCtrl.text.trim();
+              });
               _loadTaxonomyFromService(forceRefresh: true);
             },
             child: const Text('Add Chapter', style: TextStyle(color: Colors.white)),
@@ -878,9 +882,9 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                           children: [
                             const Text('Quick Actions', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                             const SizedBox(height: 14),
-                            _buildQuickActionButton(Icons.add, 'Add New Chapter'),
+                            _buildQuickActionButton(Icons.add, 'Add New Chapter', onTap: _showAddChapterDialog),
                             const SizedBox(height: 8),
-                            _buildQuickActionButton(Icons.add, 'Add New Topic'),
+                            _buildQuickActionButton(Icons.add, 'Add New Topic', onTap: _showAddTopicDialog),
                             const SizedBox(height: 8),
                             _buildQuickActionButton(Icons.file_upload_outlined, 'Import Chapters/Topics'),
                             const SizedBox(height: 8),
@@ -987,9 +991,9 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
     );
   }
 
-  Widget _buildQuickActionButton(IconData icon, String label) {
+  Widget _buildQuickActionButton(IconData icon, String label, {VoidCallback? onTap}) {
     return OutlinedButton.icon(
-      onPressed: () {},
+      onPressed: onTap ?? () {},
       style: OutlinedButton.styleFrom(
         foregroundColor: const Color(0xFF1E293B),
         side: const BorderSide(color: Color(0xFFE2E8F0)),

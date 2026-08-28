@@ -492,13 +492,20 @@ class SupabaseService {
     bool includeInactive = false,
   }) async {
     final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
-    if (!forceRefresh && _dynamicTaxonomyStore.containsKey(storeKey) && _dynamicTaxonomyStore[storeKey]!.isNotEmpty) {
+
+    // 1. Ensure memory store is initialized with seed chapters if not present
+    if (!_dynamicTaxonomyStore.containsKey(storeKey) || _dynamicTaxonomyStore[storeKey]!.isEmpty) {
+      _dynamicTaxonomyStore[storeKey] = _getSeedChaptersForSubject(exam, subject);
+    }
+
+    // 2. If not forcing refresh, return memory store contents directly
+    if (!forceRefresh) {
       final cached = _dynamicTaxonomyStore[storeKey]!;
       if (!includeInactive) {
         return cached.where((c) => c['status'] == 'Active').map((c) {
           final copy = Map<String, dynamic>.from(c);
-          if (copy['topics'] is List) {
-            copy['topics'] = (copy['topics'] as List).where((t) => t['status'] == 'Active').toList();
+          if (copy['topicsList'] is List) {
+            copy['topicsList'] = (copy['topicsList'] as List).where((t) => t['status'] == 'Active').toList();
           }
           return copy;
         }).toList();
@@ -506,7 +513,8 @@ class SupabaseService {
       return cached;
     }
 
-    List<Map<String, dynamic>> chapters = [];
+    // 3. If forceRefresh is requested, query Supabase DB and merge DB results into memory store
+    List<Map<String, dynamic>> dbChapters = [];
     try {
       final res = await client
           .from('chapters')
@@ -516,7 +524,7 @@ class SupabaseService {
           .order('display_order', ascending: true);
 
       if (res != null && (res as List).isNotEmpty) {
-        chapters = (res as List).map<Map<String, dynamic>>((e) {
+        dbChapters = (res as List).map<Map<String, dynamic>>((e) {
           final topicsList = (e['topics'] as List?)?.map<Map<String, dynamic>>((t) {
             return {
               'id': t['id'] ?? '',
@@ -542,14 +550,23 @@ class SupabaseService {
       debugPrint('Notice loading chapters from Supabase: $e');
     }
 
-    if (chapters.isEmpty) {
-      chapters = _getSeedChaptersForSubject(exam, subject);
+    if (dbChapters.isNotEmpty) {
+      final currentStore = _dynamicTaxonomyStore[storeKey] ?? [];
+      final mergedMap = <String, Map<String, dynamic>>{};
+      for (var ch in dbChapters) {
+        mergedMap[ch['id'].toString()] = ch;
+      }
+      for (var ch in currentStore) {
+        if (!mergedMap.containsKey(ch['id'].toString())) {
+          mergedMap[ch['id'].toString()] = ch;
+        }
+      }
+      _dynamicTaxonomyStore[storeKey] = mergedMap.values.toList();
     }
 
-    _dynamicTaxonomyStore[storeKey] = chapters;
-
+    final finalStore = _dynamicTaxonomyStore[storeKey]!;
     if (!includeInactive) {
-      return chapters.where((c) => c['status'] == 'Active').map((c) {
+      return finalStore.where((c) => c['status'] == 'Active').map((c) {
         final copy = Map<String, dynamic>.from(c);
         if (copy['topicsList'] is List) {
           copy['topicsList'] = (copy['topicsList'] as List).where((t) => t['status'] == 'Active').toList();
@@ -558,7 +575,7 @@ class SupabaseService {
       }).toList();
     }
 
-    return chapters;
+    return finalStore;
   }
 
   static List<Map<String, dynamic>> _getSeedChaptersForSubject(String exam, String subject) {
@@ -796,7 +813,7 @@ class SupabaseService {
     ];
   }
 
-  static Future<bool> addChapterToDatabase({
+  static Future<String> addChapterToDatabase({
     required String exam,
     required String subject,
     required String name,
@@ -834,7 +851,7 @@ class SupabaseService {
     final current = _dynamicTaxonomyStore[storeKey] ?? _getSeedChaptersForSubject(exam, subject);
     current.add(newChapter);
     _dynamicTaxonomyStore[storeKey] = current;
-    return true;
+    return newId;
   }
 
   static Future<bool> updateChapterInDatabase({
