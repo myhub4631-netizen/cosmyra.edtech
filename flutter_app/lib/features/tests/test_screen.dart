@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/latex_view.dart';
+import '../../core/services/supabase_service.dart';
 
 class CustomTestScreen extends StatefulWidget {
   final List<QuestionModel> questions;
@@ -9,11 +10,11 @@ class CustomTestScreen extends StatefulWidget {
   final Function(TestAttemptModel attempt, Map<int, String> answers) onTestSubmitted;
 
   const CustomTestScreen({
-    Key? key,
+    super.key,
     required this.questions,
     this.durationMinutes = 60,
     required this.onTestSubmitted,
-  }) : super(key: key);
+  });
 
   @override
   State<CustomTestScreen> createState() => _CustomTestScreenState();
@@ -34,9 +35,47 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
   void initState() {
     super.initState();
     _startedAt = DateTime.now();
-    _expiresAt = _startedAt.add(Duration(minutes: widget.durationMinutes));
-    _secondsRemaining = widget.durationMinutes * 60;
+    _secondsRemaining = widget.durationMinutes > 0 ? widget.durationMinutes * 60 : 3600;
+    _expiresAt = _startedAt.add(Duration(seconds: _secondsRemaining));
+    _restoreActiveSession();
     _startTimer();
+  }
+
+  Future<void> _restoreActiveSession() async {
+    final savedSession = await SupabaseService.loadActiveTestSession();
+    if (savedSession != null && mounted) {
+      final savedAnswersRaw = savedSession['userAnswers'] as Map<String, dynamic>?;
+      final savedReviewRaw = savedSession['markedForReview'] as List<dynamic>?;
+      final savedSecs = savedSession['secondsRemaining'] as int?;
+
+      setState(() {
+        if (savedAnswersRaw != null) {
+          savedAnswersRaw.forEach((k, v) {
+            final idx = int.tryParse(k);
+            if (idx != null) {
+              _userAnswers[idx] = v.toString();
+            }
+          });
+        }
+        if (savedReviewRaw != null) {
+          _markedForReview.addAll(savedReviewRaw.map((e) => e as int));
+        }
+        if (savedSecs != null && savedSecs > 0) {
+          _secondsRemaining = savedSecs;
+        }
+      });
+    }
+  }
+
+  void _persistCurrentSession() {
+    SupabaseService.saveActiveTestSession(
+      questions: widget.questions,
+      userAnswers: _userAnswers,
+      markedForReview: _markedForReview,
+      secondsRemaining: _secondsRemaining,
+      startedAt: _startedAt,
+      durationMinutes: widget.durationMinutes,
+    );
   }
 
   void _startTimer() {
@@ -46,6 +85,9 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
         _submitTest(auto: true);
       } else {
         setState(() => _secondsRemaining--);
+        if (_secondsRemaining % 10 == 0) {
+          _persistCurrentSession();
+        }
       }
     });
   }
@@ -60,12 +102,14 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
     setState(() {
       _userAnswers[_currentIndex] = optionText;
     });
+    _persistCurrentSession();
   }
 
   void _clearResponse() {
     setState(() {
       _userAnswers.remove(_currentIndex);
     });
+    _persistCurrentSession();
   }
 
   void _toggleMarkForReview() {
@@ -76,6 +120,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
         _markedForReview.add(_currentIndex);
       }
     });
+    _persistCurrentSession();
   }
 
   void _confirmSubmit() {
@@ -84,31 +129,55 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('Submit Examination?'),
-        content: Text(
-          'You have attempted $attemptedCount out of $totalCount questions.\n\nAre you sure you want to submit your test?',
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.assignment_turned_in_outlined, color: Color(0xFF4F46E5)),
+            SizedBox(width: 8),
+            Text('Submit Test?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('You have answered $attemptedCount out of $totalCount questions.'),
+            const SizedBox(height: 12),
+            const Text(
+              'Once submitted, you cannot change your answers.',
+              style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+            ),
+          ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel & Resume')),
+          OutlinedButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('CANCEL'),
+          ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4F46E5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
             onPressed: () {
               Navigator.of(ctx).pop();
               _submitTest(auto: false);
             },
-            child: const Text('Confirm Submission'),
+            child: const Text('SUBMIT TEST', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
-  void _submitTest({required bool auto}) {
+  Future<void> _submitTest({required bool auto}) async {
     if (_isSubmitting) return;
     setState(() => _isSubmitting = true);
     _timer?.cancel();
 
-    // Calculate Test Score Server-Style (+4 for correct, -1 for incorrect)
+    // Calculate Test Score (+4 for correct, -1 for incorrect)
     int correct = 0;
     int incorrect = 0;
     double score = 0.0;
@@ -142,12 +211,13 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
     final attempted = _userAnswers.length;
     final unattempted = widget.questions.length - attempted;
     final accuracy = attempted > 0 ? (correct / attempted) * 100 : 0.0;
+    final timeSpent = (widget.durationMinutes * 60) - _secondsRemaining;
 
     final attempt = TestAttemptModel(
       id: 'att-${DateTime.now().millisecondsSinceEpoch}',
-      userId: 'usr-demo-123',
+      userId: 'usr-current',
       testTemplateId: 'tmpl-custom',
-      testTitle: 'Custom NEET/JEE Full Mock Test',
+      testTitle: 'Custom Test Session',
       startedAt: _startedAt,
       expiresAt: _expiresAt,
       submittedAt: DateTime.now(),
@@ -160,10 +230,20 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
       incorrectCount: incorrect,
       unattemptedCount: unattempted,
       accuracy: double.parse(accuracy.toStringAsFixed(1)),
-      timeSpentSeconds: (widget.durationMinutes * 60) - _secondsRemaining,
+      timeSpentSeconds: timeSpent > 0 ? timeSpent : 1,
     );
 
-    widget.onTestSubmitted(attempt, _userAnswers);
+    // Save to Supabase and storage
+    await SupabaseService.submitTestAttempt(
+      userId: 'usr-current',
+      attempt: attempt,
+      questions: widget.questions,
+      userAnswers: _userAnswers,
+    );
+
+    if (mounted) {
+      widget.onTestSubmitted(attempt, _userAnswers);
+    }
   }
 
   @override
@@ -175,22 +255,26 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
     final question = widget.questions[_currentIndex];
     final selectedAns = _userAnswers[_currentIndex];
     final isMarked = _markedForReview.contains(_currentIndex);
+    final isDesktop = MediaQuery.of(context).size.width >= 900;
 
     return Scaffold(
       appBar: AppBar(
         title: Text('Question ${_currentIndex + 1} of ${widget.questions.length}'),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF0F172A),
+        elevation: 1,
         actions: [
           // Countdown Timer Chip
           Container(
             margin: const EdgeInsets.only(right: 12),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             decoration: BoxDecoration(
-              color: _secondsRemaining < 300 ? Colors.red : Theme.of(context).primaryColor,
+              color: _secondsRemaining < 300 ? Colors.red : const Color(0xFF4F46E5),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
               children: [
-                const Icon(Icons.timer, color: Colors.white, size: 16),
+                const Icon(Icons.timer_outlined, color: Colors.white, size: 16),
                 const SizedBox(width: 6),
                 Text(
                   '${(_secondsRemaining ~/ 60).toString().padLeft(2, '0')}:${(_secondsRemaining % 60).toString().padLeft(2, '0')}',
@@ -199,41 +283,50 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
               ],
             ),
           ),
-          ElevatedButton(
-            onPressed: _confirmSubmit,
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Submit Test'),
+          Padding(
+            padding: const EdgeInsets.only(right: 12.0),
+            child: ElevatedButton(
+              onPressed: _isSubmitting ? null : _confirmSubmit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('SUBMIT TEST', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
           ),
-          const SizedBox(width: 16),
         ],
       ),
       body: Row(
         children: [
-          // Question Content
+          // Question Content Area
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Test Header & Status
+                  // Test Header Bar (Marking Scheme + Controls)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Marking: +${question.marks.toInt()} / -${question.negativeMarks.toInt()}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                      Chip(
+                        label: Text('Marking: +${question.marks.toInt()} / -${question.negativeMarks.toInt()}'),
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        side: BorderSide.none,
                       ),
                       Row(
                         children: [
                           OutlinedButton.icon(
                             onPressed: _toggleMarkForReview,
-                            icon: Icon(isMarked ? Icons.bookmark : Icons.bookmark_border, color: Colors.amber),
+                            icon: Icon(
+                              isMarked ? Icons.bookmark : Icons.bookmark_border,
+                              color: isMarked ? Colors.amber : const Color(0xFF64748B),
+                            ),
                             label: Text(isMarked ? 'Marked for Review' : 'Mark for Review'),
                           ),
                           const SizedBox(width: 8),
                           OutlinedButton(
-                            onPressed: _clearResponse,
+                            onPressed: selectedAns != null ? _clearResponse : null,
                             child: const Text('Clear Answer'),
                           ),
                         ],
@@ -242,20 +335,31 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Question Card (HIDDEN SOLUTIONS & ANSWERS DURING TEST)
+                  // Question Card
                   Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     child: Padding(
                       padding: const EdgeInsets.all(24.0),
-                      child: LaTeXView(
-                        text: question.questionText,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 17, height: 1.4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          LaTeXView(
+                            text: question.questionText,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 17, height: 1.4),
+                          ),
+                          if (question.questionImage != null) ...[
+                            const SizedBox(height: 12),
+                            Image.network(question.questionImage!, height: 180, fit: BoxFit.contain),
+                          ],
+                        ],
                       ),
                     ),
                   ),
 
                   const SizedBox(height: 24),
 
-                  // Options (Only highlight user selected option, correct answer is HIDDEN)
+                  // Options List (STRICT NO ANSWER REVEAL / NO CORRECTNESS HIGHLIGHT DURING TEST)
                   if (question.qType == 'numerical')
                     _buildNumericalField(selectedAns)
                   else
@@ -269,10 +373,10 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: isSelected ? Theme.of(context).primaryColor.withOpacity(0.12) : Theme.of(context).cardColor,
+                              color: isSelected ? const Color(0xFFEEF2FF) : Colors.white,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: isSelected ? Theme.of(context).primaryColor : Theme.of(context).dividerColor.withOpacity(0.2),
+                                color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
                                 width: isSelected ? 2 : 1,
                               ),
                             ),
@@ -280,11 +384,11 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                               children: [
                                 CircleAvatar(
                                   radius: 16,
-                                  backgroundColor: isSelected ? Theme.of(context).primaryColor : Colors.grey.withOpacity(0.2),
+                                  backgroundColor: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFF1F5F9),
                                   child: Text(
                                     String.fromCharCode(65 + opt.optionIndex),
                                     style: TextStyle(
-                                      color: isSelected ? Colors.white : Colors.black87,
+                                      color: isSelected ? Colors.white : const Color(0xFF475569),
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -300,15 +404,16 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
 
                   const SizedBox(height: 32),
 
-                  // Navigation Row
+                  // Bottom Controls
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      OutlinedButton(
+                      OutlinedButton.icon(
                         onPressed: _currentIndex > 0 ? () => setState(() => _currentIndex--) : null,
-                        child: const Text('Previous'),
+                        icon: const Icon(Icons.arrow_back),
+                        label: const Text('Previous'),
                       ),
-                      ElevatedButton(
+                      ElevatedButton.icon(
                         onPressed: () {
                           if (_currentIndex < widget.questions.length - 1) {
                             setState(() => _currentIndex++);
@@ -316,7 +421,16 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                             _confirmSubmit();
                           }
                         },
-                        child: Text(_currentIndex == widget.questions.length - 1 ? 'Review & Submit' : 'Next Question'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4F46E5),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: Icon(_currentIndex == widget.questions.length - 1 ? Icons.check_circle_outline : Icons.arrow_forward, color: Colors.white),
+                        label: Text(
+                          _currentIndex == widget.questions.length - 1 ? 'Review & Submit' : 'Next Question',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ],
                   ),
@@ -325,74 +439,75 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
             ),
           ),
 
-          // Question Palette Side Navigation
-          Container(
-            width: 240,
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              border: Border(left: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.1))),
-            ),
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Question Palette', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 12),
-                const Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    _PaletteLegend(color: Colors.green, label: 'Attempted'),
-                    _PaletteLegend(color: Colors.amber, label: 'Review'),
-                    _PaletteLegend(color: Colors.grey, label: 'Unattempted'),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 4,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                    ),
-                    itemCount: widget.questions.length,
-                    itemBuilder: (ctx, idx) {
-                      final isCur = idx == _currentIndex;
-                      final isAns = _userAnswers.containsKey(idx);
-                      final isRev = _markedForReview.contains(idx);
+          // Question Palette Sidebar on Desktop
+          if (isDesktop)
+            Container(
+              width: 240,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(left: BorderSide(color: Color(0xFFE2E8F0))),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Question Palette', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A))),
+                  const SizedBox(height: 12),
+                  const Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      _PaletteLegend(color: Color(0xFF4F46E5), label: 'Answered'),
+                      _PaletteLegend(color: Colors.amber, label: 'Review'),
+                      _PaletteLegend(color: Color(0xFFCBD5E1), label: 'Unanswered'),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: GridView.builder(
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 4,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                      ),
+                      itemCount: widget.questions.length,
+                      itemBuilder: (ctx, idx) {
+                        final isCur = idx == _currentIndex;
+                        final isAns = _userAnswers.containsKey(idx);
+                        final isRev = _markedForReview.contains(idx);
 
-                      Color bg = Colors.grey.withOpacity(0.15);
-                      if (isAns) bg = Colors.green;
-                      if (isRev) bg = Colors.amber;
+                        Color bg = const Color(0xFFF1F5F9);
+                        if (isAns) bg = const Color(0xFF4F46E5);
+                        if (isRev) bg = Colors.amber;
 
-                      return InkWell(
-                        onTap: () => setState(() => _currentIndex = idx),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: bg,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: isCur ? Theme.of(context).primaryColor : Colors.transparent,
-                              width: isCur ? 3.0 : 0,
+                        return InkWell(
+                          onTap: () => setState(() => _currentIndex = idx),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: bg,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isCur ? const Color(0xFF0F172A) : Colors.transparent,
+                                width: isCur ? 3.0 : 0,
+                              ),
                             ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '${idx + 1}',
-                              style: TextStyle(
-                                color: isAns || isRev ? Colors.white : Colors.black87,
-                                fontWeight: FontWeight.bold,
+                            child: Center(
+                              child: Text(
+                                '${idx + 1}',
+                                style: TextStyle(
+                                  color: isAns || isRev ? Colors.white : const Color(0xFF475569),
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -406,7 +521,11 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
         TextField(
           controller: controller,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Numerical Answer'),
+          decoration: const InputDecoration(
+            labelText: 'Enter Numerical Answer (Integer / Decimal)',
+            hintText: 'e.g. 15.5',
+            border: OutlineInputBorder(),
+          ),
           onChanged: (val) => _selectOption(val),
         ),
       ],
@@ -418,7 +537,7 @@ class _PaletteLegend extends StatelessWidget {
   final Color color;
   final String label;
 
-  const _PaletteLegend({Key? key, required this.color, required this.label}) : super(key: key);
+  const _PaletteLegend({required this.color, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -427,7 +546,7 @@ class _PaletteLegend extends StatelessWidget {
       children: [
         Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
       ],
     );
   }

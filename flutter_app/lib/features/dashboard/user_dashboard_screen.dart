@@ -7,21 +7,23 @@ class UserDashboardScreen extends StatefulWidget {
   final UserProfileModel userProfile;
   final String activeExam;
   final VoidCallback onOpenPractice;
+  final VoidCallback? onOpenCustomTest;
   final VoidCallback onOpenMockTests;
   final VoidCallback onOpenPyqs;
   final VoidCallback onOpenMistakes;
   final VoidCallback? onLogout;
 
   const UserDashboardScreen({
-    Key? key,
+    super.key,
     required this.userProfile,
     required this.activeExam,
     required this.onOpenPractice,
+    this.onOpenCustomTest,
     required this.onOpenMockTests,
     required this.onOpenPyqs,
     required this.onOpenMistakes,
     this.onLogout,
-  }) : super(key: key);
+  });
 
   @override
   State<UserDashboardScreen> createState() => _UserDashboardScreenState();
@@ -511,7 +513,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   Widget _buildMobileQuickActions() {
     final actions = [
       {'label': 'Custom Practice', 'icon': Icons.track_changes_rounded, 'color': const Color(0xFF16A34A), 'bg': const Color(0xFFDCFCE7), 'tap': widget.onOpenPractice},
-      {'label': 'Custom Test', 'icon': Icons.assignment_outlined, 'color': const Color(0xFF2563EB), 'bg': const Color(0xFFDBEAFE), 'tap': widget.onOpenMockTests},
+      {'label': 'Custom Test', 'icon': Icons.assignment_outlined, 'color': const Color(0xFF2563EB), 'bg': const Color(0xFFDBEAFE), 'tap': widget.onOpenCustomTest ?? widget.onOpenMockTests},
       {'label': 'PYQ Practice', 'icon': Icons.menu_book_rounded, 'color': const Color(0xFF7C3AED), 'bg': const Color(0xFFDDD6FE), 'tap': widget.onOpenPyqs},
       {'label': 'NTA Questions', 'icon': Icons.shield_outlined, 'color': const Color(0xFFEA580C), 'bg': const Color(0xFFFFEDD5), 'tap': widget.onOpenPyqs},
       {'label': 'Test Series', 'icon': Icons.calendar_today_outlined, 'color': const Color(0xFFDB2777), 'bg': const Color(0xFFFCE7F3), 'tap': widget.onOpenMockTests},
@@ -1068,7 +1070,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                         return;
                       }
                       if (item['label'] == 'Practice' || item['label'] == 'Custom Practice') widget.onOpenPractice();
-                      if (item['label'] == 'Custom Test' || item['label'] == 'Test Series') widget.onOpenMockTests();
+                      if (item['label'] == 'Custom Test') {
+                        (widget.onOpenCustomTest ?? widget.onOpenMockTests)();
+                      } else if (item['label'] == 'Test Series') {
+                        widget.onOpenMockTests();
+                      }
                       if (item['label'] == 'PYQ' || item['label'] == 'NTA Questions') widget.onOpenPyqs();
                       if (item['label'] == 'Bookmarks' || item['label'] == 'My Mistakes') widget.onOpenMistakes();
                     },
@@ -1572,7 +1578,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         'cardBg': const Color(0xFFEFF6FF),
         'borderColor': const Color(0xFFDBEAFE),
         'iconBg': const Color(0xFFDBEAFE),
-        'onTap': widget.onOpenMockTests,
+        'onTap': widget.onOpenCustomTest ?? widget.onOpenMockTests,
       },
       {
         'title': 'PYQ Practice',

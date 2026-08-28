@@ -6,12 +6,14 @@ class CustomPracticeWizardModal extends StatefulWidget {
   final String initialExam;
   final VoidCallback? onClose;
   final Function(List<QuestionModel> questions, int timerMinutes) onStartPractice;
+  final PracticeTestMode mode;
 
   const CustomPracticeWizardModal({
     super.key,
     required this.initialExam,
     this.onClose,
     required this.onStartPractice,
+    this.mode = PracticeTestMode.practice,
   });
 
   @override
@@ -551,24 +553,26 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
-                  children: const [
+                  children: [
                     Text(
-                      'Custom Practice',
+                      widget.mode == PracticeTestMode.test ? 'Custom Test' : 'Custom Practice',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF0F172A),
                         letterSpacing: -0.3,
                       ),
                     ),
-                    SizedBox(height: 1),
+                    const SizedBox(height: 1),
                     Text(
-                      'Build your personalized practice',
+                      widget.mode == PracticeTestMode.test
+                          ? 'Configure your full-length evaluation test'
+                          : 'Build your personalized practice',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 11.5,
                         color: Color(0xFF64748B),
                         fontWeight: FontWeight.w400,
@@ -2401,29 +2405,37 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
               Container(
                 width: 40,
                 height: 40,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFEEF2FF),
+                decoration: BoxDecoration(
+                  color: widget.mode == PracticeTestMode.test ? const Color(0xFFFEF2F2) : const Color(0xFFEEF2FF),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.lightbulb_outline_rounded, color: Color(0xFFEAB308), size: 22),
+                child: Icon(
+                  widget.mode == PracticeTestMode.test ? Icons.warning_amber_rounded : Icons.lightbulb_outline_rounded,
+                  color: widget.mode == PracticeTestMode.test ? const Color(0xFFDC2626) : const Color(0xFFEAB308),
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'You\'re all set to start practicing!',
-                      style: TextStyle(
+                      widget.mode == PracticeTestMode.test
+                          ? 'Important Notice: Test Mode Active'
+                          : 'You\'re all set to start practicing!',
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF0F172A),
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
-                      'Click on Start Practice to begin your customized session.',
-                      style: TextStyle(
+                      widget.mode == PracticeTestMode.test
+                          ? 'This is a test. Your answers will not show correctness or solutions until you submit the test.'
+                          : 'Click on Start Practice to begin your customized session.',
+                      style: const TextStyle(
                         fontSize: 12.5,
                         color: Color(0xFF64748B),
                         height: 1.3,
@@ -2631,11 +2643,15 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   if (_currentStep == 3) ...[
-                    const Icon(Icons.play_arrow_outlined, color: Colors.white, size: 22),
+                    Icon(
+                      widget.mode == PracticeTestMode.test ? Icons.assignment_turned_in_outlined : Icons.play_arrow_outlined,
+                      color: Colors.white,
+                      size: 22,
+                    ),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Start Practice',
-                      style: TextStyle(
+                    Text(
+                      widget.mode == PracticeTestMode.test ? 'Start Test' : 'Start Practice',
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,

@@ -628,3 +628,60 @@ class ReportModel {
     );
   }
 }
+
+/// Mode for custom practice vs custom test sessions
+enum PracticeTestMode { practice, test }
+
+/// Unified configuration model for Custom Practice and Custom Test
+class PracticeTestConfigModel {
+  final String exam; // NEET, JEE
+  final List<String> selectedSubjects;
+  final List<String> selectedChapterIds;
+  final List<String> selectedTopicIds;
+  final List<String> selectedSources; // PYQ, NTA, NCERT, Practice, Others
+  final String difficulty; // Easy, Medium, Hard, Mixed
+  final int questionCount;
+  final int timeLimitMinutes;
+  final PracticeTestMode mode;
+
+  PracticeTestConfigModel({
+    required this.exam,
+    required this.selectedSubjects,
+    required this.selectedChapterIds,
+    required this.selectedTopicIds,
+    required this.selectedSources,
+    required this.difficulty,
+    required this.questionCount,
+    required this.timeLimitMinutes,
+    this.mode = PracticeTestMode.practice,
+  });
+
+  bool get isTest => mode == PracticeTestMode.test;
+
+  Map<String, dynamic> toJson() => {
+        'exam': exam,
+        'selected_subjects': selectedSubjects,
+        'selected_chapter_ids': selectedChapterIds,
+        'selected_topic_ids': selectedTopicIds,
+        'selected_sources': selectedSources,
+        'difficulty': difficulty,
+        'question_count': questionCount,
+        'time_limit_minutes': timeLimitMinutes,
+        'mode': mode.name,
+      };
+
+  factory PracticeTestConfigModel.fromJson(Map<String, dynamic> json) {
+    return PracticeTestConfigModel(
+      exam: json['exam'] ?? 'NEET',
+      selectedSubjects: List<String>.from(json['selected_subjects'] ?? []),
+      selectedChapterIds: List<String>.from(json['selected_chapter_ids'] ?? []),
+      selectedTopicIds: List<String>.from(json['selected_topic_ids'] ?? []),
+      selectedSources: List<String>.from(json['selected_sources'] ?? []),
+      difficulty: json['difficulty'] ?? 'Medium',
+      questionCount: json['question_count'] ?? 20,
+      timeLimitMinutes: json['time_limit_minutes'] ?? 30,
+      mode: (json['mode'] == 'test') ? PracticeTestMode.test : PracticeTestMode.practice,
+    );
+  }
+}
+

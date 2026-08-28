@@ -53,6 +53,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   // Active Test Engine State
   List<QuestionModel>? _activeTestQuestions;
+  int _activeTestDurationMinutes = 30;
+  List<QuestionModel>? _lastTestQuestions;
   TestAttemptModel? _lastTestAttemptResult;
   Map<int, String>? _lastTestUserAnswers;
 
@@ -149,9 +151,34 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   void _startCustomTest() {
-    setState(() {
-      _activeTestQuestions = SupabaseService.getSampleQuestions();
-    });
+    _openCustomTestWizard();
+  }
+
+  void _openCustomTestWizard() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) => CustomPracticeWizardModal(
+          initialExam: _activeExam,
+          mode: PracticeTestMode.test,
+          onClose: () {
+            if (Navigator.of(ctx).canPop()) {
+              Navigator.of(ctx).pop();
+            } else {
+              setState(() => _selectedIndex = 0);
+            }
+          },
+          onStartPractice: (questions, timerMins) {
+            if (Navigator.of(ctx).canPop()) {
+              Navigator.of(ctx).pop();
+            }
+            setState(() {
+              _activeTestQuestions = questions;
+              _activeTestDurationMinutes = timerMins;
+            });
+          },
+        ),
+      ),
+    );
   }
 
   void _openAuthModal() {
@@ -196,9 +223,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     if (_activeTestQuestions != null) {
       return CustomTestScreen(
         questions: _activeTestQuestions!,
-        durationMinutes: 30,
+        durationMinutes: _activeTestDurationMinutes > 0 ? _activeTestDurationMinutes : 30,
         onTestSubmitted: (attempt, answers) {
           setState(() {
+            _lastTestQuestions = List<QuestionModel>.from(_activeTestQuestions!);
             _activeTestQuestions = null;
             _lastTestAttemptResult = attempt;
             _lastTestUserAnswers = answers;
@@ -213,12 +241,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         appBar: AppBar(title: const Text('Examination Score Report')),
         body: TestResultScreen(
           attempt: _lastTestAttemptResult!,
-          questions: SupabaseService.getSampleQuestions(),
+          questions: _lastTestQuestions ?? SupabaseService.getSampleQuestions(),
           userAnswers: _lastTestUserAnswers!,
           onBackToDashboard: () {
             setState(() {
               _lastTestAttemptResult = null;
               _lastTestUserAnswers = null;
+              _lastTestQuestions = null;
+              _selectedIndex = 0;
             });
           },
         ),
@@ -273,6 +303,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           userProfile: _currentUser,
           activeExam: _activeExam,
           onOpenPractice: _openCustomPracticeWizard,
+          onOpenCustomTest: _openCustomTestWizard,
           onOpenMockTests: () => setState(() => _selectedIndex = 2),
           onOpenPyqs: () => setState(() => _selectedIndex = 3),
           onOpenMistakes: () => setState(() => _selectedIndex = 4),
@@ -349,6 +380,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           userProfile: _currentUser,
           activeExam: _activeExam,
           onOpenPractice: _openCustomPracticeWizard,
+          onOpenCustomTest: _openCustomTestWizard,
           onOpenMockTests: () => setState(() => _selectedIndex = 2),
           onOpenPyqs: () => setState(() => _selectedIndex = 3),
           onOpenMistakes: () => setState(() => _selectedIndex = 4),
