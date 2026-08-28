@@ -26,117 +26,34 @@ class AdminQuestionsBankDashboard extends StatefulWidget {
 class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboard> {
   int _activeCategoryTab = 0; // 0 = All Questions, 1 = Custom Practice, 2 = Custom Test, 3 = PYQ Practice, 4 = NTA Questions, 5 = Mock Tests
   String _searchQuery = '';
-  String _selectedExam = 'NEET 2026';
+  String _selectedExam = 'All Exams';
   String _selectedSubject = 'All Subjects';
   String _selectedChapter = 'All Chapters';
   String _selectedType = 'All Types';
   String _selectedStatus = 'All Status';
 
   bool _isSidebarCollapsed = false;
+  bool _isLoading = true;
   int _currentPage = 1;
   int _itemsPerPage = 10;
   final Set<String> _selectedQuestionIds = {};
 
-  final List<Map<String, dynamic>> _allQuestionsData = [
-    {
-      'id': 'Q125678',
-      'questionText': 'The velocity-time graph of a particle moving in a straight line is shown below...',
-      'category': 'Custom Practice',
-      'categoryColor': const Color(0xFFEEF2FF),
-      'categoryTextColor': const Color(0xFF4F46E5),
-      'subject': 'Physics',
-      'chapter': '1. Mechanics',
-      'topic': 'Kinematics',
-      'type': 'MCQ',
-      'marks': 4,
-      'status': 'Active',
-      'usedIn': 12,
-    },
-    {
-      'id': 'Q125677',
-      'questionText': 'Two bodies A and B of masses 2m and m are connected by a light string...',
-      'category': 'Custom Test',
-      'categoryColor': const Color(0xFFDBEAFE),
-      'categoryTextColor': const Color(0xFF2563EB),
-      'subject': 'Physics',
-      'chapter': '2. Thermodynamics',
-      'topic': 'Thermal Properties',
-      'type': 'MCQ',
-      'marks': 4,
-      'status': 'Active',
-      'usedIn': 8,
-    },
-    {
-      'id': 'Q125676',
-      'questionText': r'If y = \sin^{-1}\left(\frac{2x}{1+x^2}\right), \text{ then } \frac{dy}{dx} \text{ is equal to?}',
-      'category': 'PYQ Practice',
-      'categoryColor': const Color(0xFFDCFCE7),
-      'categoryTextColor': const Color(0xFF16A34A),
-      'subject': 'Mathematics',
-      'chapter': '3. Trigonometry',
-      'topic': 'Inverse Trigonometric Functions',
-      'type': 'MCQ',
-      'marks': 4,
-      'status': 'Active',
-      'usedIn': 15,
-    },
-    {
-      'id': 'Q125675',
-      'questionText': 'Match List-I with List-II regarding chemical stoichiometry.',
-      'category': 'NTA Question',
-      'categoryColor': const Color(0xFFFFEDD5),
-      'categoryTextColor': const Color(0xFFEA580C),
-      'subject': 'Chemistry',
-      'chapter': '1. Some Basic Concepts',
-      'topic': 'Mole Concept',
-      'type': 'Match',
-      'marks': 4,
-      'status': 'Active',
-      'usedIn': 24,
-    },
-    {
-      'id': 'Q125674',
-      'questionText': 'Which of the following is not a primary organelle in eukaryotic cells?',
-      'category': 'NTA Question',
-      'categoryColor': const Color(0xFFFFEDD5),
-      'categoryTextColor': const Color(0xFFEA580C),
-      'subject': 'Biology',
-      'chapter': '2. Cell: The Unit of Life',
-      'topic': 'Cell Organelles',
-      'type': 'MCQ',
-      'marks': 4,
-      'status': 'Active',
-      'usedIn': 18,
-    },
-    {
-      'id': 'Q125673',
-      'questionText': 'Consider the following statements regarding Kirchhoff\'s current law.',
-      'category': 'Mock Test',
-      'categoryColor': const Color(0xFFFCE7F3),
-      'categoryTextColor': const Color(0xFFDB2777),
-      'subject': 'Physics',
-      'chapter': '4. Electromagnetism',
-      'topic': 'Current Electricity',
-      'type': 'Assertion',
-      'marks': 4,
-      'status': 'Active',
-      'usedIn': 30,
-    },
-    {
-      'id': 'Q125672',
-      'questionText': 'A hydrogen-like atom in the ground state absorbs a photon of energy...',
-      'category': 'Mock Test',
-      'categoryColor': const Color(0xFFFCE7F3),
-      'categoryTextColor': const Color(0xFFDB2777),
-      'subject': 'Physics',
-      'chapter': '5. Modern Physics',
-      'topic': 'Atomic Structure',
-      'type': 'MCQ',
-      'marks': 4,
-      'status': 'Active',
-      'usedIn': 22,
-    },
-  ];
+  List<Map<String, dynamic>> _allQuestionsData = [];
+
+  // Cascading taxonomy mappings
+  final Map<String, List<String>> _examSubjectsMap = {
+    'NEET 2026': ['Physics', 'Chemistry', 'Biology'],
+    'NEET 2025': ['Physics', 'Chemistry', 'Biology'],
+    'JEE Main 2026': ['Physics', 'Chemistry', 'Mathematics'],
+    'JEE Main 2025': ['Physics', 'Chemistry', 'Mathematics'],
+  };
+
+  final Map<String, List<String>> _subjectChaptersMap = {
+    'Physics': ['1. Mechanics', '2. Thermodynamics', '3. Oscillations and Waves', '4. Electromagnetism', '5. Modern Physics'],
+    'Chemistry': ['1. Some Basic Concepts', '2. Organic Chemistry (GOC)', '3. Inorganic Periodic Table', '4. Physical Equilibrium'],
+    'Biology': ['1. Cell: The Unit of Life', '2. Genetics & Evolution', '3. Plant Physiology', '4. Human Physiology'],
+    'Mathematics': ['1. Algebra', '2. Trigonometry', '3. Calculus', '4. Coordinate Geometry'],
+  };
 
   @override
   void initState() {
@@ -145,36 +62,141 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
   }
 
   Future<void> _loadSupabaseQuestions() async {
+    setState(() => _isLoading = true);
     try {
       final dbQuestions = await SupabaseService.fetchAllQuestionsFromSupabase();
-      if (dbQuestions.isNotEmpty && mounted) {
-        setState(() {
-          for (var q in dbQuestions) {
-            final idx = _allQuestionsData.indexWhere((item) => item['id'] == q['id']);
-            if (idx != -1) {
-              _allQuestionsData[idx] = q;
-            } else {
-              _allQuestionsData.insert(0, {
-                'id': q['id'] ?? 'Q_${_allQuestionsData.length + 1}',
-                'questionText': q['questionText'] ?? q['question_text'] ?? '',
-                'category': q['category'] ?? 'Custom Practice',
-                'categoryColor': const Color(0xFFEEF2FF),
-                'categoryTextColor': const Color(0xFF4F46E5),
-                'subject': q['subject'] ?? 'Physics',
-                'chapter': q['chapter'] ?? '1. Mechanics',
-                'topic': q['topic'] ?? 'General',
-                'type': q['type'] ?? 'MCQ',
-                'marks': q['marks'] ?? 4,
-                'status': 'Active',
-                'usedIn': q['usedIn'] ?? 10,
-              });
-            }
-          }
-        });
+
+      if (dbQuestions.isNotEmpty) {
+        _allQuestionsData = dbQuestions;
+      } else {
+        // Fallback seed data if DB is completely fresh
+        _allQuestionsData = _getSeedQuestionsData();
       }
-    } catch (_) {}
+    } catch (_) {
+      _allQuestionsData = _getSeedQuestionsData();
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
+  List<Map<String, dynamic>> _getSeedQuestionsData() {
+    return [
+      {
+        'id': 'Q125678',
+        'questionText': 'The velocity-time graph of a particle moving in a straight line is shown below...',
+        'category': 'Custom Practice',
+        'subject': 'Physics',
+        'chapter': '1. Mechanics',
+        'topic': 'Kinematics',
+        'type': 'MCQ',
+        'marks': 4,
+        'negativeMarks': 1.0,
+        'status': 'Active',
+        'usedIn': 12,
+        'options': ['Option A', 'Option B', 'Option C', 'Option D'],
+        'correctAnswer': 'Option A',
+        'explanation': 'Acceleration is constant as the slope is linear.',
+      },
+      {
+        'id': 'Q125677',
+        'questionText': 'Two bodies A and B of masses 2m and m are connected by a light string...',
+        'category': 'Custom Test',
+        'subject': 'Physics',
+        'chapter': '2. Thermodynamics',
+        'topic': 'Thermal Properties',
+        'type': 'MCQ',
+        'marks': 4,
+        'negativeMarks': 1.0,
+        'status': 'Active',
+        'usedIn': 8,
+        'options': ['T1 > T2', 'T1 < T2', 'T1 = T2', 'None'],
+        'correctAnswer': 'T1 = T2',
+        'explanation': 'Thermal equilibrium implies equal temperatures.',
+      },
+      {
+        'id': 'Q125676',
+        'questionText': r'If y = \sin^{-1}\left(\frac{2x}{1+x^2}\right), \text{ then } \frac{dy}{dx} \text{ is equal to?}',
+        'category': 'PYQ Practice',
+        'subject': 'Mathematics',
+        'chapter': '3. Trigonometry',
+        'topic': 'Inverse Trigonometric Functions',
+        'type': 'MCQ',
+        'marks': 4,
+        'negativeMarks': 1.0,
+        'status': 'Active',
+        'usedIn': 15,
+        'options': [r'\frac{2}{1+x^2}', r'\frac{1}{1+x^2}', r'\frac{-2}{1+x^2}', '0'],
+        'correctAnswer': r'\frac{2}{1+x^2}',
+        'explanation': 'Substitute x = tan(theta).',
+      },
+      {
+        'id': 'Q125675',
+        'questionText': 'Match List-I with List-II regarding chemical stoichiometry.',
+        'category': 'NTA Question',
+        'subject': 'Chemistry',
+        'chapter': '1. Some Basic Concepts',
+        'topic': 'Mole Concept',
+        'type': 'Match',
+        'marks': 4,
+        'negativeMarks': 1.0,
+        'status': 'Active',
+        'usedIn': 24,
+        'options': ['A-I, B-II', 'A-II, B-III', 'A-III, B-I', 'A-IV, B-II'],
+        'correctAnswer': 'A-I, B-II',
+        'explanation': '1 mole of gas at STP occupies 22.4 L.',
+      },
+      {
+        'id': 'Q125674',
+        'questionText': 'Which of the following is not a primary organelle in eukaryotic cells?',
+        'category': 'NTA Question',
+        'subject': 'Biology',
+        'chapter': '2. Cell: The Unit of Life',
+        'topic': 'Cell Organelles',
+        'type': 'MCQ',
+        'marks': 4,
+        'negativeMarks': 1.0,
+        'status': 'Active',
+        'usedIn': 18,
+        'options': ['Mitochondria', 'Chloroplast', 'Ribosome', 'Nucleus'],
+        'correctAnswer': 'Ribosome',
+        'explanation': 'Ribosome is non-membrane bound.',
+      },
+      {
+        'id': 'Q125673',
+        'questionText': 'Consider the following statements regarding Kirchhoff\'s current law.',
+        'category': 'Mock Test',
+        'subject': 'Physics',
+        'chapter': '4. Electromagnetism',
+        'topic': 'Current Electricity',
+        'type': 'Assertion',
+        'marks': 4,
+        'negativeMarks': 1.0,
+        'status': 'Active',
+        'usedIn': 30,
+        'options': ['Both A and R true', 'A true R false', 'A false R true', 'Both false'],
+        'correctAnswer': 'Both A and R true',
+        'explanation': 'KCL is based on conservation of charge.',
+      },
+      {
+        'id': 'Q125672',
+        'questionText': 'A hydrogen-like atom in the ground state absorbs a photon of energy...',
+        'category': 'Mock Test',
+        'subject': 'Physics',
+        'chapter': '5. Modern Physics',
+        'topic': 'Atomic Structure',
+        'type': 'MCQ',
+        'marks': 4,
+        'negativeMarks': 1.0,
+        'status': 'Active',
+        'usedIn': 22,
+        'options': ['13.6 eV', '10.2 eV', '3.4 eV', '1.51 eV'],
+        'correctAnswer': '10.2 eV',
+        'explanation': 'E2 - E1 = -3.4 - (-13.6) = 10.2 eV.',
+      },
+    ];
+  }
+
+  // Filter Logic
   List<Map<String, dynamic>> get _filteredQuestions {
     final catTabs = ['All', 'Custom Practice', 'Custom Test', 'PYQ Practice', 'NTA Question', 'Mock Test'];
     final activeTabName = catTabs[_activeCategoryTab];
@@ -191,18 +213,29 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
         return false;
       }
 
-      // Type Filter
-      if (_selectedType != 'All Types' && q['type'] != _selectedType) {
+      // Chapter Filter
+      if (_selectedChapter != 'All Chapters' && !(q['chapter'] ?? '').toString().contains(_selectedChapter)) {
         return false;
       }
 
-      // Search Query
+      // Question Type Filter
+      if (_selectedType != 'All Types' && !(q['type'] ?? '').toString().toLowerCase().contains(_selectedType.toLowerCase())) {
+        return false;
+      }
+
+      // Status Filter
+      if (_selectedStatus != 'All Status' && q['status'] != _selectedStatus) {
+        return false;
+      }
+
+      // Search Query Filter
       if (_searchQuery.isNotEmpty) {
         final qText = (q['questionText'] ?? '').toString().toLowerCase();
         final qId = (q['id'] ?? '').toString().toLowerCase();
         final qChapter = (q['chapter'] ?? '').toString().toLowerCase();
+        final qTopic = (q['topic'] ?? '').toString().toLowerCase();
         final sLower = _searchQuery.toLowerCase();
-        if (!qText.contains(sLower) && !qId.contains(sLower) && !qChapter.contains(sLower)) {
+        if (!qText.contains(sLower) && !qId.contains(sLower) && !qChapter.contains(sLower) && !qTopic.contains(sLower)) {
           return false;
         }
       }
@@ -211,30 +244,501 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     }).toList();
   }
 
+  // Statistics Computations
+  int get _totalQuestionsCount => _allQuestionsData.length;
+  int get _activeQuestionsCount => _allQuestionsData.where((q) => q['status'] == 'Active').length;
+  int get _usedInTestsCount => _allQuestionsData.where((q) => (q['usedIn'] as int? ?? 0) > 0).length;
+  int get _inactiveQuestionsCount => _allQuestionsData.where((q) => q['status'] == 'Inactive').length;
+  int get _totalMarksSum {
+    int sum = 0;
+    for (var q in _allQuestionsData) {
+      final m = q['marks'];
+      if (m is int) sum += m;
+      else if (m is String) sum += int.tryParse(m) ?? 4;
+    }
+    return sum;
+  }
+
+  // CRUD Actions
   void _openAddQuestionDialog() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (ctx) => AdminQuestionBuilderScreen(
-          userProfile: widget.userProfile,
-          onBack: () {
-            Navigator.pop(ctx);
-            _loadSupabaseQuestions();
-          },
+    _showQuestionFormModal(isEdit: false);
+  }
+
+  void _openEditQuestionDialog(Map<String, dynamic> question) {
+    _showQuestionFormModal(isEdit: true, initialData: question);
+  }
+
+  void _showQuestionPreviewModal(Map<String, dynamic> question) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF2FF),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                question['id'] ?? '',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '${question['subject']} • ${question['chapter']}',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
+        content: SizedBox(
+          width: 540,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Question Text:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                const SizedBox(height: 6),
+                LaTeXView(
+                  text: question['questionText'] ?? '',
+                  style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 16),
+
+                if (question['options'] != null && (question['options'] as List).isNotEmpty) ...[
+                  const Text('Options:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                  const SizedBox(height: 6),
+                  ...(question['options'] as List).map((opt) {
+                    final isCorrect = opt.toString() == question['correctAnswer'];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isCorrect ? const Color(0xFFDCFCE7) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: isCorrect ? const Color(0xFF16A34A) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isCorrect ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                            size: 16,
+                            color: isCorrect ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              opt.toString(),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isCorrect ? FontWeight.bold : FontWeight.normal,
+                                color: isCorrect ? const Color(0xFF16A34A) : const Color(0xFF334155),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  const SizedBox(height: 14),
+                ],
+
+                const Text('Explanation / Solution:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                const SizedBox(height: 4),
+                Text(
+                  question['explanation'] ?? 'No explanation provided.',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF334155)),
+                ),
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    _buildPreviewChip('Category', question['category'] ?? 'Custom Practice'),
+                    const SizedBox(width: 8),
+                    _buildPreviewChip('Type', question['type'] ?? 'MCQ'),
+                    const SizedBox(width: 8),
+                    _buildPreviewChip('Marks', '+${question['marks']} / -${question['negativeMarks'] ?? 1.0}'),
+                    const SizedBox(width: 8),
+                    _buildPreviewChip('Used In', '${question['usedIn'] ?? 0} Tests'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close', style: TextStyle(color: Color(0xFF4F46E5), fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
 
-  void _openImportPdfDialog() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (ctx) => AdminPdfImportScreen(
-          userProfile: widget.userProfile,
-          onBack: () {
-            Navigator.pop(ctx);
-            _loadSupabaseQuestions();
-          },
+  Widget _buildPreviewChip(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        '$label: $value',
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+      ),
+    );
+  }
+
+  void _duplicateQuestion(Map<String, dynamic> question) async {
+    final dupId = 'Q_${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
+    final dupData = Map<String, dynamic>.from(question);
+    dupData['id'] = dupId;
+    dupData['questionText'] = '${question['questionText']} (Copy)';
+
+    await SupabaseService.insertQuestionToSupabase(dupData);
+    setState(() {
+      _allQuestionsData.insert(0, dupData);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Question duplicated successfully as $dupId!')),
+    );
+  }
+
+  void _deleteQuestion(String id) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Deletion', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to delete question $id? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await SupabaseService.deleteQuestionFromSupabase(id);
+              setState(() {
+                _allQuestionsData.removeWhere((q) => q['id'] == id);
+                _selectedQuestionIds.remove(id);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Question $id deleted successfully.')),
+              );
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Bulk Actions
+  void _executeBulkAction(String action) async {
+    if (_selectedQuestionIds.isEmpty) return;
+
+    final selectedList = _selectedQuestionIds.toList();
+
+    if (action == 'delete') {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Confirm Bulk Delete', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Text('Delete ${selectedList.length} selected questions permanently?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await SupabaseService.deleteBulkQuestionsFromSupabase(selectedList);
+                setState(() {
+                  _allQuestionsData.removeWhere((q) => selectedList.contains(q['id']));
+                  _selectedQuestionIds.clear();
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${selectedList.length} questions deleted successfully.')),
+                );
+              },
+              child: const Text('Bulk Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
+      );
+    } else if (action == 'activate' || action == 'deactivate') {
+      final targetStatus = action == 'activate' ? 'Active' : 'Inactive';
+      await SupabaseService.updateBulkQuestionStatusInSupabase(selectedList, targetStatus);
+      setState(() {
+        for (var q in _allQuestionsData) {
+          if (selectedList.contains(q['id'])) {
+            q['status'] = targetStatus;
+          }
+        }
+        _selectedQuestionIds.clear();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${selectedList.length} questions set to $targetStatus.')),
+      );
+    }
+  }
+
+  // Add/Edit Question Modal Form
+  void _showQuestionFormModal({required bool isEdit, Map<String, dynamic>? initialData}) {
+    final formKey = GlobalKey<FormState>();
+    final qTextCtrl = TextEditingController(text: (isEdit && initialData != null) ? (initialData['questionText'] ?? '').toString() : '');
+    final qImageCtrl = TextEditingController(text: (isEdit && initialData != null) ? (initialData['questionImage'] ?? '').toString() : '');
+    final expCtrl = TextEditingController(text: (isEdit && initialData != null) ? (initialData['explanation'] ?? '').toString() : '');
+    final solCtrl = TextEditingController(text: (isEdit && initialData != null) ? (initialData['solution'] ?? '').toString() : '');
+    final marksCtrl = TextEditingController(text: (isEdit && initialData != null) ? (initialData['marks'] ?? 4).toString() : '4');
+    final negCtrl = TextEditingController(text: (isEdit && initialData != null) ? (initialData['negativeMarks'] ?? 1.0).toString() : '1.0');
+
+    String selSubject = (isEdit && initialData != null) ? (initialData['subject'] ?? 'Physics').toString() : 'Physics';
+    String selChapter = (isEdit && initialData != null) ? (initialData['chapter'] ?? '1. Mechanics').toString() : '1. Mechanics';
+    String selTopic = (isEdit && initialData != null) ? (initialData['topic'] ?? 'Kinematics').toString() : 'Kinematics';
+    String selCategory = (isEdit && initialData != null) ? (initialData['category'] ?? 'Custom Practice').toString() : 'Custom Practice';
+    String selType = (isEdit && initialData != null) ? (initialData['type'] ?? 'MCQ').toString() : 'MCQ';
+    String selDifficulty = (isEdit && initialData != null) ? (initialData['difficulty'] ?? 'Medium').toString() : 'Medium';
+    String selStatus = (isEdit && initialData != null) ? (initialData['status'] ?? 'Active').toString() : 'Active';
+
+    final opts = (isEdit && initialData != null && initialData['options'] is List) ? (initialData['options'] as List) : [];
+    final opt1Ctrl = TextEditingController(text: opts.isNotEmpty ? opts[0].toString() : 'Option A');
+    final opt2Ctrl = TextEditingController(text: opts.length > 1 ? opts[1].toString() : 'Option B');
+    final opt3Ctrl = TextEditingController(text: opts.length > 2 ? opts[2].toString() : 'Option C');
+    final opt4Ctrl = TextEditingController(text: opts.length > 3 ? opts[3].toString() : 'Option D');
+    String selCorrectOpt = (isEdit && initialData != null) ? (initialData['correctAnswer'] ?? opt1Ctrl.text).toString() : opt1Ctrl.text;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          isEdit ? 'Edit Question (${initialData?['id']})' : 'Add New Question',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF0F172A)),
+        ),
+        content: SizedBox(
+          width: 620,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Form(
+              key: formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Row 1: Subject & Chapter
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: selSubject,
+                          decoration: const InputDecoration(labelText: 'Subject', border: OutlineInputBorder()),
+                          items: ['Physics', 'Chemistry', 'Biology', 'Mathematics'].map((s) {
+                            return DropdownMenuItem(value: s, child: Text(s));
+                          }).toList(),
+                          onChanged: (v) => selSubject = v!,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _subjectChaptersMap[selSubject]?.contains(selChapter) == true ? selChapter : _subjectChaptersMap[selSubject]?.first,
+                          decoration: const InputDecoration(labelText: 'Chapter', border: OutlineInputBorder()),
+                          items: (_subjectChaptersMap[selSubject] ?? ['1. General']).map((c) {
+                            return DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis));
+                          }).toList(),
+                          onChanged: (v) => selChapter = v!,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Row 2: Category & Question Type
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: selCategory,
+                          decoration: const InputDecoration(labelText: 'Category / Source Module', border: OutlineInputBorder()),
+                          items: ['Custom Practice', 'Custom Test', 'PYQ Practice', 'NTA Question', 'Mock Test'].map((c) {
+                            return DropdownMenuItem(value: c, child: Text(c));
+                          }).toList(),
+                          onChanged: (v) => selCategory = v!,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: selType,
+                          decoration: const InputDecoration(labelText: 'Question Type', border: OutlineInputBorder()),
+                          items: ['MCQ', 'Multiple Correct', 'Match', 'Assertion', 'Numerical', 'True/False'].map((t) {
+                            return DropdownMenuItem(value: t, child: Text(t));
+                          }).toList(),
+                          onChanged: (v) => selType = v!,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Question Text Input
+                  TextFormField(
+                    controller: qTextCtrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: r'Question Text (Supports LaTeX \$...\$)',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (v) => (v == null || v.isEmpty) ? 'Please enter question text' : null,
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Options Inputs
+                  const Text('Answer Options:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(child: TextFormField(controller: opt1Ctrl, decoration: const InputDecoration(labelText: 'Option A', isDense: true, border: OutlineInputBorder()))),
+                      const SizedBox(width: 8),
+                      Expanded(child: TextFormField(controller: opt2Ctrl, decoration: const InputDecoration(labelText: 'Option B', isDense: true, border: OutlineInputBorder()))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: TextFormField(controller: opt3Ctrl, decoration: const InputDecoration(labelText: 'Option C', isDense: true, border: OutlineInputBorder()))),
+                      const SizedBox(width: 8),
+                      Expanded(child: TextFormField(controller: opt4Ctrl, decoration: const InputDecoration(labelText: 'Option D', isDense: true, border: OutlineInputBorder()))),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Correct Answer & Difficulty
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: selCorrectOpt,
+                          decoration: const InputDecoration(labelText: 'Correct Option', border: OutlineInputBorder()),
+                          items: [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text].map((o) {
+                            return DropdownMenuItem(value: o, child: Text(o.isEmpty ? 'Option' : o));
+                          }).toList(),
+                          onChanged: (v) => selCorrectOpt = v!,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: selDifficulty,
+                          decoration: const InputDecoration(labelText: 'Difficulty', border: OutlineInputBorder()),
+                          items: ['Easy', 'Medium', 'Hard'].map((d) {
+                            return DropdownMenuItem(value: d, child: Text(d));
+                          }).toList(),
+                          onChanged: (v) => selDifficulty = v!,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Marks & Status Row
+                  Row(
+                    children: [
+                      Expanded(child: TextFormField(controller: marksCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Marks (+)', border: OutlineInputBorder()))),
+                      const SizedBox(width: 12),
+                      Expanded(child: TextFormField(controller: negCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Negative Marks (-)', border: OutlineInputBorder()))),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: selStatus,
+                          decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
+                          items: ['Active', 'Inactive'].map((s) {
+                            return DropdownMenuItem(value: s, child: Text(s));
+                          }).toList(),
+                          onChanged: (v) => selStatus = v!,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Explanation / Solution Input
+                  TextFormField(
+                    controller: expCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Explanation / Solution Details',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5)),
+            onPressed: () async {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(ctx);
+                final qMap = {
+                  'id': isEdit ? initialData!['id'] : 'Q_${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
+                  'questionText': qTextCtrl.text,
+                  'questionImage': qImageCtrl.text,
+                  'subject': selSubject,
+                  'chapter': selChapter,
+                  'topic': selTopic,
+                  'category': selCategory,
+                  'type': selType,
+                  'difficulty': selDifficulty,
+                  'status': selStatus,
+                  'marks': int.tryParse(marksCtrl.text) ?? 4,
+                  'negativeMarks': double.tryParse(negCtrl.text) ?? 1.0,
+                  'options': [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text],
+                  'correctAnswer': selCorrectOpt,
+                  'explanation': expCtrl.text,
+                  'usedIn': isEdit ? (initialData!['usedIn'] ?? 0) : 0,
+                };
+
+                if (isEdit) {
+                  await SupabaseService.updateQuestionInSupabase(qMap['id'].toString(), qMap);
+                  setState(() {
+                    final idx = _allQuestionsData.indexWhere((item) => item['id'] == qMap['id']);
+                    if (idx != -1) _allQuestionsData[idx] = qMap;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Question updated successfully!')),
+                  );
+                } else {
+                  await SupabaseService.insertQuestionToSupabase(qMap);
+                  setState(() {
+                    _allQuestionsData.insert(0, qMap);
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Question created successfully!')),
+                  );
+                }
+              }
+            },
+            child: Text(isEdit ? 'Save Changes' : 'Create Question', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -258,44 +762,49 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
 
                 // Scrollable Content Body
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    physics: const BouncingScrollPhysics(),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Page Header Title & Buttons
-                        _buildPageHeader(),
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5)))
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(24.0),
+                          physics: const BouncingScrollPhysics(),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Page Header Title & Buttons
+                              _buildPageHeader(),
 
-                        const SizedBox(height: 20),
+                              const SizedBox(height: 20),
 
-                        // 5 Stat Metric Cards Row
-                        _buildStatCardsRow(),
+                              // 5 Stat Metric Cards Row
+                              _buildStatCardsRow(),
 
-                        const SizedBox(height: 24),
+                              const SizedBox(height: 24),
 
-                        // Category Sub-Navigation Tabs Bar
-                        _buildCategoryTabsBar(),
+                              // Category Sub-Navigation Tabs Bar
+                              _buildCategoryTabsBar(),
 
-                        const SizedBox(height: 18),
+                              const SizedBox(height: 18),
 
-                        // Filter Toolbar
-                        _buildFilterToolbar(),
+                              // Filter Toolbar
+                              _buildFilterToolbar(),
 
-                        const SizedBox(height: 16),
+                              const SizedBox(height: 16),
 
-                        // Questions Data Table
-                        _buildQuestionsDataTable(),
+                              // Bulk Selection Action Bar (Shown when items selected)
+                              if (_selectedQuestionIds.isNotEmpty) _buildBulkActionBar(),
 
-                        const SizedBox(height: 16),
+                              // Questions Data Table
+                              _buildQuestionsDataTable(),
 
-                        // Table Pagination Footer
-                        _buildPaginationFooter(),
+                              const SizedBox(height: 16),
 
-                        const SizedBox(height: 30),
-                      ],
-                    ),
-                  ),
+                              // Table Pagination Footer
+                              _buildPaginationFooter(),
+
+                              const SizedBox(height: 30),
+                            ],
+                          ),
+                        ),
                 ),
               ],
             ),
@@ -366,8 +875,12 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                     child: Text('CONTENT MANAGEMENT', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
                   ),
 
-                _buildSidebarItem(Icons.assignment_outlined, 'Exams', false),
-                _buildSidebarItem(Icons.science_outlined, 'Subjects', false),
+                _buildSidebarItem(Icons.assignment_outlined, 'Exams', false, onTap: () {
+                  Navigator.pushReplacementNamed(context, '/admin');
+                }),
+                _buildSidebarItem(Icons.science_outlined, 'Subjects', false, onTap: () {
+                  Navigator.pushReplacementNamed(context, '/admin/chapters');
+                }),
                 _buildSidebarItem(Icons.menu_book_outlined, 'Chapters', false, onTap: () {
                   Navigator.pushReplacementNamed(context, '/admin/chapters');
                 }),
@@ -375,7 +888,9 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                   Navigator.pushReplacementNamed(context, '/admin/chapters');
                 }),
                 _buildSidebarItem(Icons.help_outline_rounded, 'Questions', true),
-                _buildSidebarItem(Icons.description_outlined, 'NTA Mock Papers', false),
+                _buildSidebarItem(Icons.description_outlined, 'NTA Mock Papers', false, onTap: () {
+                  Navigator.pushReplacementNamed(context, '/pyq');
+                }),
 
                 const SizedBox(height: 14),
                 if (!_isSidebarCollapsed)
@@ -384,10 +899,18 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                     child: Text('PRACTICE & TEST', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
                   ),
 
-                _buildSidebarItem(Icons.edit_note_rounded, 'Custom Practice', false),
-                _buildSidebarItem(Icons.assignment_turned_in_outlined, 'Custom Tests', false),
-                _buildSidebarItem(Icons.history_edu_rounded, 'PYQ Practice', false),
-                _buildSidebarItem(Icons.quiz_outlined, 'Mock Tests', false),
+                _buildSidebarItem(Icons.edit_note_rounded, 'Custom Practice', false, onTap: () {
+                  Navigator.pushReplacementNamed(context, '/custom-practice');
+                }),
+                _buildSidebarItem(Icons.assignment_turned_in_outlined, 'Custom Tests', false, onTap: () {
+                  Navigator.pushReplacementNamed(context, '/custom-test');
+                }),
+                _buildSidebarItem(Icons.history_edu_rounded, 'PYQ Practice', false, onTap: () {
+                  Navigator.pushReplacementNamed(context, '/pyq');
+                }),
+                _buildSidebarItem(Icons.quiz_outlined, 'Mock Tests', false, onTap: () {
+                  Navigator.pushReplacementNamed(context, '/pyq');
+                }),
 
                 const SizedBox(height: 14),
                 if (!_isSidebarCollapsed)
@@ -595,7 +1118,19 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
 
             // Import Questions Button
             OutlinedButton.icon(
-              onPressed: _openImportPdfDialog,
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (ctx) => AdminPdfImportScreen(
+                      userProfile: widget.userProfile,
+                      onBack: () {
+                        Navigator.pop(ctx);
+                        _loadSupabaseQuestions();
+                      },
+                    ),
+                  ),
+                );
+              },
               style: OutlinedButton.styleFrom(
                 backgroundColor: Colors.white,
                 side: const BorderSide(color: Color(0xFFE2E8F0)),
@@ -618,12 +1153,16 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
   // 5 STAT CARDS ROW
   // ==========================================
   Widget _buildStatCardsRow() {
+    final activePct = _totalQuestionsCount > 0 ? ((_activeQuestionsCount / _totalQuestionsCount) * 100).toStringAsFixed(2) : '0.00';
+    final usedPct = _totalQuestionsCount > 0 ? ((_usedInTestsCount / _totalQuestionsCount) * 100).toStringAsFixed(2) : '0.00';
+    final inactivePct = _totalQuestionsCount > 0 ? ((_inactiveQuestionsCount / _totalQuestionsCount) * 100).toStringAsFixed(2) : '0.00';
+
     return Row(
       children: [
         Expanded(
           child: _buildMetricStatCard(
             title: 'Total Questions',
-            value: '24,856',
+            value: _totalQuestionsCount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},'),
             footer: 'All Categories',
             footerColor: const Color(0xFF64748B),
             icon: Icons.help_outline_rounded,
@@ -635,8 +1174,8 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
         Expanded(
           child: _buildMetricStatCard(
             title: 'Active Questions',
-            value: '23,742',
-            footer: '95.52% of Total',
+            value: _activeQuestionsCount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},'),
+            footer: '$activePct% of Total',
             footerColor: const Color(0xFF16A34A),
             icon: Icons.description_outlined,
             iconColor: const Color(0xFF16A34A),
@@ -647,8 +1186,8 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
         Expanded(
           child: _buildMetricStatCard(
             title: 'Used in Tests',
-            value: '18,562',
-            footer: '74.72% of Total',
+            value: _usedInTestsCount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},'),
+            footer: '$usedPct% of Total',
             footerColor: const Color(0xFFEA580C),
             icon: Icons.visibility_outlined,
             iconColor: const Color(0xFFEA580C),
@@ -659,8 +1198,8 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
         Expanded(
           child: _buildMetricStatCard(
             title: 'Inactive Questions',
-            value: '1,114',
-            footer: '4.48% of Total',
+            value: _inactiveQuestionsCount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},'),
+            footer: '$inactivePct% of Total',
             footerColor: const Color(0xFFEF4444),
             icon: Icons.cancel_outlined,
             iconColor: const Color(0xFFEF4444),
@@ -671,7 +1210,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
         Expanded(
           child: _buildMetricStatCard(
             title: 'Total Marks',
-            value: '248,560',
+            value: _totalMarksSum.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},'),
             footer: 'Across All Questions',
             footerColor: const Color(0xFF64748B),
             icon: Icons.local_offer_outlined,
@@ -792,9 +1331,17 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
   }
 
   // ==========================================
-  // FILTER TOOLBAR
+  // FILTER TOOLBAR (WITH CASCADING LOGIC)
   // ==========================================
   Widget _buildFilterToolbar() {
+    final subjectsForExam = _selectedExam == 'All Exams'
+        ? ['All Subjects', 'Physics', 'Chemistry', 'Biology', 'Mathematics']
+        : ['All Subjects', ...(_examSubjectsMap[_selectedExam] ?? ['Physics', 'Chemistry', 'Biology'])];
+
+    final chaptersForSubject = _selectedSubject == 'All Subjects'
+        ? ['All Chapters', '1. Mechanics', '2. Thermodynamics', '3. Trigonometry']
+        : ['All Chapters', ...(_subjectChaptersMap[_selectedSubject] ?? ['1. General'])];
+
     return Row(
       children: [
         // Search Input Box
@@ -830,25 +1377,32 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
         const SizedBox(width: 10),
 
         // Exam Dropdown
-        _buildDropdownFilter('Exam', _selectedExam, ['NEET 2026', 'NEET 2025', 'JEE Main 2026'], (v) {
-          setState(() => _selectedExam = v!);
+        _buildDropdownFilter('Exam', _selectedExam, ['All Exams', 'NEET 2026', 'NEET 2025', 'JEE Main 2026', 'JEE Main 2025'], (v) {
+          setState(() {
+            _selectedExam = v!;
+            _selectedSubject = 'All Subjects';
+            _selectedChapter = 'All Chapters';
+          });
         }),
         const SizedBox(width: 10),
 
         // Subject Dropdown
-        _buildDropdownFilter('Subject', _selectedSubject, ['All Subjects', 'Physics', 'Chemistry', 'Biology', 'Mathematics'], (v) {
-          setState(() => _selectedSubject = v!);
+        _buildDropdownFilter('Subject', _selectedSubject, subjectsForExam, (v) {
+          setState(() {
+            _selectedSubject = v!;
+            _selectedChapter = 'All Chapters';
+          });
         }),
         const SizedBox(width: 10),
 
         // Chapter Dropdown
-        _buildDropdownFilter('Chapter', _selectedChapter, ['All Chapters', '1. Mechanics', '2. Thermodynamics', '3. Trigonometry'], (v) {
+        _buildDropdownFilter('Chapter', _selectedChapter, chaptersForSubject, (v) {
           setState(() => _selectedChapter = v!);
         }),
         const SizedBox(width: 10),
 
         // Question Type Dropdown
-        _buildDropdownFilter('Question Type', _selectedType, ['All Types', 'MCQ', 'Match', 'Assertion'], (v) {
+        _buildDropdownFilter('Question Type', _selectedType, ['All Types', 'MCQ', 'Match', 'Assertion', 'Numerical', 'True/False'], (v) {
           setState(() => _selectedType = v!);
         }),
         const SizedBox(width: 10),
@@ -864,7 +1418,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
           onPressed: () {
             setState(() {
               _searchQuery = '';
-              _selectedExam = 'NEET 2026';
+              _selectedExam = 'All Exams';
               _selectedSubject = 'All Subjects';
               _selectedChapter = 'All Chapters';
               _selectedType = 'All Types';
@@ -883,7 +1437,11 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
 
         // Filters Button
         ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Advanced filters active.')),
+            );
+          },
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFEEF2FF),
             elevation: 0,
@@ -923,11 +1481,61 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     );
   }
 
+  // Bulk Action Bar
+  Widget _buildBulkActionBar() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEF2FF),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFC7D2FE)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            '${_selectedQuestionIds.length} questions selected',
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF4338CA)),
+          ),
+          Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _executeBulkAction('activate'),
+                style: OutlinedButton.styleFrom(backgroundColor: Colors.white),
+                icon: const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A), size: 16),
+                label: const Text('Bulk Activate', style: TextStyle(fontSize: 12, color: Color(0xFF16A34A), fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () => _executeBulkAction('deactivate'),
+                style: OutlinedButton.styleFrom(backgroundColor: Colors.white),
+                icon: const Icon(Icons.cancel_outlined, color: Color(0xFFEA580C), size: 16),
+                label: const Text('Bulk Deactivate', style: TextStyle(fontSize: 12, color: Color(0xFFEA580C), fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: () => _executeBulkAction('delete'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 16),
+                label: const Text('Bulk Delete', style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   // ==========================================
   // QUESTIONS DATA TABLE
   // ==========================================
   Widget _buildQuestionsDataTable() {
     final questions = _filteredQuestions;
+    final startIndex = (_currentPage - 1) * _itemsPerPage;
+    final paginatedQuestions = questions.skip(startIndex).take(_itemsPerPage).toList();
+
+    final allPaginatedSelected = paginatedQuestions.isNotEmpty && paginatedQuestions.every((q) => _selectedQuestionIds.contains(q['id']));
 
     return Container(
       decoration: BoxDecoration(
@@ -946,22 +1554,59 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
           headingRowHeight: 46,
           horizontalMargin: 16,
           columnSpacing: 18,
-          columns: const [
-            DataColumn(label: SizedBox(width: 24, child: Checkbox(value: false, onChanged: null))),
-            DataColumn(label: Text('ID', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-            DataColumn(label: Text('Question', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-            DataColumn(label: Text('Category', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-            DataColumn(label: Text('Subject', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-            DataColumn(label: Text('Chapter / Topic', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-            DataColumn(label: Text('Type', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-            DataColumn(label: Text('Marks', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-            DataColumn(label: Text('Status', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-            DataColumn(label: Text('Used In', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
-            DataColumn(label: Text('Actions', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+          columns: [
+            DataColumn(
+              label: SizedBox(
+                width: 24,
+                child: Checkbox(
+                  value: allPaginatedSelected,
+                  activeColor: const Color(0xFF4F46E5),
+                  onChanged: (val) {
+                    setState(() {
+                      if (val == true) {
+                        for (var q in paginatedQuestions) {
+                          _selectedQuestionIds.add(q['id']);
+                        }
+                      } else {
+                        for (var q in paginatedQuestions) {
+                          _selectedQuestionIds.remove(q['id']);
+                        }
+                      }
+                    });
+                  },
+                ),
+              ),
+            ),
+            const DataColumn(label: Text('ID', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            const DataColumn(label: Text('Question', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            const DataColumn(label: Text('Category', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            const DataColumn(label: Text('Subject', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            const DataColumn(label: Text('Chapter / Topic', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            const DataColumn(label: Text('Type', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            const DataColumn(label: Text('Marks', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            const DataColumn(label: Text('Status', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            const DataColumn(label: Text('Used In', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+            const DataColumn(label: Text('Actions', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
           ],
-          rows: questions.map((q) {
+          rows: paginatedQuestions.map((q) {
             final qId = q['id'].toString();
             final isChecked = _selectedQuestionIds.contains(qId);
+
+            final categoryBg = q['category'] == 'Custom Test'
+                ? const Color(0xFFDBEAFE)
+                : (q['category'] == 'PYQ Practice'
+                    ? const Color(0xFFDCFCE7)
+                    : (q['category'] == 'NTA Question'
+                        ? const Color(0xFFFFEDD5)
+                        : (q['category'] == 'Mock Test' ? const Color(0xFFFCE7F3) : const Color(0xFFEEF2FF))));
+
+            final categoryText = q['category'] == 'Custom Test'
+                ? const Color(0xFF2563EB)
+                : (q['category'] == 'PYQ Practice'
+                    ? const Color(0xFF16A34A)
+                    : (q['category'] == 'NTA Question'
+                        ? const Color(0xFFEA580C)
+                        : (q['category'] == 'Mock Test' ? const Color(0xFFDB2777) : const Color(0xFF4F46E5))));
 
             return DataRow(
               cells: [
@@ -999,7 +1644,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: q['categoryColor'] ?? const Color(0xFFEEF2FF),
+                      color: categoryBg,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -1007,7 +1652,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: q['categoryTextColor'] ?? const Color(0xFF4F46E5),
+                        color: categoryText,
                       ),
                     ),
                   ),
@@ -1050,18 +1695,22 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
+                      color: q['status'] == 'Active' ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text(
-                      'Active',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                    child: Text(
+                      q['status'] ?? 'Active',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: q['status'] == 'Active' ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
+                      ),
                     ),
                   ),
                 ),
                 DataCell(
                   Text(
-                    '${q['usedIn'] ?? 10}',
+                    '${q['usedIn'] ?? 0}',
                     style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                   ),
                 ),
@@ -1070,19 +1719,19 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                     children: [
                       IconButton(
                         icon: const Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF2563EB)),
-                        onPressed: () {},
+                        onPressed: () => _showQuestionPreviewModal(q),
                       ),
                       IconButton(
                         icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF7C3AED)),
-                        onPressed: () {},
+                        onPressed: () => _openEditQuestionDialog(q),
                       ),
                       IconButton(
                         icon: const Icon(Icons.content_copy_outlined, size: 16, color: Color(0xFF475569)),
-                        onPressed: () {},
+                        onPressed: () => _duplicateQuestion(q),
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFFEF4444)),
-                        onPressed: () {},
+                        onPressed: () => _deleteQuestion(qId),
                       ),
                     ],
                   ),
@@ -1099,12 +1748,17 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
   // TABLE PAGINATION FOOTER
   // ==========================================
   Widget _buildPaginationFooter() {
+    final totalCount = _filteredQuestions.length;
+    final start = totalCount == 0 ? 0 : (_currentPage - 1) * _itemsPerPage + 1;
+    final end = (_currentPage * _itemsPerPage) > totalCount ? totalCount : (_currentPage * _itemsPerPage);
+    final totalPages = (totalCount / _itemsPerPage).ceil();
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text(
-          'Showing 1 to 10 of 24,856 questions',
-          style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+        Text(
+          'Showing $start to $end of ${totalCount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} questions',
+          style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
         ),
         Row(
           children: [
@@ -1122,7 +1776,12 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                   icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
                   style: const TextStyle(fontSize: 12, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
                   onChanged: (v) {
-                    if (v != null) setState(() => _itemsPerPage = v);
+                    if (v != null) {
+                      setState(() {
+                        _itemsPerPage = v;
+                        _currentPage = 1;
+                      });
+                    }
                   },
                   items: [10, 25, 50, 100].map((count) {
                     return DropdownMenuItem<int>(
@@ -1140,17 +1799,20 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
               icon: const Icon(Icons.chevron_left_rounded, size: 20, color: Color(0xFF94A3B8)),
               onPressed: _currentPage > 1 ? () => setState(() => _currentPage--) : null,
             ),
-            _buildPageNumBtn(1, true),
-            _buildPageNumBtn(2, false),
-            _buildPageNumBtn(3, false),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 6),
-              child: Text('...', style: TextStyle(color: Color(0xFF64748B))),
-            ),
-            _buildPageNumBtn(2486, false),
+            ...List.generate(totalPages > 3 ? 3 : totalPages, (index) {
+              final pNum = index + 1;
+              return _buildPageNumBtn(pNum, _currentPage == pNum);
+            }),
+            if (totalPages > 3) ...[
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6),
+                child: Text('...', style: TextStyle(color: Color(0xFF64748B))),
+              ),
+              _buildPageNumBtn(totalPages, _currentPage == totalPages),
+            ],
             IconButton(
               icon: const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF0F172A)),
-              onPressed: () => setState(() => _currentPage++),
+              onPressed: _currentPage < totalPages ? () => setState(() => _currentPage++) : null,
             ),
           ],
         ),
@@ -1159,22 +1821,25 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
   }
 
   Widget _buildPageNumBtn(int pageNum, bool isSelected) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 3),
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFF4F46E5) : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0)),
-      ),
-      child: Center(
-        child: Text(
-          '$pageNum',
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? Colors.white : const Color(0xFF334155),
+    return InkWell(
+      onTap: () => setState(() => _currentPage = pageNum),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF4F46E5) : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0)),
+        ),
+        child: Center(
+          child: Text(
+            '$pageNum',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.bold,
+              color: isSelected ? Colors.white : const Color(0xFF334155),
+            ),
           ),
         ),
       ),

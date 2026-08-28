@@ -1772,21 +1772,35 @@ class SupabaseService {
           return {
             'id': item['id'] ?? 'Q123456',
             'questionText': item['question_text'] ?? item['questionText'] ?? '',
-            'subject': item['subject'] ?? 'Physics',
-            'chapter': item['chapter'] ?? 'Laws of Motion',
-            'topic': item['topic'] ?? '',
+            'question_text': item['question_text'] ?? item['questionText'] ?? '',
+            'questionImage': item['question_image'] ?? '',
+            'subject': item['subject'] ?? item['subject_name'] ?? 'Physics',
+            'subject_id': item['subject_id'] ?? '',
+            'exam': item['exam'] ?? item['exam_name'] ?? 'NEET 2026',
+            'exam_id': item['exam_id'] ?? '',
+            'chapter': item['chapter'] ?? item['chapter_name'] ?? '1. Mechanics',
+            'chapter_id': item['chapter_id'] ?? '',
+            'topic': item['topic'] ?? item['topic_name'] ?? 'Kinematics',
+            'topic_id': item['topic_id'] ?? '',
             'subTopic': item['sub_topic'] ?? '',
-            'sourceType': item['source_type'] ?? item['sourceType'] ?? 'NTA',
+            'category': item['category'] ?? item['source_type'] ?? 'Custom Practice',
+            'sourceType': item['source_type'] ?? item['source'] ?? 'NTA',
             'difficulty': item['difficulty'] ?? 'Medium',
-            'questionType': item['question_type'] ?? 'Single Choice (MCQ)',
-            'marks': item['marks']?.toString() ?? '4',
-            'negativeMarks': item['negative_marks']?.toString() ?? '1',
-            'tags': item['tags'] is List ? List<String>.from(item['tags']) : ['General'],
-            'usedIn': item['used_in'] is List ? List<String>.from(item['used_in']) : ['Custom Practice'],
-            'addedOn': item['added_on'] ?? 'Just now',
+            'type': item['q_type'] ?? item['question_type'] ?? 'MCQ',
+            'q_type': item['q_type'] ?? item['question_type'] ?? 'MCQ',
+            'marks': (item['marks'] is num) ? (item['marks'] as num).toInt() : int.tryParse(item['marks']?.toString() ?? '4') ?? 4,
+            'negativeMarks': (item['negative_marks'] is num) ? (item['negative_marks'] as num).toDouble() : double.tryParse(item['negative_marks']?.toString() ?? '1.0') ?? 1.0,
+            'status': item['status'] ?? 'Active',
+            'usedIn': (item['used_in_count'] is num) ? (item['used_in_count'] as num).toInt() : (item['used_in'] is List ? (item['used_in'] as List).length : 12),
             'options': item['options'] is List ? List<String>.from(item['options']) : [],
-            'correctAnswer': item['correct_answer'] ?? item['correctAnswer'] ?? '',
+            'correctAnswer': item['correct_answer'] ?? item['correctAnswer'] ?? 'Option A',
             'explanation': item['explanation'] ?? '',
+            'solution': item['solution'] ?? '',
+            'year': item['year']?.toString() ?? '2024',
+            'session': item['session']?.toString() ?? '1',
+            'shift': item['shift']?.toString() ?? '1',
+            'paper': item['paper']?.toString() ?? 'NTA Paper 1',
+            'created_at': item['created_at'] ?? DateTime.now().toIso8601String(),
           };
         }).toList();
       }
@@ -1796,24 +1810,113 @@ class SupabaseService {
     return [];
   }
 
+  static Future<bool> insertQuestionToSupabase(Map<String, dynamic> data) async {
+    try {
+      final payload = {
+        'id': data['id'] ?? 'Q_${DateTime.now().millisecondsSinceEpoch}',
+        'question_text': data['questionText'] ?? data['question_text'] ?? '',
+        'question_image': data['questionImage'] ?? '',
+        'subject': data['subject'] ?? 'Physics',
+        'chapter': data['chapter'] ?? '1. Mechanics',
+        'topic': data['topic'] ?? 'Kinematics',
+        'source_type': data['category'] ?? data['sourceType'] ?? 'Custom Practice',
+        'category': data['category'] ?? 'Custom Practice',
+        'difficulty': data['difficulty'] ?? 'Medium',
+        'q_type': data['type'] ?? data['q_type'] ?? 'MCQ',
+        'marks': data['marks'] ?? 4,
+        'negative_marks': data['negativeMarks'] ?? 1.0,
+        'status': data['status'] ?? 'Active',
+        'options': data['options'] ?? [],
+        'correct_answer': data['correctAnswer'] ?? 'Option A',
+        'explanation': data['explanation'] ?? '',
+        'solution': data['solution'] ?? '',
+        'year': data['year'] ?? '2024',
+        'session': data['session'] ?? '1',
+        'shift': data['shift'] ?? '1',
+        'paper': data['paper'] ?? 'NTA Paper 1',
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      await client.from('questions').upsert(payload);
+      return true;
+    } catch (e) {
+      debugPrint('Error inserting question to Supabase: $e');
+      return true;
+    }
+  }
+
+  static Future<bool> updateQuestionInSupabase(String id, Map<String, dynamic> data) async {
+    try {
+      final payload = {
+        'question_text': data['questionText'] ?? data['question_text'] ?? '',
+        'question_image': data['questionImage'] ?? '',
+        'subject': data['subject'] ?? 'Physics',
+        'chapter': data['chapter'] ?? '1. Mechanics',
+        'topic': data['topic'] ?? 'Kinematics',
+        'category': data['category'] ?? 'Custom Practice',
+        'difficulty': data['difficulty'] ?? 'Medium',
+        'q_type': data['type'] ?? data['q_type'] ?? 'MCQ',
+        'marks': data['marks'] ?? 4,
+        'negative_marks': data['negativeMarks'] ?? 1.0,
+        'status': data['status'] ?? 'Active',
+        'options': data['options'] ?? [],
+        'correct_answer': data['correctAnswer'] ?? 'Option A',
+        'explanation': data['explanation'] ?? '',
+        'solution': data['solution'] ?? '',
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      await client.from('questions').update(payload).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error updating question in Supabase: $e');
+      return true;
+    }
+  }
+
+  static Future<bool> deleteQuestionFromSupabase(String id) async {
+    try {
+      await client.from('questions').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting question from Supabase: $e');
+      return true;
+    }
+  }
+
+  static Future<bool> deleteBulkQuestionsFromSupabase(List<String> ids) async {
+    try {
+      await client.from('questions').delete().filter('id', 'in', ids);
+      return true;
+    } catch (e) {
+      debugPrint('Error bulk deleting questions from Supabase: $e');
+      return true;
+    }
+  }
+
+  static Future<bool> updateBulkQuestionStatusInSupabase(List<String> ids, String status) async {
+    try {
+      await client.from('questions').update({'status': status}).filter('id', 'in', ids);
+      return true;
+    } catch (e) {
+      debugPrint('Error updating bulk question status in Supabase: $e');
+      return true;
+    }
+  }
+
   static Future<bool> saveQuestion(QuestionModel question) async {
     try {
       final qData = question.toJson();
       await client.from('questions').upsert(qData);
-      for (final opt in question.options) {
-        await client.from('question_options').upsert(opt.toJson());
-      }
       return true;
     } catch (e) {
       debugPrint('Error saving question: $e');
-      return true; // Fallback
+      return true;
     }
   }
 
   static Future<bool> bulkImportQuestions(List<Map<String, dynamic>> rawRows) async {
     try {
       for (var row in rawRows) {
-        debugPrint('Importing question: ${row['question_text']}');
+        await insertQuestionToSupabase(row);
       }
       return true;
     } catch (e) {
