@@ -3,6 +3,7 @@ import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import 'pyq_practice_screen.dart';
 import 'nta_paper_wise_screen.dart';
+import 'nta_chapter_topic_wise_screen.dart';
 
 class NtaPracticeTestScreen extends StatefulWidget {
   final String activeExam;
@@ -130,32 +131,14 @@ class _NtaPracticeTestScreenState extends State<NtaPracticeTestScreen> {
         );
       }
 
-      return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0.5,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
-            onPressed: () => setState(() => _showSubScreen = false),
-          ),
-          title: const Text(
-            'Chapter & Topic-wise Practice',
-            style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-        ),
-        body: PYQPracticeScreen(
-          activeExam: _selectedExam.contains('JEE') ? 'JEE Main' : 'NEET',
-          onStartPYQSession: (questions, timerMins, isTestMode) {
-            if (widget.onStartSession != null) {
-              widget.onStartSession!(questions, timerMins, isTestMode);
-            }
-          },
-          onStartPractice: (questions, timerMins) {
-            if (widget.onStartPractice != null) {
-              widget.onStartPractice!(questions);
-            }
-          },
-        ),
+      return NtaChapterTopicWiseScreen(
+        activeExam: _selectedExam,
+        onBack: () => setState(() => _showSubScreen = false),
+        onStartSession: (questions, timerMins, isTestMode) {
+          if (widget.onStartSession != null) {
+            widget.onStartSession!(questions, timerMins, isTestMode);
+          }
+        },
       );
     }
 
