@@ -1029,6 +1029,67 @@ class SupabaseService {
     return true;
   }
 
+  static Future<bool> deleteChapterFromDatabase({
+    required String exam,
+    required String subject,
+    required String chapterId,
+  }) async {
+    final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
+
+    try {
+      await client.from('chapters').delete().eq('id', chapterId);
+    } catch (e) {
+      debugPrint('Notice deleting chapter from Supabase DB: $e');
+      try {
+        await client.from('chapters').update({'is_active': false}).eq('id', chapterId);
+      } catch (e2) {
+        debugPrint('Fallback deactivating chapter in DB: $e2');
+      }
+    }
+
+    final current = _dynamicTaxonomyStore[storeKey] ?? [];
+    current.removeWhere((c) => c['id'].toString() == chapterId.toString());
+    _dynamicTaxonomyStore[storeKey] = current;
+    await _saveTaxonomyToLocalStorage();
+    await syncTaxonomyToCloud();
+    return true;
+  }
+
+  static Future<bool> deleteTopicFromDatabase({
+    required String exam,
+    required String subject,
+    required String chapterId,
+    required String topicId,
+  }) async {
+    final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
+
+    try {
+      await client.from('topics').delete().eq('id', topicId);
+    } catch (e) {
+      debugPrint('Notice deleting topic from Supabase DB: $e');
+      try {
+        await client.from('topics').update({'is_active': false}).eq('id', topicId);
+      } catch (e2) {
+        debugPrint('Fallback deactivating topic in DB: $e2');
+      }
+    }
+
+    final current = _dynamicTaxonomyStore[storeKey] ?? [];
+    for (var c in current) {
+      if (c['id'].toString() == chapterId.toString()) {
+        final topicsList = (c['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        topicsList.removeWhere((t) => t['id'].toString() == topicId.toString());
+        c['topicsList'] = topicsList;
+        c['topics'] = topicsList.length;
+        break;
+      }
+    }
+    _dynamicTaxonomyStore[storeKey] = current;
+    await _saveTaxonomyToLocalStorage();
+    await syncTaxonomyToCloud();
+    return true;
+  }
+
   static Future<bool> addTopicToDatabase({
     required String exam,
     required String subject,

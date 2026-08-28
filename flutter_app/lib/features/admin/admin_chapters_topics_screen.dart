@@ -290,6 +290,59 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
     );
   }
 
+  void _confirmDeleteChapter(Map<String, dynamic> chapter) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete Chapter "${chapter['name']}"?'),
+        content: const Text('Are you sure you want to delete this chapter? This will remove it centrally from the database.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE11D48)),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await SupabaseService.deleteChapterFromDatabase(
+                exam: _selectedExam,
+                subject: _selectedSubject,
+                chapterId: chapter['id'],
+              );
+              _loadTaxonomyFromService(forceRefresh: true);
+            },
+            child: const Text('Delete Chapter', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteTopic(Map<String, dynamic> topic) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete Topic "${topic['name']}"?'),
+        content: const Text('Are you sure you want to delete this topic? This will remove it centrally from the database.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE11D48)),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await SupabaseService.deleteTopicFromDatabase(
+                exam: _selectedExam,
+                subject: _selectedSubject,
+                chapterId: _selectedChapterId,
+                topicId: topic['id'],
+              );
+              _loadTaxonomyFromService(forceRefresh: true);
+            },
+            child: const Text('Delete Topic', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSidebar() {
     return Container(
       width: 250,
@@ -731,6 +784,12 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                                               IconButton(
                                                 icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF64748B)),
                                                 onPressed: () => _showEditChapterDialog(c),
+                                                tooltip: 'Edit Chapter',
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFFE11D48)),
+                                                onPressed: () => _confirmDeleteChapter(c),
+                                                tooltip: 'Delete Chapter',
                                               ),
                                             ],
                                           ),
@@ -830,6 +889,12 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                                               IconButton(
                                                 icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF64748B)),
                                                 onPressed: () => _showEditTopicDialog(t),
+                                                tooltip: 'Edit Topic',
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFFE11D48)),
+                                                onPressed: () => _confirmDeleteTopic(t),
+                                                tooltip: 'Delete Topic',
                                               ),
                                             ],
                                           ),
