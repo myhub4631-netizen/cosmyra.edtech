@@ -351,20 +351,46 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
   }
 
   Future<void> _loadChapters() async {
-    if (_selectedSubjectIds.isEmpty) {
-      return;
+    final examCode = _selectedExam.contains('JEE') ? 'JEE Main' : 'NEET';
+    final subjects = _selectedExam.contains('JEE') ? ['Physics', 'Chemistry', 'Mathematics'] : ['Physics', 'Chemistry', 'Biology'];
+
+    final Map<String, List<Map<String, dynamic>>> dynamicMap = {};
+
+    for (var sub in subjects) {
+      final rawChapters = await SupabaseService.fetchTaxonomyForSubject(
+        exam: examCode,
+        subject: sub,
+        includeInactive: false,
+      );
+
+      final formattedList = rawChapters.map((c) {
+        final rawTopics = (c['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        final subtopics = rawTopics.map((t) {
+          return {
+            'id': t['id'] ?? '',
+            'name': t['name'] ?? '',
+            'isSelected': true,
+          };
+        }).toList();
+
+        return {
+          'number': c['id'],
+          'name': c['name'],
+          'topicsCountText': '${subtopics.length} Topics Selected',
+          'isSelected': true,
+          'subtopics': subtopics,
+        };
+      }).toList();
+
+      dynamicMap[sub] = formattedList;
     }
-    List<ChapterModel> allChs = [];
-    for (final subId in _selectedSubjectIds) {
-      final chs = await SupabaseService.getChapters(subId);
-      allChs.addAll(chs);
+
+    if (mounted) {
+      setState(() {
+        _subjectChaptersMap.clear();
+        _subjectChaptersMap.addAll(dynamicMap);
+      });
     }
-    setState(() {
-      _selectedChapterIds.clear();
-      for (final ch in allChs) {
-        _selectedChapterIds.add(ch.id);
-      }
-    });
   }
 
   void _selectAllSubjects() {

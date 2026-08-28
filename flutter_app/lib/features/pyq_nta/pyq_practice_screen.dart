@@ -95,296 +95,57 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     _initChapters();
   }
 
-  void _initChapters() {
+  Future<void> _initChapters() async {
     final isNeet = _selectedExam.contains('NEET');
+    final examCode = isNeet ? 'NEET' : 'JEE Main';
+    final subjects = isNeet ? ['Physics', 'Chemistry', 'Biology'] : ['Physics', 'Chemistry', 'Mathematics'];
 
-    // 1. Physics Chapters (Full NEET & JEE Syllabus)
-    final physicsChapters = [
-      ChapterItem(
-        id: 'phy_c1',
-        name: '1. Mechanics & Motion',
-        isExpanded: true,
-        topics: [
-          TopicItem(id: 'phy_t1_1', name: '1.1 Physical World & Units Measurement', isSelected: true),
-          TopicItem(id: 'phy_t1_2', name: '1.2 Kinematics 1D & 2D Motion', isSelected: true),
-          TopicItem(id: 'phy_t1_3', name: '1.3 Laws of Motion & Friction', isSelected: true),
-          TopicItem(id: 'phy_t1_4', name: '1.4 Work, Energy & Power', isSelected: true),
-          TopicItem(id: 'phy_t1_5', name: '1.5 Rotational Motion & System of Particles', isSelected: true),
-          TopicItem(id: 'phy_t1_6', name: '1.6 Gravitation & Satellite Motion', isSelected: true),
-        ],
-      ),
-      ChapterItem(
-        id: 'phy_c2',
-        name: '2. Properties of Matter & Thermodynamics',
-        isExpanded: false,
-        topics: [
-          TopicItem(id: 'phy_t2_1', name: '2.1 Mechanical Properties of Solids & Fluids', isSelected: true),
-          TopicItem(id: 'phy_t2_2', name: '2.2 Thermal Properties of Matter & Calorimetry', isSelected: true),
-          TopicItem(id: 'phy_t2_3', name: '2.3 Thermodynamics & Heat Engines', isSelected: true),
-          TopicItem(id: 'phy_t2_4', name: '2.4 Kinetic Theory of Gases', isSelected: true),
-        ],
-      ),
-      ChapterItem(
-        id: 'phy_c3',
-        name: '3. Oscillations & Waves',
-        isExpanded: false,
-        topics: [
-          TopicItem(id: 'phy_t3_1', name: '3.1 Simple Harmonic Motion (SHM)', isSelected: true),
-          TopicItem(id: 'phy_t3_2', name: '3.2 Sound Waves & Doppler Effect', isSelected: true),
-        ],
-      ),
-      ChapterItem(
-        id: 'phy_c4',
-        name: '4. Electrostatics & Current Electricity',
-        isExpanded: false,
-        topics: [
-          TopicItem(id: 'phy_t4_1', name: '4.1 Electric Charges & Fields', isSelected: true),
-          TopicItem(id: 'phy_t4_2', name: '4.2 Electrostatic Potential & Capacitance', isSelected: true),
-          TopicItem(id: 'phy_t4_3', name: '4.3 Current Electricity & Circuits', isSelected: true),
-        ],
-      ),
-      ChapterItem(
-        id: 'phy_c5',
-        name: '5. Magnetism & Electromagnetic Induction',
-        isExpanded: false,
-        topics: [
-          TopicItem(id: 'phy_t5_1', name: '5.1 Moving Charges & Magnetism', isSelected: true),
-          TopicItem(id: 'phy_t5_2', name: '5.2 Magnetism & Matter', isSelected: true),
-          TopicItem(id: 'phy_t5_3', name: '5.3 Electromagnetic Induction (EMI)', isSelected: true),
-          TopicItem(id: 'phy_t5_4', name: '5.4 Alternating Current & EM Waves', isSelected: true),
-        ],
-      ),
-      ChapterItem(
-        id: 'phy_c6',
-        name: '6. Optics',
-        isExpanded: false,
-        topics: [
-          TopicItem(id: 'phy_t6_1', name: '6.1 Ray Optics & Optical Instruments', isSelected: true),
-          TopicItem(id: 'phy_t6_2', name: '6.2 Wave Optics & Interference', isSelected: true),
-        ],
-      ),
-      ChapterItem(
-        id: 'phy_c7',
-        name: '7. Modern Physics & Semiconductors',
-        isExpanded: false,
-        topics: [
-          TopicItem(id: 'phy_t7_1', name: '7.1 Dual Nature of Radiation & Matter', isSelected: true),
-          TopicItem(id: 'phy_t7_2', name: '7.2 Atoms & Nuclei', isSelected: true),
-          TopicItem(id: 'phy_t7_3', name: '7.3 Semiconductor Electronics & Logic Gates', isSelected: true),
-        ],
-      ),
-    ];
+    final Map<String, List<ChapterItem>> newMap = {};
 
-    // 2. Chemistry Chapters (Full Physical, Organic, Inorganic)
-    final chemistryChapters = [
-      ChapterItem(
-        id: 'chem_c1',
-        name: '1. Physical Chemistry',
-        isExpanded: true,
-        topics: [
-          TopicItem(id: 'chem_t1_1', name: '1.1 Some Basic Concepts of Chemistry & Mole Concept', isSelected: true),
-          TopicItem(id: 'chem_t1_2', name: '1.2 Structure of Atom', isSelected: true),
-          TopicItem(id: 'chem_t1_3', name: '1.3 Chemical Thermodynamics & Energetics', isSelected: true),
-          TopicItem(id: 'chem_t1_4', name: '1.4 Chemical & Ionic Equilibrium', isSelected: true),
-          TopicItem(id: 'chem_t1_5', name: '1.5 Solutions & Colligative Properties', isSelected: true),
-          TopicItem(id: 'chem_t1_6', name: '1.6 Electrochemistry & Chemical Kinetics', isSelected: true),
-        ],
-      ),
-      ChapterItem(
-        id: 'chem_c2',
-        name: '2. Inorganic Chemistry',
-        isExpanded: false,
-        topics: [
-          TopicItem(id: 'chem_t2_1', name: '2.1 Classification of Elements & Periodic Properties', isSelected: true),
-          TopicItem(id: 'chem_t2_2', name: '2.2 Chemical Bonding & Molecular Structure', isSelected: true),
-          TopicItem(id: 'chem_t2_3', name: '2.3 p-Block Elements', isSelected: true),
-          TopicItem(id: 'chem_t2_4', name: '2.4 d- and f-Block Elements', isSelected: true),
-          TopicItem(id: 'chem_t2_5', name: '2.5 Coordination Compounds', isSelected: true),
-        ],
-      ),
-      ChapterItem(
-        id: 'chem_c3',
-        name: '3. Organic Chemistry',
-        isExpanded: false,
-        topics: [
-          TopicItem(id: 'chem_t3_1', name: '3.1 General Organic Chemistry (GOC) & Isomerism', isSelected: true),
-          TopicItem(id: 'chem_t3_2', name: '3.2 Hydrocarbons & Alkanes/Alkenes', isSelected: true),
-          TopicItem(id: 'chem_t3_3', name: '3.3 Haloalkanes & Haloarenes', isSelected: true),
-          TopicItem(id: 'chem_t3_4', name: '3.4 Alcohols, Phenols & Ethers', isSelected: true),
-          TopicItem(id: 'chem_t3_5', name: '3.5 Aldehydes, Ketones & Carboxylic Acids', isSelected: true),
-          TopicItem(id: 'chem_t3_6', name: '3.6 Amines & Biomolecules', isSelected: true),
-        ],
-      ),
-    ];
+    for (var sub in subjects) {
+      final rawChapters = await SupabaseService.fetchTaxonomyForSubject(
+        exam: examCode,
+        subject: sub,
+        includeInactive: false,
+      );
 
-    if (isNeet) {
-      // 3. Biology Chapters for NEET (Botany & Zoology)
-      final biologyChapters = [
-        ChapterItem(
-          id: 'bio_c1',
-          name: '1. Diversity in Living World',
+      final List<ChapterItem> chapterItems = rawChapters.map((cMap) {
+        final rawTopics = (cMap['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        final topicItems = rawTopics.map((tMap) {
+          return TopicItem(
+            id: tMap['id'] ?? '',
+            name: tMap['name'] ?? '',
+            isSelected: true,
+          );
+        }).toList();
+
+        return ChapterItem(
+          id: cMap['id'] ?? '',
+          name: cMap['name'] ?? '',
+          isExpanded: false,
+          topics: topicItems,
+        );
+      }).toList();
+
+      if (chapterItems.isNotEmpty) {
+        chapterItems.first = ChapterItem(
+          id: chapterItems.first.id,
+          name: chapterItems.first.name,
           isExpanded: true,
-          topics: [
-            TopicItem(id: 'bio_t1_1', name: '1.1 The Living World', isSelected: true),
-            TopicItem(id: 'bio_t1_2', name: '1.2 Biological Classification', isSelected: true),
-            TopicItem(id: 'bio_t1_3', name: '1.3 Plant Kingdom', isSelected: true),
-            TopicItem(id: 'bio_t1_4', name: '1.4 Animal Kingdom', isSelected: true),
-          ],
-        ),
-        ChapterItem(
-          id: 'bio_c2',
-          name: '2. Structural Organisation in Plants & Animals',
-          isExpanded: false,
-          topics: [
-            TopicItem(id: 'bio_t2_1', name: '2.1 Morphology of Flowering Plants', isSelected: true),
-            TopicItem(id: 'bio_t2_2', name: '2.2 Anatomy of Flowering Plants', isSelected: true),
-            TopicItem(id: 'bio_t2_3', name: '2.3 Structural Organisation in Animals (Tissues)', isSelected: true),
-          ],
-        ),
-        ChapterItem(
-          id: 'bio_c3',
-          name: '3. Cell Structure & Function',
-          isExpanded: false,
-          topics: [
-            TopicItem(id: 'bio_t3_1', name: '3.1 Cell: The Unit of Life', isSelected: true),
-            TopicItem(id: 'bio_t3_2', name: '3.2 Biomolecules', isSelected: true),
-            TopicItem(id: 'bio_t3_3', name: '3.3 Cell Cycle & Cell Division', isSelected: true),
-          ],
-        ),
-        ChapterItem(
-          id: 'bio_c4',
-          name: '4. Plant Physiology',
-          isExpanded: false,
-          topics: [
-            TopicItem(id: 'bio_t4_1', name: '4.1 Photosynthesis in Higher Plants', isSelected: true),
-            TopicItem(id: 'bio_t4_2', name: '4.2 Respiration in Plants', isSelected: true),
-            TopicItem(id: 'bio_t4_3', name: '4.3 Plant Growth & Development', isSelected: true),
-          ],
-        ),
-        ChapterItem(
-          id: 'bio_c5',
-          name: '5. Human Physiology',
-          isExpanded: false,
-          topics: [
-            TopicItem(id: 'bio_t5_1', name: '5.1 Breathing & Exchange of Gases', isSelected: true),
-            TopicItem(id: 'bio_t5_2', name: '5.2 Body Fluids & Circulation', isSelected: true),
-            TopicItem(id: 'bio_t5_3', name: '5.3 Excretory Products & Elimination', isSelected: true),
-            TopicItem(id: 'bio_t5_4', name: '5.4 Locomotion & Movement', isSelected: true),
-            TopicItem(id: 'bio_t5_5', name: '5.5 Neural Control & Coordination', isSelected: true),
-            TopicItem(id: 'bio_t5_6', name: '5.6 Chemical Coordination & Integration', isSelected: true),
-          ],
-        ),
-        ChapterItem(
-          id: 'bio_c6',
-          name: '6. Reproduction',
-          isExpanded: false,
-          topics: [
-            TopicItem(id: 'bio_t6_1', name: '6.1 Sexual Reproduction in Flowering Plants', isSelected: true),
-            TopicItem(id: 'bio_t6_2', name: '6.2 Human Reproduction', isSelected: true),
-            TopicItem(id: 'bio_t6_3', name: '6.3 Reproductive Health', isSelected: true),
-          ],
-        ),
-        ChapterItem(
-          id: 'bio_c7',
-          name: '7. Genetics & Evolution',
-          isExpanded: false,
-          topics: [
-            TopicItem(id: 'bio_t7_1', name: '7.1 Principles of Inheritance & Variation', isSelected: true),
-            TopicItem(id: 'bio_t7_2', name: '7.2 Molecular Basis of Inheritance', isSelected: true),
-            TopicItem(id: 'bio_t7_3', name: '7.3 Evolution', isSelected: true),
-          ],
-        ),
-        ChapterItem(
-          id: 'bio_c8',
-          name: '8. Biotechnology & Applications',
-          isExpanded: false,
-          topics: [
-            TopicItem(id: 'bio_t8_1', name: '8.1 Biotechnology: Principles & Processes', isSelected: true),
-            TopicItem(id: 'bio_t8_2', name: '8.2 Biotechnology & its Applications', isSelected: true),
-          ],
-        ),
-        ChapterItem(
-          id: 'bio_c9',
-          name: '9. Ecology & Environment',
-          isExpanded: false,
-          topics: [
-            TopicItem(id: 'bio_t9_1', name: '9.1 Organisms & Populations', isSelected: true),
-            TopicItem(id: 'bio_t9_2', name: '9.2 Ecosystem', isSelected: true),
-            TopicItem(id: 'bio_t9_3', name: '9.3 Biodiversity & Conservation', isSelected: true),
-          ],
-        ),
-      ];
+          topics: chapterItems.first.topics,
+        );
+      }
 
-      _subjectChaptersMap = {
-        'Physics': physicsChapters,
-        'Chemistry': chemistryChapters,
-        'Biology': biologyChapters,
-      };
-    } else {
-      // 4. Mathematics Chapters for JEE (PCM)
-      final mathChapters = [
-        ChapterItem(
-          id: 'math_c1',
-          name: '1. Sets, Relations & Functions',
-          isExpanded: true,
-          topics: [
-            TopicItem(id: 'math_t1_1', name: '1.1 Sets & Relations', isSelected: true),
-            TopicItem(id: 'math_t1_2', name: '1.2 Functions & Domain/Range', isSelected: true),
-            TopicItem(id: 'math_t1_3', name: '1.3 Inverse Trigonometric Functions', isSelected: true),
-          ],
-        ),
-        ChapterItem(
-          id: 'math_c2',
-          name: '2. Algebra',
-          isExpanded: false,
-          topics: [
-            TopicItem(id: 'math_t2_1', name: '2.1 Complex Numbers & Quadratic Equations', isSelected: true),
-            TopicItem(id: 'math_t2_2', name: '2.2 Matrices & Determinants', isSelected: true),
-            TopicItem(id: 'math_t2_3', name: '2.3 Permutations & Combinations', isSelected: true),
-            TopicItem(id: 'math_t2_4', name: '2.4 Binomial Theorem & Sequences/Series', isSelected: true),
-            TopicItem(id: 'math_t2_5', name: '2.5 Probability & Statistics', isSelected: true),
-          ],
-        ),
-        ChapterItem(
-          id: 'math_c3',
-          name: '3. Coordinate Geometry',
-          isExpanded: false,
-          topics: [
-            TopicItem(id: 'math_t3_1', name: '3.1 Straight Lines & Circles', isSelected: true),
-            TopicItem(id: 'math_t3_2', name: '3.2 Conic Sections (Parabola, Ellipse, Hyperbola)', isSelected: true),
-          ],
-        ),
-        ChapterItem(
-          id: 'math_c4',
-          name: '4. Calculus',
-          isExpanded: false,
-          topics: [
-            TopicItem(id: 'math_t4_1', name: '4.1 Limits, Continuity & Differentiability', isSelected: true),
-            TopicItem(id: 'math_t4_2', name: '4.2 Applications of Derivatives (AOD)', isSelected: true),
-            TopicItem(id: 'math_t4_3', name: '4.3 Indefinite & Definite Integrals', isSelected: true),
-            TopicItem(id: 'math_t4_4', name: '4.4 Differential Equations & Area', isSelected: true),
-          ],
-        ),
-        ChapterItem(
-          id: 'math_c5',
-          name: '5. Vectors & 3D Geometry',
-          isExpanded: false,
-          topics: [
-            TopicItem(id: 'math_t5_1', name: '5.1 Vector Algebra', isSelected: true),
-            TopicItem(id: 'math_t5_2', name: '5.2 Three Dimensional Geometry (3D)', isSelected: true),
-          ],
-        ),
-      ];
-
-      _subjectChaptersMap = {
-        'Physics': physicsChapters,
-        'Chemistry': chemistryChapters,
-        'Mathematics': mathChapters,
-      };
+      newMap[sub] = chapterItems;
     }
 
-    if (!_subjectChaptersMap.containsKey(_activeStep2Subject)) {
-      _activeStep2Subject = _subjectChaptersMap.keys.first;
+    if (mounted) {
+      setState(() {
+        _subjectChaptersMap = newMap;
+        if (!_subjectChaptersMap.containsKey(_activeStep2Subject) && _subjectChaptersMap.isNotEmpty) {
+          _activeStep2Subject = _subjectChaptersMap.keys.first;
+        }
+      });
     }
   }
 

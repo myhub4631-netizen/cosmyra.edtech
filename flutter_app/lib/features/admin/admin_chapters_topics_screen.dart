@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/services/supabase_service.dart';
 
 class AdminChaptersTopicsScreen extends StatefulWidget {
   const AdminChaptersTopicsScreen({Key? key}) : super(key: key);
@@ -11,29 +12,279 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
   String _selectedExam = 'NEET';
   String _selectedSubject = 'Physics';
   String _searchChapterQuery = '';
-  String _selectedChapterForTopics = '1. Mechanics';
+  String _selectedChapterId = '';
+  String _selectedChapterForTopics = '';
 
-  final List<Map<String, dynamic>> _chaptersList = [
-    {'name': '1. Mechanics', 'topics': 8, 'questions': 1248, 'status': 'Active'},
-    {'name': '2. Thermodynamics', 'topics': 6, 'questions': 896, 'status': 'Active'},
-    {'name': '3. Oscillations', 'topics': 5, 'questions': 642, 'status': 'Active'},
-    {'name': '4. Waves', 'topics': 7, 'questions': 734, 'status': 'Active'},
-    {'name': '5. Electromagnetism', 'topics': 12, 'questions': 1856, 'status': 'Active'},
-    {'name': '6. Optics', 'topics': 9, 'questions': 1124, 'status': 'Inactive'},
-    {'name': '7. Modern Physics', 'topics': 10, 'questions': 1346, 'status': 'Active'},
-    {'name': '8. Dual Nature of Radiation and Matter', 'topics': 4, 'questions': 512, 'status': 'Active'},
-  ];
+  List<Map<String, dynamic>> _chaptersList = [];
+  List<Map<String, dynamic>> _topicsList = [];
+  bool _isLoading = true;
 
-  final List<Map<String, dynamic>> _topicsList = [
-    {'name': '1.1 Units and Dimensions', 'questions': 156, 'status': 'Active'},
-    {'name': '1.2 Kinematics', 'questions': 312, 'status': 'Active'},
-    {'name': '1.3 Laws of Motion', 'questions': 298, 'status': 'Active'},
-    {'name': '1.4 Friction', 'questions': 184, 'status': 'Active'},
-    {'name': '1.5 Circular Motion', 'questions': 210, 'status': 'Active'},
-    {'name': '1.6 Work, Power and Energy', 'questions': 246, 'status': 'Active'},
-    {'name': '1.7 Centre of Mass', 'questions': 128, 'status': 'Active'},
-    {'name': '1.8 Rigid Body Dynamics', 'questions': 114, 'status': 'Inactive'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadTaxonomyFromService();
+  }
+
+  Future<void> _loadTaxonomyFromService({bool forceRefresh = false}) async {
+    setState(() => _isLoading = true);
+    final chapters = await SupabaseService.fetchTaxonomyForSubject(
+      exam: _selectedExam,
+      subject: _selectedSubject,
+      forceRefresh: forceRefresh,
+      includeInactive: true,
+    );
+
+    if (mounted) {
+      setState(() {
+        _chaptersList = List<Map<String, dynamic>>.from(chapters);
+        if (_chaptersList.isNotEmpty) {
+          final selected = _chaptersList.firstWhere(
+            (c) => c['id'] == _selectedChapterId || c['name'] == _selectedChapterForTopics,
+            orElse: () => _chaptersList.first,
+          );
+          _selectedChapterId = selected['id'] ?? '';
+          _selectedChapterForTopics = selected['name'] ?? '';
+          _topicsList = List<Map<String, dynamic>>.from(selected['topicsList'] ?? []);
+        } else {
+          _selectedChapterId = '';
+          _selectedChapterForTopics = '';
+          _topicsList = [];
+        }
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _onSelectChapter(Map<String, dynamic> chapter) {
+    setState(() {
+      _selectedChapterId = chapter['id'] ?? '';
+      _selectedChapterForTopics = chapter['name'] ?? '';
+      _topicsList = List<Map<String, dynamic>>.from(chapter['topicsList'] ?? []);
+    });
+  }
+
+  void _showAddChapterDialog() {
+    final nameCtrl = TextEditingController();
+    final codeCtrl = TextEditingController();
+    bool isActive = true;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Add New Chapter for $_selectedExam - $_selectedSubject', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Chapter Name *', hintText: 'e.g. 9. Modern Physics'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: codeCtrl,
+              decoration: const InputDecoration(labelText: 'Chapter Code', hintText: 'e.g. PHYS_MOD'),
+            ),
+            const SizedBox(height: 12),
+            StatefulBuilder(
+              builder: (context, setDlgState) => SwitchListTile(
+                title: const Text('Status (Active)'),
+                value: isActive,
+                onChanged: (val) => setDlgState(() => isActive = val),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1)),
+            onPressed: () async {
+              if (nameCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx);
+              final code = codeCtrl.text.trim().isNotEmpty ? codeCtrl.text : nameCtrl.text.toUpperCase().replaceAll(' ', '_');
+              await SupabaseService.addChapterToDatabase(
+                exam: _selectedExam,
+                subject: _selectedSubject,
+                name: nameCtrl.text,
+                code: code,
+                isActive: isActive,
+              );
+              _loadTaxonomyFromService(forceRefresh: true);
+            },
+            child: const Text('Add Chapter', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditChapterDialog(Map<String, dynamic> chapter) {
+    final nameCtrl = TextEditingController(text: chapter['name']);
+    final codeCtrl = TextEditingController(text: chapter['code'] ?? '');
+    bool isActive = chapter['status'] == 'Active';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Chapter', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Chapter Name *'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: codeCtrl,
+              decoration: const InputDecoration(labelText: 'Chapter Code'),
+            ),
+            const SizedBox(height: 12),
+            StatefulBuilder(
+              builder: (context, setDlgState) => SwitchListTile(
+                title: const Text('Status (Active)'),
+                value: isActive,
+                onChanged: (val) => setDlgState(() => isActive = val),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1)),
+            onPressed: () async {
+              if (nameCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx);
+              await SupabaseService.updateChapterInDatabase(
+                exam: _selectedExam,
+                subject: _selectedSubject,
+                chapterId: chapter['id'],
+                name: nameCtrl.text,
+                code: codeCtrl.text,
+                isActive: isActive,
+              );
+              _loadTaxonomyFromService(forceRefresh: true);
+            },
+            child: const Text('Save Changes', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddTopicDialog() {
+    if (_selectedChapterId.isEmpty) return;
+    final nameCtrl = TextEditingController();
+    final codeCtrl = TextEditingController();
+    bool isActive = true;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Add Topic in $_selectedChapterForTopics', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Topic Name *', hintText: 'e.g. 1.9 Special Theory'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: codeCtrl,
+              decoration: const InputDecoration(labelText: 'Topic Code', hintText: 'e.g. TOPIC_SPEC'),
+            ),
+            const SizedBox(height: 12),
+            StatefulBuilder(
+              builder: (context, setDlgState) => SwitchListTile(
+                title: const Text('Status (Active)'),
+                value: isActive,
+                onChanged: (val) => setDlgState(() => isActive = val),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1)),
+            onPressed: () async {
+              if (nameCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx);
+              final code = codeCtrl.text.trim().isNotEmpty ? codeCtrl.text : nameCtrl.text.toUpperCase().replaceAll(' ', '_');
+              await SupabaseService.addTopicToDatabase(
+                exam: _selectedExam,
+                subject: _selectedSubject,
+                chapterId: _selectedChapterId,
+                name: nameCtrl.text,
+                code: code,
+                isActive: isActive,
+              );
+              _loadTaxonomyFromService(forceRefresh: true);
+            },
+            child: const Text('Add Topic', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditTopicDialog(Map<String, dynamic> topic) {
+    final nameCtrl = TextEditingController(text: topic['name']);
+    final codeCtrl = TextEditingController(text: topic['code'] ?? '');
+    bool isActive = topic['status'] == 'Active';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Topic', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Topic Name *'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: codeCtrl,
+              decoration: const InputDecoration(labelText: 'Topic Code'),
+            ),
+            const SizedBox(height: 12),
+            StatefulBuilder(
+              builder: (context, setDlgState) => SwitchListTile(
+                title: const Text('Status (Active)'),
+                value: isActive,
+                onChanged: (val) => setDlgState(() => isActive = val),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1)),
+            onPressed: () async {
+              if (nameCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx);
+              await SupabaseService.updateTopicInDatabase(
+                exam: _selectedExam,
+                subject: _selectedSubject,
+                chapterId: _selectedChapterId,
+                topicId: topic['id'],
+                name: nameCtrl.text,
+                code: codeCtrl.text,
+                isActive: isActive,
+              );
+              _loadTaxonomyFromService(forceRefresh: true);
+            },
+            child: const Text('Save Changes', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -219,7 +470,7 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
 
                           // Add Chapter Button
                           ElevatedButton.icon(
-                            onPressed: () {},
+                            onPressed: _showAddChapterDialog,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF6366F1),
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -337,7 +588,10 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                                           return DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)));
                                         }).toList(),
                                         onChanged: (val) {
-                                          if (val != null) setState(() => _selectedSubject = val);
+                                          if (val != null) {
+                                            setState(() => _selectedSubject = val);
+                                            _loadTaxonomyFromService();
+                                          }
                                         },
                                       ),
                                     ),
@@ -407,7 +661,7 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                                       ),
                                       children: [
                                         InkWell(
-                                          onTap: () => setState(() => _selectedChapterForTopics = c['name']),
+                                          onTap: () => _onSelectChapter(c),
                                           child: Padding(
                                             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
                                             child: Text(c['name'], style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF0F172A))),
@@ -430,12 +684,13 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                                           ),
                                         ),
                                         Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                                          padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
                                           child: Row(
-                                            children: const [
-                                              Icon(Icons.edit_outlined, size: 16, color: Color(0xFF64748B)),
-                                              SizedBox(width: 6),
-                                              Icon(Icons.more_vert, size: 16, color: Color(0xFF64748B)),
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF64748B)),
+                                                onPressed: () => _showEditChapterDialog(c),
+                                              ),
                                             ],
                                           ),
                                         ),
@@ -465,12 +720,15 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    'Topics in: Mechanics',
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                  Expanded(
+                                    child: Text(
+                                      'Topics in: $_selectedChapterForTopics',
+                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                   ElevatedButton.icon(
-                                    onPressed: () {},
+                                    onPressed: _showAddTopicDialog,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF6366F1),
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -525,12 +783,13 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                                           ),
                                         ),
                                         Padding(
-                                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                                          padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
                                           child: Row(
-                                            children: const [
-                                              Icon(Icons.edit_outlined, size: 16, color: Color(0xFF64748B)),
-                                              SizedBox(width: 6),
-                                              Icon(Icons.more_vert, size: 16, color: Color(0xFF64748B)),
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF64748B)),
+                                                onPressed: () => _showEditTopicDialog(t),
+                                              ),
                                             ],
                                           ),
                                         ),

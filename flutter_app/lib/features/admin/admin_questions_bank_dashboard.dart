@@ -97,6 +97,18 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
 
   List<Map<String, dynamic>> get _questionsList => _sharedQuestionsBankList;
 
+  List<String> _getAvailableChaptersForFilter() {
+    final chaptersSet = <String>{'All Chapters'};
+    for (var q in _questionsList) {
+      if (q['chapter'] != null && q['chapter'].toString().isNotEmpty) {
+        if (_selectedSubjectFilter == 'All Subjects' || q['subject'] == _selectedSubjectFilter) {
+          chaptersSet.add(q['chapter'].toString());
+        }
+      }
+    }
+    return chaptersSet.toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1093,10 +1105,10 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
 
           const SizedBox(width: 10),
 
-          // Dropdown 2: All Chapters
+          // Dropdown 2: Dynamic Chapters Filter
           _buildFilterDropdown(
             value: _selectedChapterFilter,
-            items: ['All Chapters', 'Laws of Motion', 'Units and Measurements', 'States of Matter', 'Photosynthesis', 'Solutions'],
+            items: _getAvailableChaptersForFilter(),
             onChanged: (val) => setState(() => _selectedChapterFilter = val!),
           ),
 

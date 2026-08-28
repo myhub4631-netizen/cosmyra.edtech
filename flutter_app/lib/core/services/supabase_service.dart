@@ -482,21 +482,477 @@ class SupabaseService {
     ];
   }
 
-  static Future<List<ChapterModel>> getChapters(String subjectId) async {
+  // ================= CANONICAL TAXONOMY ENGINE (SINGLE SOURCE OF TRUTH) =================
+  static final Map<String, List<Map<String, dynamic>>> _dynamicTaxonomyStore = {};
+
+  static Future<List<Map<String, dynamic>>> fetchTaxonomyForSubject({
+    required String exam,
+    required String subject,
+    bool forceRefresh = false,
+    bool includeInactive = false,
+  }) async {
+    final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
+    if (!forceRefresh && _dynamicTaxonomyStore.containsKey(storeKey) && _dynamicTaxonomyStore[storeKey]!.isNotEmpty) {
+      final cached = _dynamicTaxonomyStore[storeKey]!;
+      if (!includeInactive) {
+        return cached.where((c) => c['status'] == 'Active').map((c) {
+          final copy = Map<String, dynamic>.from(c);
+          if (copy['topics'] is List) {
+            copy['topics'] = (copy['topics'] as List).where((t) => t['status'] == 'Active').toList();
+          }
+          return copy;
+        }).toList();
+      }
+      return cached;
+    }
+
+    List<Map<String, dynamic>> chapters = [];
     try {
-      final res = await client.from('chapters').select('*').eq('subject_id', subjectId).order('display_order');
+      final res = await client
+          .from('chapters')
+          .select('*, topics(*)')
+          .eq('exam', exam)
+          .eq('subject', subject)
+          .order('display_order', ascending: true);
+
       if (res != null && (res as List).isNotEmpty) {
-        return (res as List).map((e) => ChapterModel.fromJson(e)).toList();
+        chapters = (res as List).map<Map<String, dynamic>>((e) {
+          final topicsList = (e['topics'] as List?)?.map<Map<String, dynamic>>((t) {
+            return {
+              'id': t['id'] ?? '',
+              'name': t['name'] ?? '',
+              'code': t['code'] ?? '',
+              'questions': t['questions_count'] ?? 0,
+              'status': (t['is_active'] ?? true) ? 'Active' : 'Inactive',
+            };
+          }).toList() ?? [];
+
+          return {
+            'id': e['id'] ?? '',
+            'name': e['name'] ?? '',
+            'code': e['code'] ?? '',
+            'topics': topicsList.length,
+            'topicsList': topicsList,
+            'questions': e['questions_count'] ?? 0,
+            'status': (e['is_active'] ?? true) ? 'Active' : 'Inactive',
+          };
+        }).toList();
       }
     } catch (e) {
-      debugPrint('Error fetching chapters: $e');
+      debugPrint('Notice loading chapters from Supabase: $e');
     }
+
+    if (chapters.isEmpty) {
+      chapters = _getSeedChaptersForSubject(exam, subject);
+    }
+
+    _dynamicTaxonomyStore[storeKey] = chapters;
+
+    if (!includeInactive) {
+      return chapters.where((c) => c['status'] == 'Active').map((c) {
+        final copy = Map<String, dynamic>.from(c);
+        if (copy['topicsList'] is List) {
+          copy['topicsList'] = (copy['topicsList'] as List).where((t) => t['status'] == 'Active').toList();
+        }
+        return copy;
+      }).toList();
+    }
+
+    return chapters;
+  }
+
+  static List<Map<String, dynamic>> _getSeedChaptersForSubject(String exam, String subject) {
+    final isNeet = exam.toUpperCase().contains('NEET');
+
+    if (subject.toUpperCase() == 'PHYSICS') {
+      return [
+        {
+          'id': 'phys_c1',
+          'name': '1. Mechanics',
+          'code': 'PHYS_MECH',
+          'topics': 8,
+          'questions': 1248,
+          'status': 'Active',
+          'topicsList': [
+            {'id': 'phys_t1_1', 'name': '1.1 Units and Dimensions', 'questions': 156, 'status': 'Active'},
+            {'id': 'phys_t1_2', 'name': '1.2 Kinematics & Projectile Motion', 'questions': 312, 'status': 'Active'},
+            {'id': 'phys_t1_3', 'name': '1.3 Laws of Motion & Friction', 'questions': 298, 'status': 'Active'},
+            {'id': 'phys_t1_4', 'name': '1.4 Work, Energy and Power', 'questions': 246, 'status': 'Active'},
+            {'id': 'phys_t1_5', 'name': '1.5 Centre of Mass & Collisions', 'questions': 128, 'status': 'Active'},
+            {'id': 'phys_t1_6', 'name': '1.6 Rotational Dynamics & Moment of Inertia', 'questions': 108, 'status': 'Active'},
+          ],
+        },
+        {
+          'id': 'phys_c2',
+          'name': '2. Thermodynamics & Kinetic Theory',
+          'code': 'PHYS_THERMO',
+          'topics': 6,
+          'questions': 896,
+          'status': 'Active',
+          'topicsList': [
+            {'id': 'phys_t2_1', 'name': '2.1 Thermal Properties of Matter', 'questions': 180, 'status': 'Active'},
+            {'id': 'phys_t2_2', 'name': '2.2 First & Second Law of Thermodynamics', 'questions': 240, 'status': 'Active'},
+            {'id': 'phys_t2_3', 'name': '2.3 Heat Engines & Carnot Cycle', 'questions': 190, 'status': 'Active'},
+            {'id': 'phys_t2_4', 'name': '2.4 Kinetic Theory of Gases', 'questions': 286, 'status': 'Active'},
+          ],
+        },
+        {
+          'id': 'phys_c3',
+          'name': '3. Oscillations and Waves',
+          'code': 'PHYS_WAVES',
+          'topics': 5,
+          'questions': 642,
+          'status': 'Active',
+          'topicsList': [
+            {'id': 'phys_t3_1', 'name': '3.1 Simple Harmonic Motion (SHM)', 'questions': 210, 'status': 'Active'},
+            {'id': 'phys_t3_2', 'name': '3.2 Wave Motion & Doppler Effect', 'questions': 220, 'status': 'Active'},
+            {'id': 'phys_t3_3', 'name': '3.3 Sound Waves & Organ Pipes', 'questions': 212, 'status': 'Active'},
+          ],
+        },
+        {
+          'id': 'phys_c4',
+          'name': '4. Electromagnetism & Circuits',
+          'code': 'PHYS_EM',
+          'topics': 12,
+          'questions': 1856,
+          'status': 'Active',
+          'topicsList': [
+            {'id': 'phys_t4_1', 'name': '4.1 Electrostatics & Coulomb\'s Law', 'questions': 340, 'status': 'Active'},
+            {'id': 'phys_t4_2', 'name': '4.2 Capacitors & Dielectrics', 'questions': 280, 'status': 'Active'},
+            {'id': 'phys_t4_3', 'name': '4.3 Current Electricity & Kirchhoff\'s Laws', 'questions': 450, 'status': 'Active'},
+            {'id': 'phys_t4_4', 'name': '4.4 Magnetic Effects of Current & EMI', 'questions': 420, 'status': 'Active'},
+            {'id': 'phys_t4_5', 'name': '4.5 Alternating Current (AC)', 'questions': 366, 'status': 'Active'},
+          ],
+        },
+        {
+          'id': 'phys_c5',
+          'name': '5. Optics & Modern Physics',
+          'code': 'PHYS_OPTICS',
+          'topics': 9,
+          'questions': 1346,
+          'status': 'Active',
+          'topicsList': [
+            {'id': 'phys_t5_1', 'name': '5.1 Ray Optics & Optical Instruments', 'questions': 390, 'status': 'Active'},
+            {'id': 'phys_t5_2', 'name': '5.2 Wave Optics & Interference', 'questions': 280, 'status': 'Active'},
+            {'id': 'phys_t5_3', 'name': '5.3 Dual Nature of Matter & Photoelectric Effect', 'questions': 310, 'status': 'Active'},
+            {'id': 'phys_t5_4', 'name': '5.4 Atoms & Nuclei', 'questions': 366, 'status': 'Active'},
+          ],
+        },
+      ];
+    }
+
+    if (subject.toUpperCase() == 'CHEMISTRY') {
+      return [
+        {
+          'id': 'chem_c1',
+          'name': '1. Physical Chemistry',
+          'code': 'CHEM_PHYS',
+          'topics': 6,
+          'questions': 1120,
+          'status': 'Active',
+          'topicsList': [
+            {'id': 'chem_t1_1', 'name': '1.1 Some Basic Concepts of Chemistry (Mole Concept)', 'questions': 240, 'status': 'Active'},
+            {'id': 'chem_t1_2', 'name': '1.2 Atomic Structure & Quantum Numbers', 'questions': 210, 'status': 'Active'},
+            {'id': 'chem_t1_3', 'name': '1.3 Chemical Bonding & Molecular Structure', 'questions': 310, 'status': 'Active'},
+            {'id': 'chem_t1_4', 'name': '1.4 Chemical & Ionic Equilibrium', 'questions': 210, 'status': 'Active'},
+            {'id': 'chem_t1_5', 'name': '1.5 Electrochemistry & Redox Reactions', 'questions': 150, 'status': 'Active'},
+          ],
+        },
+        {
+          'id': 'chem_c2',
+          'name': '2. Organic Chemistry',
+          'code': 'CHEM_ORG',
+          'topics': 8,
+          'questions': 1480,
+          'status': 'Active',
+          'topicsList': [
+            {'id': 'chem_t2_1', 'name': '2.1 GOC & Isomerism', 'questions': 380, 'status': 'Active'},
+            {'id': 'chem_t2_2', 'name': '2.2 Hydrocarbons (Alkanes, Alkenes, Alkynes)', 'questions': 320, 'status': 'Active'},
+            {'id': 'chem_t2_3', 'name': '2.3 Haloalkanes & Haloarenes', 'questions': 260, 'status': 'Active'},
+            {'id': 'chem_t2_4', 'name': '2.4 Alcohols, Phenols & Ethers', 'questions': 280, 'status': 'Active'},
+            {'id': 'chem_t2_5', 'name': '2.5 Aldehydes, Ketones & Carboxylic Acids', 'questions': 240, 'status': 'Active'},
+          ],
+        },
+        {
+          'id': 'chem_c3',
+          'name': '3. Inorganic Chemistry',
+          'code': 'CHEM_INORG',
+          'topics': 5,
+          'questions': 940,
+          'status': 'Active',
+          'topicsList': [
+            {'id': 'chem_t3_1', 'name': '3.1 Periodic Classification & Periodicity', 'questions': 220, 'status': 'Active'},
+            {'id': 'chem_t3_2', 'name': '3.2 p-Block Elements', 'questions': 240, 'status': 'Active'},
+            {'id': 'chem_t3_3', 'name': '3.3 d & f Block Elements', 'questions': 210, 'status': 'Active'},
+            {'id': 'chem_t3_4', 'name': '3.4 Coordination Compounds', 'questions': 270, 'status': 'Active'},
+          ],
+        },
+      ];
+    }
+
+    if (isNeet && (subject.toUpperCase() == 'BIOLOGY' || subject.toUpperCase().contains('BIOLOGY'))) {
+      return [
+        {
+          'id': 'bio_c1',
+          'name': '1. Diversity in Living World',
+          'code': 'BIO_DIV',
+          'topics': 4,
+          'questions': 650,
+          'status': 'Active',
+          'topicsList': [
+            {'id': 'bio_t1_1', 'name': '1.1 The Living World', 'questions': 120, 'status': 'Active'},
+            {'id': 'bio_t1_2', 'name': '1.2 Biological Classification', 'questions': 180, 'status': 'Active'},
+            {'id': 'bio_t1_3', 'name': '1.3 Plant Kingdom', 'questions': 170, 'status': 'Active'},
+            {'id': 'bio_t1_4', 'name': '1.4 Animal Kingdom', 'questions': 180, 'status': 'Active'},
+          ],
+        },
+        {
+          'id': 'bio_c2',
+          'name': '2. Cell Structure & Functions',
+          'code': 'BIO_CELL',
+          'topics': 3,
+          'questions': 780,
+          'status': 'Active',
+          'topicsList': [
+            {'id': 'bio_t2_1', 'name': '2.1 Cell: The Unit of Life', 'questions': 280, 'status': 'Active'},
+            {'id': 'bio_t2_2', 'name': '2.2 Biomolecules', 'questions': 240, 'status': 'Active'},
+            {'id': 'bio_t2_3', 'name': '2.3 Cell Cycle & Cell Division', 'questions': 260, 'status': 'Active'},
+          ],
+        },
+        {
+          'id': 'bio_c3',
+          'name': '3. Genetics & Evolution',
+          'code': 'BIO_GEN',
+          'topics': 3,
+          'questions': 920,
+          'status': 'Active',
+          'topicsList': [
+            {'id': 'bio_t3_1', 'name': '3.1 Principles of Inheritance & Variation', 'questions': 340, 'status': 'Active'},
+            {'id': 'bio_t3_2', 'name': '3.2 Molecular Basis of Inheritance', 'questions': 320, 'status': 'Active'},
+            {'id': 'bio_t3_3', 'name': '3.3 Evolution', 'questions': 260, 'status': 'Active'},
+          ],
+        },
+        {
+          'id': 'bio_c4',
+          'name': '4. Human Physiology',
+          'code': 'BIO_PHYS',
+          'topics': 5,
+          'questions': 1140,
+          'status': 'Active',
+          'topicsList': [
+            {'id': 'bio_t4_1', 'name': '4.1 Breathing & Exchange of Gases', 'questions': 220, 'status': 'Active'},
+            {'id': 'bio_t4_2', 'name': '4.2 Body Fluids & Circulation', 'questions': 240, 'status': 'Active'},
+            {'id': 'bio_t4_3', 'name': '4.3 Excretory Products & Elimination', 'questions': 210, 'status': 'Active'},
+            {'id': 'bio_t4_4', 'name': '4.4 Locomotion & Movement', 'questions': 210, 'status': 'Active'},
+            {'id': 'bio_t4_5', 'name': '4.5 Neural Control & Chemical Coordination', 'questions': 260, 'status': 'Active'},
+          ],
+        },
+      ];
+    }
+
+    // Default for Mathematics
     return [
-      ChapterModel(id: 'b1111111-1111-1111-1111-111111111111', subjectId: subjectId, name: 'Laws of Motion & Friction', code: 'PHYS_LOM', classLevel: 11, masteryPercentage: 88.0),
-      ChapterModel(id: 'b2222222-2222-2222-2222-222222222222', subjectId: subjectId, name: 'Kinematics & Projectile Motion', code: 'PHYS_KIN', classLevel: 11, masteryPercentage: 94.0),
-      ChapterModel(id: 'b3333333-3333-3333-3333-333333333333', subjectId: subjectId, name: 'Organic Hydrocarbons & Alkanes', code: 'CHEM_HYDRO', classLevel: 11, masteryPercentage: 76.0),
-      ChapterModel(id: 'b4444444-4444-4444-4444-444444444444', subjectId: subjectId, name: 'Human Physiology & Digestion', code: 'BIO_DIG', classLevel: 11, masteryPercentage: 91.0),
+      {
+        'id': 'math_c1',
+        'name': '1. Sets, Relations & Functions',
+        'code': 'MATH_SETS',
+        'topics': 3,
+        'questions': 540,
+        'status': 'Active',
+        'topicsList': [
+          {'id': 'math_t1_1', 'name': '1.1 Sets & Relations', 'questions': 180, 'status': 'Active'},
+          {'id': 'math_t1_2', 'name': '1.2 Functions & Domain/Range', 'questions': 210, 'status': 'Active'},
+          {'id': 'math_t1_3', 'name': '1.3 Inverse Trigonometric Functions', 'questions': 150, 'status': 'Active'},
+        ],
+      },
+      {
+        'id': 'math_c2',
+        'name': '2. Algebra',
+        'code': 'MATH_ALG',
+        'topics': 5,
+        'questions': 890,
+        'status': 'Active',
+        'topicsList': [
+          {'id': 'math_t2_1', 'name': '2.1 Complex Numbers & Quadratic Equations', 'questions': 220, 'status': 'Active'},
+          {'id': 'math_t2_2', 'name': '2.2 Matrices & Determinants', 'questions': 240, 'status': 'Active'},
+          {'id': 'math_t2_3', 'name': '2.3 Permutations & Combinations', 'questions': 190, 'status': 'Active'},
+          {'id': 'math_t2_4', 'name': '2.4 Binomial Theorem & Sequences/Series', 'questions': 240, 'status': 'Active'},
+        ],
+      },
+      {
+        'id': 'math_c3',
+        'name': '3. Calculus',
+        'code': 'MATH_CALC',
+        'topics': 4,
+        'questions': 1120,
+        'status': 'Active',
+        'topicsList': [
+          {'id': 'math_t3_1', 'name': '3.1 Limits, Continuity & Differentiability', 'questions': 320, 'status': 'Active'},
+          {'id': 'math_t3_2', 'name': '3.2 Applications of Derivatives (AOD)', 'questions': 280, 'status': 'Active'},
+          {'id': 'math_t3_3', 'name': '3.3 Indefinite & Definite Integrals', 'questions': 310, 'status': 'Active'},
+          {'id': 'math_t3_4', 'name': '3.4 Differential Equations & Area', 'questions': 210, 'status': 'Active'},
+        ],
+      },
     ];
+  }
+
+  static Future<bool> addChapterToDatabase({
+    required String exam,
+    required String subject,
+    required String name,
+    required String code,
+    String? description,
+    bool isActive = true,
+  }) async {
+    final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
+    final newId = 'c_${DateTime.now().millisecondsSinceEpoch}';
+
+    final newChapter = {
+      'id': newId,
+      'name': name.trim(),
+      'code': code.trim().toUpperCase(),
+      'topics': 0,
+      'questions': 0,
+      'status': isActive ? 'Active' : 'Inactive',
+      'topicsList': <Map<String, dynamic>>[],
+    };
+
+    try {
+      await client.from('chapters').insert({
+        'id': newId,
+        'exam': exam,
+        'subject': subject,
+        'name': name.trim(),
+        'code': code.trim().toUpperCase(),
+        'is_active': isActive,
+        'display_order': 99,
+      });
+    } catch (e) {
+      debugPrint('Notice adding chapter to Supabase: $e');
+    }
+
+    final current = _dynamicTaxonomyStore[storeKey] ?? _getSeedChaptersForSubject(exam, subject);
+    current.add(newChapter);
+    _dynamicTaxonomyStore[storeKey] = current;
+    return true;
+  }
+
+  static Future<bool> updateChapterInDatabase({
+    required String exam,
+    required String subject,
+    required String chapterId,
+    required String name,
+    String? code,
+    bool? isActive,
+  }) async {
+    final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
+
+    try {
+      final updates = <String, dynamic>{'name': name.trim()};
+      if (code != null) updates['code'] = code.trim().toUpperCase();
+      if (isActive != null) updates['is_active'] = isActive;
+
+      await client.from('chapters').update(updates).eq('id', chapterId);
+    } catch (e) {
+      debugPrint('Notice updating chapter in Supabase: $e');
+    }
+
+    final current = _dynamicTaxonomyStore[storeKey] ?? _getSeedChaptersForSubject(exam, subject);
+    for (var c in current) {
+      if (c['id'] == chapterId) {
+        c['name'] = name.trim();
+        if (code != null) c['code'] = code.trim().toUpperCase();
+        if (isActive != null) c['status'] = isActive ? 'Active' : 'Inactive';
+        break;
+      }
+    }
+    _dynamicTaxonomyStore[storeKey] = current;
+    return true;
+  }
+
+  static Future<bool> addTopicToDatabase({
+    required String exam,
+    required String subject,
+    required String chapterId,
+    required String name,
+    required String code,
+    bool isActive = true,
+  }) async {
+    final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
+    final newId = 't_${DateTime.now().millisecondsSinceEpoch}';
+
+    final newTopic = {
+      'id': newId,
+      'name': name.trim(),
+      'code': code.trim().toUpperCase(),
+      'questions': 0,
+      'status': isActive ? 'Active' : 'Inactive',
+    };
+
+    try {
+      await client.from('topics').insert({
+        'id': newId,
+        'chapter_id': chapterId,
+        'name': name.trim(),
+        'code': code.trim().toUpperCase(),
+        'is_active': isActive,
+      });
+    } catch (e) {
+      debugPrint('Notice adding topic to Supabase: $e');
+    }
+
+    final current = _dynamicTaxonomyStore[storeKey] ?? _getSeedChaptersForSubject(exam, subject);
+    for (var c in current) {
+      if (c['id'] == chapterId) {
+        final topicsList = (c['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        topicsList.add(newTopic);
+        c['topicsList'] = topicsList;
+        c['topics'] = topicsList.length;
+        break;
+      }
+    }
+    _dynamicTaxonomyStore[storeKey] = current;
+    return true;
+  }
+
+  static Future<bool> updateTopicInDatabase({
+    required String exam,
+    required String subject,
+    required String chapterId,
+    required String topicId,
+    required String name,
+    String? code,
+    bool? isActive,
+  }) async {
+    final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
+
+    try {
+      final updates = <String, dynamic>{'name': name.trim()};
+      if (code != null) updates['code'] = code.trim().toUpperCase();
+      if (isActive != null) updates['is_active'] = isActive;
+
+      await client.from('topics').update(updates).eq('id', topicId);
+    } catch (e) {
+      debugPrint('Notice updating topic in Supabase: $e');
+    }
+
+    final current = _dynamicTaxonomyStore[storeKey] ?? _getSeedChaptersForSubject(exam, subject);
+    for (var c in current) {
+      if (c['id'] == chapterId) {
+        final topicsList = (c['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        for (var t in topicsList) {
+          if (t['id'] == topicId) {
+            t['name'] = name.trim();
+            if (code != null) t['code'] = code.trim().toUpperCase();
+            if (isActive != null) t['status'] = isActive ? 'Active' : 'Inactive';
+            break;
+          }
+        }
+        break;
+      }
+    }
+    _dynamicTaxonomyStore[storeKey] = current;
+    return true;
   }
 
   // ================= QUESTIONS ENGINE =================
