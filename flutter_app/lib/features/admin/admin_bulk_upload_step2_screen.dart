@@ -172,16 +172,13 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     if (mounted) setState(() => _isLoading = false);
   }
 
-  Future<void> _saveCurrentBatch({bool showToast = true}) async {
+  Future<void> _saveAllQuestions({bool showToast = true}) async {
     if (_isSavingBatch) return;
     setState(() => _isSavingBatch = true);
 
-    final int startIndex = (_currentPageIndex - 1) * _itemsPerPage;
-    final int endIndex = (startIndex + _itemsPerPage).clamp(0, _questionsList.length);
-
     final List<Map<String, dynamic>> batchToSave = [];
 
-    for (int i = startIndex; i < endIndex; i++) {
+    for (int i = 0; i < _questionsList.length; i++) {
       final q = _questionsList[i];
       final bool hasContent = q.text.trim().isNotEmpty ||
           (q.questionImage != null && q.questionImage!.isNotEmpty) ||
@@ -216,7 +213,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           'topic': q.topic,
           'sourceType': _paperData?['source_category'] ?? _paperData?['sourceCategory'] ?? 'PYQ',
           'exam': _paperData?['exam'] ?? _paperData?['exam_name'] ?? 'NEET',
-          'year': int.tryParse(_paperData?['year']?.toString() ?? '2026') ?? 2026,
+          'year': _paperData?['year']?.toString() ?? '2026',
           'paperName': _paperData?['paper_name'] ?? _paperData?['paperName'] ?? widget.paperName,
         });
       }
@@ -229,31 +226,118 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       );
 
       if (success) {
-        for (int i = startIndex; i < endIndex; i++) {
-          final q = _questionsList[i];
-          final bool hasContent = q.text.trim().isNotEmpty ||
-              (q.questionImage != null && q.questionImage!.isNotEmpty) ||
-              q.optionImages.any((img) => img != null && img.isNotEmpty);
-          if (hasContent) {
-            q.isSaved = true;
-            q.id = 'q_${_paperId}_${q.number}';
+        setState(() {
+          for (var q in _questionsList) {
+            final bool hasContent = q.text.trim().isNotEmpty ||
+                (q.questionImage != null && q.questionImage!.isNotEmpty) ||
+                q.optionImages.any((img) => img != null && img.isNotEmpty);
+            if (hasContent) {
+              q.isSaved = true;
+              q.id = 'q_${_paperId}_${q.number}';
+            }
           }
-        }
-        _addedCount = _questionsList.where((q) => q.isSaved).length;
+          _addedCount = _questionsList.where((q) => q.isSaved).length;
+        });
 
         if (showToast && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('✓ Persisted ${batchToSave.length} question(s) to Supabase Question Bank! (Saved: $_addedCount / ${_questionsList.length})'),
+              content: Text('✓ Persisted ${batchToSave.length} question(s) to Supabase Question Bank! (Total Saved: $_addedCount / ${_questionsList.length})'),
               backgroundColor: const Color(0xFF10B981),
               duration: const Duration(seconds: 3),
             ),
           );
         }
       }
+    } else {
+      if (showToast && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No questions with content found to save. Please enter question text or attach an image.'),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
+      }
     }
 
     if (mounted) setState(() => _isSavingBatch = false);
+  }
+
+  Future<void> _saveSingleQuestion(QuestionItemData q, {bool showToast = true}) async {
+    final bool hasContent = q.text.trim().isNotEmpty ||
+        (q.questionImage != null && q.questionImage!.isNotEmpty) ||
+        q.optionImages.any((img) => img != null && img.isNotEmpty);
+
+    if (!hasContent) {
+      if (mounted && showToast) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Question ${q.number} is empty. Please enter text or an image before saving.'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+      return;
+    }
+
+    int correctIdx = (q.correctOptionIndex >= 0 && q.correctOptionIndex < q.options.length) ? q.correctOptionIndex : 0;
+    String correctLetter = String.fromCharCode(65 + correctIdx);
+    String correctAnsText = q.options[correctIdx].isNotEmpty
+        ? q.options[correctIdx]
+        : 'Option $correctLetter';
+
+    final qMap = {
+      'id': q.id.isNotEmpty ? q.id : 'q_${_paperId}_${q.number}',
+      'questionNumber': q.number,
+      'questionText': q.text,
+      'questionImage': q.questionImage ?? '',
+      'options': q.options,
+      'optionImages': q.optionImages,
+      'correctAnswer': 'Option $correctLetter',
+      'correct_answer': 'Option $correctLetter',
+      'correctOptionIndex': correctIdx,
+      'correct_option_index': correctIdx,
+      'correctText': correctAnsText,
+      'explanation': q.explanation,
+      'difficulty': q.difficulty,
+      'marks': double.tryParse(q.positiveMarks) ?? 4.0,
+      'negativeMarks': double.tryParse(q.negativeMarks) ?? 1.0,
+      'qType': q.questionType,
+      'subject': q.subject,
+      'chapter': q.chapter,
+      'topic': q.topic,
+      'sourceType': _paperData?['source_category'] ?? _paperData?['sourceCategory'] ?? 'PYQ',
+      'exam': _paperData?['exam'] ?? _paperData?['exam_name'] ?? 'NEET',
+      'year': _paperData?['year']?.toString() ?? '2026',
+      'paperName': _paperData?['paper_name'] ?? _paperData?['paperName'] ?? widget.paperName,
+    };
+
+    final success = await SupabaseService.upsertIncrementalQuestions(
+      paperId: _paperId,
+      questionsData: [qMap],
+    );
+
+    if (success) {
+      setState(() {
+        q.isSaved = true;
+        q.id = 'q_${_paperId}_${q.number}';
+        _addedCount = _questionsList.where((item) => item.isSaved).length;
+      });
+
+      if (mounted && showToast) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✓ Question ${q.number} saved successfully to Supabase Question Bank!'),
+            backgroundColor: const Color(0xFF10B981),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveCurrentBatch({bool showToast = true}) async {
+    return _saveAllQuestions(showToast: showToast);
   }
 
   Future<void> _pickAndUploadQuestionImage(QuestionItemData q) async {
@@ -1093,11 +1177,13 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                 Row(
                   children: [
                     OutlinedButton(
-                      onPressed: () {
-                        setState(() => _addedCount++);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Question ${q.number} saved!'), duration: const Duration(seconds: 1)),
-                        );
+                      onPressed: () async {
+                        await _saveSingleQuestion(q);
+                        if (index < _questionsList.length - 1) {
+                          final nextQNum = q.number + 1;
+                          final nextPageIndex = ((nextQNum - 1) ~/ _itemsPerPage) + 1;
+                          setState(() => _currentPageIndex = nextPageIndex);
+                        }
                       },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF334155),
@@ -1111,12 +1197,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                     const SizedBox(width: 10),
 
                     ElevatedButton(
-                      onPressed: () {
-                        setState(() => _addedCount++);
+                      onPressed: () async {
+                        await _saveSingleQuestion(q);
                         if (index < _questionsList.length - 1) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Question ${q.number} saved. Moving to Question ${q.number + 1}...'), duration: const Duration(seconds: 1)),
-                          );
+                          final nextQNum = q.number + 1;
+                          final nextPageIndex = ((nextQNum - 1) ~/ _itemsPerPage) + 1;
+                          setState(() => _currentPageIndex = nextPageIndex);
                         }
                       },
                       style: ElevatedButton.styleFrom(
