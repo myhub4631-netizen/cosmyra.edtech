@@ -1931,7 +1931,7 @@ class SupabaseService {
         'q_type': (qMap['qType'] ?? qMap['q_type'] ?? qMap['questionType'] ?? 'MCQ').toString().startsWith('MCQ') ? 'MCQ' : (qMap['qType'] ?? qMap['q_type'] ?? 'MCQ').toString(),
         'marks': (qMap['marks'] is num) ? (qMap['marks'] as num).toInt() : int.tryParse(qMap['marks']?.toString() ?? '4') ?? 4,
         'negative_marks': (qMap['negativeMarks'] is num) ? (qMap['negativeMarks'] as num).toDouble() : double.tryParse(qMap['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
-        'status': qMap['status'] ?? 'Active',
+        'status': (qMap['status'] ?? 'active').toString().toLowerCase(),
         'options': optionsList,
         'option_images': optionImagesList,
         'correct_answer': normCorrectAns,
@@ -2025,6 +2025,19 @@ class SupabaseService {
                 }
               }
             }
+            if (!repaired && (errStr.contains('question_status') || errStr.contains('status'))) {
+              if (qData.containsKey('status')) {
+                final cur = qData['status']?.toString() ?? '';
+                if (cur != cur.toLowerCase()) {
+                  qData['status'] = cur.toLowerCase();
+                  repaired = true;
+                } else {
+                  debugPrint('Auto-repair: Removing status enum column...');
+                  qData.remove('status');
+                  repaired = true;
+                }
+              }
+            }
             if (!repaired && errStr.contains('difficulty') && qData.containsKey('difficulty')) {
               final cur = qData['difficulty']?.toString() ?? '';
               if (cur != cur.toLowerCase()) {
@@ -2034,10 +2047,6 @@ class SupabaseService {
                 qData.remove('difficulty');
                 repaired = true;
               }
-            }
-            if (!repaired && errStr.contains('status') && qData.containsKey('status')) {
-              qData.remove('status');
-              repaired = true;
             }
             if (!repaired && errStr.contains('source_type') && qData.containsKey('source_type')) {
               qData.remove('source_type');
