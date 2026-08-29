@@ -1005,14 +1005,16 @@ class SupabaseService {
       debugPrint('Notice checking duplicate chapter in DB: $e');
     }
 
-    String finalChapterId = 'c_${DateTime.now().millisecondsSinceEpoch}';
+    String finalChapterId = toValidUuid('c_${DateTime.now().millisecondsSinceEpoch}');
 
     // 2. Remote Supabase Database Insert with fallback
     try {
       final res = await client.from('chapters').insert({
+        'id': finalChapterId,
         'subject_id': subjectId,
         'name': trimmedName,
         'code': trimmedCode,
+        'is_active': isActive,
         'display_order': 99,
       }).select();
 
@@ -1030,6 +1032,7 @@ class SupabaseService {
           'subject_id': subjectId,
           'name': trimmedName,
           'code': trimmedCode,
+          'is_active': isActive,
           'display_order': 99,
         });
       } catch (e2) {
@@ -1118,14 +1121,16 @@ class SupabaseService {
     bool isActive = true,
   }) async {
     final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
-    String finalTopicId = 't_${DateTime.now().millisecondsSinceEpoch}';
+    String finalTopicId = toValidUuid('t_${DateTime.now().millisecondsSinceEpoch}');
 
     // 1. Remote Supabase Database Insert with fallback
     try {
       final res = await client.from('topics').insert({
+        'id': finalTopicId,
         'chapter_id': chapterId,
         'name': name.trim(),
         'code': code.trim().toUpperCase(),
+        'is_active': isActive,
       }).select();
 
       if (res != null && (res as List).isNotEmpty) {
@@ -1142,6 +1147,7 @@ class SupabaseService {
           'chapter_id': chapterId,
           'name': name.trim(),
           'code': code.trim().toUpperCase(),
+          'is_active': isActive,
         });
       } catch (e2) {
         debugPrint('Supabase remote topic insert fallback notice: $e2');
@@ -2025,24 +2031,46 @@ class SupabaseService {
 
   static Future<void> ensureTaxonomySeeded() async {
     try {
-      await client.from('exams').insert({
-        'id': '11111111-1111-1111-1111-111111111111',
-        'name': 'NEET',
-        'code': 'NEET',
-        'is_active': true,
-        'display_order': 1,
-      });
+      await client.from('exams').insert([
+        {
+          'id': '11111111-1111-1111-1111-111111111111',
+          'name': 'NEET',
+          'code': 'NEET',
+          'is_active': true,
+          'display_order': 1,
+        },
+        {
+          'id': '22222222-2222-2222-2222-222222222222',
+          'name': 'JEE Main',
+          'code': 'JEE_MAIN',
+          'is_active': true,
+          'display_order': 2,
+        },
+        {
+          'id': '33333333-3333-3333-3333-333333333333',
+          'name': 'JEE Advanced',
+          'code': 'JEE_ADV',
+          'is_active': true,
+          'display_order': 3,
+        },
+      ]);
     } catch (_) {}
 
     try {
-      await client.from('subjects').insert({
-        'id': 'a1111111-1111-1111-1111-111111111111',
-        'exam_id': '11111111-1111-1111-1111-111111111111',
-        'name': 'Physics',
-        'code': 'PHY',
-        'is_active': true,
-        'display_order': 1,
-      });
+      await client.from('subjects').insert([
+        // NEET
+        {'id': 'a1111111-1111-1111-1111-111111111111', 'exam_id': '11111111-1111-1111-1111-111111111111', 'name': 'Physics', 'code': 'NEET_PHY', 'is_active': true, 'display_order': 1},
+        {'id': 'a2222222-2222-2222-2222-222222222222', 'exam_id': '11111111-1111-1111-1111-111111111111', 'name': 'Chemistry', 'code': 'NEET_CHEM', 'is_active': true, 'display_order': 2},
+        {'id': 'a3333333-3333-3333-3333-333333333333', 'exam_id': '11111111-1111-1111-1111-111111111111', 'name': 'Biology', 'code': 'NEET_BIO', 'is_active': true, 'display_order': 3},
+        // JEE Main
+        {'id': 'a4444444-4444-4444-4444-444444444444', 'exam_id': '22222222-2222-2222-2222-222222222222', 'name': 'Physics', 'code': 'JEE_M_PHY', 'is_active': true, 'display_order': 1},
+        {'id': 'a5555555-5555-5555-5555-555555555555', 'exam_id': '22222222-2222-2222-2222-222222222222', 'name': 'Chemistry', 'code': 'JEE_M_CHEM', 'is_active': true, 'display_order': 2},
+        {'id': 'a6666666-6666-6666-6666-666666666666', 'exam_id': '22222222-2222-2222-2222-222222222222', 'name': 'Mathematics', 'code': 'JEE_M_MATH', 'is_active': true, 'display_order': 3},
+        // JEE Advanced
+        {'id': 'a7777777-7777-7777-7777-777777777777', 'exam_id': '33333333-3333-3333-3333-333333333333', 'name': 'Physics', 'code': 'JEE_A_PHY', 'is_active': true, 'display_order': 1},
+        {'id': 'a8888888-8888-8888-8888-888888888888', 'exam_id': '33333333-3333-3333-3333-333333333333', 'name': 'Chemistry', 'code': 'JEE_A_CHEM', 'is_active': true, 'display_order': 2},
+        {'id': 'a9999999-9999-9999-9999-999999999999', 'exam_id': '33333333-3333-3333-3333-333333333333', 'name': 'Mathematics', 'code': 'JEE_A_MATH', 'is_active': true, 'display_order': 3},
+      ]);
     } catch (_) {}
 
     try {
