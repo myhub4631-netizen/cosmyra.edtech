@@ -700,40 +700,50 @@ class SupabaseService {
   }
 
   static Future<List<Map<String, dynamic>>> fetchAllChaptersForDropdown({String? exam, String? subject}) async {
-    try {
-      final String examName = (exam != null && exam.trim().isNotEmpty) ? exam.trim() : 'NEET';
-      final String subjectName = (subject != null && subject.trim().isNotEmpty) ? subject.trim() : 'Physics';
+    final List<Map<String, dynamic>> combined = [];
+    final String activeExam = (exam != null && exam.trim().isNotEmpty) ? exam.trim() : 'NEET';
 
-      final chapters = await fetchTaxonomyForSubject(exam: examName, subject: subjectName, includeInactive: true);
-      if (chapters.isNotEmpty) {
-        return chapters;
+    // 1. Load chapters across all core subjects (Physics, Chemistry, Biology, Mathematics)
+    final subjectsToLoad = ['Physics', 'Chemistry', 'Biology', 'Mathematics'];
+    for (final sub in subjectsToLoad) {
+      try {
+        final chaps = await fetchTaxonomyForSubject(exam: activeExam, subject: sub, includeInactive: true);
+        for (var c in chaps) {
+          final cId = c['id']?.toString() ?? '';
+          if (cId.isNotEmpty && !combined.any((item) => item['id'].toString() == cId)) {
+            combined.add(c);
+          }
+        }
+      } catch (e) {
+        debugPrint('Notice loading chapters for $sub in dropdown: $e');
       }
-    } catch (e) {
-      debugPrint('Notice in fetchAllChaptersForDropdown via fetchTaxonomyForSubject: $e');
     }
 
-    try {
-      final res = await client
-          .from('chapters')
-          .select('id, name, code, subject_id, is_active, display_order')
-          .order('display_order', ascending: true);
+    // 2. Direct query fallback from DB chapters table if combined is empty
+    if (combined.isEmpty) {
+      try {
+        final res = await client
+            .from('chapters')
+            .select('id, name, code, subject_id, display_order')
+            .order('display_order', ascending: true);
 
-      if (res != null && (res as List).isNotEmpty) {
-        return (res as List).map<Map<String, dynamic>>((e) {
-          return {
-            'id': e['id']?.toString() ?? '',
-            'name': e['name']?.toString() ?? '',
-            'code': e['code']?.toString() ?? '',
-            'subject_id': e['subject_id']?.toString() ?? '',
-            'status': (e['is_active'] ?? true) ? 'Active' : 'Inactive',
-          };
-        }).toList();
+        if (res != null && (res as List).isNotEmpty) {
+          return (res as List).map<Map<String, dynamic>>((e) {
+            return {
+              'id': e['id']?.toString() ?? '',
+              'name': e['name']?.toString() ?? '',
+              'code': e['code']?.toString() ?? '',
+              'subject_id': e['subject_id']?.toString() ?? '',
+              'status': 'Active',
+            };
+          }).toList();
+        }
+      } catch (e) {
+        debugPrint('Notice in fetchAllChaptersForDropdown direct query fallback: $e');
       }
-    } catch (e) {
-      debugPrint('Notice in fetchAllChaptersForDropdown direct query: $e');
     }
 
-    return [];
+    return combined;
   }
 
   static List<Map<String, dynamic>> _getSeedChaptersForSubject(String exam, String subject) {
