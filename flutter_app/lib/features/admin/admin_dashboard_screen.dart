@@ -26,7 +26,6 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> with SingleTickerProviderStateMixin {
   String _activeTab = 'Dashboard';
   bool _isLoading = false;
-  bool _isQuestionBankExpanded = true;
 
   List<QuestionModel> _questionBank = [];
   List<ReportModel> _reports = [];
@@ -362,23 +361,38 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('CONTENT MANAGEMENT'),
+                
+                // Prominent Separate Primary Button for Upload Questions (Step 1)
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(SmoothPageRoute(child: AdminBulkUploadStep1Screen(userProfile: widget.userProfile)));
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4F46E5),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      elevation: 3,
+                      shadowColor: const Color(0xFF4F46E5).withOpacity(0.4),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.cloud_upload_rounded, size: 18, color: Colors.white),
+                    label: const Text(
+                      'Upload Questions (Step 1)',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+
                 _buildSidebarTile('Dashboard Sections', Icons.dashboard_customize_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/sections')),
                 _buildSidebarTile('Paper Predictions', Icons.note_alt_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
-                _buildSidebarTile('Question Bank', Icons.quiz_outlined, false, hasDropdown: true, isExpanded: _isQuestionBankExpanded, onTap: () {
-                  setState(() => _isQuestionBankExpanded = !_isQuestionBankExpanded);
+                _buildSidebarTile('Question & Paper Bank', Icons.quiz_outlined, false, onTap: () {
+                  Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
                 }),
-                if (_isQuestionBankExpanded) ...[
-                  _buildSubSidebarTile('• All Questions', () {
-                    Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
-                  }),
-                  _buildSubSidebarTile('• Upload Questions (Step 1)', () {
-                    Navigator.of(context).push(SmoothPageRoute(child: AdminBulkUploadStep1Screen(userProfile: widget.userProfile)));
-                  }, isHighlighted: true),
-                  _buildSubSidebarTile('• Add Question (Step 2)', () {
-                    Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionBuilderScreen(userProfile: widget.userProfile)));
-                  }),
-                ],
-                _buildSidebarTile('Bulk Upload (Step 1)', Icons.cloud_upload_outlined, false, onTap: () {
+                _buildSidebarTile('Upload Questions (Step 1)', Icons.cloud_upload_outlined, false, onTap: () {
                   Navigator.of(context).push(SmoothPageRoute(child: AdminBulkUploadStep1Screen(userProfile: widget.userProfile)));
                 }),
                 _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false, onTap: () {
@@ -522,28 +536,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     );
   }
 
-  Widget _buildSubSidebarTile(String title, VoidCallback onTap, {bool isHighlighted = false}) {
-    return Container(
-      margin: const EdgeInsets.only(left: 20, top: 2, bottom: 2),
-      decoration: BoxDecoration(
-        color: isHighlighted ? const Color(0xFF4F46E5).withOpacity(0.2) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: ListTile(
-        dense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: isHighlighted ? FontWeight.bold : FontWeight.w500,
-            color: isHighlighted ? const Color(0xFFA5B4FC) : const Color(0xFF94A3B8),
-          ),
-        ),
-        onTap: onTap,
-      ),
-    );
-  }
+
 
   Widget _buildSidebarTile(String title, IconData icon, bool isActive, {bool hasDropdown = false, bool isExpanded = false, VoidCallback? onTap}) {
     return InkWell(
