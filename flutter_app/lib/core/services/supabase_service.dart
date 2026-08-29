@@ -1992,6 +1992,15 @@ class SupabaseService {
 
           bool repaired = false;
 
+          // 0. Check for 42501 RLS Policy Violation
+          if (errStr.contains('42501') || errStr.contains('row-level security')) {
+            debugPrint('🚨 Supabase RLS Permission Error (42501) on table "questions": $errStr');
+            return {
+              'success': false,
+              'error': 'Supabase RLS Policy Violation (42501): Database access denied for table "questions". Ensure admin permissions or run updated 02_rls.sql migration.'
+            };
+          }
+
           // 1. Check for PGRST204 missing column in schema cache
           final missingCol = extractMissingColumnFromError(errStr);
           if (missingCol != null && qData.containsKey(missingCol)) {

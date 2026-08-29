@@ -44,14 +44,32 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION public.is_admin(user_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
-  RETURN public.has_role(user_id, 'admin') OR public.has_role(user_id, 'super_admin');
+  IF user_id IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  RETURN public.has_role(user_id, 'admin') 
+      OR public.has_role(user_id, 'super_admin')
+      OR EXISTS (
+        SELECT 1 FROM public.profiles 
+        WHERE id = user_id AND LOWER(role) IN ('admin', 'super_admin')
+      );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 CREATE OR REPLACE FUNCTION public.is_teacher(user_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
-  RETURN public.has_role(user_id, 'teacher') OR public.is_admin(user_id);
+  IF user_id IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  RETURN public.has_role(user_id, 'teacher') 
+      OR public.is_admin(user_id)
+      OR EXISTS (
+        SELECT 1 FROM public.profiles 
+        WHERE id = user_id AND LOWER(role) IN ('teacher', 'admin', 'super_admin')
+      );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -98,24 +116,61 @@ CREATE POLICY "Taxonomy full public access" ON public.chapters FOR ALL TO anon, 
 CREATE POLICY "Taxonomy full public access" ON public.topics FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- 5. QUESTIONS & OPTIONS
-CREATE POLICY "Published questions viewable by authenticated users"
-ON public.questions FOR SELECT TO authenticated 
-USING (status = 'published' OR created_by = auth.uid() OR public.is_admin(auth.uid()));
+DROP POLICY IF EXISTS "Published questions viewable by authenticated users" ON public.questions;
+DROP POLICY IF EXISTS "Questions viewable by users" ON public.questions;
+DROP POLICY IF EXISTS "Teachers and admins can insert questions" ON public.questions;
+DROP POLICY IF EXISTS "Admins and creators can update questions" ON public.questions;
+DROP POLICY IF EXISTS "Admins can delete questions" ON public.questions;
 
-CREATE POLICY "Teachers and admins can insert questions"
-ON public.questions FOR INSERT TO authenticated 
-WITH CHECK (public.is_teacher(auth.uid()) OR public.is_admin(auth.uid()));
+-- SELECT Policy
+CREATE POLICY "Questions select policy"
+ON public.questions FOR SELECT TO anon, authenticated 
+USING (status = 'published' OR status = 'Active' OR created_by = auth.uid() OR public.is_admin(auth.uid()));
 
-CREATE POLICY "Admins and creators can update questions"
-ON public.questions FOR UPDATE TO authenticated 
-USING (created_by = auth.uid() OR public.is_admin(auth.uid()));
+-- INSERT Policy
+CREATE POLICY "Questions insert policy"
+ON public.questions FOR INSERT TO anon, authenticated 
+WITH CHECK (
+  auth.uid() IS NOT NULL AND (
+    public.is_admin(auth.uid()) OR 
+    public.is_teacher(auth.uid())
+  )
+  OR auth.role() = 'anon'
+);
 
-CREATE POLICY "Options viewable by authenticated users"
-ON public.question_options FOR SELECT TO authenticated USING (true);
+-- UPDATE Policy
+CREATE POLICY "Questions update policy"
+ON public.questions FOR UPDATE TO anon, authenticated 
+USING (
+  created_by = auth.uid() OR 
+  public.is_admin(auth.uid()) OR 
+  auth.role() = 'anon'
+);
 
-CREATE POLICY "Teachers and admins manage options"
-ON public.question_options FOR ALL TO authenticated 
-USING (public.is_teacher(auth.uid()) OR public.is_admin(auth.uid()));
+-- DELETE Policy
+CREATE POLICY "Questions delete policy"
+ON public.questions FOR DELETE TO anon, authenticated 
+USING (
+  created_by = auth.uid() OR 
+  public.is_admin(auth.uid()) OR 
+  auth.role() = 'anon'
+);
+
+-- Question Options Policies
+DROP POLICY IF EXISTS "Options viewable by authenticated users" ON public.question_options;
+DROP POLICY IF EXISTS "Teachers and admins manage options" ON public.question_options;
+
+CREATE POLICY "Options select policy"
+ON public.question_options FOR SELECT TO anon, authenticated USING (true);
+
+CREATE POLICY "Options insert policy"
+ON public.question_options FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+CREATE POLICY "Options update policy"
+ON public.question_options FOR UPDATE TO anon, authenticated USING (true);
+
+CREATE POLICY "Options delete policy"
+ON public.question_options FOR DELETE TO anon, authenticated USING (true);
 
 -- 6. TESTS & INVITATIONS
 CREATE POLICY "Published tests viewable by authenticated users"
