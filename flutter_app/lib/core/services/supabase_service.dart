@@ -2272,6 +2272,26 @@ class SupabaseService {
             debugPrint('Notice saving question_options: $optErr');
           }
 
+          // Cache saved question locally by paper_id & paper_uuid for instant resumability
+          if (pIdRaw.trim().isNotEmpty) {
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              for (final key in ['cosmyra_paper_questions_$pIdRaw', 'cosmyra_paper_questions_${toValidUuid(pIdRaw)}']) {
+                final str = prefs.getString(key) ?? '[]';
+                final List<dynamic> list = jsonDecode(str);
+                final idx = list.indexWhere((item) => (item['question_number'] ?? item['questionNumber']) == qNum || item['id'] == qData['id']);
+                if (idx != -1) {
+                  list[idx] = qData;
+                } else {
+                  list.add(qData);
+                }
+                await prefs.setString(key, jsonEncode(list));
+              }
+            } catch (e) {
+              debugPrint('Notice updating local paper questions cache: $e');
+            }
+          }
+
           return {'success': true};
         } catch (e) {
           final errStr = e.toString();
@@ -3497,24 +3517,44 @@ class SupabaseService {
   /// Fetch saved questions for a given paper ID
   static Future<List<Map<String, dynamic>>> fetchQuestionsForPaper(String paperId) async {
     final List<Map<String, dynamic>> results = [];
+    final String paperUuid = toValidUuid(paperId);
 
+    // 1. Check SharedPreferences by paperId & paperUuid
     try {
       final prefs = await SharedPreferences.getInstance();
-      final paperQStr = prefs.getString('cosmyra_paper_questions_$paperId');
-      if (paperQStr != null && paperQStr.isNotEmpty) {
-        final List<dynamic> decoded = jsonDecode(paperQStr);
-        results.addAll(decoded.map((e) => Map<String, dynamic>.from(e as Map)));
+      for (final key in ['cosmyra_paper_questions_$paperId', 'cosmyra_paper_questions_$paperUuid']) {
+        final str = prefs.getString(key);
+        if (str != null && str.isNotEmpty) {
+          final List<dynamic> decoded = jsonDecode(str);
+          for (var item in decoded) {
+            final map = Map<String, dynamic>.from(item as Map);
+            final qNum = (map['question_number'] ?? map['questionNumber'] ?? 0) as int;
+            final idx = results.indexWhere((r) => (r['question_number'] ?? r['questionNumber']) == qNum || r['id'] == map['id']);
+            if (idx != -1) {
+              results[idx] = map;
+            } else {
+              results.add(map);
+            }
+          }
+        }
       }
     } catch (e) {
-      debugPrint('Error loading paper questions from SharedPreferences: $e');
+      debugPrint('Notice reading local paper questions: $e');
     }
 
+    // 2. Query Supabase DB questions table using paper_id UUID OR paper_id string OR questions with matching ID prefix
     try {
-      final res = await client.from('questions').select().eq('paper_id', paperId).order('question_number', ascending: true);
+      final res = await client
+          .from('questions')
+          .select()
+          .or('paper_id.eq.$paperUuid,paper_id.eq.$paperId')
+          .order('question_number', ascending: true);
+
       if (res != null && (res as List).isNotEmpty) {
         final dbQuestions = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         for (var dbQ in dbQuestions) {
-          final idx = results.indexWhere((r) => r['id'] == dbQ['id'] || r['question_number'] == dbQ['question_number']);
+          final qNum = (dbQ['question_number'] ?? dbQ['questionNumber'] ?? 0) as int;
+          final idx = results.indexWhere((r) => (r['question_number'] ?? r['questionNumber']) == qNum || r['id'] == dbQ['id']);
           if (idx != -1) {
             results[idx] = dbQ;
           } else {
@@ -3523,8 +3563,39 @@ class SupabaseService {
         }
       }
     } catch (e) {
-      debugPrint('Supabase fetchQuestionsForPaper notice: $e');
+      debugPrint('Notice querying Supabase questions for paper: $e');
     }
+
+    // 3. Fallback: Query all questions from DB and filter by paper_id or test_series_id matching paperId/paperUuid
+    if (results.isEmpty) {
+      try {
+        final res = await client.from('questions').select().limit(500);
+        if (res != null && (res as List).isNotEmpty) {
+          final allDb = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
+          for (var dbQ in allDb) {
+            final pId = dbQ['paper_id']?.toString() ?? dbQ['paperId']?.toString() ?? dbQ['test_series_id']?.toString() ?? '';
+            if (pId == paperId || pId == paperUuid) {
+              final qNum = (dbQ['question_number'] ?? dbQ['questionNumber'] ?? 0) as int;
+              final idx = results.indexWhere((r) => (r['question_number'] ?? r['questionNumber']) == qNum || r['id'] == dbQ['id']);
+              if (idx != -1) {
+                results[idx] = dbQ;
+              } else {
+                results.add(dbQ);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Notice in fallback question fetch for paper: $e');
+      }
+    }
+
+    // Sort by question_number ascending
+    results.sort((a, b) {
+      final numA = (a['question_number'] ?? a['questionNumber'] ?? 999) as int;
+      final numB = (b['question_number'] ?? b['questionNumber'] ?? 999) as int;
+      return numA.compareTo(numB);
+    });
 
     return results;
   }
