@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ChevronLeft,
   Sparkles,
+  Upload,
 } from 'lucide-react';
 
 interface AdminSidebarProps {
@@ -151,6 +152,15 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               {!isCollapsed && <span>Topics</span>}
             </button>
 
+            {/* Prominent Separate Action Button for Step 1 Bulk Upload */}
+            <button
+              onClick={() => navigate('/admin/bulk-upload')}
+              className="w-full flex items-center justify-center gap-2.5 px-3 py-2.5 my-2 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
+            >
+              <Upload className="w-4 h-4 text-white" />
+              {!isCollapsed && <span>Upload Questions (Step 1)</span>}
+            </button>
+
             <button
               onClick={() => navigate('/admin/questions')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
@@ -164,6 +174,21 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 {!isCollapsed && <span>Question Bank</span>}
               </div>
               {!isCollapsed && <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+
+            {/* Separate Navigation Menu Tile for Step 1 Bulk Upload */}
+            <button
+              onClick={() => navigate('/admin/bulk-upload')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                isNavActive('/admin/bulk-upload') || isNavActive('/admin/upload-step1')
+                  ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/30'
+                  : 'text-indigo-300 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Upload className="w-4 h-4 text-indigo-400" />
+                {!isCollapsed && <span>Upload Questions (Step 1)</span>}
+              </div>
             </button>
           </div>
 

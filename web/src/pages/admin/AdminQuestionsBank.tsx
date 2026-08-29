@@ -145,7 +145,18 @@ export const AdminQuestionsBank: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <button className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-extrabold text-xs flex items-center gap-1.5 transition-colors shadow-xs">
+          <button
+            onClick={() => navigate('/admin/bulk-upload')}
+            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-md shadow-indigo-600/30 flex items-center gap-2 transition-all cursor-pointer"
+          >
+            <Upload className="w-4 h-4 text-white" />
+            <span>Bulk Upload (Step 1)</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/admin/bulk-upload')}
+            className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-extrabold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+          >
             <Upload className="w-4 h-4 text-slate-500" />
             <span>Import Questions</span>
           </button>

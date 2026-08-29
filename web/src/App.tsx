@@ -48,6 +48,7 @@ import { AdminPricingPlans } from './pages/admin/AdminPricingPlans';
 import { AdminOffersCoupons } from './pages/admin/AdminOffersCoupons';
 import { AdminPaperPrediction } from './pages/admin/AdminPaperPrediction';
 import { AdminQuestionsBank } from './pages/admin/AdminQuestionsBank';
+import { AdminBulkUploadStep1 } from './pages/admin/AdminBulkUploadStep1';
 
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -225,6 +226,9 @@ export function App() {
           <Route path="/admin/questions" element={<AdminQuestionsBank />} />
           <Route path="/admin/question-bank" element={<AdminQuestionsBank />} />
           <Route path="/admin/questions-bank" element={<AdminQuestionsBank />} />
+          <Route path="/admin/bulk-upload" element={<AdminBulkUploadStep1 />} />
+          <Route path="/admin/upload-step1" element={<AdminBulkUploadStep1 />} />
+          <Route path="/admin/upload-questions" element={<AdminBulkUploadStep1 />} />
           <Route path="/admin/taxonomy" element={<TaxonomyManagerView />} />
           <Route path="/admin/moderation" element={<QuestionModerationView />} />
           <Route path="/admin/bulk-import" element={<QuestionModerationView />} />
