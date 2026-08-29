@@ -669,24 +669,24 @@ class SupabaseService {
         if (dbChapters.isNotEmpty) {
           _dynamicTaxonomyStore[storeKey] = dbChapters;
           await _saveTaxonomyToLocalStorage();
-
-          if (!includeInactive) {
-            return dbChapters.where((c) => c['status'] == 'Active').map((c) {
-              final copy = Map<String, dynamic>.from(c);
-              if (copy['topicsList'] is List) {
-                copy['topicsList'] = (copy['topicsList'] as List).where((t) => t['status'] == 'Active').toList();
-              }
-              return copy;
-            }).toList();
-          }
-          return dbChapters;
         }
+
+        if (!includeInactive) {
+          return dbChapters.where((c) => c['status'] == 'Active').map((c) {
+            final copy = Map<String, dynamic>.from(c);
+            if (copy['topicsList'] is List) {
+              copy['topicsList'] = (copy['topicsList'] as List).where((t) => t['status'] == 'Active').toList();
+            }
+            return copy;
+          }).toList();
+        }
+        return dbChapters;
       }
     } catch (e) {
       debugPrint('Notice loading chapters from Supabase DB: $e');
     }
 
-    final cached = _dynamicTaxonomyStore[storeKey] ?? _getSeedChaptersForSubject(exam, subject);
+    final cached = _dynamicTaxonomyStore[storeKey] ?? [];
     if (!includeInactive) {
       return cached.where((c) => c['status'] == 'Active').map((c) {
         final copy = Map<String, dynamic>.from(c);
