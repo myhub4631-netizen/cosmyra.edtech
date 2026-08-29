@@ -1837,6 +1837,22 @@ class SupabaseService {
   }
 
   // ================= ADMIN MANAGEMENT =================
+  static String? extractMissingColumnFromError(String errStr) {
+    if (!errStr.contains("Could not find the '")) return null;
+    try {
+      const startMarker = "Could not find the '";
+      final startIdx = errStr.indexOf(startMarker);
+      if (startIdx != -1) {
+        final cut = errStr.substring(startIdx + startMarker.length);
+        final endIdx = cut.indexOf("' column of");
+        if (endIdx != -1) {
+          return cut.substring(0, endIdx);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   static Future<Map<String, dynamic>> saveQuestionMapWithStatus(Map<String, dynamic> qMap) async {
     try {
       final rawCat = (qMap['category'] ?? qMap['sourceType'] ?? 'Custom Practice').toString();
@@ -1864,15 +1880,13 @@ class SupabaseService {
           ? List<String?>.from(qMap['optionImages'])
           : (qMap['option_images'] is List ? List<String?>.from(qMap['option_images']) : <String?>[]);
 
-      final qData = {
+      final Map<String, dynamic> qData = {
         'id': (qMap['id'] != null && qMap['id'].toString().isNotEmpty) ? qMap['id'].toString() : 'Q_${DateTime.now().millisecondsSinceEpoch}',
         'paper_id': (qMap['paper_id'] ?? qMap['paperId'] ?? '').toString(),
         'question_number': qNum,
         'question_text': qMap['questionText'] ?? qMap['question_text'] ?? '',
         'question_image': qMap['questionImage'] ?? qMap['question_image'] ?? '',
         'subject': qMap['subject'] ?? 'Physics',
-        'chapter': qMap['chapter'] ?? '1. Mechanics',
-        'topic': qMap['topic'] ?? 'Kinematics',
         'source_type': canonicalMap['source_type'],
         'source': canonicalMap['source'],
         'difficulty': qMap['difficulty'] ?? 'Medium',
@@ -1892,10 +1906,29 @@ class SupabaseService {
         'updated_at': DateTime.now().toIso8601String(),
       };
 
-      await client.from('questions').upsert(qData);
-      return {'success': true};
+      int attempts = 0;
+      while (attempts < 10) {
+        attempts++;
+        try {
+          await client.from('questions').upsert(qData);
+          return {'success': true};
+        } catch (e) {
+          final errStr = e.toString();
+          debugPrint('Supabase saveQuestion attempt $attempts error: $errStr');
+
+          final missingCol = extractMissingColumnFromError(errStr);
+          if (missingCol != null && qData.containsKey(missingCol)) {
+            debugPrint('Auto-repair: Removing non-existent column "$missingCol" from payload and retrying...');
+            qData.remove(missingCol);
+            continue;
+          }
+
+          return {'success': false, 'error': errStr};
+        }
+      }
+
+      return {'success': false, 'error': 'Exceeded maximum schema auto-repair retries.'};
     } catch (e) {
-      debugPrint('Supabase saveQuestion error: $e');
       return {'success': false, 'error': e.toString()};
     }
   }
@@ -2982,14 +3015,30 @@ class SupabaseService {
         };
     }).toList();
 
-    try {
-      await client.from('questions').upsert(cleanPayloads);
-      debugPrint('✓ Successfully upserted ${cleanPayloads.length} questions to remote Supabase DB!');
-      return true;
-    } catch (e) {
-      debugPrint('Supabase incremental question upsert error: $e');
-      return false;
+    int attempts = 0;
+    while (attempts < 10) {
+      attempts++;
+      try {
+        await client.from('questions').upsert(cleanPayloads);
+        debugPrint('✓ Successfully upserted ${cleanPayloads.length} questions to remote Supabase DB!');
+        return true;
+      } catch (e) {
+        final errStr = e.toString();
+        debugPrint('Supabase incremental question upsert attempt $attempts error: $errStr');
+
+        final missingCol = extractMissingColumnFromError(errStr);
+        if (missingCol != null) {
+          debugPrint('Auto-repair incremental: Removing non-existent column "$missingCol" from payloads and retrying...');
+          for (var p in cleanPayloads) {
+            p.remove(missingCol);
+          }
+          continue;
+        }
+        return false;
+      }
     }
+
+    return false;
   }
 
   /// Fetch saved questions for a given paper ID
