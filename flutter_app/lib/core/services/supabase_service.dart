@@ -2013,18 +2013,30 @@ class SupabaseService {
           if (!repaired && (errStr.contains('23502') || errStr.toLowerCase().contains('violates not-null constraint'))) {
             final match = RegExp(r'null value in column "([^"]+)"').firstMatch(errStr);
             final col = (match != null && match.groupCount >= 1) ? match.group(1) : null;
-            if (col != null && qData.containsKey(col)) {
+            if (col != null) {
               debugPrint('Auto-repair: Resolving not-null constraint for column "$col"...');
-              if (col == 'paper_id') {
+              if (col == 'chapter_id') {
+                qData['chapter_id'] = 'b1111111-1111-1111-1111-111111111111';
+                repaired = true;
+              } else if (col == 'subject_id') {
+                qData['subject_id'] = 'a1111111-1111-1111-1111-111111111111';
+                repaired = true;
+              } else if (col == 'exam_id') {
+                qData['exam_id'] = '11111111-1111-1111-1111-111111111111';
+                repaired = true;
+              } else if (col == 'paper_id') {
                 qData.remove('paper_id');
                 repaired = true;
               } else if (col == 'created_at' || col == 'updated_at') {
                 qData[col] = DateTime.now().toIso8601String();
                 repaired = true;
-              } else {
+              } else if (qData.containsKey(col)) {
                 qData.remove(col);
                 repaired = true;
               }
+            } else if (errStr.contains('chapter_id')) {
+              qData['chapter_id'] = 'b1111111-1111-1111-1111-111111111111';
+              repaired = true;
             } else if (errStr.contains('paper_id') && qData.containsKey('paper_id')) {
               qData.remove('paper_id');
               repaired = true;
