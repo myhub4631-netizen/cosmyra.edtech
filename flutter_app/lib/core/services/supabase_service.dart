@@ -1887,6 +1887,55 @@ class SupabaseService {
     return '$part1-$part2-$part3-$part4-$part5';
   }
 
+  static bool _hasTaxonomyBeenSeeded = false;
+
+  static Future<void> ensureTaxonomySeeded() async {
+    if (_hasTaxonomyBeenSeeded) return;
+    try {
+      // 1. Ensure Exam row
+      await client.from('exams').upsert({
+        'id': '11111111-1111-1111-1111-111111111111',
+        'name': 'NEET',
+        'code': 'NEET',
+        'is_active': true,
+        'display_order': 1,
+      });
+
+      // 2. Ensure Subject row
+      await client.from('subjects').upsert({
+        'id': 'a1111111-1111-1111-1111-111111111111',
+        'exam_id': '11111111-1111-1111-1111-111111111111',
+        'name': 'Physics',
+        'code': 'PHY',
+        'is_active': true,
+        'display_order': 1,
+      });
+
+      // 3. Ensure Chapter rows
+      await client.from('chapters').upsert([
+        {
+          'id': 'b1111111-1111-1111-1111-111111111111',
+          'subject_id': 'a1111111-1111-1111-1111-111111111111',
+          'name': 'Laws of Motion',
+          'code': 'CHAP_LOM',
+          'is_active': true,
+          'display_order': 1,
+        },
+        {
+          'id': 'b2222222-2222-2222-2222-222222222222',
+          'subject_id': 'a1111111-1111-1111-1111-111111111111',
+          'name': 'Kinematics',
+          'code': 'CHAP_KIN',
+          'is_active': true,
+          'display_order': 2,
+        },
+      ]);
+      _hasTaxonomyBeenSeeded = true;
+    } catch (e) {
+      debugPrint('Notice ensuring taxonomy seeded: $e');
+    }
+  }
+
   static Future<Map<String, dynamic>> saveQuestionMapWithStatus(Map<String, dynamic> qMap) async {
     try {
       final rawCat = (qMap['category'] ?? qMap['sourceType'] ?? 'Custom Practice').toString();
@@ -1953,6 +2002,8 @@ class SupabaseService {
         'created_at': qMap['created_at'] ?? DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       };
+
+      await ensureTaxonomySeeded();
 
       int attempts = 0;
       String lastErr = '';
