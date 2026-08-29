@@ -176,12 +176,13 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     if (_isSavingBatch) return;
     setState(() => _isSavingBatch = true);
 
-    final List<Map<String, dynamic>> batchToSave = [];
+    int savedCount = 0;
 
     for (int i = 0; i < _questionsList.length; i++) {
       final q = _questionsList[i];
       final bool hasContent = q.text.trim().isNotEmpty ||
           (q.questionImage != null && q.questionImage!.isNotEmpty) ||
+          q.options.any((opt) => opt.trim().isNotEmpty) ||
           q.optionImages.any((img) => img != null && img.isNotEmpty);
 
       if (hasContent) {
@@ -191,13 +192,19 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
             ? q.options[correctIdx]
             : 'Option $correctLetter';
 
-        batchToSave.add({
-          'id': q.id.isNotEmpty ? q.id : 'q_${_paperId}_${q.number}',
-          'questionNumber': q.number,
+        final String qId = q.id.isNotEmpty ? q.id : 'q_${_paperId}_${q.number}';
+
+        final qMap = {
+          'id': qId,
+          'paper_id': _paperId,
+          'question_number': q.number,
           'questionText': q.text,
+          'question_text': q.text,
           'questionImage': q.questionImage ?? '',
+          'question_image': q.questionImage ?? '',
           'options': q.options,
           'optionImages': q.optionImages,
+          'option_images': q.optionImages,
           'correctAnswer': 'Option $correctLetter',
           'correct_answer': 'Option $correctLetter',
           'correctOptionIndex': correctIdx,
@@ -215,39 +222,30 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           'exam': _paperData?['exam'] ?? _paperData?['exam_name'] ?? 'NEET',
           'year': _paperData?['year']?.toString() ?? '2026',
           'paperName': _paperData?['paper_name'] ?? _paperData?['paperName'] ?? widget.paperName,
-        });
+        };
+
+        final ok = await SupabaseService.saveQuestionMap(qMap);
+        if (ok) {
+          q.isSaved = true;
+          q.id = qId;
+          savedCount++;
+        }
       }
     }
 
-    if (batchToSave.isNotEmpty) {
-      final success = await SupabaseService.upsertIncrementalQuestions(
-        paperId: _paperId,
-        questionsData: batchToSave,
-      );
+    if (savedCount > 0) {
+      setState(() {
+        _addedCount = _questionsList.where((q) => q.isSaved).length;
+      });
 
-      if (success) {
-        setState(() {
-          for (var q in _questionsList) {
-            final bool hasContent = q.text.trim().isNotEmpty ||
-                (q.questionImage != null && q.questionImage!.isNotEmpty) ||
-                q.optionImages.any((img) => img != null && img.isNotEmpty);
-            if (hasContent) {
-              q.isSaved = true;
-              q.id = 'q_${_paperId}_${q.number}';
-            }
-          }
-          _addedCount = _questionsList.where((q) => q.isSaved).length;
-        });
-
-        if (showToast && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('✓ Persisted ${batchToSave.length} question(s) to Supabase Question Bank! (Total Saved: $_addedCount / ${_questionsList.length})'),
-              backgroundColor: const Color(0xFF10B981),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
+      if (showToast && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✓ Persisted $savedCount question(s) to Supabase Question Bank! (Total Saved: $_addedCount / ${_questionsList.length})'),
+            backgroundColor: const Color(0xFF10B981),
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     } else {
       if (showToast && mounted) {
@@ -266,6 +264,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   Future<void> _saveSingleQuestion(QuestionItemData q, {bool showToast = true}) async {
     final bool hasContent = q.text.trim().isNotEmpty ||
         (q.questionImage != null && q.questionImage!.isNotEmpty) ||
+        q.options.any((opt) => opt.trim().isNotEmpty) ||
         q.optionImages.any((img) => img != null && img.isNotEmpty);
 
     if (!hasContent) {
@@ -286,13 +285,19 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         ? q.options[correctIdx]
         : 'Option $correctLetter';
 
+    final String qId = q.id.isNotEmpty ? q.id : 'q_${_paperId}_${q.number}';
+
     final qMap = {
-      'id': q.id.isNotEmpty ? q.id : 'q_${_paperId}_${q.number}',
-      'questionNumber': q.number,
+      'id': qId,
+      'paper_id': _paperId,
+      'question_number': q.number,
       'questionText': q.text,
+      'question_text': q.text,
       'questionImage': q.questionImage ?? '',
+      'question_image': q.questionImage ?? '',
       'options': q.options,
       'optionImages': q.optionImages,
+      'option_images': q.optionImages,
       'correctAnswer': 'Option $correctLetter',
       'correct_answer': 'Option $correctLetter',
       'correctOptionIndex': correctIdx,
@@ -312,15 +317,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       'paperName': _paperData?['paper_name'] ?? _paperData?['paperName'] ?? widget.paperName,
     };
 
-    final success = await SupabaseService.upsertIncrementalQuestions(
-      paperId: _paperId,
-      questionsData: [qMap],
-    );
+    final success = await SupabaseService.saveQuestionMap(qMap);
 
     if (success) {
       setState(() {
         q.isSaved = true;
-        q.id = 'q_${_paperId}_${q.number}';
+        q.id = qId;
         _addedCount = _questionsList.where((item) => item.isSaved).length;
       });
 
@@ -330,6 +332,15 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
             content: Text('✓ Question ${q.number} saved successfully to Supabase Question Bank!'),
             backgroundColor: const Color(0xFF10B981),
             duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } else {
+      if (mounted && showToast) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save Question ${q.number} to Supabase database.'),
+            backgroundColor: const Color(0xFFEF4444),
           ),
         );
       }
