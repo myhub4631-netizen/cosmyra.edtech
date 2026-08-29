@@ -42,6 +42,11 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   String? _difficultyDistribution;
   String _questionOrdering = 'Subject-wise';
 
+  // Test Series Selection State
+  String _testSeriesOption = 'existing'; // 'existing' or 'new'
+  String _existingTestSeries = 'NEET 2026 Full Syllabus Test Series';
+  late TextEditingController _newTestSeriesCtrl;
+
   // Checkboxes for subjects
   bool _subjectPhysics = true;
   bool _subjectChemistry = true;
@@ -68,6 +73,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     _negativeMarksCtrl = TextEditingController(text: '-4');
     _positiveMarksCtrl = TextEditingController(text: '+4');
     _instructionsCtrl = TextEditingController();
+    _newTestSeriesCtrl = TextEditingController();
   }
 
   @override
@@ -80,6 +86,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     _negativeMarksCtrl.dispose();
     _positiveMarksCtrl.dispose();
     _instructionsCtrl.dispose();
+    _newTestSeriesCtrl.dispose();
     super.dispose();
   }
 
@@ -615,13 +622,22 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                   _buildDropdownField(
                     label: 'Source Category *',
                     value: _sourceCategory,
-                    items: ['PYQ', 'Mock Test', 'Practice Paper', 'Sample Paper'],
-                    onChanged: (val) => setState(() => _sourceCategory = val!),
+                    items: ['PYQ', 'NTA', 'Questions', 'Test Series'],
+                    onChanged: (val) {
+                      setState(() {
+                        _sourceCategory = val!;
+                        if (_sourceCategory == 'PYQ' && !['NEET', 'JEE Main', 'JEE Advanced', 'AIIMS'].contains(_examName)) {
+                          _examName = 'NEET';
+                        }
+                      });
+                    },
                   ),
                   _buildDropdownField(
                     label: 'Exam Name *',
-                    value: _examName,
-                    items: ['NEET', 'JEE Main', 'JEE Advanced', 'CUET', 'CBSE 12'],
+                    value: ['NEET', 'JEE Main', 'JEE Advanced', 'AIIMS', 'CUET', 'CBSE 12'].contains(_examName) ? _examName : 'NEET',
+                    items: _sourceCategory == 'PYQ'
+                        ? ['NEET', 'JEE Main', 'JEE Advanced', 'AIIMS']
+                        : ['NEET', 'JEE Main', 'JEE Advanced', 'AIIMS', 'CUET', 'CBSE 12'],
                     onChanged: (val) => setState(() => _examName = val!),
                   ),
                   _buildDropdownField(
@@ -646,6 +662,74 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
               );
             },
           ),
+
+          // Conditional Test Series Card Block (When Source Category == 'Test Series')
+          if (_sourceCategory == 'Test Series') ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEF2FF),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFC7D2FE)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Test Series Option *',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF3730A3)),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Row(
+                        children: [
+                          Radio<String>(
+                            value: 'existing',
+                            groupValue: _testSeriesOption,
+                            activeColor: const Color(0xFF4F46E5),
+                            onChanged: (val) => setState(() => _testSeriesOption = val!),
+                          ),
+                          const Text('Select Existing Test Series', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E1B4B))),
+                        ],
+                      ),
+                      const SizedBox(width: 24),
+                      Row(
+                        children: [
+                          Radio<String>(
+                            value: 'new',
+                            groupValue: _testSeriesOption,
+                            activeColor: const Color(0xFF4F46E5),
+                            onChanged: (val) => setState(() => _testSeriesOption = val!),
+                          ),
+                          const Text('Create New Test Series', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E1B4B))),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (_testSeriesOption == 'existing')
+                    _buildDropdownField(
+                      label: 'Select Test Series *',
+                      value: _existingTestSeries,
+                      items: [
+                        'NEET 2026 Full Syllabus Test Series',
+                        'NEET 2026 Chapter Wise Test Series',
+                        'NEET 2026 Topic Wise Test Series',
+                        'NEET 2026 Previous Year Papers',
+                      ],
+                      onChanged: (val) => setState(() => _existingTestSeries = val!),
+                    )
+                  else
+                    _buildTextField(
+                      label: 'New Test Series Title *',
+                      controller: _newTestSeriesCtrl,
+                    ),
+                ],
+              ),
+            ),
+          ],
 
           const SizedBox(height: 20),
 

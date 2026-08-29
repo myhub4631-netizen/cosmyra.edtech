@@ -19,6 +19,10 @@ export const AdminBulkUploadStep1: React.FC = () => {
   const [phaseSession, setPhaseSession] = useState<string>('Phase 1');
   const [paperType, setPaperType] = useState<string>('Medical (UG)');
 
+  const [testSeriesOption, setTestSeriesOption] = useState<'existing' | 'new'>('existing');
+  const [existingTestSeries, setExistingTestSeries] = useState<string>('NEET 2026 Full Syllabus Test Series');
+  const [newTestSeriesName, setNewTestSeriesName] = useState<string>('');
+
   const [paperName, setPaperName] = useState<string>('NEET 2026 Phase 1');
   const [paperCode, setPaperCode] = useState<string>('N26P1');
   const [language, setLanguage] = useState<string>('English');
@@ -109,13 +113,19 @@ export const AdminBulkUploadStep1: React.FC = () => {
             </label>
             <select
               value={sourceCategory}
-              onChange={(e) => setSourceCategory(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSourceCategory(val);
+                if (val === 'PYQ' && !['NEET', 'JEE Main', 'JEE Advanced', 'AIIMS'].includes(examName)) {
+                  setExamName('NEET');
+                }
+              }}
               className="w-full text-xs font-medium border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="PYQ">PYQ</option>
-              <option value="Mock Test">Mock Test</option>
-              <option value="Practice Paper">Practice Paper</option>
-              <option value="Sample Paper">Sample Paper</option>
+              <option value="NTA">NTA</option>
+              <option value="Questions">Questions</option>
+              <option value="Test Series">Test Series</option>
             </select>
           </div>
 
@@ -128,10 +138,23 @@ export const AdminBulkUploadStep1: React.FC = () => {
               onChange={(e) => setExamName(e.target.value)}
               className="w-full text-xs font-medium border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="NEET">NEET</option>
-              <option value="JEE Main">JEE Main</option>
-              <option value="JEE Advanced">JEE Advanced</option>
-              <option value="CUET">CUET</option>
+              {sourceCategory === 'PYQ' ? (
+                <>
+                  <option value="NEET">NEET</option>
+                  <option value="JEE Main">JEE Main</option>
+                  <option value="JEE Advanced">JEE Advanced</option>
+                  <option value="AIIMS">AIIMS</option>
+                </>
+              ) : (
+                <>
+                  <option value="NEET">NEET</option>
+                  <option value="JEE Main">JEE Main</option>
+                  <option value="JEE Advanced">JEE Advanced</option>
+                  <option value="AIIMS">AIIMS</option>
+                  <option value="CUET">CUET</option>
+                  <option value="CBSE 12">CBSE 12</option>
+                </>
+              )}
             </select>
           </div>
 
@@ -182,6 +205,65 @@ export const AdminBulkUploadStep1: React.FC = () => {
             </select>
           </div>
         </div>
+
+        {/* Conditional Block when Source Category is Test Series */}
+        {sourceCategory === 'Test Series' && (
+          <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-4 space-y-3 my-2">
+            <h3 className="text-xs font-bold text-indigo-900">Test Series Option *</h3>
+            <div className="flex flex-wrap items-center gap-6">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-900">
+                <input
+                  type="radio"
+                  name="testSeriesOpt"
+                  value="existing"
+                  checked={testSeriesOption === 'existing'}
+                  onChange={() => setTestSeriesOption('existing')}
+                  className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                />
+                <span>Select Existing Test Series</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-900">
+                <input
+                  type="radio"
+                  name="testSeriesOpt"
+                  value="new"
+                  checked={testSeriesOption === 'new'}
+                  onChange={() => setTestSeriesOption('new')}
+                  className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
+                />
+                <span>Create New Test Series</span>
+              </label>
+            </div>
+
+            {testSeriesOption === 'existing' ? (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Select Test Series *</label>
+                <select
+                  value={existingTestSeries}
+                  onChange={(e) => setExistingTestSeries(e.target.value)}
+                  className="w-full text-xs font-medium border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="NEET 2026 Full Syllabus Test Series">NEET 2026 Full Syllabus Test Series</option>
+                  <option value="NEET 2026 Chapter Wise Test Series">NEET 2026 Chapter Wise Test Series</option>
+                  <option value="NEET 2026 Topic Wise Test Series">NEET 2026 Topic Wise Test Series</option>
+                  <option value="NEET 2026 Previous Year Papers">NEET 2026 Previous Year Papers</option>
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">New Test Series Title *</label>
+                <input
+                  type="text"
+                  value={newTestSeriesName}
+                  onChange={(e) => setNewTestSeriesName(e.target.value)}
+                  placeholder="Enter title for new test series..."
+                  className="w-full text-xs font-medium border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Row 2 (5 Columns) */}
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
