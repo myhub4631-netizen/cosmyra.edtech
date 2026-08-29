@@ -534,8 +534,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     final actions = [
       {'label': 'Custom Practice', 'icon': Icons.track_changes_rounded, 'color': const Color(0xFF16A34A), 'bg': const Color(0xFFDCFCE7), 'tap': () => context.go('/custom-practice')},
       {'label': 'Custom Test', 'icon': Icons.assignment_outlined, 'color': const Color(0xFF2563EB), 'bg': const Color(0xFFDBEAFE), 'tap': () => context.go('/custom-test')},
-      {'label': 'PYQ Practice', 'icon': Icons.menu_book_rounded, 'color': const Color(0xFF7C3AED), 'bg': const Color(0xFFDDD6FE), 'tap': widget.onOpenPyqs},
-      {'label': 'NTA Questions', 'icon': Icons.shield_outlined, 'color': const Color(0xFFEA580C), 'bg': const Color(0xFFFFEDD5), 'tap': widget.onOpenPyqs},
+      {'label': 'PYQ Practice', 'icon': Icons.menu_book_rounded, 'color': const Color(0xFF7C3AED), 'bg': const Color(0xFFDDD6FE), 'tap': () => context.go('/pyq')},
+      {'label': 'NTA Questions', 'icon': Icons.shield_outlined, 'color': const Color(0xFFEA580C), 'bg': const Color(0xFFFFEDD5), 'tap': () => context.go('/nta-practice')},
       {'label': 'Test Series', 'icon': Icons.calendar_today_outlined, 'color': const Color(0xFFDB2777), 'bg': const Color(0xFFFCE7F3), 'tap': widget.onOpenMockTests},
     ];
 
@@ -1095,7 +1095,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                       } else if (item['label'] == 'Test Series') {
                         widget.onOpenMockTests();
                       }
-                      if (item['label'] == 'PYQ' || item['label'] == 'NTA Questions') widget.onOpenPyqs();
+                      if (item['label'] == 'PYQ' || item['label'] == 'PYQ Practice') context.go('/pyq');
+                      if (item['label'] == 'NTA Questions' || item['label'] == 'NTA Practice') context.go('/nta-practice');
                       if (item['label'] == 'Bookmarks' || item['label'] == 'My Mistakes') widget.onOpenMistakes();
                     },
                     borderRadius: BorderRadius.circular(10),
@@ -1608,7 +1609,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         'cardBg': const Color(0xFFF5F3FF),
         'borderColor': const Color(0xFFDDD6FE),
         'iconBg': const Color(0xFFDDD6FE),
-        'onTap': widget.onOpenPyqs,
+        'onTap': () => context.go('/pyq'),
       },
       {
         'title': 'NTA Questions',
@@ -1618,7 +1619,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         'cardBg': const Color(0xFFFFF7ED),
         'borderColor': const Color(0xFFFFEDD5),
         'iconBg': const Color(0xFFFFEDD5),
-        'onTap': widget.onOpenPyqs,
+        'onTap': () => context.go('/nta-practice'),
       },
       {
         'title': 'Test Series',

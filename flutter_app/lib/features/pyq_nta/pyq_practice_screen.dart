@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
+import '../../models/pyq_models.dart';
 import '../../core/services/supabase_service.dart';
-
-enum PYQPracticeMode { chapterWise, yearWise }
 
 class ChapterItem {
   final String id;

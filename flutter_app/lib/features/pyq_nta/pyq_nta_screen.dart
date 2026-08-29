@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
-import 'nta_practice_test_screen.dart';
+import 'pyq_practice_screen.dart';
 
 class PyqNtaScreen extends StatelessWidget {
   final String activeExam;
@@ -16,10 +16,10 @@ class PyqNtaScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NtaPracticeTestScreen(
+    return PYQPracticeScreen(
       activeExam: activeExam,
-      onStartSession: onStartSession,
-      onStartPractice: onStartPractice,
+      onStartPYQSession: onStartSession,
+      onStartPractice: onStartPractice != null ? (qs, timer) => onStartPractice!(qs) : null,
     );
   }
 }

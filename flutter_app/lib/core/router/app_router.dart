@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/supabase_service.dart';
 import '../../models/models.dart';
+import '../../models/pyq_models.dart';
 import '../../shared/widgets/not_found_screen.dart';
 import '../../features/landing/landing_page_screen.dart';
 import '../../features/auth/login_screen.dart';
@@ -9,6 +10,11 @@ import '../../features/auth/signup_screen.dart';
 import '../../features/dashboard/user_dashboard_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/pyq_nta/pyq_nta_screen.dart';
+import '../../features/pyq_nta/pyq_practice_screen.dart';
+import '../../features/pyq_nta/pyq_result_screen.dart';
+import '../../features/pyq_nta/nta_practice_test_screen.dart';
+import '../../features/pyq_nta/nta_chapter_topic_wise_screen.dart';
+import '../../features/pyq_nta/nta_paper_wise_screen.dart';
 import '../../features/mistakes_bookmarks/mistakes_bookmarks_screen.dart';
 import '../../features/analytics/analytics_screen.dart';
 import '../../features/leaderboard/leaderboard_screen.dart';
@@ -326,17 +332,177 @@ final GoRouter appRouter = GoRouter(
         );
       },
     ),
+    // =========================================================================
+    // PYQ PRACTICE ROUTES (/pyq/...)
+    // =========================================================================
     GoRoute(
       path: '/pyq',
-      builder: (context, state) => PyqNtaScreen(
+      builder: (context, state) => PYQPracticeScreen(
         activeExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        onStartPYQSession: (questions, timerMins, isTestMode) {
+          _activeTestQuestions = questions;
+          _activeTestTimerMinutes = timerMins;
+          final attemptId = 'pyq_${DateTime.now().millisecondsSinceEpoch}';
+          if (isTestMode) {
+            context.go('/pyq/test');
+          } else {
+            context.go('/pyq/practice');
+          }
+        },
+        onBack: () => context.go('/dashboard'),
       ),
     ),
     GoRoute(
-      path: '/pyq/:paperId',
-      builder: (context, state) => PyqNtaScreen(
-        activeExam: 'NEET',
+      path: '/pyq/practice',
+      builder: (context, state) {
+        final questions = _activeTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        return PracticeScreen(
+          questions: questions,
+          timerMinutes: 0,
+          onFinish: () => context.go('/pyq'),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/pyq/test',
+      builder: (context, state) {
+        final questions = _activeTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        final attemptId = 'pyq_${DateTime.now().millisecondsSinceEpoch}';
+        return CustomTestScreen(
+          questions: questions,
+          durationMinutes: _activeTestTimerMinutes > 0 ? _activeTestTimerMinutes : 30,
+          onTestSubmitted: (attempt, answers) {
+            _lastTestAttempt = attempt;
+            _lastTestUserAnswers = answers;
+            _lastTestQuestions = List<QuestionModel>.from(questions);
+            context.go('/pyq/result/$attemptId');
+          },
+        );
+      },
+    ),
+    GoRoute(
+      path: '/pyq/papers',
+      builder: (context, state) => PYQPracticeScreen(
+        activeExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        onBack: () => context.go('/dashboard'),
       ),
+    ),
+    GoRoute(
+      path: '/pyq/result/:attemptId',
+      builder: (context, state) {
+        final pyqResult = PYQSessionResultModel(
+          id: state.pathParameters['attemptId'] ?? 'pyq_1',
+          userId: 'student_1',
+          exam: 'NEET',
+          mode: PYQPracticeMode.chapterWise,
+          subjects: const ['Physics', 'Chemistry', 'Biology'],
+          years: const [2024, 2025, 2026],
+          attemptedAt: DateTime.now(),
+          totalQuestions: 45,
+          attemptedCount: 42,
+          correctCount: 40,
+          incorrectCount: 2,
+          skippedCount: 3,
+          accuracy: 95.2,
+          timeSpentSeconds: 2700,
+        );
+        final questions = _lastTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        final userAnswers = _lastTestUserAnswers ?? const {0: 'A', 1: 'B', 2: 'C'};
+
+        return PYQResultScreen(
+          result: pyqResult,
+          questions: questions,
+          userAnswers: userAnswers,
+          onDone: () => context.go('/pyq'),
+        );
+      },
+    ),
+
+    // =========================================================================
+    // NTA PRACTICE & TEST ROUTES (/nta-practice/...)
+    // =========================================================================
+    GoRoute(
+      path: '/nta-practice',
+      builder: (context, state) => NtaPracticeTestScreen(
+        activeExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        onStartSession: (questions, timerMins, isTestMode) {
+          _activeTestQuestions = questions;
+          _activeTestTimerMinutes = timerMins;
+          final attemptId = 'nta_${DateTime.now().millisecondsSinceEpoch}';
+          if (isTestMode) {
+            context.go('/nta-practice/test/$attemptId');
+          } else {
+            context.go('/nta-practice/questions');
+          }
+        },
+      ),
+    ),
+    GoRoute(
+      path: '/nta-practice/questions',
+      builder: (context, state) => NtaChapterTopicWiseScreen(
+        activeExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        onBack: () => context.go('/nta-practice'),
+      ),
+    ),
+    GoRoute(
+      path: '/nta-practice/papers',
+      builder: (context, state) => NtaPaperWiseScreen(
+        activeExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        onBack: () => context.go('/nta-practice'),
+      ),
+    ),
+    GoRoute(
+      path: '/nta-practice/test/:paperId',
+      builder: (context, state) {
+        final paperId = state.pathParameters['paperId'] ?? 'nta_paper_1';
+        final questions = _activeTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        return CustomTestScreen(
+          questions: questions,
+          durationMinutes: _activeTestTimerMinutes > 0 ? _activeTestTimerMinutes : 180,
+          onTestSubmitted: (attempt, answers) {
+            _lastTestAttempt = attempt;
+            _lastTestUserAnswers = answers;
+            _lastTestQuestions = List<QuestionModel>.from(questions);
+            context.go('/nta-practice/result/$paperId');
+          },
+        );
+      },
+    ),
+    GoRoute(
+      path: '/nta-practice/result/:attemptId',
+      builder: (context, state) {
+        final attempt = _lastTestAttempt ??
+            TestAttemptModel(
+              id: state.pathParameters['attemptId'] ?? 'nta_1',
+              userId: 'student_1',
+              testTemplateId: 'nta_template_1',
+              testTitle: 'NTA Mock Test Score Report',
+              startedAt: DateTime.now().subtract(const Duration(hours: 3)),
+              expiresAt: DateTime.now(),
+              submittedAt: DateTime.now(),
+              status: 'submitted',
+              totalScore: 680,
+              maxMarks: 720,
+              totalQuestions: 180,
+              attemptedCount: 175,
+              correctCount: 170,
+              incorrectCount: 5,
+              unattemptedCount: 5,
+              accuracy: 97.1,
+              timeSpentSeconds: 10800,
+            );
+        final questions = _lastTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        final userAnswers = _lastTestUserAnswers ?? const {0: 'A', 1: 'B', 2: 'C'};
+
+        return Scaffold(
+          body: TestResultScreen(
+            attempt: attempt,
+            questions: questions,
+            userAnswers: userAnswers,
+            onBackToDashboard: () => context.go('/nta-practice'),
+          ),
+        );
+      },
     ),
     GoRoute(
       path: '/predictions',
