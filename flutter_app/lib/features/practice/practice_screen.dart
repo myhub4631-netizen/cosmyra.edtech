@@ -56,20 +56,33 @@ class _PracticeScreenState extends State<PracticeScreen> {
     super.dispose();
   }
 
-  void _selectOption(int optionIndex, String optionText) {
+  bool _isOptSelected(String? userAns, String optKey, String optLetter, String optText) {
+    if (userAns == null || userAns.isEmpty) return false;
+    final parts = userAns.split(',');
+    for (var p in parts) {
+      final trimmed = p.trim();
+      if (trimmed == optKey) return true;
+      if (trimmed == optLetter || trimmed == 'Option $optLetter') return true;
+      if (optText.isNotEmpty && trimmed == optText) return true;
+    }
+    return false;
+  }
+
+  void _selectOption(int optionIndex, String optKey, [String? optionText]) {
     if (_hasAnswered[_currentIndex] == true) return; // Immediate feedback given once
 
     final question = widget.questions[_currentIndex];
     bool isCorrect = false;
 
+    final textVal = optionText ?? optKey;
     if (question.qType == 'numerical') {
-      isCorrect = optionText.trim() == (question.numericalAnswer ?? '').trim();
+      isCorrect = textVal.trim() == (question.numericalAnswer ?? '').trim();
     } else {
       isCorrect = question.options[optionIndex].isCorrect;
     }
 
     setState(() {
-      _selectedAnswers[_currentIndex] = optionText;
+      _selectedAnswers[_currentIndex] = optKey;
       _hasAnswered[_currentIndex] = true;
       _isCorrectMap[_currentIndex] = isCorrect;
     });
@@ -238,8 +251,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
                     _buildNumericalInput(question)
                   else
                     ...question.options.map((opt) {
+                      final String optKey = (opt.id != null && opt.id.isNotEmpty) ? opt.id : 'opt_${question.id}_${opt.optionIndex}';
+                      final String optLetter = String.fromCharCode(65 + opt.optionIndex);
                       final optionText = opt.optionText;
-                      final isSelected = _selectedAnswers[_currentIndex] == optionText;
+                      final isSelected = _isOptSelected(_selectedAnswers[_currentIndex], optKey, optLetter, optionText);
                       final isThisCorrect = opt.isCorrect;
 
                       Color optionBorderColor = Theme.of(context).dividerColor.withOpacity(0.2);
@@ -258,7 +273,8 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12.0),
                         child: InkWell(
-                          onTap: () => _selectOption(opt.optionIndex, optionText),
+                          key: ValueKey('opt_practice_${question.id}_${opt.optionIndex}'),
+                          onTap: () => _selectOption(opt.optionIndex, optKey, optionText),
                           borderRadius: BorderRadius.circular(14),
                           child: Container(
                             padding: const EdgeInsets.all(16),
@@ -277,7 +293,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                                           ? Colors.red
                                           : Theme.of(context).primaryColor.withOpacity(0.1)),
                                   child: Text(
-                                    String.fromCharCode(65 + opt.optionIndex),
+                                    optLetter,
                                     style: TextStyle(
                                       color: isAnswered && (isThisCorrect || (isSelected && !isThisCorrect))
                                           ? Colors.white
@@ -288,7 +304,21 @@ class _PracticeScreenState extends State<PracticeScreen> {
                                 ),
                                 const SizedBox(width: 14),
                                 Expanded(
-                                  child: LaTeXView(text: optionText),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (optionText.isNotEmpty) LaTeXView(text: optionText),
+                                      if (opt.optionImage != null && opt.optionImage!.isNotEmpty) ...[
+                                        if (optionText.isNotEmpty) const SizedBox(height: 6),
+                                        Image.network(
+                                          opt.optionImage!,
+                                          height: 120,
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 ),
                                 if (isAnswered && isThisCorrect)
                                   const Icon(Icons.check_circle_rounded, color: Colors.green)

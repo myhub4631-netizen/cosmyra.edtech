@@ -98,9 +98,36 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
     super.dispose();
   }
 
-  void _selectOption(String optionText) {
+  bool _isOptSelected(String? userAns, String optKey, String optLetter, String optText) {
+    if (userAns == null || userAns.isEmpty) return false;
+    final parts = userAns.split(',');
+    for (var p in parts) {
+      final trimmed = p.trim();
+      if (trimmed == optKey) return true;
+      if (trimmed == optLetter || trimmed == 'Option $optLetter') return true;
+      if (optText.isNotEmpty && trimmed == optText) return true;
+    }
+    return false;
+  }
+
+  void _selectOption(String optKey, {bool isMultiple = false}) {
     setState(() {
-      _userAnswers[_currentIndex] = optionText;
+      if (isMultiple) {
+        final current = _userAnswers[_currentIndex] ?? '';
+        final parts = current.isEmpty ? <String>[] : current.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+        if (parts.contains(optKey)) {
+          parts.remove(optKey);
+        } else {
+          parts.add(optKey);
+        }
+        if (parts.isEmpty) {
+          _userAnswers.remove(_currentIndex);
+        } else {
+          _userAnswers[_currentIndex] = parts.join(',');
+        }
+      } else {
+        _userAnswers[_currentIndex] = optKey;
+      }
     });
     _persistCurrentSession();
   }
@@ -192,7 +219,11 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
           isCorrect = userAns.trim() == (q.numericalAnswer ?? '').trim();
         } else {
           final matchedOpt = q.options.firstWhere(
-            (opt) => opt.optionText == userAns,
+            (opt) {
+              final optKey = (opt.id != null && opt.id.isNotEmpty) ? opt.id : 'opt_${q.id}_${opt.optionIndex}';
+              final optLetter = String.fromCharCode(65 + opt.optionIndex);
+              return _isOptSelected(userAns, optKey, optLetter, opt.optionText);
+            },
             orElse: () => QuestionOptionModel(id: '', questionId: '', optionIndex: 0, optionText: '', isCorrect: false),
           );
           isCorrect = matchedOpt.isCorrect;
@@ -364,11 +395,16 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                     _buildNumericalField(selectedAns)
                   else
                     ...question.options.map((opt) {
-                      final isSelected = selectedAns == opt.optionText;
+                      final String optKey = (opt.id != null && opt.id.isNotEmpty) ? opt.id : 'opt_${question.id}_${opt.optionIndex}';
+                      final String optLetter = String.fromCharCode(65 + opt.optionIndex);
+                      final bool isMultiple = (question.qType == 'multiple_correct' || question.qType == 'multiple');
+                      final bool isSelected = _isOptSelected(selectedAns, optKey, optLetter, opt.optionText);
+
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12.0),
                         child: InkWell(
-                          onTap: () => _selectOption(opt.optionText),
+                          key: ValueKey('opt_widget_${question.id}_${opt.optionIndex}'),
+                          onTap: () => _selectOption(optKey, isMultiple: isMultiple),
                           borderRadius: BorderRadius.circular(14),
                           child: Container(
                             padding: const EdgeInsets.all(16),
