@@ -2642,6 +2642,37 @@ class SupabaseService {
     return null;
   }
 
+  /// Upload image bytes to Supabase Storage bucket 'question-images' with fallback to base64 Data URL
+  static Future<String?> uploadImageToSupabase(Uint8List bytes, String filename) async {
+    final cleanName = filename.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    final String path = 'questions/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
+
+    try {
+      await client.storage.from('question-images').uploadBinary(
+        path,
+        bytes,
+        fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+      );
+      final String publicUrl = client.storage.from('question-images').getPublicUrl(path);
+      if (publicUrl.isNotEmpty) return publicUrl;
+    } catch (e) {
+      debugPrint('Supabase storage upload notice (using instant base64 Data URL fallback): $e');
+    }
+
+    try {
+      final base64Str = base64Encode(bytes);
+      String mimeType = 'jpeg';
+      final lower = filename.toLowerCase();
+      if (lower.endsWith('.png')) mimeType = 'png';
+      else if (lower.endsWith('.webp')) mimeType = 'webp';
+      else if (lower.endsWith('.gif')) mimeType = 'gif';
+      return 'data:image/$mimeType;base64,$base64Str';
+    } catch (e) {
+      debugPrint('Error encoding image bytes: $e');
+      return null;
+    }
+  }
+
   /// Upsert batch of questions to Supabase and SharedPreferences incrementally
   static Future<bool> upsertIncrementalQuestions({
     required String paperId,
@@ -2657,13 +2688,16 @@ class SupabaseService {
           : 'q_${paperId}_${q['questionNumber']}';
 
       final optionsList = q['options'] is List ? List<String>.from(q['options']) : <String>[];
+      final optionImagesList = q['optionImages'] is List
+          ? List<String?>.from(q['optionImages'])
+          : (q['option_images'] is List ? List<String?>.from(q['option_images']) : <String?>[]);
 
       return {
         'id': qId,
         'paper_id': paperId,
         'question_number': q['questionNumber'] ?? 1,
         'question_text': q['questionText'] ?? q['question_text'] ?? '',
-        'question_image': q['questionImage'] ?? '',
+        'question_image': q['questionImage'] ?? q['question_image'] ?? '',
         'subject': q['subject'] ?? 'Physics',
         'chapter': q['chapter'] ?? 'General',
         'topic': q['topic'] ?? 'General',
@@ -2676,6 +2710,7 @@ class SupabaseService {
         'negative_marks': (q['negativeMarks'] is num) ? (q['negativeMarks'] as num).toDouble() : double.tryParse(q['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
         'status': 'Active',
         'options': optionsList,
+        'option_images': optionImagesList,
         'correct_answer': q['correctAnswer'] ?? (optionsList.isNotEmpty ? optionsList[0] : 'Option A'),
         'explanation': q['explanation'] ?? '',
         'solution': q['explanation'] ?? '',

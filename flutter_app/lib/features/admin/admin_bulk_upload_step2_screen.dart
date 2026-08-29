@@ -1,5 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../../core/services/supabase_service.dart';
 import 'admin_bulk_upload_step1_screen.dart';
@@ -26,7 +28,9 @@ class QuestionItemData {
   String id;
   int number;
   String text;
+  String? questionImage;
   List<String> options;
+  List<String?> optionImages;
   int correctOptionIndex;
   String explanation;
   String difficulty;
@@ -40,12 +44,16 @@ class QuestionItemData {
   bool isMarkedForReview;
   bool isCollapsed;
   bool isSaved;
+  bool isUploadingQuestionImage;
+  List<bool> isUploadingOptionImage;
 
   QuestionItemData({
     this.id = '',
     required this.number,
     this.text = '',
+    this.questionImage,
     List<String>? options,
+    List<String?>? optionImages,
     this.correctOptionIndex = -1,
     this.explanation = '',
     this.difficulty = 'Medium',
@@ -59,7 +67,11 @@ class QuestionItemData {
     this.isMarkedForReview = false,
     this.isCollapsed = false,
     this.isSaved = false,
-  }) : options = options ?? ['', '', '', ''];
+    this.isUploadingQuestionImage = false,
+    List<bool>? isUploadingOptionImage,
+  })  : options = options ?? ['', '', '', ''],
+        optionImages = optionImages ?? [null, null, null, null],
+        isUploadingOptionImage = isUploadingOptionImage ?? [false, false, false, false];
 }
 
 class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen> {
@@ -119,11 +131,19 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           correctIdx = optNum - 1;
         }
 
+        final optImgsRaw = savedMatch['option_images'] ?? savedMatch['optionImages'];
+        final List<String?> optImgs = optImgsRaw is List
+            ? List<String?>.from(optImgsRaw)
+            : <String?>[null, null, null, null];
+        while (optImgs.length < opts.length) optImgs.add(null);
+
         _questionsList[i] = QuestionItemData(
           id: savedMatch['id'] ?? 'q_${_paperId}_$qNum',
           number: qNum,
           text: savedMatch['question_text'] ?? savedMatch['questionText'] ?? '',
+          questionImage: savedMatch['question_image'] ?? savedMatch['questionImage'],
           options: opts,
+          optionImages: optImgs,
           correctOptionIndex: correctIdx >= 0 ? correctIdx : 0,
           explanation: savedMatch['explanation'] ?? '',
           difficulty: savedMatch['difficulty'] ?? 'Medium',
@@ -163,7 +183,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
     for (int i = startIndex; i < endIndex; i++) {
       final q = _questionsList[i];
-      if (q.text.trim().isNotEmpty) {
+      final bool hasContent = q.text.trim().isNotEmpty ||
+          (q.questionImage != null && q.questionImage!.isNotEmpty) ||
+          q.optionImages.any((img) => img != null && img.isNotEmpty);
+
+      if (hasContent) {
         String correctAnsText = 'Option A';
         if (q.correctOptionIndex >= 0 && q.correctOptionIndex < q.options.length) {
           correctAnsText = q.options[q.correctOptionIndex].isNotEmpty
@@ -175,7 +199,9 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           'id': q.id.isNotEmpty ? q.id : 'q_${_paperId}_${q.number}',
           'questionNumber': q.number,
           'questionText': q.text,
+          'questionImage': q.questionImage ?? '',
           'options': q.options,
+          'optionImages': q.optionImages,
           'correctAnswer': correctAnsText,
           'explanation': q.explanation,
           'difficulty': q.difficulty,
@@ -224,6 +250,59 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     }
 
     if (mounted) setState(() => _isSavingBatch = false);
+  }
+
+  Future<void> _pickAndUploadQuestionImage(QuestionItemData q) async {
+    try {
+      setState(() => q.isUploadingQuestionImage = true);
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+        withData: true,
+      );
+      if (result != null && result.files.single.bytes != null) {
+        final bytes = result.files.single.bytes!;
+        final filename = result.files.single.name;
+        final url = await SupabaseService.uploadImageToSupabase(bytes, filename);
+        if (url != null && url.isNotEmpty) {
+          setState(() {
+            q.questionImage = url;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking/uploading question image: $e');
+    } finally {
+      if (mounted) setState(() => q.isUploadingQuestionImage = false);
+    }
+  }
+
+  Future<void> _pickAndUploadOptionImage(QuestionItemData q, int optIdx) async {
+    try {
+      while (q.optionImages.length <= optIdx) q.optionImages.add(null);
+      while (q.isUploadingOptionImage.length <= optIdx) q.isUploadingOptionImage.add(false);
+
+      setState(() => q.isUploadingOptionImage[optIdx] = true);
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+        withData: true,
+      );
+      if (result != null && result.files.single.bytes != null) {
+        final bytes = result.files.single.bytes!;
+        final filename = result.files.single.name;
+        final url = await SupabaseService.uploadImageToSupabase(bytes, filename);
+        if (url != null && url.isNotEmpty) {
+          setState(() {
+            q.optionImages[optIdx] = url;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking/uploading option image: $e');
+    } finally {
+      if (mounted) setState(() => q.isUploadingOptionImage[optIdx] = false);
+    }
   }
 
   void _addOptionToQuestion(QuestionItemData q) {
@@ -1106,7 +1185,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       ],
                     ),
                     OutlinedButton.icon(
-                      onPressed: () {},
+                      onPressed: () => _pickAndUploadQuestionImage(q),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF334155),
                         backgroundColor: Colors.white,
@@ -1116,12 +1195,64 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                       ),
-                      icon: const Icon(Icons.add_photo_alternate_outlined, size: 14, color: Color(0xFF475569)),
-                      label: Text('Add Image', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600)),
+                      icon: q.isUploadingQuestionImage
+                          ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.5))
+                          : const Icon(Icons.add_photo_alternate_outlined, size: 14, color: Color(0xFF475569)),
+                      label: Text(
+                        q.isUploadingQuestionImage ? 'Uploading...' : (q.questionImage != null && q.questionImage!.isNotEmpty ? 'Change Image' : 'Add Image'),
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ],
                 ),
               ),
+
+              // Question Image Preview
+              if (q.questionImage != null && q.questionImage!.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.network(
+                            q.questionImage!,
+                            height: 70,
+                            width: 100,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded, color: Colors.grey),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Question Image attached',
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF0F172A)),
+                          ),
+                        ),
+                        OutlinedButton(
+                          onPressed: () => _pickAndUploadQuestionImage(q),
+                          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), minimumSize: Size.zero),
+                          child: const Text('Replace', style: TextStyle(fontSize: 10)),
+                        ),
+                        const SizedBox(width: 6),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red),
+                          onPressed: () => setState(() => q.questionImage = null),
+                          tooltip: 'Remove Image',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
 
               // Textarea
               Padding(
@@ -1195,60 +1326,127 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         const SizedBox(height: 10),
 
         ...List.generate(q.options.length, (optIdx) {
+          while (q.optionImages.length < q.options.length) q.optionImages.add(null);
+          while (q.isUploadingOptionImage.length < q.options.length) q.isUploadingOptionImage.add(false);
+
           final letter = optionLetters[optIdx];
           final isSelected = (q.correctOptionIndex == optIdx);
+          final optImg = q.optionImages[optIdx];
+          final isUploadingOpt = q.isUploadingOptionImage[optIdx];
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Option Letter Badge (A, B, C, D)
-                Container(
-                  width: 34,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: const BorderRadius.only(topLeft: Radius.circular(8), bottomLeft: Radius.circular(8)),
-                    border: Border.all(color: const Color(0xFFCBD5E1)),
-                  ),
-                  child: Center(
-                    child: Text(letter, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF334155))),
-                  ),
-                ),
-
-                // Option Input Field
-                Expanded(
-                  child: Container(
-                    height: 38,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: const BorderRadius.only(topRight: Radius.circular(8), bottomRight: Radius.circular(8)),
-                      border: Border.all(color: const Color(0xFFCBD5E1)),
-                    ),
-                    child: TextFormField(
-                      initialValue: q.options[optIdx],
-                      onChanged: (val) => q.options[optIdx] = val,
-                      decoration: InputDecoration(
-                        hintText: 'Enter option $letter',
-                        hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                Row(
+                  children: [
+                    // Option Letter Badge (A, B, C, D)
+                    Container(
+                      width: 34,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: const BorderRadius.only(topLeft: Radius.circular(8), bottomLeft: Radius.circular(8)),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
                       ),
-                      style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF0F172A)),
+                      child: Center(
+                        child: Text(letter, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF334155))),
+                      ),
+                    ),
+
+                    // Option Input Field
+                    Expanded(
+                      child: Container(
+                        height: 38,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: const BorderRadius.only(topRight: Radius.circular(8), bottomRight: Radius.circular(8)),
+                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                        ),
+                        child: TextFormField(
+                          initialValue: q.options[optIdx],
+                          onChanged: (val) => q.options[optIdx] = val,
+                          decoration: InputDecoration(
+                            hintText: 'Enter option $letter (or add image)',
+                            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF0F172A)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // Add Image Control for Option
+                    IconButton(
+                      icon: isUploadingOpt
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 1.5))
+                          : Icon(
+                              optImg != null && optImg.isNotEmpty ? Icons.image_rounded : Icons.add_photo_alternate_outlined,
+                              color: optImg != null && optImg.isNotEmpty ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                              size: 20,
+                            ),
+                      onPressed: () => _pickAndUploadOptionImage(q, optIdx),
+                      tooltip: 'Add / Replace Image for Option $letter',
+                    ),
+                    const SizedBox(width: 8),
+
+                    // Is Correct Radio Button
+                    Radio<int>(
+                      value: optIdx,
+                      groupValue: q.correctOptionIndex,
+                      activeColor: const Color(0xFF4F46E5),
+                      onChanged: (val) => setState(() => q.correctOptionIndex = val ?? -1),
+                    ),
+                  ],
+                ),
+
+                // Option Image Preview Thumbnail
+                if (optImg != null && optImg.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 36, bottom: 6),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.network(
+                              optImg,
+                              height: 45,
+                              width: 60,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded, color: Colors.grey, size: 20),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('Option $letter Image', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF475569))),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () => _pickAndUploadOptionImage(q, optIdx),
+                            child: Text('Replace', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () => setState(() => q.optionImages[optIdx] = null),
+                            child: const Icon(Icons.close_rounded, size: 14, color: Colors.red),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-
-                // Is Correct Radio Button
-                Radio<int>(
-                  value: optIdx,
-                  groupValue: q.correctOptionIndex,
-                  activeColor: const Color(0xFF4F46E5),
-                  onChanged: (val) => setState(() => q.correctOptionIndex = val ?? -1),
-                ),
+                ],
               ],
             ),
           );

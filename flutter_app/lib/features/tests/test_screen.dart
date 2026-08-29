@@ -394,7 +394,23 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 14),
-                                Expanded(child: LaTeXView(text: opt.optionText)),
+                                 Expanded(
+                                   child: Column(
+                                     crossAxisAlignment: CrossAxisAlignment.start,
+                                     children: [
+                                       if (opt.optionText.isNotEmpty) LaTeXView(text: opt.optionText),
+                                       if (opt.optionImage != null && opt.optionImage!.isNotEmpty) ...[
+                                         if (opt.optionText.isNotEmpty) const SizedBox(height: 6),
+                                         Image.network(
+                                           opt.optionImage!,
+                                           height: 120,
+                                           fit: BoxFit.contain,
+                                           errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                         ),
+                                       ],
+                                     ],
+                                   ),
+                                 ),
                               ],
                             ),
                           ),

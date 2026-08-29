@@ -22,7 +22,9 @@ interface QuestionItem {
   id: number;
   questionId?: string;
   text: string;
+  questionImage?: string;
   options: string[];
+  optionImages?: (string | null)[];
   correctOptionIndex: number;
   explanation: string;
   difficulty: string;
@@ -97,7 +99,9 @@ export const AdminBulkUploadStep2: React.FC = () => {
               id: qNum,
               questionId: match.id,
               text: match.questionText || match.question_text || '',
+              questionImage: match.questionImage || match.question_image || '',
               options: match.options || ['', '', '', ''],
+              optionImages: match.optionImages || match.option_images || [null, null, null, null],
               correctOptionIndex: match.options ? match.options.indexOf(match.correctAnswer || match.correct_answer) : 0,
               explanation: match.explanation || '',
               difficulty: match.difficulty || 'Medium',
@@ -117,7 +121,9 @@ export const AdminBulkUploadStep2: React.FC = () => {
             return {
               id: qNum,
               text: '',
+              questionImage: '',
               options: ['', '', '', ''],
+              optionImages: [null, null, null, null],
               correctOptionIndex: -1,
               explanation: '',
               difficulty: 'Medium',
@@ -151,7 +157,11 @@ export const AdminBulkUploadStep2: React.FC = () => {
     const end = Math.min(start + itemsPerPage, questions.length);
 
     const currentBatch = questions.slice(start, end);
-    const batchToSave = currentBatch.filter((q) => q.text.trim().length > 0);
+    const batchToSave = currentBatch.filter((q) => 
+      q.text.trim().length > 0 || 
+      Boolean(q.questionImage && q.questionImage.length > 0) ||
+      Boolean(q.optionImages && q.optionImages.some((img) => img && img.length > 0))
+    );
 
     if (batchToSave.length > 0) {
       const pId = paperId || `paper_${Date.now()}`;
@@ -177,7 +187,11 @@ export const AdminBulkUploadStep2: React.FC = () => {
           question_number: q.id,
           questionText: q.text,
           question_text: q.text,
+          questionImage: q.questionImage || '',
+          question_image: q.questionImage || '',
           options: q.options,
+          optionImages: q.optionImages || [null, null, null, null],
+          option_images: q.optionImages || [null, null, null, null],
           correctAnswer: correctAnsText,
           correct_answer: correctAnsText,
           explanation: q.explanation,
@@ -528,11 +542,45 @@ export const AdminBulkUploadStep2: React.FC = () => {
                           <button className="hover:text-slate-900"><ImageIcon className="w-3.5 h-3.5" /></button>
                         </div>
 
-                        <button className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                        <label className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer">
                           <ImageIcon className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Add Image</span>
-                        </button>
+                          <span>{q.questionImage ? 'Change Image' : 'Add Image'}</span>
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/jpg,image/webp"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (evt) => {
+                                  const url = evt.target?.result as string;
+                                  setQuestions((prev) =>
+                                    prev.map((item) => (item.id === q.id ? { ...item, questionImage: url } : item))
+                                  );
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </label>
                       </div>
+
+                      {/* Question Image Preview */}
+                      {q.questionImage && (
+                        <div className="bg-slate-50 p-2.5 border-b border-slate-200 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <img src={q.questionImage} alt="Question preview" className="h-16 w-24 object-contain rounded border border-slate-200 bg-white" />
+                            <span className="text-xs font-semibold text-slate-700">Question Image Attached</span>
+                          </div>
+                          <button
+                            onClick={() => setQuestions((prev) => prev.map((item) => (item.id === q.id ? { ...item, questionImage: '' } : item)))}
+                            className="text-xs font-bold text-red-600 hover:text-red-700 px-2 py-1 bg-red-50 rounded"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
 
                       {/* Textarea */}
                       <textarea
@@ -559,30 +607,95 @@ export const AdminBulkUploadStep2: React.FC = () => {
                     <div className="space-y-3">
                       {q.options.map((optVal, optIdx) => {
                         const letter = ['A', 'B', 'C', 'D', 'E', 'F'][optIdx];
+                        const optionImages = q.optionImages || [null, null, null, null];
+                        const optImg = optionImages[optIdx];
+
                         return (
-                          <div key={optIdx} className="flex items-center gap-3">
-                            <div className="flex-1 flex items-center border border-slate-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500">
-                              <span className="w-9 h-9 bg-slate-50 border-r border-slate-300 flex items-center justify-center text-xs font-bold text-slate-700 flex-shrink-0">
-                                {letter}
-                              </span>
+                          <div key={optIdx} className="space-y-1.5">
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1 flex items-center border border-slate-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500">
+                                <span className="w-9 h-9 bg-slate-50 border-r border-slate-300 flex items-center justify-center text-xs font-bold text-slate-700 flex-shrink-0">
+                                  {letter}
+                                </span>
+                                <input
+                                  type="text"
+                                  value={optVal}
+                                  onChange={(e) => handleOptionChange(q.id, optIdx, e.target.value)}
+                                  placeholder={`Enter option ${letter} (or add image)`}
+                                  className="w-full text-xs font-medium px-3 py-2 text-slate-900 focus:outline-none"
+                                />
+                                <label className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 cursor-pointer flex-shrink-0" title={`Add Image for Option ${letter}`}>
+                                  <ImageIcon className="w-4 h-4" />
+                                  <input
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        const reader = new FileReader();
+                                        reader.onload = (evt) => {
+                                          const url = evt.target?.result as string;
+                                          setQuestions((prev) =>
+                                            prev.map((item) => {
+                                              if (item.id === q.id) {
+                                                const newOptImgs = [...(item.optionImages || [null, null, null, null])];
+                                                newOptImgs[optIdx] = url;
+                                                return { ...item, optionImages: newOptImgs };
+                                              }
+                                              return item;
+                                            })
+                                          );
+                                        };
+                                        reader.readAsDataURL(file);
+                                      }
+                                    }}
+                                  />
+                                </label>
+                              </div>
+
                               <input
-                                type="text"
-                                value={optVal}
-                                onChange={(e) => handleOptionChange(q.id, optIdx, e.target.value)}
-                                placeholder={`Enter option ${letter}`}
-                                className="w-full text-xs font-medium px-3 py-2 text-slate-900 focus:outline-none"
+                                type="radio"
+                                name={`correct-opt-${q.id}`}
+                                checked={q.correctOptionIndex === optIdx}
+                                onChange={() =>
+                                  setQuestions((prev) =>
+                                    prev.map((item) => (item.id === q.id ? { ...item, correctOptionIndex: optIdx } : item))
+                                  )
+                                }
+                                className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                               />
                             </div>
 
-                            <input
-                              type="radio"
-                              name={`correct-opt-${q.id}`}
-                              checked={q.correctOptionIndex === optIdx}
-                              onChange={() =>
-                                setQuestions((prev) =>
-                                  prev.map((item) => (item.id === q.id ? { ...item, correctOptionIndex: optIdx } : item))
-                                )
-                              }
+                            {/* Option Image Thumbnail Preview */}
+                            {optImg && (
+                              <div className="ml-10 flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200 inline-flex">
+                                <img src={optImg} alt={`Option ${letter} preview`} className="h-10 w-14 object-contain rounded border border-slate-200 bg-white" />
+                                <span className="text-[11px] font-semibold text-slate-600">Option {letter} Image</span>
+                                <button
+                                  onClick={() =>
+                                    setQuestions((prev) =>
+                                      prev.map((item) => {
+                                        if (item.id === q.id) {
+                                          const newOptImgs = [...(item.optionImages || [null, null, null, null])];
+                                          newOptImgs[optIdx] = null;
+                                          return { ...item, optionImages: newOptImgs };
+                                        }
+                                        return item;
+                                      })
+                                    )
+                                  }
+                                  className="text-[11px] font-bold text-red-600 hover:text-red-700 ml-1 px-1.5 py-0.5 bg-red-50 rounded"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                               className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer"
                             />
                           </div>
