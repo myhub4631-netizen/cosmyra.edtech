@@ -317,9 +317,9 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       'paperName': _paperData?['paper_name'] ?? _paperData?['paperName'] ?? widget.paperName,
     };
 
-    final success = await SupabaseService.saveQuestionMap(qMap);
+    final res = await SupabaseService.saveQuestionMapWithStatus(qMap);
 
-    if (success) {
+    if (res['success'] == true) {
       setState(() {
         q.isSaved = true;
         q.id = qId;
@@ -337,10 +337,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       }
     } else {
       if (mounted && showToast) {
+        final err = res['error'] ?? 'Unknown database error';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save Question ${q.number} to Supabase database.'),
+            content: Text('Failed to save Question ${q.number}: $err'),
             backgroundColor: const Color(0xFFEF4444),
+            duration: const Duration(seconds: 4),
           ),
         );
       }

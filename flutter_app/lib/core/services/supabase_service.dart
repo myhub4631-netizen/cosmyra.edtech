@@ -1837,14 +1837,37 @@ class SupabaseService {
   }
 
   // ================= ADMIN MANAGEMENT =================
-  static Future<bool> saveQuestionMap(Map<String, dynamic> qMap) async {
+  static Future<Map<String, dynamic>> saveQuestionMapWithStatus(Map<String, dynamic> qMap) async {
     try {
       final rawCat = (qMap['category'] ?? qMap['sourceType'] ?? 'Custom Practice').toString();
       final canonicalMap = getCanonicalCategoryAndSourceType(rawCat);
+      final int qNum = (qMap['question_number'] ?? qMap['questionNumber'] is num)
+          ? (qMap['question_number'] ?? qMap['questionNumber'] as num).toInt()
+          : int.tryParse((qMap['question_number'] ?? qMap['questionNumber'])?.toString() ?? '1') ?? 1;
+
+      final dynamic cAnsRaw = qMap['correct_answer'] ?? qMap['correctAnswer'];
+      final dynamic cIdxRaw = qMap['correct_option_index'] ?? qMap['correctOptionIndex'];
+      int cIdx = 0;
+      if (cIdxRaw is num) {
+        cIdx = cIdxRaw.toInt();
+      } else if (cIdxRaw != null) {
+        cIdx = int.tryParse(cIdxRaw.toString()) ?? 0;
+      }
+
+      String normCorrectAns = 'Option ${String.fromCharCode(65 + cIdx)}';
+      if (cAnsRaw != null && cAnsRaw.toString().trim().isNotEmpty) {
+        normCorrectAns = cAnsRaw.toString().trim();
+      }
+
+      final optionsList = qMap['options'] is List ? List<String>.from(qMap['options']) : <String>[];
+      final optionImagesList = qMap['optionImages'] is List
+          ? List<String?>.from(qMap['optionImages'])
+          : (qMap['option_images'] is List ? List<String?>.from(qMap['option_images']) : <String?>[]);
+
       final qData = {
-        'id': qMap['id'] ?? 'Q_${DateTime.now().millisecondsSinceEpoch}',
-        'paper_id': qMap['paper_id'] ?? qMap['paperId'] ?? '',
-        'question_number': (qMap['question_number'] ?? qMap['questionNumber'] ?? -1) as int,
+        'id': (qMap['id'] != null && qMap['id'].toString().isNotEmpty) ? qMap['id'].toString() : 'Q_${DateTime.now().millisecondsSinceEpoch}',
+        'paper_id': (qMap['paper_id'] ?? qMap['paperId'] ?? '').toString(),
+        'question_number': qNum,
         'question_text': qMap['questionText'] ?? qMap['question_text'] ?? '',
         'question_image': qMap['questionImage'] ?? qMap['question_image'] ?? '',
         'subject': qMap['subject'] ?? 'Physics',
@@ -1858,23 +1881,29 @@ class SupabaseService {
         'marks': (qMap['marks'] is num) ? (qMap['marks'] as num).toInt() : int.tryParse(qMap['marks']?.toString() ?? '4') ?? 4,
         'negative_marks': (qMap['negativeMarks'] is num) ? (qMap['negativeMarks'] as num).toDouble() : double.tryParse(qMap['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
         'status': qMap['status'] ?? 'Active',
-        'options': qMap['options'] ?? [],
-        'option_images': qMap['optionImages'] ?? qMap['option_images'] ?? [null, null, null, null],
-        'correct_answer': qMap['correctAnswer'] ?? qMap['correct_answer'] ?? 'Option A',
-        'correct_option_index': qMap['correctOptionIndex'] ?? qMap['correct_option_index'],
+        'options': optionsList,
+        'option_images': optionImagesList,
+        'correct_answer': normCorrectAns,
+        'correct_option_index': cIdx,
         'explanation': qMap['explanation'] ?? '',
-        'solution': qMap['explanation'] ?? '',
+        'solution': qMap['solution'] ?? qMap['explanation'] ?? '',
         'year': qMap['year']?.toString() ?? '2026',
         'exam': qMap['exam']?.toString() ?? 'NEET 2026',
         'created_at': qMap['created_at'] ?? DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       };
+
       await client.from('questions').upsert(qData);
-      return true;
+      return {'success': true};
     } catch (e) {
       debugPrint('Supabase saveQuestion error: $e');
-      return false;
+      return {'success': false, 'error': e.toString()};
     }
+  }
+
+  static Future<bool> saveQuestionMap(Map<String, dynamic> qMap) async {
+    final res = await saveQuestionMapWithStatus(qMap);
+    return res['success'] == true;
   }
 
   /// Background sync to upsert any local / practice questions to remote Supabase DB so Desktop and Mobile match 100%
