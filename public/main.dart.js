@@ -9101,7 +9101,7 @@ case 7:i=A.bO("c_"+Date.now())
 b=$.cl().b
 b===$&&A.b()
 s=9
-return A.w(b.bG("chapters").iW(0,A.u(["id",i,"subject_id",d,"name",c,"code",a,"is_active",a3,"display_order",99],t.N,t.K)).xa(),$async$y5)
+return A.w(b.bG("chapters").iW(0,A.u(["id",i,"subject_id",d,"name",c,"code",a,"display_order",99],t.N,t.K)).xa(),$async$y5)
 case 9:h=a7
 b=J.ba(h)
 g=b.gcf(h)
@@ -9123,7 +9123,7 @@ bDH(a,b,c,d,e,f){var s=0,r=A.F(t.y),q,p=2,o=[],n,m,l,k,j
 var $async$Mr=A.B(function(g,h){if(g===1){o.push(h)
 s=p}while(true)switch(s){case 0:p=4
 n=A.u(["name",B.c.ap(e)],t.N,t.z)
-J.cZ(n,"code",B.c.ap(b).toUpperCase())
+if(b.length!==0)J.cZ(n,"code",B.c.ap(b).toUpperCase())
 l=$.cl().b
 l===$&&A.b()
 s=7
@@ -9211,35 +9211,37 @@ case 1:return A.D(q,r)
 case 2:return A.C(o.at(-1),r)}})
 return A.E($async$Mi,r)},
 CT(a,b,c,d,e,f){return A.bDg(a,b,c,d,e,f)},
-bDg(a,b,c,d,e,a0){var s=0,r=A.F(t.y),q,p=2,o=[],n,m,l,k,j,i,h,g,f
-var $async$CT=A.B(function(a1,a2){if(a1===1){o.push(a2)
-s=p}while(true)switch(s){case 0:h=A.bO("t_"+Date.now())
+bDg(a,b,c,d,a0,a1){var s=0,r=A.F(t.y),q,p=2,o=[],n,m,l,k,j,i,h,g,f,e
+var $async$CT=A.B(function(a2,a3){if(a2===1){o.push(a3)
+s=p}while(true)switch(s){case 0:g=A.bO("t_"+Date.now())
 p=4
 j=$.cl().b
 j===$&&A.b()
+i=t.N
 s=7
-return A.w(j.bG("topics").iW(0,A.u(["id",h,"chapter_id",a,"name",B.c.ap(e),"code",B.c.ap(b).toUpperCase(),"is_active",d],t.N,t.K)).xa(),$async$CT)
-case 7:n=a2
+return A.w(j.bG("topics").iW(0,A.u(["id",g,"chapter_id",a,"name",B.c.ap(a0),"code",B.c.ap(b).toUpperCase()],i,i)).xa(),$async$CT)
+case 7:n=a3
 if(n!=null&&J.dc(n)){j=J.aV(J.jC(n),"id")
 m=j==null?null:J.ae(j)
-if(m!=null&&m.length!==0)h=m}p=2
+if(m!=null&&m.length!==0)g=m}p=2
 s=6
 break
 case 4:p=3
-g=o.pop()
-l=A.ac(g)
+f=o.pop()
+l=A.ac(f)
 A.be().$1("Supabase remote topic insert notice (fallback to custom ID): "+A.k(l))
 p=9
 j=$.cl().b
 j===$&&A.b()
+i=t.N
 s=12
-return A.w(j.bG("topics").iW(0,A.u(["id",h,"chapter_id",a,"name",B.c.ap(e),"code",B.c.ap(b).toUpperCase(),"is_active",d],t.N,t.K)),$async$CT)
+return A.w(j.bG("topics").iW(0,A.u(["id",g,"chapter_id",a,"name",B.c.ap(a0),"code",B.c.ap(b).toUpperCase()],i,i)),$async$CT)
 case 12:p=3
 s=11
 break
 case 9:p=8
-f=o.pop()
-k=A.ac(f)
+e=o.pop()
+k=A.ac(e)
 A.be().$1("Supabase remote topic insert fallback notice: "+A.k(k))
 s=11
 break
@@ -9249,7 +9251,7 @@ case 11:s=6
 break
 case 3:s=2
 break
-case 6:$.lN.H(0,c.toUpperCase()+"_"+a0.toUpperCase())
+case 6:$.lN.H(0,c.toUpperCase()+"_"+a1.toUpperCase())
 s=13
 return A.w(A.oD(),$async$CT)
 case 13:s=14

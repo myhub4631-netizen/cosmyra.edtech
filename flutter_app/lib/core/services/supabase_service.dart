@@ -1057,7 +1057,6 @@ class SupabaseService {
       'subject_id': subjectId,
       'name': trimmedName,
       'code': trimmedCode,
-      'is_active': isActive,
       'display_order': 99,
     }).select();
 
@@ -1088,7 +1087,7 @@ class SupabaseService {
 
     try {
       final updates = <String, dynamic>{'name': name.trim()};
-      if (code != null) updates['code'] = code.trim().toUpperCase();
+      if (code != null && code.isNotEmpty) updates['code'] = code.trim().toUpperCase();
 
       await client.from('chapters').update(updates).eq('id', chapterId);
     } catch (e) {
@@ -1151,14 +1150,13 @@ class SupabaseService {
     final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
     String finalTopicId = toValidUuid('t_${DateTime.now().millisecondsSinceEpoch}');
 
-    // 1. Remote Supabase Database Insert with fallback
+    // 1. Remote Supabase Database Insert
     try {
       final res = await client.from('topics').insert({
         'id': finalTopicId,
         'chapter_id': chapterId,
         'name': name.trim(),
         'code': code.trim().toUpperCase(),
-        'is_active': isActive,
       }).select();
 
       if (res != null && (res as List).isNotEmpty) {
@@ -1175,7 +1173,6 @@ class SupabaseService {
           'chapter_id': chapterId,
           'name': name.trim(),
           'code': code.trim().toUpperCase(),
-          'is_active': isActive,
         });
       } catch (e2) {
         debugPrint('Supabase remote topic insert fallback notice: $e2');
