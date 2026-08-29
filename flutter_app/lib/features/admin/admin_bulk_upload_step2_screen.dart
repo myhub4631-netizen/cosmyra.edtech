@@ -188,12 +188,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           q.optionImages.any((img) => img != null && img.isNotEmpty);
 
       if (hasContent) {
-        String correctAnsText = 'Option A';
-        if (q.correctOptionIndex >= 0 && q.correctOptionIndex < q.options.length) {
-          correctAnsText = q.options[q.correctOptionIndex].isNotEmpty
-              ? q.options[q.correctOptionIndex]
-              : 'Option ${String.fromCharCode(65 + q.correctOptionIndex)}';
-        }
+        int correctIdx = (q.correctOptionIndex >= 0 && q.correctOptionIndex < q.options.length) ? q.correctOptionIndex : 0;
+        String correctLetter = String.fromCharCode(65 + correctIdx);
+        String correctAnsText = q.options[correctIdx].isNotEmpty
+            ? q.options[correctIdx]
+            : 'Option $correctLetter';
 
         batchToSave.add({
           'id': q.id.isNotEmpty ? q.id : 'q_${_paperId}_${q.number}',
@@ -202,7 +201,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           'questionImage': q.questionImage ?? '',
           'options': q.options,
           'optionImages': q.optionImages,
-          'correctAnswer': correctAnsText,
+          'correctAnswer': 'Option $correctLetter',
+          'correct_answer': 'Option $correctLetter',
+          'correctOptionIndex': correctIdx,
+          'correct_option_index': correctIdx,
+          'correctText': correctAnsText,
           'explanation': q.explanation,
           'difficulty': q.difficulty,
           'marks': double.tryParse(q.positiveMarks) ?? 4.0,

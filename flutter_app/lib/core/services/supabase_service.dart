@@ -1591,16 +1591,96 @@ class SupabaseService {
     ];
   }
 
+  /// Robust helper to determine if an option is correct regardless of format (A/B/C/D, Option A, 0/1/2/3, text, etc.)
+  static bool checkOptionIsCorrect({
+    required int optionIndex,
+    required String optionText,
+    required String optionKey,
+    dynamic correctAnswerRaw,
+    dynamic correctOptionIndexRaw,
+  }) {
+    final String letter = String.fromCharCode(65 + optionIndex); // 'A', 'B', 'C', 'D'
+
+    // 1. Direct index match if correctOptionIndex is numeric
+    if (correctOptionIndexRaw != null) {
+      if (correctOptionIndexRaw is num && correctOptionIndexRaw.toInt() == optionIndex) {
+        return true;
+      }
+      final parsedIdx = int.tryParse(correctOptionIndexRaw.toString().trim());
+      if (parsedIdx != null && parsedIdx == optionIndex) {
+        return true;
+      }
+    }
+
+    if (correctAnswerRaw == null) return false;
+
+    final List<String> targets = [];
+    if (correctAnswerRaw is List) {
+      targets.addAll(correctAnswerRaw.map((e) => e.toString().trim()));
+    } else {
+      final str = correctAnswerRaw.toString().trim();
+      if (str.contains(',')) {
+        targets.addAll(str.split(',').map((e) => e.trim()));
+      } else {
+        targets.add(str);
+      }
+    }
+
+    for (var target in targets) {
+      if (target.isEmpty) continue;
+      final tUpper = target.toUpperCase();
+      final tLower = target.toLowerCase();
+
+      // Numeric index string match ("0", "1", "2", "3")
+      final numIdx = int.tryParse(target);
+      if (numIdx != null && numIdx == optionIndex) {
+        return true;
+      }
+
+      // Letter / Option label match ('A', 'B', 'C', 'D' or 'OPTION A', 'OPTION B', etc.)
+      if (tUpper == letter ||
+          tUpper == 'OPTION $letter' ||
+          tUpper == 'OPTION_$letter' ||
+          tUpper == 'OPT_$letter' ||
+          tUpper == 'OPT $letter' ||
+          tLower == letter.toLowerCase()) {
+        return true;
+      }
+
+      // Option key / ID match
+      if (optionKey.isNotEmpty && (target == optionKey || tUpper == optionKey.toUpperCase())) {
+        return true;
+      }
+
+      // Exact text match (if optionText is not empty)
+      if (optionText.isNotEmpty) {
+        if (target == optionText || tLower == optionText.toLowerCase().trim()) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   static List<QuestionModel> getSampleQuestions([int count = 50]) {
     final realMaps = get20RealQuestionsMap();
     final models = realMaps.map((map) {
       final opts = (map['options'] as List<String>).asMap().entries.map((e) {
+        final optKey = 'opt_${map['id']}_${e.key}';
+        final isCorr = checkOptionIsCorrect(
+          optionIndex: e.key,
+          optionText: e.value,
+          optionKey: optKey,
+          correctAnswerRaw: map['correctAnswer'] ?? map['correct_answer'],
+          correctOptionIndexRaw: map['correctOptionIndex'] ?? map['correct_option_index'],
+        );
         return QuestionOptionModel(
-          id: 'opt_${map['id']}_${e.key}',
+          id: optKey,
           questionId: map['id'],
           optionIndex: e.key,
           optionText: e.value,
-          isCorrect: e.value == map['correctAnswer'],
+          isCorrect: isCorr,
         );
       }).toList();
 
@@ -1743,9 +1823,16 @@ class SupabaseService {
         final idx = e.key;
         final text = e.value;
         final img = idx < optImgsRaw.length ? optImgsRaw[idx] : null;
-        final isCorr = text == map['correctAnswer'] || text == map['correct_answer'] || idx == map['correctOptionIndex'];
+        final optKey = 'opt_${map['id']}_$idx';
+        final isCorr = checkOptionIsCorrect(
+          optionIndex: idx,
+          optionText: text,
+          optionKey: optKey,
+          correctAnswerRaw: map['correctAnswer'] ?? map['correct_answer'],
+          correctOptionIndexRaw: map['correctOptionIndex'] ?? map['correct_option_index'],
+        );
         return QuestionOptionModel(
-          id: 'opt_${map['id']}_$idx',
+          id: optKey,
           questionId: map['id']?.toString() ?? '',
           optionIndex: idx,
           optionText: text,
@@ -2821,41 +2908,52 @@ class SupabaseService {
       final optionImagesList = q['optionImages'] is List
           ? List<String?>.from(q['optionImages'])
           : (q['option_images'] is List ? List<String?>.from(q['option_images']) : <String?>[]);
-
       final rawCat = q['category'] ?? q['sourceType'] ?? q['source_category'] ?? 'PYQ';
-      final canonical = getCanonicalCategoryAndSourceType(rawCat);
+      final canonical = getCanonicalCategoryAndSourceType(rawCat.toString());
 
-      return {
-        'id': qId,
-        'paper_id': paperId,
-        'question_number': qNum,
-        'question_text': q['questionText'] ?? q['question_text'] ?? '',
-        'question_image': q['questionImage'] ?? q['question_image'] ?? '',
-        'subject': q['subject'] ?? 'Physics',
-        'subject_id': q['subject'] ?? 'Physics',
-        'chapter': q['chapter'] ?? 'General',
-        'chapter_id': q['chapter'] ?? 'General',
-        'topic': q['topic'] ?? 'General',
-        'topic_id': q['topic'] ?? 'General',
-        'category': canonical['category'],
-        'source_type': canonical['source_type'],
-        'source': canonical['source'],
-        'difficulty': q['difficulty'] ?? 'Medium',
-        'q_type': q['qType'] ?? q['question_type'] ?? 'Single Choice (MCQ)',
-        'marks': (q['marks'] is num) ? (q['marks'] as num).toInt() : int.tryParse(q['marks']?.toString() ?? '4') ?? 4,
-        'negative_marks': (q['negativeMarks'] is num) ? (q['negativeMarks'] as num).toDouble() : double.tryParse(q['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
-        'status': 'Active',
-        'options': optionsList,
-        'option_images': optionImagesList,
-        'correct_answer': q['correctAnswer'] ?? (optionsList.isNotEmpty ? optionsList[0] : 'Option A'),
-        'explanation': q['explanation'] ?? '',
-        'solution': q['explanation'] ?? '',
-        'year': q['year'] ?? 2026,
-        'paper_name': q['paperName'] ?? 'NEET 2026 Phase 1',
-        'exam': q['exam'] ?? 'NEET',
-        'created_at': q['created_at'] ?? timeIso,
-        'updated_at': timeIso,
-      };
+      final dynamic cAnsRaw = q['correct_answer'] ?? q['correctAnswer'];
+        final dynamic cIdxRaw = q['correct_option_index'] ?? q['correctOptionIndex'];
+        String normCorrectAns = 'Option A';
+        if (cAnsRaw != null && cAnsRaw.toString().trim().isNotEmpty) {
+          normCorrectAns = cAnsRaw.toString().trim();
+        } else if (cIdxRaw != null && cIdxRaw is num) {
+          normCorrectAns = 'Option ${String.fromCharCode(65 + cIdxRaw.toInt())}';
+        }
+
+        return {
+          'id': qId,
+          'paper_id': paperId,
+          'question_number': qNum,
+          'question_text': q['questionText'] ?? q['question_text'] ?? '',
+          'question_image': q['questionImage'] ?? q['question_image'] ?? '',
+          'subject': q['subject'] ?? 'Physics',
+          'subject_id': q['subject'] ?? 'Physics',
+          'chapter': q['chapter'] ?? 'General',
+          'chapter_id': q['chapter'] ?? 'General',
+          'topic': q['topic'] ?? 'General',
+          'topic_id': q['topic'] ?? 'General',
+          'category': canonical['category'],
+          'source_type': canonical['source_type'],
+          'source': canonical['source'],
+          'difficulty': q['difficulty'] ?? 'Medium',
+          'q_type': q['qType'] ?? q['question_type'] ?? 'Single Choice (MCQ)',
+          'marks': (q['marks'] is num) ? (q['marks'] as num).toInt() : int.tryParse(q['marks']?.toString() ?? '4') ?? 4,
+          'negative_marks': (q['negativeMarks'] is num) ? (q['negativeMarks'] as num).toDouble() : double.tryParse(q['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
+          'status': 'Active',
+          'options': optionsList,
+          'option_images': optionImagesList,
+          'correct_answer': normCorrectAns,
+          'correctAnswer': normCorrectAns,
+          'correct_option_index': cIdxRaw,
+          'correctOptionIndex': cIdxRaw,
+          'explanation': q['explanation'] ?? '',
+          'solution': q['explanation'] ?? '',
+          'year': q['year'] ?? 2026,
+          'paper_name': q['paperName'] ?? 'NEET 2026 Phase 1',
+          'exam': q['exam'] ?? 'NEET',
+          'created_at': q['created_at'] ?? timeIso,
+          'updated_at': timeIso,
+        };
     }).toList();
 
     try {
@@ -3099,9 +3197,16 @@ class SupabaseService {
         final idx = e.key;
         final text = e.value;
         final img = idx < optImgsRaw.length ? optImgsRaw[idx] : null;
-        final isCorr = text == map['correctAnswer'] || text == map['correct_answer'] || idx == map['correctOptionIndex'];
+        final optKey = 'opt_${map['id']}_$idx';
+        final isCorr = checkOptionIsCorrect(
+          optionIndex: idx,
+          optionText: text,
+          optionKey: optKey,
+          correctAnswerRaw: map['correctAnswer'] ?? map['correct_answer'],
+          correctOptionIndexRaw: map['correctOptionIndex'] ?? map['correct_option_index'],
+        );
         return QuestionOptionModel(
-          id: 'opt_${map['id']}_$idx',
+          id: optKey,
           questionId: map['id']?.toString() ?? '',
           optionIndex: idx,
           optionText: text,
