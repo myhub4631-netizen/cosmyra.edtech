@@ -1853,6 +1853,39 @@ class SupabaseService {
     return null;
   }
 
+  static bool isValidUuid(String str) {
+    final trimmed = str.trim();
+    final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+    return uuidRegex.hasMatch(trimmed);
+  }
+
+  static String toValidUuid(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return '00000000-0000-4000-8000-000000000000';
+    if (isValidUuid(trimmed)) return trimmed.toLowerCase();
+
+    int hash1 = 0x811c9dc5;
+    int hash2 = 0x01000193;
+    final bytes = utf8.encode(trimmed);
+    for (var b in bytes) {
+      hash1 = ((hash1 ^ b) * 16777619) & 0xFFFFFFFF;
+      hash2 = ((hash2 + b) * 31) & 0xFFFFFFFF;
+    }
+
+    final h1Str = hash1.toRadixString(16).padLeft(8, '0');
+    final h2Str = hash2.toRadixString(16).padLeft(8, '0');
+    final codeStr = trimmed.length.toRadixString(16).padLeft(4, '0');
+    final rawHex = '$h1Str$h2Str$codeStr${h1Str.substring(0, 4)}$h2Str$h1Str'.padRight(32, '0').substring(0, 32);
+
+    final part1 = rawHex.substring(0, 8);
+    final part2 = rawHex.substring(8, 12);
+    final part3 = '4' + rawHex.substring(13, 16);
+    final part4 = 'a' + rawHex.substring(17, 20);
+    final part5 = rawHex.substring(20, 32);
+
+    return '$part1-$part2-$part3-$part4-$part5';
+  }
+
   static Future<Map<String, dynamic>> saveQuestionMapWithStatus(Map<String, dynamic> qMap) async {
     try {
       final rawCat = (qMap['category'] ?? qMap['sourceType'] ?? 'Custom Practice').toString();
@@ -1880,9 +1913,14 @@ class SupabaseService {
           ? List<String?>.from(qMap['optionImages'])
           : (qMap['option_images'] is List ? List<String?>.from(qMap['option_images']) : <String?>[]);
 
+      final String rawId = (qMap['id'] != null && qMap['id'].toString().isNotEmpty)
+          ? qMap['id'].toString()
+          : 'Q_${DateTime.now().millisecondsSinceEpoch}';
+      final String rawPaperId = (qMap['paper_id'] ?? qMap['paperId'] ?? '').toString();
+
       final Map<String, dynamic> qData = {
-        'id': (qMap['id'] != null && qMap['id'].toString().isNotEmpty) ? qMap['id'].toString() : 'Q_${DateTime.now().millisecondsSinceEpoch}',
-        'paper_id': (qMap['paper_id'] ?? qMap['paperId'] ?? '').toString(),
+        'id': toValidUuid(rawId),
+        'paper_id': rawPaperId.isNotEmpty ? toValidUuid(rawPaperId) : null,
         'question_number': qNum,
         'question_text': qMap['questionText'] ?? qMap['question_text'] ?? '',
         'question_image': qMap['questionImage'] ?? qMap['question_image'] ?? '',
@@ -1923,7 +1961,17 @@ class SupabaseService {
             continue;
           }
 
-          if (errStr.contains('22P02') || errStr.toLowerCase().contains('invalid input value for enum')) {
+          if (errStr.contains('22P02') || errStr.toLowerCase().contains('invalid input')) {
+            if (errStr.contains('uuid')) {
+              if (qData['id'] != null && !isValidUuid(qData['id'].toString())) {
+                qData['id'] = toValidUuid(qData['id'].toString());
+                continue;
+              }
+              if (qData['paper_id'] != null && !isValidUuid(qData['paper_id'].toString())) {
+                qData['paper_id'] = toValidUuid(qData['paper_id'].toString());
+                continue;
+              }
+            }
             if (errStr.contains('difficulty') && qData.containsKey('difficulty')) {
               final cur = qData['difficulty']?.toString() ?? '';
               if (cur != cur.toLowerCase()) {
@@ -2989,7 +3037,9 @@ class SupabaseService {
 
     final cleanPayloads = questionsData.map((q) {
       final int qNum = (q['questionNumber'] ?? q['question_number'] ?? 1) as int;
-      final String qId = 'q_${paperId}_$qNum';
+      final String rawQId = (q['id'] != null && q['id'].toString().isNotEmpty)
+          ? q['id'].toString()
+          : 'q_${paperId}_$qNum';
 
       final optionsList = q['options'] is List ? List<String>.from(q['options']) : <String>[];
       final optionImagesList = q['optionImages'] is List
@@ -2999,18 +3049,18 @@ class SupabaseService {
       final canonical = getCanonicalCategoryAndSourceType(rawCat.toString());
 
       final dynamic cAnsRaw = q['correct_answer'] ?? q['correctAnswer'];
-        final dynamic cIdxRaw = q['correct_option_index'] ?? q['correctOptionIndex'];
-        String normCorrectAns = 'Option A';
-        if (cAnsRaw != null && cAnsRaw.toString().trim().isNotEmpty) {
-          normCorrectAns = cAnsRaw.toString().trim();
-        } else if (cIdxRaw != null && cIdxRaw is num) {
-          normCorrectAns = 'Option ${String.fromCharCode(65 + cIdxRaw.toInt())}';
-        }
+      final dynamic cIdxRaw = q['correct_option_index'] ?? q['correctOptionIndex'];
+      String normCorrectAns = 'Option A';
+      if (cAnsRaw != null && cAnsRaw.toString().trim().isNotEmpty) {
+        normCorrectAns = cAnsRaw.toString().trim();
+      } else if (cIdxRaw != null && cIdxRaw is num) {
+        normCorrectAns = 'Option ${String.fromCharCode(65 + cIdxRaw.toInt())}';
+      }
 
-        return {
-          'id': qId,
-          'paper_id': paperId,
-          'question_number': qNum,
+      return {
+        'id': toValidUuid(rawQId),
+        'paper_id': paperId.trim().isNotEmpty ? toValidUuid(paperId) : null,
+        'question_number': qNum,
           'question_text': q['questionText'] ?? q['question_text'] ?? '',
           'question_image': q['questionImage'] ?? q['question_image'] ?? '',
           'subject': q['subject'] ?? 'Physics',
