@@ -1887,22 +1887,116 @@ class SupabaseService {
     return '$part1-$part2-$part3-$part4-$part5';
   }
 
-  static bool _hasTaxonomyBeenSeeded = false;
+  static Future<String> getOrCreateValidExamId(String examName) async {
+    try {
+      final existing = await client.from('exams').select('id').limit(1);
+      if (existing != null && (existing as List).isNotEmpty) {
+        return existing[0]['id'].toString();
+      }
+      const newExamId = '11111111-1111-1111-1111-111111111111';
+      await client.from('exams').insert({
+        'id': newExamId,
+        'name': examName.isNotEmpty ? examName : 'NEET',
+        'code': 'NEET',
+        'is_active': true,
+        'display_order': 1,
+      });
+      return newExamId;
+    } catch (e) {
+      debugPrint('Notice in getOrCreateValidExamId: $e');
+    }
+    return '11111111-1111-1111-1111-111111111111';
+  }
+
+  static Future<String> getOrCreateValidSubjectId(String examId, String subjectName) async {
+    try {
+      final existing = await client.from('subjects').select('id').eq('exam_id', examId).limit(1);
+      if (existing != null && (existing as List).isNotEmpty) {
+        return existing[0]['id'].toString();
+      }
+      final anySub = await client.from('subjects').select('id').limit(1);
+      if (anySub != null && (anySub as List).isNotEmpty) {
+        return anySub[0]['id'].toString();
+      }
+      const newSubId = 'a1111111-1111-1111-1111-111111111111';
+      await client.from('subjects').insert({
+        'id': newSubId,
+        'exam_id': examId,
+        'name': subjectName.isNotEmpty ? subjectName : 'Physics',
+        'code': 'SUB_${DateTime.now().millisecondsSinceEpoch}',
+        'display_order': 1,
+      });
+      return newSubId;
+    } catch (e) {
+      debugPrint('Notice in getOrCreateValidSubjectId: $e');
+    }
+    return 'a1111111-1111-1111-1111-111111111111';
+  }
+
+  static Future<String> getOrCreateValidChapterId(String subjectId, String chapterName) async {
+    try {
+      final cleanName = chapterName.replaceAll(RegExp(r'^(Physics|Chemistry|Biology|Maths?)\s*-\s*', caseSensitive: false), '').trim();
+      final nameToSearch = cleanName.isNotEmpty ? cleanName : 'Kinematics';
+
+      final existing = await client
+          .from('chapters')
+          .select('id')
+          .eq('subject_id', subjectId)
+          .ilike('name', '%$nameToSearch%')
+          .limit(1);
+
+      if (existing != null && (existing as List).isNotEmpty) {
+        return existing[0]['id'].toString();
+      }
+
+      final anySubChap = await client
+          .from('chapters')
+          .select('id')
+          .eq('subject_id', subjectId)
+          .limit(1);
+
+      if (anySubChap != null && (anySubChap as List).isNotEmpty) {
+        return anySubChap[0]['id'].toString();
+      }
+
+      final anyChap = await client
+          .from('chapters')
+          .select('id')
+          .limit(1);
+
+      if (anyChap != null && (anyChap as List).isNotEmpty) {
+        return anyChap[0]['id'].toString();
+      }
+
+      const newChapId = 'b2222222-2222-2222-2222-222222222222';
+      await client.from('chapters').insert({
+        'id': newChapId,
+        'subject_id': subjectId,
+        'name': nameToSearch,
+        'code': 'CHAP_${DateTime.now().millisecondsSinceEpoch}',
+        'class_level': 11,
+        'display_order': 1,
+      });
+      return newChapId;
+    } catch (e) {
+      debugPrint('Notice in getOrCreateValidChapterId: $e');
+    }
+    return 'b2222222-2222-2222-2222-222222222222';
+  }
 
   static Future<void> ensureTaxonomySeeded() async {
-    if (_hasTaxonomyBeenSeeded) return;
     try {
-      // 1. Ensure Exam row
-      await client.from('exams').upsert({
+      await client.from('exams').insert({
         'id': '11111111-1111-1111-1111-111111111111',
         'name': 'NEET',
         'code': 'NEET',
         'is_active': true,
         'display_order': 1,
       });
+    } catch (_) {}
 
-      // 2. Ensure Subject row
-      await client.from('subjects').upsert({
+    try {
+      await client.from('subjects').insert({
         'id': 'a1111111-1111-1111-1111-111111111111',
         'exam_id': '11111111-1111-1111-1111-111111111111',
         'name': 'Physics',
@@ -1910,9 +2004,10 @@ class SupabaseService {
         'is_active': true,
         'display_order': 1,
       });
+    } catch (_) {}
 
-      // 3. Ensure Chapter rows
-      await client.from('chapters').upsert([
+    try {
+      await client.from('chapters').insert([
         {
           'id': 'b1111111-1111-1111-1111-111111111111',
           'subject_id': 'a1111111-1111-1111-1111-111111111111',
@@ -1930,10 +2025,7 @@ class SupabaseService {
           'display_order': 2,
         },
       ]);
-      _hasTaxonomyBeenSeeded = true;
-    } catch (e) {
-      debugPrint('Notice ensuring taxonomy seeded: $e');
-    }
+    } catch (_) {}
   }
 
   static Future<Map<String, dynamic>> saveQuestionMapWithStatus(Map<String, dynamic> qMap) async {
@@ -1967,20 +2059,18 @@ class SupabaseService {
           ? qMap['id'].toString()
           : 'Q_${DateTime.now().millisecondsSinceEpoch}';
 
+      await ensureTaxonomySeeded();
+
+      final String finalExamId = await getOrCreateValidExamId(qMap['exam']?.toString() ?? 'NEET');
+      final String finalSubjectId = await getOrCreateValidSubjectId(finalExamId, qMap['subject']?.toString() ?? 'Physics');
+      final String finalChapterId = await getOrCreateValidChapterId(finalSubjectId, qMap['chapter']?.toString() ?? qMap['chapterTopic']?.toString() ?? 'Kinematics');
+
       final Map<String, dynamic> qData = {
         'id': toValidUuid(rawId),
-        'exam_id': (qMap['exam_id'] != null && isValidUuid(qMap['exam_id'].toString()))
-            ? qMap['exam_id'].toString()
-            : '11111111-1111-1111-1111-111111111111',
-        'subject_id': (qMap['subject_id'] != null && isValidUuid(qMap['subject_id'].toString()))
-            ? qMap['subject_id'].toString()
-            : 'a1111111-1111-1111-1111-111111111111',
-        'chapter_id': (qMap['chapter_id'] != null && isValidUuid(qMap['chapter_id'].toString()))
-            ? qMap['chapter_id'].toString()
-            : 'b1111111-1111-1111-1111-111111111111',
-        'topic_id': (qMap['topic_id'] != null && isValidUuid(qMap['topic_id'].toString()))
-            ? qMap['topic_id'].toString()
-            : 'c1111111-1111-1111-1111-111111111111',
+        'exam_id': finalExamId,
+        'subject_id': finalSubjectId,
+        'chapter_id': finalChapterId,
+        'topic_id': (qMap['topic_id'] != null && isValidUuid(qMap['topic_id'].toString())) ? qMap['topic_id'].toString() : null,
         'question_text': qMap['questionText'] ?? qMap['question_text'] ?? '',
         'question_image': qMap['questionImage'] ?? qMap['question_image'] ?? '',
         'q_type': SupabaseQuestionMapper.toDbQuestionType(qMap['qType'] ?? qMap['q_type'] ?? qMap['questionType']),
