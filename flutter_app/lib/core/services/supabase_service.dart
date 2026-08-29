@@ -2096,18 +2096,19 @@ class SupabaseService {
 
           // 3. Check for 23503 Foreign Key constraint violation
           if (!repaired && (errStr.contains('23503') || errStr.toLowerCase().contains('violates foreign key constraint'))) {
+            await ensureTaxonomySeeded();
             if (errStr.contains('paper_id') && qData.containsKey('paper_id')) {
               debugPrint('Auto-repair: Removing paper_id foreign key...');
               qData.remove('paper_id');
               repaired = true;
-            } else if (errStr.contains('exam_id') && qData.containsKey('exam_id')) {
-              qData.remove('exam_id');
+            } else if (errStr.contains('chapter_id')) {
+              qData['chapter_id'] = 'b2222222-2222-2222-2222-222222222222';
               repaired = true;
-            } else if (errStr.contains('subject_id') && qData.containsKey('subject_id')) {
-              qData.remove('subject_id');
+            } else if (errStr.contains('subject_id')) {
+              qData['subject_id'] = 'a1111111-1111-1111-1111-111111111111';
               repaired = true;
-            } else if (errStr.contains('chapter_id') && qData.containsKey('chapter_id')) {
-              qData.remove('chapter_id');
+            } else if (errStr.contains('exam_id')) {
+              qData['exam_id'] = '11111111-1111-1111-1111-111111111111';
               repaired = true;
             } else if (errStr.contains('topic_id') && qData.containsKey('topic_id')) {
               qData.remove('topic_id');
