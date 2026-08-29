@@ -2030,48 +2030,42 @@ class SupabaseService {
   }
 
   static Future<void> ensureTaxonomySeeded() async {
-    try {
-      await client.from('exams').insert([
-        {
-          'id': '11111111-1111-1111-1111-111111111111',
-          'name': 'NEET',
-          'code': 'NEET',
-          'is_active': true,
-          'display_order': 1,
-        },
-        {
-          'id': '22222222-2222-2222-2222-222222222222',
-          'name': 'JEE Main',
-          'code': 'JEE_MAIN',
-          'is_active': true,
-          'display_order': 2,
-        },
-        {
-          'id': '33333333-3333-3333-3333-333333333333',
-          'name': 'JEE Advanced',
-          'code': 'JEE_ADV',
-          'is_active': true,
-          'display_order': 3,
-        },
-      ]);
-    } catch (_) {}
+    final exams = [
+      {'id': '11111111-1111-1111-1111-111111111111', 'name': 'NEET', 'code': 'NEET', 'is_active': true, 'display_order': 1},
+      {'id': '22222222-2222-2222-2222-222222222222', 'name': 'JEE Main', 'code': 'JEE_MAIN', 'is_active': true, 'display_order': 2},
+      {'id': '33333333-3333-3333-3333-333333333333', 'name': 'JEE Advanced', 'code': 'JEE_ADV', 'is_active': true, 'display_order': 3},
+    ];
 
-    try {
-      await client.from('subjects').insert([
-        // NEET
-        {'id': 'a1111111-1111-1111-1111-111111111111', 'exam_id': '11111111-1111-1111-1111-111111111111', 'name': 'Physics', 'code': 'NEET_PHY', 'is_active': true, 'display_order': 1},
-        {'id': 'a2222222-2222-2222-2222-222222222222', 'exam_id': '11111111-1111-1111-1111-111111111111', 'name': 'Chemistry', 'code': 'NEET_CHEM', 'is_active': true, 'display_order': 2},
-        {'id': 'a3333333-3333-3333-3333-333333333333', 'exam_id': '11111111-1111-1111-1111-111111111111', 'name': 'Biology', 'code': 'NEET_BIO', 'is_active': true, 'display_order': 3},
-        // JEE Main
-        {'id': 'a4444444-4444-4444-4444-444444444444', 'exam_id': '22222222-2222-2222-2222-222222222222', 'name': 'Physics', 'code': 'JEE_M_PHY', 'is_active': true, 'display_order': 1},
-        {'id': 'a5555555-5555-5555-5555-555555555555', 'exam_id': '22222222-2222-2222-2222-222222222222', 'name': 'Chemistry', 'code': 'JEE_M_CHEM', 'is_active': true, 'display_order': 2},
-        {'id': 'a6666666-6666-6666-6666-666666666666', 'exam_id': '22222222-2222-2222-2222-222222222222', 'name': 'Mathematics', 'code': 'JEE_M_MATH', 'is_active': true, 'display_order': 3},
-        // JEE Advanced
-        {'id': 'a7777777-7777-7777-7777-777777777777', 'exam_id': '33333333-3333-3333-3333-333333333333', 'name': 'Physics', 'code': 'JEE_A_PHY', 'is_active': true, 'display_order': 1},
-        {'id': 'a8888888-8888-8888-8888-888888888888', 'exam_id': '33333333-3333-3333-3333-333333333333', 'name': 'Chemistry', 'code': 'JEE_A_CHEM', 'is_active': true, 'display_order': 2},
-        {'id': 'a9999999-9999-9999-9999-999999999999', 'exam_id': '33333333-3333-3333-3333-333333333333', 'name': 'Mathematics', 'code': 'JEE_A_MATH', 'is_active': true, 'display_order': 3},
-      ]);
-    } catch (_) {}
+    for (var ex in exams) {
+      try {
+        await client.from('exams').upsert(ex);
+      } catch (e) {
+        debugPrint('Notice upserting exam ${ex['name']}: $e');
+      }
+    }
+
+    final subjects = [
+      // NEET
+      {'id': 'a1111111-1111-1111-1111-111111111111', 'exam_id': '11111111-1111-1111-1111-111111111111', 'name': 'Physics', 'code': 'NEET_PHY', 'is_active': true, 'display_order': 1},
+      {'id': 'a2222222-2222-2222-2222-222222222222', 'exam_id': '11111111-1111-1111-1111-111111111111', 'name': 'Chemistry', 'code': 'NEET_CHEM', 'is_active': true, 'display_order': 2},
+      {'id': 'a3333333-3333-3333-3333-333333333333', 'exam_id': '11111111-1111-1111-1111-111111111111', 'name': 'Biology', 'code': 'NEET_BIO', 'is_active': true, 'display_order': 3},
+      // JEE Main
+      {'id': 'a4444444-4444-4444-4444-444444444444', 'exam_id': '22222222-2222-2222-2222-222222222222', 'name': 'Physics', 'code': 'JEE_M_PHY', 'is_active': true, 'display_order': 1},
+      {'id': 'a5555555-5555-5555-5555-555555555555', 'exam_id': '22222222-2222-2222-2222-222222222222', 'name': 'Chemistry', 'code': 'JEE_M_CHEM', 'is_active': true, 'display_order': 2},
+      {'id': 'a6666666-6666-6666-6666-666666666666', 'exam_id': '22222222-2222-2222-2222-222222222222', 'name': 'Mathematics', 'code': 'JEE_M_MATH', 'is_active': true, 'display_order': 3},
+      // JEE Advanced
+      {'id': 'a7777777-7777-7777-7777-777777777777', 'exam_id': '33333333-3333-3333-3333-333333333333', 'name': 'Physics', 'code': 'JEE_A_PHY', 'is_active': true, 'display_order': 1},
+      {'id': 'a8888888-8888-8888-8888-888888888888', 'exam_id': '33333333-3333-3333-3333-333333333333', 'name': 'Chemistry', 'code': 'JEE_A_CHEM', 'is_active': true, 'display_order': 2},
+      {'id': 'a9999999-9999-9999-9999-999999999999', 'exam_id': '33333333-3333-3333-3333-333333333333', 'name': 'Mathematics', 'code': 'JEE_A_MATH', 'is_active': true, 'display_order': 3},
+    ];
+
+    for (var sub in subjects) {
+      try {
+        await client.from('subjects').upsert(sub);
+      } catch (e) {
+        debugPrint('Notice upserting subject ${sub['name']}: $e');
+      }
+    }
 
     try {
       await client.from('chapters').insert([
