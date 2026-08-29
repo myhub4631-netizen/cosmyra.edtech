@@ -1871,30 +1871,40 @@ class SupabaseService {
   // ================= ADMIN MANAGEMENT =================
   static Future<bool> saveQuestionMap(Map<String, dynamic> qMap) async {
     try {
+      final rawCat = (qMap['category'] ?? qMap['sourceType'] ?? 'Custom Practice').toString();
+      final canonicalMap = getCanonicalCategoryAndSourceType(rawCat);
       final qData = {
-        'id': qMap['id'],
-        'question_text': qMap['questionText'],
-        'subject': qMap['subject'],
-        'chapter': qMap['chapter'],
-        'topic': qMap['topic'],
-        'sub_topic': qMap['subTopic'],
-        'source_type': qMap['sourceType'],
-        'difficulty': qMap['difficulty'],
-        'question_type': qMap['questionType'],
-        'marks': int.tryParse(qMap['marks']?.toString() ?? '4') ?? 4,
-        'negative_marks': int.tryParse(qMap['negativeMarks']?.toString() ?? '1') ?? 1,
-        'options': qMap['options'],
-        'correct_answer': qMap['correctAnswer'],
-        'explanation': qMap['explanation'],
-        'tags': qMap['tags'],
-        'used_in': qMap['usedIn'],
-        'added_on': qMap['addedOn'],
-        'created_at': DateTime.now().toIso8601String(),
+        'id': qMap['id'] ?? 'Q_${DateTime.now().millisecondsSinceEpoch}',
+        'paper_id': qMap['paper_id'] ?? qMap['paperId'] ?? '',
+        'question_number': (qMap['question_number'] ?? qMap['questionNumber'] ?? -1) as int,
+        'question_text': qMap['questionText'] ?? qMap['question_text'] ?? '',
+        'question_image': qMap['questionImage'] ?? qMap['question_image'] ?? '',
+        'subject': qMap['subject'] ?? 'Physics',
+        'chapter': qMap['chapter'] ?? '1. Mechanics',
+        'topic': qMap['topic'] ?? 'Kinematics',
+        'category': canonicalMap['category'],
+        'source_type': canonicalMap['source_type'],
+        'source': canonicalMap['source'],
+        'difficulty': qMap['difficulty'] ?? 'Medium',
+        'q_type': qMap['qType'] ?? qMap['q_type'] ?? qMap['questionType'] ?? 'MCQ',
+        'marks': (qMap['marks'] is num) ? (qMap['marks'] as num).toInt() : int.tryParse(qMap['marks']?.toString() ?? '4') ?? 4,
+        'negative_marks': (qMap['negativeMarks'] is num) ? (qMap['negativeMarks'] as num).toDouble() : double.tryParse(qMap['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
+        'status': qMap['status'] ?? 'Active',
+        'options': qMap['options'] ?? [],
+        'option_images': qMap['optionImages'] ?? qMap['option_images'] ?? [null, null, null, null],
+        'correct_answer': qMap['correctAnswer'] ?? qMap['correct_answer'] ?? 'Option A',
+        'correct_option_index': qMap['correctOptionIndex'] ?? qMap['correct_option_index'],
+        'explanation': qMap['explanation'] ?? '',
+        'solution': qMap['explanation'] ?? '',
+        'year': qMap['year']?.toString() ?? '2026',
+        'exam': qMap['exam']?.toString() ?? 'NEET 2026',
+        'created_at': qMap['created_at'] ?? DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
       };
-      await client.from('questions').upsert(qData);
+      await client.from('questions').upsert(qData, onConflict: 'id');
       return true;
     } catch (e) {
-      debugPrint('Supabase saveQuestion error (will fallback to local): $e');
+      debugPrint('Supabase saveQuestion error: $e');
       return false;
     }
   }
@@ -2996,9 +3006,7 @@ class SupabaseService {
           'options': optionsList,
           'option_images': optionImagesList,
           'correct_answer': normCorrectAns,
-          'correctAnswer': normCorrectAns,
           'correct_option_index': cIdxRaw,
-          'correctOptionIndex': cIdxRaw,
           'explanation': q['explanation'] ?? '',
           'solution': q['explanation'] ?? '',
           'year': q['year'] ?? 2026,
@@ -3011,8 +3019,9 @@ class SupabaseService {
 
     try {
       await client.from('questions').upsert(cleanPayloads, onConflict: 'id');
+      debugPrint('✓ Successfully upserted ${cleanPayloads.length} questions to remote Supabase DB!');
     } catch (e) {
-      debugPrint('Supabase incremental question upsert notice (fallback to local): $e');
+      debugPrint('Supabase incremental question upsert error: $e');
     }
 
     try {
