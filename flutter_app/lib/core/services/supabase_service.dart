@@ -1952,12 +1952,11 @@ class SupabaseService {
     }
   }
 
-  /// Fetch all real questions from Supabase DB, synchronizing local/sample questions to DB
+  /// Fetch all real questions from Supabase DB as the live single source of truth
   static Future<List<Map<String, dynamic>>> fetchAllQuestionsFromSupabase() async {
     final List<Map<String, dynamic>> allQuestions = [];
-    final List<Map<String, dynamic>> toSeedToSupabase = [];
 
-    void addOrUpdate(Map<String, dynamic> qMap, {bool fromRemote = false}) {
+    void addOrUpdate(Map<String, dynamic> qMap) {
       final String id = qMap['id']?.toString() ?? '';
       final String paperId = (qMap['paper_id'] ?? qMap['paperId'] ?? '').toString();
       final int qNum = (qMap['question_number'] ?? qMap['questionNumber'] ?? -1) as int;
@@ -2017,48 +2016,29 @@ class SupabaseService {
         allQuestions[idx] = normalized;
       } else {
         allQuestions.add(normalized);
-        if (!fromRemote) {
-          toSeedToSupabase.add(normalized);
-        }
       }
     }
 
-    // 1. Load remote questions from Supabase DB FIRST as single source of truth
+    // 1. Fetch live questions directly from Supabase DB as single source of truth
     try {
       final res = await client.from('questions').select('*').order('created_at', ascending: false);
       if (res != null && (res as List).isNotEmpty) {
         final dbList = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         for (var dbQ in dbList) {
-          addOrUpdate(dbQ, fromRemote: true);
+          addOrUpdate(dbQ);
         }
       }
     } catch (e) {
       debugPrint('Notice querying Supabase questions table: $e');
     }
 
-    // 2. Load SharedPreferences saved custom questions
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
-      if (jsonStr != null && jsonStr.isNotEmpty) {
-        final List<dynamic> decoded = jsonDecode(jsonStr);
-        for (var item in decoded) {
-          addOrUpdate(Map<String, dynamic>.from(item as Map), fromRemote: false);
-        }
+    // 2. If Supabase DB is completely empty (0 rows), seed initial 20 practice questions once
+    if (allQuestions.isEmpty) {
+      final practice20 = get20RealQuestionsMap();
+      for (var pQ in practice20) {
+        addOrUpdate(pQ);
       }
-    } catch (e) {
-      debugPrint('Notice loading custom saved questions: $e');
-    }
-
-    // 3. Load 20 practice questions so they are present everywhere
-    final practice20 = get20RealQuestionsMap();
-    for (var pQ in practice20) {
-      addOrUpdate(pQ, fromRemote: false);
-    }
-
-    // 4. Background seed any unsynced local questions to Supabase DB so Mobile & Desktop match 100%
-    if (toSeedToSupabase.isNotEmpty) {
-      _seedLocalQuestionsToSupabase(toSeedToSupabase);
+      _seedLocalQuestionsToSupabase(allQuestions);
     }
 
     return allQuestions;
