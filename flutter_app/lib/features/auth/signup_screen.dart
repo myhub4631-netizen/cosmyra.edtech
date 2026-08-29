@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
 import '../navigation/main_navigation.dart';
@@ -148,10 +149,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return UserDashboardScreen(
         userProfile: _signedUpProfile!,
         activeExam: 'NEET',
-        onOpenPractice: () => Navigator.pushReplacementNamed(context, '/practice'),
-        onOpenMockTests: () => Navigator.pushReplacementNamed(context, '/tests'),
-        onOpenPyqs: () => Navigator.pushReplacementNamed(context, '/pyq'),
-        onOpenMistakes: () => Navigator.pushReplacementNamed(context, '/mistakes'),
+        onOpenPractice: () => context.go('/practice'),
+        onOpenMockTests: () => context.go('/mock-tests'),
+        onOpenPyqs: () => context.go('/pyq'),
+        onOpenMistakes: () => context.go('/mistakes'),
       );
     }
     final screenWidth = MediaQuery.of(context).size.width;
@@ -290,7 +291,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   OutlinedButton(
                     onPressed: widget.onLoginTap ??
                         () {
-                          Navigator.pushNamed(context, '/login');
+                          context.go('/login');
                         },
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),

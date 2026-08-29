@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
 import '../navigation/main_navigation.dart';
@@ -63,18 +64,21 @@ class _LoginScreenState extends State<LoginScreen> {
           widget.onLoginSuccess!(userProfile);
         } else {
           if (userProfile.isSuperAdmin) {
-            Navigator.pushReplacementNamed(context, '/superadmin');
+            context.go('/superadmin');
           } else if (userProfile.isAdmin) {
-            Navigator.pushReplacementNamed(context, '/admin');
+            context.go('/admin');
           } else {
-            Navigator.pushReplacementNamed(context, '/dashboard');
+            context.go('/dashboard');
           }
         }
       }
     } catch (e) {
+      debugPrint('Login error: $e');
       if (mounted) {
         setState(() {
-          _errorMessage = 'Invalid email or password. Please try again.';
+          _errorMessage = e.toString().contains('Invalid')
+              ? 'Invalid email or password. Please try again.'
+              : e.toString().replaceAll('Exception:', '').trim();
         });
       }
     } finally {
@@ -155,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         GestureDetector(
                           onTap: widget.onSignUpTap ??
                               () {
-                                Navigator.pushNamed(context, '/signup');
+                                context.go('/signup');
                               },
                           child: const Text(
                             'Sign Up',
