@@ -2013,29 +2013,53 @@ class SupabaseService {
                 repaired = true;
               }
             }
+            if (!repaired && (errStr.contains('question_status') || errStr.contains('status'))) {
+              if (qData.containsKey('status')) {
+                final cur = qData['status']?.toString() ?? '';
+                if (cur == 'active' || cur == 'Active') {
+                  qData['status'] = 'ACTIVE';
+                  repaired = true;
+                } else if (cur == 'ACTIVE') {
+                  qData['status'] = 'Published';
+                  repaired = true;
+                } else if (cur == 'Published') {
+                  qData['status'] = 'published';
+                  repaired = true;
+                } else {
+                  debugPrint('Auto-repair: Removing status enum column from payload...');
+                  qData.remove('status');
+                  repaired = true;
+                }
+              }
+            }
             if (!repaired && (errStr.contains('question_type') || errStr.contains('q_type'))) {
               if (qData.containsKey('q_type')) {
                 final cur = qData['q_type']?.toString() ?? '';
-                if (cur != 'MCQ') {
-                  qData['q_type'] = 'MCQ';
+                if (cur == 'MCQ') {
+                  qData['q_type'] = 'mcq';
+                  repaired = true;
+                } else if (cur == 'mcq') {
+                  qData['q_type'] = 'Single Choice';
                   repaired = true;
                 } else {
+                  debugPrint('Auto-repair: Removing q_type enum column from payload...');
                   qData.remove('q_type');
                   repaired = true;
                 }
               }
             }
-            if (!repaired && (errStr.contains('question_status') || errStr.contains('status'))) {
-              if (qData.containsKey('status')) {
-                final cur = qData['status']?.toString() ?? '';
-                if (cur != cur.toLowerCase()) {
-                  qData['status'] = cur.toLowerCase();
-                  repaired = true;
-                } else {
-                  debugPrint('Auto-repair: Removing status enum column...');
-                  qData.remove('status');
-                  repaired = true;
-                }
+            if (!repaired && errStr.contains('difficulty') && qData.containsKey('difficulty')) {
+              final cur = qData['difficulty']?.toString() ?? '';
+              if (cur == 'medium' || cur == 'Medium') {
+                qData['difficulty'] = 'MEDIUM';
+                repaired = true;
+              } else if (cur == 'MEDIUM') {
+                qData['difficulty'] = 'Easy';
+                repaired = true;
+              } else {
+                debugPrint('Auto-repair: Removing difficulty enum column from payload...');
+                qData.remove('difficulty');
+                repaired = true;
               }
             }
             if (!repaired && errStr.contains('difficulty') && qData.containsKey('difficulty')) {
