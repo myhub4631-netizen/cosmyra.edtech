@@ -56592,72 +56592,65 @@ if(!s&&a.c==="a3333333")return!1
 return!0},
 $S:742}
 A.aEj.prototype={
-$1(c0){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0=null,b1="optionImages",b2="option_images",b3="category",b4="correct_option_index",b5="General",b6="marks",b7="negativeMarks",b8="explanation",b9=c0.h(0,"questionNumber")
-if(b9==null)b9=c0.h(0,"question_number")
-s=A.dV(b9==null?1:b9)
-b9=this.a
+$1(b5){var s,r,q,p,o,n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3,a4,a5,a6=null,a7="optionImages",a8="option_images",a9="category",b0="correct_option_index",b1="marks",b2="negativeMarks",b3="explanation",b4=b5.h(0,"questionNumber")
+if(b4==null)b4=b5.h(0,"question_number")
+s=A.dV(b4==null?1:b4)
+b4=this.a
 r=t.j
-q=r.b(c0.h(0,"options"))?A.dc(c0.h(0,"options"),!0,t.N):A.a([],t.s)
-if(r.b(c0.h(0,b1)))p=A.dc(c0.h(0,b1),!0,t.v)
-else p=r.b(c0.h(0,b2))?A.dc(c0.h(0,b2),!0,t.v):A.a([],t._m)
-r=c0.h(0,b3)
-if(r==null)r=c0.h(0,"sourceType")
-o=r==null?c0.h(0,"source_category"):r
+q=r.b(b5.h(0,"options"))?A.dc(b5.h(0,"options"),!0,t.N):A.a([],t.s)
+if(r.b(b5.h(0,a7)))p=A.dc(b5.h(0,a7),!0,t.v)
+else p=r.b(b5.h(0,a8))?A.dc(b5.h(0,a8),!0,t.v):A.a([],t._m)
+r=b5.h(0,a9)
+if(r==null)r=b5.h(0,"sourceType")
+o=r==null?b5.h(0,"source_category"):r
 n=A.a1E(J.aq(o==null?"PYQ":o))
-m=c0.h(0,"correct_answer")
-if(m==null)m=c0.h(0,"correctAnswer")
-l=c0.h(0,b4)
-if(l==null)l=c0.h(0,"correctOptionIndex")
+m=b5.h(0,"correct_answer")
+if(m==null)m=b5.h(0,"correctAnswer")
+l=b5.h(0,b0)
+if(l==null)l=b5.h(0,"correctOptionIndex")
 if(m!=null&&B.d.az(J.aq(m)).length!==0)k=B.d.az(J.aq(m))
 else k=l!=null&&typeof l=="number"?"Option "+A.dS(65+B.k.c8(l)):"Option A"
-r=c0.h(0,"questionText")
-if(r==null)r=c0.h(0,"question_text")
+r=b5.h(0,"questionText")
+if(r==null)r=b5.h(0,"question_text")
 if(r==null)r=""
-j=c0.h(0,"questionImage")
-if(j==null)j=c0.h(0,"question_image")
+j=b5.h(0,"questionImage")
+if(j==null)j=b5.h(0,"question_image")
 if(j==null)j=""
-i=c0.h(0,"subject")
+i=b5.h(0,"subject")
 if(i==null)i="Physics"
-h=c0.h(0,"subject")
-if(h==null)h="Physics"
-g=c0.h(0,"chapter")
-if(g==null)g=b5
-f=c0.h(0,"chapter")
-if(f==null)f=b5
-e=c0.h(0,"topic")
-if(e==null)e=b5
-d=c0.h(0,"topic")
-if(d==null)d=b5
-c=n.h(0,b3)
-b=n.h(0,"source_type")
-a=n.h(0,"source")
-a0=c0.h(0,"difficulty")
-if(a0==null)a0="Medium"
-a1=c0.h(0,"qType")
-if(a1==null)a1=c0.h(0,"question_type")
-if(a1==null)a1="Single Choice (MCQ)"
-if(typeof c0.h(0,b6)=="number")a2=B.k.c8(A.dN(c0.h(0,b6)))
-else{a2=c0.h(0,b6)
-a2=a2==null?b0:J.aq(a2)
-a2=A.f3(a2==null?"4":a2,b0)
-if(a2==null)a2=4}if(typeof c0.h(0,b7)=="number")a3=A.dN(c0.h(0,b7))
-else{a3=c0.h(0,b7)
-a3=a3==null?b0:J.aq(a3)
-a3=A.hn(a3==null?"1.0":a3)
-if(a3==null)a3=1}a4=c0.h(0,b8)
-if(a4==null)a4=""
-a5=c0.h(0,b8)
-if(a5==null)a5=""
-a6=c0.h(0,"year")
-a6=a6==null?b0:J.aq(a6)
-if(a6==null)a6="2026"
-a7=c0.h(0,"paperName")
-if(a7==null)a7="NEET 2026 Phase 1"
-a8=c0.h(0,"exam")
-if(a8==null)a8="NEET"
-a9=c0.h(0,"created_at")
-if(a9==null)a9=this.b
-return A.u(["id","q_"+b9+"_"+s,"paper_id",b9,"question_number",s,"question_text",r,"question_image",j,"subject",i,"subject_id",h,"chapter",g,"chapter_id",f,"topic",e,"topic_id",d,"category",c,"source_type",b,"source",a,"difficulty",a0,"q_type",a1,"marks",a2,"negative_marks",a3,"status","Active","options",q,"option_images",p,"correct_answer",k,b4,l,"explanation",a4,"solution",a5,"year",a6,"paper_name",a7,"exam",a8,"created_at",a9,"updated_at",this.b],t.N,t.z)},
+h=b5.h(0,"chapter")
+if(h==null)h="General"
+g=b5.h(0,"topic")
+if(g==null)g="General"
+f=n.h(0,a9)
+e=n.h(0,"source_type")
+d=n.h(0,"source")
+c=b5.h(0,"difficulty")
+if(c==null)c="Medium"
+b=b5.h(0,"qType")
+if(b==null)b=b5.h(0,"question_type")
+if(b==null)b="Single Choice (MCQ)"
+if(typeof b5.h(0,b1)=="number")a=B.k.c8(A.dN(b5.h(0,b1)))
+else{a=b5.h(0,b1)
+a=a==null?a6:J.aq(a)
+a=A.f3(a==null?"4":a,a6)
+if(a==null)a=4}if(typeof b5.h(0,b2)=="number")a0=A.dN(b5.h(0,b2))
+else{a0=b5.h(0,b2)
+a0=a0==null?a6:J.aq(a0)
+a0=A.hn(a0==null?"1.0":a0)
+if(a0==null)a0=1}a1=b5.h(0,b3)
+if(a1==null)a1=""
+a2=b5.h(0,"solution")
+if(a2==null)a2=b5.h(0,b3)
+if(a2==null)a2=""
+a3=b5.h(0,"year")
+a3=a3==null?a6:J.aq(a3)
+if(a3==null)a3="2026"
+a4=b5.h(0,"exam")
+if(a4==null)a4="NEET"
+a5=b5.h(0,"created_at")
+if(a5==null)a5=this.b
+return A.u(["id","q_"+b4+"_"+s,"paper_id",b4,"question_number",s,"question_text",r,"question_image",j,"subject",i,"chapter",h,"topic",g,"category",f,"source_type",e,"source",d,"difficulty",c,"q_type",b,"marks",a,"negative_marks",a0,"status","Active","options",q,"option_images",p,"correct_answer",k,b0,l,"explanation",a1,"solution",a2,"year",a3,"exam",a4,"created_at",a5,"updated_at",this.b],t.N,t.z)},
 $S:85}
 A.aDD.prototype={
 $1(a){return A.fW(t.f.a(a),t.N,t.z)},
