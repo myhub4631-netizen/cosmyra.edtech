@@ -2258,6 +2258,7 @@ class SupabaseService {
               final String optTxt = optionsList[i];
               final String? optImg = (i < optionImagesList.length) ? optionImagesList[i] : null;
               optRows.add({
+                'id': toValidUuid('opt_${qUuid}_$i'),
                 'question_id': qUuid,
                 'option_index': i,
                 'option_text': optTxt,
@@ -2266,7 +2267,11 @@ class SupabaseService {
               });
             }
             if (optRows.isNotEmpty) {
-              await client.from('question_options').upsert(optRows);
+              try {
+                await client.from('question_options').upsert(optRows);
+              } catch (_) {
+                await client.from('question_options').insert(optRows);
+              }
             }
           } catch (optErr) {
             debugPrint('Notice saving question_options: $optErr');

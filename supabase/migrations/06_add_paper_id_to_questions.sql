@@ -36,3 +36,6 @@ ALTER TABLE public.questions ADD COLUMN IF NOT EXISTS paper_id UUID REFERENCES p
 ALTER TABLE public.questions ADD COLUMN IF NOT EXISTS options JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.questions ADD COLUMN IF NOT EXISTS option_images JSONB DEFAULT '[]'::jsonb;
 CREATE INDEX IF NOT EXISTS idx_questions_paper_id ON public.questions(paper_id);
+
+ALTER TABLE public.question_options DROP CONSTRAINT IF EXISTS question_options_question_id_option_index_key;
+ALTER TABLE public.question_options ADD CONSTRAINT question_options_question_id_option_index_key UNIQUE (question_id, option_index);
