@@ -1928,7 +1928,7 @@ class SupabaseService {
         'source_type': canonicalMap['source_type'],
         'source': canonicalMap['source'],
         'difficulty': (qMap['difficulty'] ?? 'medium').toString().toLowerCase(),
-        'q_type': qMap['qType'] ?? qMap['q_type'] ?? qMap['questionType'] ?? 'MCQ',
+        'q_type': (qMap['qType'] ?? qMap['q_type'] ?? qMap['questionType'] ?? 'MCQ').toString().startsWith('MCQ') ? 'MCQ' : (qMap['qType'] ?? qMap['q_type'] ?? 'MCQ').toString(),
         'marks': (qMap['marks'] is num) ? (qMap['marks'] as num).toInt() : int.tryParse(qMap['marks']?.toString() ?? '4') ?? 4,
         'negative_marks': (qMap['negativeMarks'] is num) ? (qMap['negativeMarks'] as num).toDouble() : double.tryParse(qMap['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
         'status': qMap['status'] ?? 'Active',
@@ -1972,6 +1972,18 @@ class SupabaseService {
                 continue;
               }
             }
+            if (errStr.contains('question_type') || errStr.contains('q_type')) {
+              if (qData.containsKey('q_type')) {
+                final cur = qData['q_type']?.toString() ?? '';
+                if (cur != 'MCQ') {
+                  qData['q_type'] = 'MCQ';
+                  continue;
+                } else {
+                  qData.remove('q_type');
+                  continue;
+                }
+              }
+            }
             if (errStr.contains('difficulty') && qData.containsKey('difficulty')) {
               final cur = qData['difficulty']?.toString() ?? '';
               if (cur != cur.toLowerCase()) {
@@ -1986,8 +1998,8 @@ class SupabaseService {
               qData.remove('status');
               continue;
             }
-            if (errStr.contains('q_type') && qData.containsKey('q_type')) {
-              qData.remove('q_type');
+            if (errStr.contains('source_type') && qData.containsKey('source_type')) {
+              qData.remove('source_type');
               continue;
             }
           }
@@ -3069,7 +3081,7 @@ class SupabaseService {
           'source_type': canonical['source_type'],
           'source': canonical['source'],
           'difficulty': (q['difficulty'] ?? 'medium').toString().toLowerCase(),
-          'q_type': q['qType'] ?? q['question_type'] ?? 'Single Choice (MCQ)',
+          'q_type': (q['qType'] ?? q['q_type'] ?? q['question_type'] ?? 'MCQ').toString().startsWith('MCQ') ? 'MCQ' : (q['qType'] ?? q['q_type'] ?? 'MCQ').toString(),
           'marks': (q['marks'] is num) ? (q['marks'] as num).toInt() : int.tryParse(q['marks']?.toString() ?? '4') ?? 4,
           'negative_marks': (q['negativeMarks'] is num) ? (q['negativeMarks'] as num).toDouble() : double.tryParse(q['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
           'status': 'Active',
