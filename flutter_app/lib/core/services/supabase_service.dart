@@ -1945,6 +1945,7 @@ class SupabaseService {
       };
 
       int attempts = 0;
+      String lastErr = '';
       while (attempts < 10) {
         attempts++;
         try {
@@ -1952,6 +1953,7 @@ class SupabaseService {
           return {'success': true};
         } catch (e) {
           final errStr = e.toString();
+          lastErr = errStr;
           debugPrint('Supabase saveQuestion attempt $attempts error: $errStr');
 
           bool repaired = false;
@@ -1966,8 +1968,27 @@ class SupabaseService {
 
           // 2. Check for 23502 NOT NULL constraint violation
           if (!repaired && (errStr.contains('23502') || errStr.toLowerCase().contains('violates not-null constraint'))) {
-            if (errStr.contains('paper_id') && qData.containsKey('paper_id')) {
-              qData['paper_id'] = toValidUuid('default_paper');
+            final match = RegExp(r'null value in column "([^"]+)"').firstMatch(errStr);
+            final col = (match != null && match.groupCount >= 1) ? match.group(1) : null;
+            if (col != null && qData.containsKey(col)) {
+              debugPrint('Auto-repair: Resolving not-null constraint for column "$col"...');
+              if (col == 'paper_id') {
+                if (qData['paper_id'] == null) {
+                  qData['paper_id'] = toValidUuid('default_paper');
+                  repaired = true;
+                } else {
+                  qData.remove('paper_id');
+                  repaired = true;
+                }
+              } else if (col == 'created_at' || col == 'updated_at') {
+                qData[col] = DateTime.now().toIso8601String();
+                repaired = true;
+              } else {
+                qData.remove(col);
+                repaired = true;
+              }
+            } else if (errStr.contains('paper_id') && qData.containsKey('paper_id')) {
+              qData.remove('paper_id');
               repaired = true;
             }
           }
@@ -1975,6 +1996,7 @@ class SupabaseService {
           // 3. Check for 23503 Foreign Key constraint violation
           if (!repaired && (errStr.contains('23503') || errStr.toLowerCase().contains('violates foreign key constraint'))) {
             if (errStr.contains('paper_id') && qData.containsKey('paper_id')) {
+              debugPrint('Auto-repair: Removing paper_id foreign key...');
               qData.remove('paper_id');
               repaired = true;
             }
@@ -1983,16 +2005,15 @@ class SupabaseService {
           // 4. Check for 22P02 invalid input syntax (UUID, ENUM)
           if (!repaired && (errStr.contains('22P02') || errStr.toLowerCase().contains('invalid input'))) {
             if (errStr.contains('uuid')) {
-              if (qData['id'] != null && !isValidUuid(qData['id'].toString())) {
+              if (errStr.contains('paper_id') && qData.containsKey('paper_id')) {
+                qData.remove('paper_id');
+                repaired = true;
+              } else if (qData['id'] != null && !isValidUuid(qData['id'].toString())) {
                 qData['id'] = toValidUuid(qData['id'].toString());
                 repaired = true;
               }
-              if (qData['paper_id'] != null && !isValidUuid(qData['paper_id'].toString())) {
-                qData['paper_id'] = toValidUuid(qData['paper_id'].toString());
-                repaired = true;
-              }
             }
-            if (errStr.contains('question_type') || errStr.contains('q_type')) {
+            if (!repaired && (errStr.contains('question_type') || errStr.contains('q_type'))) {
               if (qData.containsKey('q_type')) {
                 final cur = qData['q_type']?.toString() ?? '';
                 if (cur != 'MCQ') {
@@ -2004,7 +2025,7 @@ class SupabaseService {
                 }
               }
             }
-            if (errStr.contains('difficulty') && qData.containsKey('difficulty')) {
+            if (!repaired && errStr.contains('difficulty') && qData.containsKey('difficulty')) {
               final cur = qData['difficulty']?.toString() ?? '';
               if (cur != cur.toLowerCase()) {
                 qData['difficulty'] = cur.toLowerCase();
@@ -2014,11 +2035,11 @@ class SupabaseService {
                 repaired = true;
               }
             }
-            if (errStr.contains('status') && qData.containsKey('status')) {
+            if (!repaired && errStr.contains('status') && qData.containsKey('status')) {
               qData.remove('status');
               repaired = true;
             }
-            if (errStr.contains('source_type') && qData.containsKey('source_type')) {
+            if (!repaired && errStr.contains('source_type') && qData.containsKey('source_type')) {
               qData.remove('source_type');
               repaired = true;
             }
@@ -2030,7 +2051,7 @@ class SupabaseService {
         }
       }
 
-      return {'success': false, 'error': 'Exceeded maximum schema auto-repair retries.'};
+      return {'success': false, 'error': 'Save failed after retries: $lastErr'};
     } catch (e) {
       return {'success': false, 'error': e.toString()};
     }
