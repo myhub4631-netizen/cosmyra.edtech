@@ -1889,7 +1889,7 @@ class SupabaseService {
         'subject': qMap['subject'] ?? 'Physics',
         'source_type': canonicalMap['source_type'],
         'source': canonicalMap['source'],
-        'difficulty': qMap['difficulty'] ?? 'Medium',
+        'difficulty': (qMap['difficulty'] ?? 'medium').toString().toLowerCase(),
         'q_type': qMap['qType'] ?? qMap['q_type'] ?? qMap['questionType'] ?? 'MCQ',
         'marks': (qMap['marks'] is num) ? (qMap['marks'] as num).toInt() : int.tryParse(qMap['marks']?.toString() ?? '4') ?? 4,
         'negative_marks': (qMap['negativeMarks'] is num) ? (qMap['negativeMarks'] as num).toDouble() : double.tryParse(qMap['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
@@ -1921,6 +1921,27 @@ class SupabaseService {
             debugPrint('Auto-repair: Removing non-existent column "$missingCol" from payload and retrying...');
             qData.remove(missingCol);
             continue;
+          }
+
+          if (errStr.contains('22P02') || errStr.toLowerCase().contains('invalid input value for enum')) {
+            if (errStr.contains('difficulty') && qData.containsKey('difficulty')) {
+              final cur = qData['difficulty']?.toString() ?? '';
+              if (cur != cur.toLowerCase()) {
+                qData['difficulty'] = cur.toLowerCase();
+                continue;
+              } else {
+                qData.remove('difficulty');
+                continue;
+              }
+            }
+            if (errStr.contains('status') && qData.containsKey('status')) {
+              qData.remove('status');
+              continue;
+            }
+            if (errStr.contains('q_type') && qData.containsKey('q_type')) {
+              qData.remove('q_type');
+              continue;
+            }
           }
 
           return {'success': false, 'error': errStr};
@@ -2997,7 +3018,7 @@ class SupabaseService {
           'topic': q['topic'] ?? 'General',
           'source_type': canonical['source_type'],
           'source': canonical['source'],
-          'difficulty': q['difficulty'] ?? 'Medium',
+          'difficulty': (q['difficulty'] ?? 'medium').toString().toLowerCase(),
           'q_type': q['qType'] ?? q['question_type'] ?? 'Single Choice (MCQ)',
           'marks': (q['marks'] is num) ? (q['marks'] as num).toInt() : int.tryParse(q['marks']?.toString() ?? '4') ?? 4,
           'negative_marks': (q['negativeMarks'] is num) ? (q['negativeMarks'] as num).toDouble() : double.tryParse(q['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
