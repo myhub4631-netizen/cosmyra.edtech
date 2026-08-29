@@ -51,8 +51,7 @@ export const AdminBulkUploadStep1: React.FC = () => {
   };
 
   const handleProceed = () => {
-    alert(`Proceeding to Step 2 with ${questionCount} questions for ${paperName}`);
-    navigate('/admin/questions');
+    navigate('/admin/upload-step2');
   };
 
   return (

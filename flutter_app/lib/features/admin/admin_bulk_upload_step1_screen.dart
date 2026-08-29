@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
+import 'admin_bulk_upload_step2_screen.dart';
 
 class AdminBulkUploadStep1Screen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -116,11 +117,13 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     if (widget.onProceedToStep2 != null) {
       widget.onProceedToStep2!(paperDetails);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Proceeding to Step 2 with ${paperDetails['questionCount']} questions for ${paperDetails['paperName']}'),
-          backgroundColor: const Color(0xFF4F46E5),
-          duration: const Duration(seconds: 2),
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AdminBulkUploadStep2Screen(
+            userProfile: widget.userProfile,
+            paperName: paperDetails['paperName'] as String? ?? 'NEET 2026 Phase 1',
+            totalQuestionsCount: paperDetails['questionCount'] as int? ?? 200,
+          ),
         ),
       );
     }

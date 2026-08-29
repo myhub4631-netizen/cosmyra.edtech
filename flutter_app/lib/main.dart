@@ -84,6 +84,8 @@ class CosmyraApp extends StatelessWidget {
         '/chapters': (context) => const MainNavigationScreen(initialIndex: 16),
         '/admin/bulk-upload': (context) => const MainNavigationScreen(initialIndex: 17),
         '/admin/upload-step1': (context) => const MainNavigationScreen(initialIndex: 17),
+        '/admin/bulk-upload-step2': (context) => const MainNavigationScreen(initialIndex: 19),
+        '/admin/upload-step2': (context) => const MainNavigationScreen(initialIndex: 19),
         '/admin/questions': (context) => const MainNavigationScreen(initialIndex: 18),
         '/admin/question-bank': (context) => const MainNavigationScreen(initialIndex: 18),
         '/superadmin': (context) => const MainNavigationScreen(initialIndex: 15),

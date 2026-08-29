@@ -23,6 +23,7 @@ import '../admin/admin_predictions_screen.dart';
 import '../admin/admin_user_management_screen.dart';
 import '../admin/admin_chapters_topics_screen.dart';
 import '../admin/admin_bulk_upload_step1_screen.dart';
+import '../admin/admin_bulk_upload_step2_screen.dart';
 import '../admin/admin_questions_bank_dashboard.dart';
 import '../dashboard/user_dashboard_screen.dart';
 import '../admin/admin_dashboard_sections_screen.dart';
@@ -324,6 +325,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     }
     if (_selectedIndex == 18) {
       return AdminQuestionsBankDashboard(userProfile: _currentUser);
+    }
+    if (_selectedIndex == 19) {
+      return AdminBulkUploadStep2Screen(userProfile: _currentUser);
     }
 
     // 5. Root / Dashboard handling for authenticated users
