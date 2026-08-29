@@ -41,6 +41,10 @@ class QuestionItemData {
   String subject;
   String chapter;
   String topic;
+  String chapterId;
+  String topicId;
+  String subjectId;
+  String examId;
   bool isMarkedForReview;
   bool isCollapsed;
   bool isSaved;
@@ -60,10 +64,14 @@ class QuestionItemData {
     this.positiveMarks = '4',
     this.negativeMarks = '-1',
     this.questionType = 'MCQ (Single Correct)',
-    this.chapterTopic = 'Select Chapter / Topic',
+    this.chapterTopic = 'Physics - Kinematics',
     this.subject = 'Physics',
-    this.chapter = 'General',
-    this.topic = 'General',
+    this.chapter = 'Kinematics',
+    this.topic = 'Kinematics',
+    this.chapterId = 'b2222222-2222-2222-2222-222222222222',
+    this.topicId = 'c2222222-2222-2222-2222-222222222222',
+    this.subjectId = 'a1111111-1111-1111-1111-111111111111',
+    this.examId = '11111111-1111-1111-1111-111111111111',
     this.isMarkedForReview = false,
     this.isCollapsed = false,
     this.isSaved = false,
@@ -1769,13 +1777,39 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
-              value: q.chapterTopic,
+              value: (q.chapterTopic.isNotEmpty && ['Physics - Kinematics', 'Physics - Laws of Motion', 'Chemistry - Organic', 'Biology - Cell Structure'].contains(q.chapterTopic))
+                  ? q.chapterTopic
+                  : 'Physics - Kinematics',
               isExpanded: true,
-              items: ['Select Chapter / Topic', 'Physics - Kinematics', 'Physics - Laws of Motion', 'Chemistry - Organic', 'Biology - Cell Structure']
-                  .map((e) => DropdownMenuItem(value: e, child: Text(e, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500))))
+              items: [
+                {'label': 'Physics - Kinematics', 'chapterId': 'b2222222-2222-2222-2222-222222222222', 'topicId': 'c2222222-2222-2222-2222-222222222222', 'subject': 'Physics', 'chapter': 'Kinematics', 'topic': 'Kinematics'},
+                {'label': 'Physics - Laws of Motion', 'chapterId': 'b1111111-1111-1111-1111-111111111111', 'topicId': 'c1111111-1111-1111-1111-111111111111', 'subject': 'Physics', 'chapter': 'Laws of Motion', 'topic': 'Laws of Motion'},
+                {'label': 'Chemistry - Organic', 'chapterId': 'b3333333-3333-3333-3333-333333333333', 'topicId': 'c3333333-3333-3333-3333-333333333333', 'subject': 'Chemistry', 'chapter': 'Organic Chemistry', 'topic': 'Organic Chemistry'},
+                {'label': 'Biology - Cell Structure', 'chapterId': 'b4444444-4444-4444-4444-444444444444', 'topicId': 'c4444444-4444-4444-4444-444444444444', 'subject': 'Biology', 'chapter': 'Cell Structure', 'topic': 'Cell Structure'},
+              ]
+                  .map((item) => DropdownMenuItem<String>(
+                        value: item['label'] as String,
+                        child: Text(item['label'] as String, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
+                      ))
                   .toList(),
               onChanged: (val) {
-                if (val != null) setState(() => q.chapterTopic = val);
+                if (val != null) {
+                  final Map<String, String> matched = [
+                    {'label': 'Physics - Kinematics', 'chapterId': 'b2222222-2222-2222-2222-222222222222', 'topicId': 'c2222222-2222-2222-2222-222222222222', 'subject': 'Physics', 'chapter': 'Kinematics', 'topic': 'Kinematics'},
+                    {'label': 'Physics - Laws of Motion', 'chapterId': 'b1111111-1111-1111-1111-111111111111', 'topicId': 'c1111111-1111-1111-1111-111111111111', 'subject': 'Physics', 'chapter': 'Laws of Motion', 'topic': 'Laws of Motion'},
+                    {'label': 'Chemistry - Organic', 'chapterId': 'b3333333-3333-3333-3333-333333333333', 'topicId': 'c3333333-3333-3333-3333-333333333333', 'subject': 'Chemistry', 'chapter': 'Organic Chemistry', 'topic': 'Organic Chemistry'},
+                    {'label': 'Biology - Cell Structure', 'chapterId': 'b4444444-4444-4444-4444-444444444444', 'topicId': 'c4444444-4444-4444-4444-444444444444', 'subject': 'Biology', 'chapter': 'Cell Structure', 'topic': 'Cell Structure'},
+                  ].firstWhere((item) => item['label'] == val, orElse: () => {'label': 'Physics - Kinematics', 'chapterId': 'b2222222-2222-2222-2222-222222222222', 'topicId': 'c2222222-2222-2222-2222-222222222222', 'subject': 'Physics', 'chapter': 'Kinematics', 'topic': 'Kinematics'});
+
+                  setState(() {
+                    q.chapterTopic = matched['label']!;
+                    q.chapterId = matched['chapterId']!;
+                    q.topicId = matched['topicId']!;
+                    q.subject = matched['subject']!;
+                    q.chapter = matched['chapter']!;
+                    q.topic = matched['topic']!;
+                  });
+                }
               },
             ),
           ),
