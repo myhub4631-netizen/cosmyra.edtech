@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
 import 'admin_bulk_upload_step2_screen.dart';
 
@@ -90,15 +91,19 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     super.dispose();
   }
 
-  void _handleProceed() {
+  Future<void> _handleProceed() async {
+    final String pName = _paperNameCtrl.text.trim().isNotEmpty ? _paperNameCtrl.text.trim() : 'NEET 2026 Phase 1';
+    final String paperId = SupabaseService.toValidUuid('paper_${_examName}_${_year}_${_phaseSession}_$pName');
+
     final Map<String, dynamic> paperDetails = {
+      'id': paperId,
       'sourceCategory': _sourceCategory,
       'examName': _examName,
       'year': _year,
       'phaseSession': _phaseSession,
       'paperType': _paperType,
-      'paperName': _paperNameCtrl.text,
-      'paperCode': _paperCodeCtrl.text,
+      'paperName': pName,
+      'paperCode': _paperCodeCtrl.text.trim(),
       'language': _language,
       'conductingBody': _conductingBody,
       'questionCount': int.tryParse(_questionCountCtrl.text) ?? 200,
@@ -121,14 +126,22 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       'showSectionBreaks': _showSectionBreaks,
     };
 
+    try {
+      await SupabaseService.savePaperRecord(paperDetails);
+    } catch (e) {
+      debugPrint('Notice saving paper record: $e');
+    }
+
     if (widget.onProceedToStep2 != null) {
       widget.onProceedToStep2!(paperDetails);
     } else {
+      if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => AdminBulkUploadStep2Screen(
             userProfile: widget.userProfile,
-            paperName: paperDetails['paperName'] as String? ?? 'NEET 2026 Phase 1',
+            paperRecord: paperDetails,
+            paperName: pName,
             totalQuestionsCount: paperDetails['questionCount'] as int? ?? 200,
           ),
         ),

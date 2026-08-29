@@ -2209,8 +2209,11 @@ class SupabaseService {
       final String finalSubjectId = await getOrCreateValidSubjectId(finalExamId, qMap['subject']?.toString() ?? 'Physics');
       final String finalChapterId = await getOrCreateValidChapterId(finalSubjectId, qMap['chapter']?.toString() ?? qMap['chapterTopic']?.toString() ?? 'Kinematics');
 
+      final String pIdRaw = qMap['paper_id']?.toString() ?? qMap['paperId']?.toString() ?? '';
+
       final Map<String, dynamic> qData = {
         'id': toValidUuid(rawId),
+        'paper_id': pIdRaw.trim().isNotEmpty ? toValidUuid(pIdRaw) : null,
         'exam_id': finalExamId,
         'subject_id': finalSubjectId,
         'chapter_id': finalChapterId,
