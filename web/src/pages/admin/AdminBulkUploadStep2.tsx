@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ChevronRight,
   ArrowLeft,
@@ -20,6 +20,7 @@ import {
 
 interface QuestionItem {
   id: number;
+  questionId?: string;
   text: string;
   options: string[];
   correctOptionIndex: number;
@@ -29,36 +30,213 @@ interface QuestionItem {
   negativeMarks: string;
   questionType: string;
   chapterTopic: string;
+  subject?: string;
+  chapter?: string;
+  topic?: string;
   isMarkedForReview: boolean;
   isCollapsed: boolean;
+  isSaved?: boolean;
 }
 
 export const AdminBulkUploadStep2: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const totalQuestionsCount = 200;
+  const [paperData, setPaperData] = useState<any>(null);
+  const [paperId, setPaperId] = useState<string>('');
+  const totalQuestionsCount = paperData?.questionCount || 200;
+
   const [addedCount, setAddedCount] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
   const [jumpToNumber, setJumpToNumber] = useState<number>(1);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   // Initialize questions
   const [questions, setQuestions] = useState<QuestionItem[]>(
-    Array.from({ length: totalQuestionsCount }, (_, i) => ({
+    Array.from({ length: 200 }, (_, i) => ({
       id: i + 1,
       text: '',
       options: ['', '', '', ''],
       correctOptionIndex: -1,
       explanation: '',
-      difficulty: '',
+      difficulty: 'Medium',
       positiveMarks: '4',
       negativeMarks: '-1',
       questionType: 'MCQ (Single Correct)',
       chapterTopic: '',
       isMarkedForReview: false,
       isCollapsed: false,
+      isSaved: false,
     }))
   );
+
+  // Recovery & Session Load on Mount
+  useEffect(() => {
+    try {
+      const activePaper = location.state?.paper || JSON.parse(localStorage.getItem('cosmyra_active_upload_paper_session') || 'null');
+      if (activePaper) {
+        setPaperData(activePaper);
+        const pId = activePaper.id || `paper_${Date.now()}`;
+        setPaperId(pId);
+
+        const count = activePaper.questionCount || 200;
+        const savedQListRaw = localStorage.getItem(`cosmyra_paper_questions_${pId}`) || '[]';
+        const savedQList = JSON.parse(savedQListRaw);
+
+        let savedCount = 0;
+        let firstUnsavedIdx = -1;
+
+        const updated = Array.from({ length: count }, (_, i) => {
+          const qNum = i + 1;
+          const match = savedQList.find((sq: any) => sq.questionNumber === qNum || sq.question_number === qNum);
+
+          if (match) {
+            savedCount++;
+            return {
+              id: qNum,
+              questionId: match.id,
+              text: match.questionText || match.question_text || '',
+              options: match.options || ['', '', '', ''],
+              correctOptionIndex: match.options ? match.options.indexOf(match.correctAnswer || match.correct_answer) : 0,
+              explanation: match.explanation || '',
+              difficulty: match.difficulty || 'Medium',
+              positiveMarks: (match.marks || 4).toString(),
+              negativeMarks: (match.negativeMarks || match.negative_marks || -1).toString(),
+              questionType: match.qType || match.question_type || 'MCQ (Single Correct)',
+              chapterTopic: `${match.subject || 'Physics'} > ${match.chapter || 'General'}`,
+              subject: match.subject || 'Physics',
+              chapter: match.chapter || 'General',
+              topic: match.topic || 'General',
+              isMarkedForReview: false,
+              isCollapsed: false,
+              isSaved: true,
+            };
+          } else {
+            if (firstUnsavedIdx === -1) firstUnsavedIdx = i;
+            return {
+              id: qNum,
+              text: '',
+              options: ['', '', '', ''],
+              correctOptionIndex: -1,
+              explanation: '',
+              difficulty: 'Medium',
+              positiveMarks: '4',
+              negativeMarks: '-1',
+              questionType: 'MCQ (Single Correct)',
+              chapterTopic: '',
+              isMarkedForReview: false,
+              isCollapsed: false,
+              isSaved: false,
+            };
+          }
+        });
+
+        setQuestions(updated);
+        setAddedCount(savedCount);
+
+        if (firstUnsavedIdx !== -1) {
+          setCurrentPage(Math.floor(firstUnsavedIdx / itemsPerPage) + 1);
+        }
+      }
+    } catch (e) {
+      console.warn('Error recovering paper session in React Step 2:', e);
+    }
+  }, []);
+
+  // Save current batch incrementally
+  const saveBatch = (showToast = true) => {
+    setIsSaving(true);
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = Math.min(start + itemsPerPage, questions.length);
+
+    const currentBatch = questions.slice(start, end);
+    const batchToSave = currentBatch.filter((q) => q.text.trim().length > 0);
+
+    if (batchToSave.length > 0) {
+      const pId = paperId || `paper_${Date.now()}`;
+      const existingPaperStr = localStorage.getItem(`cosmyra_paper_questions_${pId}`) || '[]';
+      const paperQuestions = JSON.parse(existingPaperStr);
+
+      const existingGlobalStr = localStorage.getItem('cosmyra_saved_custom_questions') || '[]';
+      const globalQuestions = JSON.parse(existingGlobalStr);
+
+      let newlySavedCount = 0;
+
+      batchToSave.forEach((q) => {
+        const qId = q.questionId || `q_${pId}_${q.id}`;
+        let correctAnsText = 'Option A';
+        if (q.correctOptionIndex >= 0 && q.correctOptionIndex < q.options.length) {
+          correctAnsText = q.options[q.correctOptionIndex] || `Option ${String.fromCharCode(65 + q.correctOptionIndex)}`;
+        }
+
+        const payload = {
+          id: qId,
+          paper_id: pId,
+          questionNumber: q.id,
+          question_number: q.id,
+          questionText: q.text,
+          question_text: q.text,
+          options: q.options,
+          correctAnswer: correctAnsText,
+          correct_answer: correctAnsText,
+          explanation: q.explanation,
+          difficulty: q.difficulty || 'Medium',
+          marks: parseFloat(q.positiveMarks) || 4,
+          negativeMarks: parseFloat(q.negativeMarks) || -1,
+          negative_marks: parseFloat(q.negativeMarks) || -1,
+          qType: q.questionType,
+          question_type: q.questionType,
+          subject: q.subject || 'Physics',
+          chapter: q.chapter || 'General',
+          topic: q.topic || 'General',
+          category: paperData?.sourceCategory || 'PYQ',
+          sourceType: paperData?.sourceCategory || 'PYQ',
+          exam: paperData?.examName || 'NEET',
+          year: parseInt(paperData?.year || '2026', 10),
+          paperName: paperData?.paperName || 'NEET 2026 Phase 1',
+          status: 'Active',
+          created_at: new Date().toISOString(),
+        };
+
+        const pIdx = paperQuestions.findIndex((pq: any) => pq.id === qId || pq.questionNumber === q.id);
+        if (pIdx !== -1) {
+          paperQuestions[pIdx] = payload;
+        } else {
+          paperQuestions.push(payload);
+        }
+
+        const gIdx = globalQuestions.findIndex((gq: any) => gq.id === qId);
+        if (gIdx !== -1) {
+          globalQuestions[gIdx] = payload;
+        } else {
+          globalQuestions.unshift(payload);
+        }
+
+        if (!q.isSaved) newlySavedCount++;
+      });
+
+      localStorage.setItem(`cosmyra_paper_questions_${pId}`, JSON.stringify(paperQuestions));
+      localStorage.setItem('cosmyra_saved_custom_questions', JSON.stringify(globalQuestions));
+
+      // Update isSaved state on current items
+      setQuestions((prev) =>
+        prev.map((q) => {
+          if (batchToSave.some((b) => b.id === q.id)) {
+            return { ...q, isSaved: true, questionId: `q_${pId}_${q.id}` };
+          }
+          return q;
+        })
+      );
+
+      setAddedCount((prev) => prev + newlySavedCount);
+
+      if (showToast) {
+        alert(`✓ Persisted ${batchToSave.length} question(s) to Question Bank!`);
+      }
+    }
+    setIsSaving(false);
+  };
 
   const remainingCount = questions.length - addedCount;
   const progressPercent = Math.round((addedCount / questions.length) * 100);
@@ -167,10 +345,11 @@ export const AdminBulkUploadStep2: React.FC = () => {
           </button>
 
           <button
-            onClick={() => alert(`Saved all ${questions.length} questions successfully!`)}
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-600/30 transition-all"
+            onClick={() => saveBatch(true)}
+            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-600/30 transition-all flex items-center gap-2"
           >
-            Save All Questions
+            {isSaving && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>}
+            <span>{isSaving ? 'Saving...' : 'Save All Questions'}</span>
           </button>
         </div>
       </div>
@@ -287,7 +466,15 @@ export const AdminBulkUploadStep2: React.FC = () => {
           <div key={q.id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             {/* Header Bar of Question Card */}
             <div className="bg-slate-50 px-6 py-3.5 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-base font-bold text-indigo-600">Question {q.id}</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-base font-bold text-indigo-600">Question {q.id}</h2>
+                {q.isSaved && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
+                    <Check className="w-3 h-3 text-emerald-600" />
+                    Saved to Question Bank
+                  </span>
+                )}
+              </div>
 
               <div className="flex items-center gap-1 text-slate-400">
                 <button
@@ -571,12 +758,21 @@ export const AdminBulkUploadStep2: React.FC = () => {
                   onClick={() => handleSaveQuestion(q.id)}
                   className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-100 transition-colors shadow-xs"
                 >
-                  Save & Next
-                </button>
-
+                {q.isSaved && (
+                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded flex items-center gap-1">
+                    Saved
+                  </span>
+                )}
                 <button
-                  onClick={() => handleSaveQuestion(q.id)}
-                  className="inline-flex items-center gap-1.5 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-md shadow-indigo-600/20 transition-colors"
+                  onClick={() => {
+                    saveBatch(false);
+                    const nextQ = q.id + 1;
+                    if (nextQ <= questions.length) {
+                      const nextP = Math.floor((nextQ - 1) / itemsPerPage) + 1;
+                      setCurrentPage(nextP);
+                    }
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors inline-flex items-center gap-1.5 shadow-sm"
                 >
                   <span>Save & Next</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -591,7 +787,10 @@ export const AdminBulkUploadStep2: React.FC = () => {
       <div className="flex items-center justify-center gap-2 pt-6">
         <button
           disabled={currentPage === 1}
-          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          onClick={() => {
+            saveBatch(false);
+            setCurrentPage((prev) => Math.max(prev - 1, 1));
+          }}
           className="p-2 border border-slate-300 rounded-lg text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100"
         >
           <ChevronRight className="w-4 h-4 rotate-180" />
@@ -600,7 +799,10 @@ export const AdminBulkUploadStep2: React.FC = () => {
         {Array.from({ length: 5 }, (_, i) => i + 1).map((pageNum) => (
           <button
             key={pageNum}
-            onClick={() => setCurrentPage(pageNum)}
+            onClick={() => {
+              saveBatch(false);
+              setCurrentPage(pageNum);
+            }}
             className={`w-9 h-9 rounded-lg text-xs font-bold transition-all ${
               currentPage === pageNum
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
@@ -614,7 +816,10 @@ export const AdminBulkUploadStep2: React.FC = () => {
         <span className="text-slate-400 font-bold px-1">...</span>
 
         <button
-          onClick={() => setCurrentPage(totalPages)}
+          onClick={() => {
+            saveBatch(false);
+            setCurrentPage(totalPages);
+          }}
           className={`w-9 h-9 rounded-lg text-xs font-bold bg-white border border-slate-300 text-slate-700 hover:bg-slate-50`}
         >
           {totalPages}
@@ -622,7 +827,10 @@ export const AdminBulkUploadStep2: React.FC = () => {
 
         <button
           disabled={currentPage === totalPages}
-          onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+          onClick={() => {
+            saveBatch(false);
+            setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+          }}
           className="p-2 border border-slate-300 rounded-lg text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100"
         >
           <ChevronRight className="w-4 h-4" />

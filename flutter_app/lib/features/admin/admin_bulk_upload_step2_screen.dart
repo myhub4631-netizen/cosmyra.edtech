@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/services/supabase_service.dart';
 import 'admin_bulk_upload_step1_screen.dart';
 
 class AdminBulkUploadStep2Screen extends StatefulWidget {
   final dynamic userProfile;
   final String paperName;
   final int totalQuestionsCount;
+  final Map<String, dynamic>? paperRecord;
 
   const AdminBulkUploadStep2Screen({
     Key? key,
     this.userProfile,
     this.paperName = 'NEET 2026 Phase 1',
     this.totalQuestionsCount = 200,
+    this.paperRecord,
   }) : super(key: key);
 
   @override
@@ -20,6 +23,7 @@ class AdminBulkUploadStep2Screen extends StatefulWidget {
 }
 
 class QuestionItemData {
+  String id;
   int number;
   String text;
   List<String> options;
@@ -30,22 +34,31 @@ class QuestionItemData {
   String negativeMarks;
   String questionType;
   String chapterTopic;
+  String subject;
+  String chapter;
+  String topic;
   bool isMarkedForReview;
   bool isCollapsed;
+  bool isSaved;
 
   QuestionItemData({
+    this.id = '',
     required this.number,
     this.text = '',
     List<String>? options,
     this.correctOptionIndex = -1,
     this.explanation = '',
-    this.difficulty = 'Select Difficulty',
+    this.difficulty = 'Medium',
     this.positiveMarks = '4',
     this.negativeMarks = '-1',
     this.questionType = 'MCQ (Single Correct)',
     this.chapterTopic = 'Select Chapter / Topic',
+    this.subject = 'Physics',
+    this.chapter = 'General',
+    this.topic = 'General',
     this.isMarkedForReview = false,
     this.isCollapsed = false,
+    this.isSaved = false,
   }) : options = options ?? ['', '', '', ''];
 }
 
@@ -56,6 +69,10 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   int _addedCount = 0;
 
   late List<QuestionItemData> _questionsList;
+  Map<String, dynamic>? _paperData;
+  String _paperId = '';
+  bool _isLoading = true;
+  bool _isSavingBatch = false;
 
   @override
   void initState() {
@@ -64,6 +81,149 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       widget.totalQuestionsCount,
       (index) => QuestionItemData(number: index + 1),
     );
+    _loadPaperAndSavedQuestions();
+  }
+
+  Future<void> _loadPaperAndSavedQuestions() async {
+    setState(() => _isLoading = true);
+
+    _paperData = widget.paperRecord ?? await SupabaseService.loadActiveUploadPaperSession();
+    _paperId = _paperData?['id'] ?? 'paper_${DateTime.now().millisecondsSinceEpoch}';
+
+    final int qCount = (int.tryParse(_paperData?['question_count']?.toString() ?? '') ?? widget.totalQuestionsCount).clamp(1, 1000);
+    if (_questionsList.length != qCount) {
+      _questionsList = List.generate(qCount, (index) => QuestionItemData(number: index + 1));
+    }
+
+    final savedQList = await SupabaseService.fetchQuestionsForPaper(_paperId);
+
+    int savedCounter = 0;
+    int firstUnsavedIndex = -1;
+
+    for (int i = 0; i < _questionsList.length; i++) {
+      final qNum = i + 1;
+      final savedMatch = savedQList.firstWhere(
+        (sq) => sq['question_number'] == qNum || sq['id'] == 'q_${_paperId}_$qNum',
+        orElse: () => {},
+      );
+
+      if (savedMatch.isNotEmpty) {
+        savedCounter++;
+        final opts = savedMatch['options'] is List ? List<String>.from(savedMatch['options']) : <String>['', '', '', ''];
+        while (opts.length < 4) opts.add('');
+
+        String correctOptText = savedMatch['correct_answer'] ?? savedMatch['correctAnswer'] ?? '';
+        int correctIdx = opts.indexOf(correctOptText);
+        if (correctIdx == -1 && correctOptText.startsWith('Option ')) {
+          int optNum = int.tryParse(correctOptText.replaceAll('Option ', '')) ?? 1;
+          correctIdx = optNum - 1;
+        }
+
+        _questionsList[i] = QuestionItemData(
+          id: savedMatch['id'] ?? 'q_${_paperId}_$qNum',
+          number: qNum,
+          text: savedMatch['question_text'] ?? savedMatch['questionText'] ?? '',
+          options: opts,
+          correctOptionIndex: correctIdx >= 0 ? correctIdx : 0,
+          explanation: savedMatch['explanation'] ?? '',
+          difficulty: savedMatch['difficulty'] ?? 'Medium',
+          positiveMarks: savedMatch['marks']?.toString() ?? '4',
+          negativeMarks: savedMatch['negative_marks']?.toString() ?? '-1',
+          questionType: savedMatch['q_type'] ?? savedMatch['question_type'] ?? 'MCQ (Single Correct)',
+          subject: savedMatch['subject'] ?? 'Physics',
+          chapter: savedMatch['chapter'] ?? 'General',
+          topic: savedMatch['topic'] ?? 'General',
+          chapterTopic: '${savedMatch['subject'] ?? 'Physics'} > ${savedMatch['chapter'] ?? 'General'}',
+          isSaved: true,
+        );
+      } else {
+        if (firstUnsavedIndex == -1) {
+          firstUnsavedIndex = i;
+        }
+      }
+    }
+
+    _addedCount = savedCounter;
+
+    if (firstUnsavedIndex != -1) {
+      _currentPageIndex = (firstUnsavedIndex ~/ _itemsPerPage) + 1;
+    }
+
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _saveCurrentBatch({bool showToast = true}) async {
+    if (_isSavingBatch) return;
+    setState(() => _isSavingBatch = true);
+
+    final int startIndex = (_currentPageIndex - 1) * _itemsPerPage;
+    final int endIndex = (startIndex + _itemsPerPage).clamp(0, _questionsList.length);
+
+    final List<Map<String, dynamic>> batchToSave = [];
+
+    for (int i = startIndex; i < endIndex; i++) {
+      final q = _questionsList[i];
+      if (q.text.trim().isNotEmpty) {
+        String correctAnsText = 'Option A';
+        if (q.correctOptionIndex >= 0 && q.correctOptionIndex < q.options.length) {
+          correctAnsText = q.options[q.correctOptionIndex].isNotEmpty
+              ? q.options[q.correctOptionIndex]
+              : 'Option ${String.fromCharCode(65 + q.correctOptionIndex)}';
+        }
+
+        batchToSave.add({
+          'id': q.id.isNotEmpty ? q.id : 'q_${_paperId}_${q.number}',
+          'questionNumber': q.number,
+          'questionText': q.text,
+          'options': q.options,
+          'correctAnswer': correctAnsText,
+          'explanation': q.explanation,
+          'difficulty': q.difficulty,
+          'marks': double.tryParse(q.positiveMarks) ?? 4.0,
+          'negativeMarks': double.tryParse(q.negativeMarks) ?? 1.0,
+          'qType': q.questionType,
+          'subject': q.subject,
+          'chapter': q.chapter,
+          'topic': q.topic,
+          'sourceType': _paperData?['source_category'] ?? _paperData?['sourceCategory'] ?? 'PYQ',
+          'exam': _paperData?['exam'] ?? _paperData?['exam_name'] ?? 'NEET',
+          'year': int.tryParse(_paperData?['year']?.toString() ?? '2026') ?? 2026,
+          'paperName': _paperData?['paper_name'] ?? _paperData?['paperName'] ?? widget.paperName,
+        });
+      }
+    }
+
+    if (batchToSave.isNotEmpty) {
+      final success = await SupabaseService.upsertIncrementalQuestions(
+        paperId: _paperId,
+        questionsData: batchToSave,
+      );
+
+      if (success) {
+        int newlySaved = 0;
+        for (int i = startIndex; i < endIndex; i++) {
+          final q = _questionsList[i];
+          if (q.text.trim().isNotEmpty) {
+            if (!q.isSaved) newlySaved++;
+            q.isSaved = true;
+            if (q.id.isEmpty) q.id = 'q_${_paperId}_${q.number}';
+          }
+        }
+        _addedCount += newlySaved;
+
+        if (showToast && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✓ Persisted ${batchToSave.length} question(s) to Supabase Question Bank! (Saved: $_addedCount / ${_questionsList.length})'),
+              backgroundColor: const Color(0xFF10B981),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    }
+
+    if (mounted) setState(() => _isSavingBatch = false);
   }
 
   void _addOptionToQuestion(QuestionItemData q) {
@@ -348,26 +508,22 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
               icon: const Icon(Icons.arrow_back_rounded, size: 16, color: Color(0xFF334155)),
               label: Text('Back to Step 1', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
             ),
-            const SizedBox(width: 12),
-
-            // Save All Questions Primary Button
-            ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('All ${_questionsList.length} questions saved successfully!'),
-                    backgroundColor: const Color(0xFF10B981),
-                  ),
-                );
-              },
+            const SizedBox(width: 12),            // Save All Questions Primary Button
+            ElevatedButton.icon(
+              onPressed: () => _saveCurrentBatch(showToast: true),
+              icon: _isSavingBatch
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.cloud_upload_rounded, size: 16, color: Colors.white),
+              label: Text(
+                _isSavingBatch ? 'Saving...' : 'Save All Questions',
+                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF4F46E5),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-                elevation: 2,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
               ),
-              child: Text('Save All Questions', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -714,9 +870,35 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Question ${q.number}',
-                  style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5)),
+                Row(
+                  children: [
+                    Text(
+                      'Question ${q.number}',
+                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5)),
+                    ),
+                    if (q.isSaved) ...[
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFA7F3D0)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF10B981)),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Saved to Question Bank',
+                              style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF065F46)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 Row(
                   children: [
@@ -1303,14 +1485,17 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   Widget _buildPaginationFooter() {
     final int totalPages = (_questionsList.length / _itemsPerPage).ceil();
 
+    void goToPage(int pageNum) {
+      _saveCurrentBatch(showToast: false);
+      setState(() => _currentPageIndex = pageNum);
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         IconButton(
           icon: const Icon(Icons.chevron_left_rounded, color: Color(0xFF64748B)),
-          onPressed: _currentPageIndex > 1
-              ? () => setState(() => _currentPageIndex--)
-              : null,
+          onPressed: _currentPageIndex > 1 ? () => goToPage(_currentPageIndex - 1) : null,
         ),
         const SizedBox(width: 8),
 
@@ -1321,7 +1506,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: InkWell(
-              onTap: () => setState(() => _currentPageIndex = pageNum),
+              onTap: () => goToPage(pageNum),
               borderRadius: BorderRadius.circular(8),
               child: Container(
                 width: 36,
@@ -1351,9 +1536,9 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           child: Text('...', style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold)),
         ),
 
-        // Page 20
+        // Page 20 / Total Pages
         InkWell(
-          onTap: () => setState(() => _currentPageIndex = totalPages),
+          onTap: () => goToPage(totalPages),
           borderRadius: BorderRadius.circular(8),
           child: Container(
             width: 36,
@@ -1375,9 +1560,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
         IconButton(
           icon: const Icon(Icons.chevron_right_rounded, color: Color(0xFF64748B)),
-          onPressed: _currentPageIndex < totalPages
-              ? () => setState(() => _currentPageIndex++)
-              : null,
+          onPressed: _currentPageIndex < totalPages ? () => goToPage(_currentPageIndex + 1) : null,
         ),
       ],
     );

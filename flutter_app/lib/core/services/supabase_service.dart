@@ -2567,6 +2567,213 @@ class SupabaseService {
       debugPrint('Error clearing active PYQ session: $e');
     }
   }
+
+  // ================= PAPER & BULK UPLOAD MANAGEMENT =================
+
+  /// Save or update paper details record in Supabase 'papers' table and local storage
+  static Future<Map<String, dynamic>> savePaperRecord(Map<String, dynamic> paperData) async {
+    final String paperId = paperData['id'] ?? 'paper_${DateTime.now().millisecondsSinceEpoch}';
+    final fullData = {
+      'id': paperId,
+      'source_category': paperData['sourceCategory'] ?? paperData['source_category'] ?? 'PYQ',
+      'exam': paperData['exam'] ?? paperData['exam_name'] ?? 'NEET',
+      'year': paperData['year']?.toString() ?? '2026',
+      'phase_session': paperData['phaseSession'] ?? paperData['phase_session'] ?? 'Phase 1',
+      'paper_type': paperData['paperType'] ?? paperData['paper_type'] ?? 'Medical (UG)',
+      'paper_name': paperData['paperName'] ?? paperData['paper_name'] ?? 'NEET 2026 Phase 1',
+      'paper_code': paperData['paperCode'] ?? paperData['paper_code'] ?? 'N26P1',
+      'language': paperData['language'] ?? 'English',
+      'conducting_body': paperData['conductingBody'] ?? paperData['conducting_body'] ?? 'NTA',
+      'question_count': (paperData['questionCount'] is num) ? (paperData['questionCount'] as num).toInt() : int.tryParse(paperData['questionCount']?.toString() ?? '200') ?? 200,
+      'total_marks': (paperData['totalMarks'] is num) ? (paperData['totalMarks'] as num).toDouble() : double.tryParse(paperData['totalMarks']?.toString() ?? '720') ?? 720.0,
+      'duration_minutes': (paperData['duration'] is num) ? (paperData['duration'] as num).toInt() : int.tryParse(paperData['duration']?.toString() ?? '180') ?? 180,
+      'negative_marking': paperData['negativeMarking'] ?? 'Yes',
+      'negative_marks': (paperData['negativeMarks'] is num) ? (paperData['negativeMarks'] as num).toDouble() : double.tryParse(paperData['negativeMarks']?.toString() ?? '-4') ?? -4.0,
+      'positive_marks': (paperData['positiveMarks'] is num) ? (paperData['positiveMarks'] as num).toDouble() : double.tryParse(paperData['positiveMarks']?.toString() ?? '+4') ?? 4.0,
+      'subjects': paperData['subjects'] ?? ['Physics', 'Chemistry', 'Botany', 'Zoology'],
+      'shift': paperData['shift'] ?? '',
+      'instructions': paperData['instructions'] ?? '',
+      'test_series_option': paperData['testSeriesOption'] ?? '',
+      'existing_test_series': paperData['existingTestSeries'] ?? '',
+      'new_test_series_name': paperData['newTestSeriesName'] ?? '',
+      'status': paperData['status'] ?? 'Draft',
+      'saved_questions_count': paperData['savedQuestionsCount'] ?? 0,
+      'created_at': paperData['created_at'] ?? DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await client.from('papers').upsert(fullData);
+    } catch (e) {
+      debugPrint('Supabase paper upsert notice (using local storage cache): $e');
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_active_upload_paper_session', jsonEncode(fullData));
+
+      final rawPapers = prefs.getString('cosmyra_saved_papers') ?? '[]';
+      final List<dynamic> list = jsonDecode(rawPapers);
+      final idx = list.indexWhere((p) => p['id'] == paperId);
+      if (idx != -1) {
+        list[idx] = fullData;
+      } else {
+        list.insert(0, fullData);
+      }
+      await prefs.setString('cosmyra_saved_papers', jsonEncode(list));
+    } catch (e) {
+      debugPrint('Error persisting paper to SharedPreferences: $e');
+    }
+
+    return fullData;
+  }
+
+  /// Load active upload paper session from SharedPreferences or Supabase
+  static Future<Map<String, dynamic>?> loadActiveUploadPaperSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString('cosmyra_active_upload_paper_session');
+      if (str != null && str.isNotEmpty) {
+        return jsonDecode(str) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      debugPrint('Error loading active upload paper session: $e');
+    }
+    return null;
+  }
+
+  /// Upsert batch of questions to Supabase and SharedPreferences incrementally
+  static Future<bool> upsertIncrementalQuestions({
+    required String paperId,
+    required List<Map<String, dynamic>> questionsData,
+  }) async {
+    if (questionsData.isEmpty) return true;
+
+    final String timeIso = DateTime.now().toIso8601String();
+
+    final cleanPayloads = questionsData.map((q) {
+      final qId = q['id'] != null && q['id'].toString().isNotEmpty
+          ? q['id'].toString()
+          : 'q_${paperId}_${q['questionNumber']}';
+
+      final optionsList = q['options'] is List ? List<String>.from(q['options']) : <String>[];
+
+      return {
+        'id': qId,
+        'paper_id': paperId,
+        'question_number': q['questionNumber'] ?? 1,
+        'question_text': q['questionText'] ?? q['question_text'] ?? '',
+        'question_image': q['questionImage'] ?? '',
+        'subject': q['subject'] ?? 'Physics',
+        'chapter': q['chapter'] ?? 'General',
+        'topic': q['topic'] ?? 'General',
+        'category': q['category'] ?? q['sourceType'] ?? 'PYQ',
+        'source_type': q['sourceType'] ?? q['source_type'] ?? 'PYQ',
+        'source': (q['sourceType'] ?? q['source'] ?? 'pyq').toString().toLowerCase(),
+        'difficulty': q['difficulty'] ?? 'Medium',
+        'q_type': q['qType'] ?? q['question_type'] ?? 'Single Choice (MCQ)',
+        'marks': (q['marks'] is num) ? (q['marks'] as num).toInt() : int.tryParse(q['marks']?.toString() ?? '4') ?? 4,
+        'negative_marks': (q['negativeMarks'] is num) ? (q['negativeMarks'] as num).toDouble() : double.tryParse(q['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
+        'status': 'Active',
+        'options': optionsList,
+        'correct_answer': q['correctAnswer'] ?? (optionsList.isNotEmpty ? optionsList[0] : 'Option A'),
+        'explanation': q['explanation'] ?? '',
+        'solution': q['explanation'] ?? '',
+        'year': q['year'] ?? 2026,
+        'paper_name': q['paperName'] ?? 'NEET 2026 Phase 1',
+        'exam': q['exam'] ?? 'NEET',
+        'created_at': q['created_at'] ?? timeIso,
+        'updated_at': timeIso,
+      };
+    }).toList();
+
+    try {
+      await client.from('questions').upsert(cleanPayloads, onConflict: 'id');
+    } catch (e) {
+      debugPrint('Supabase incremental question upsert notice (fallback to local): $e');
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      final existingGlobalStr = prefs.getString('cosmyra_saved_custom_questions') ?? '[]';
+      final List<dynamic> globalList = jsonDecode(existingGlobalStr);
+
+      final existingPaperStr = prefs.getString('cosmyra_paper_questions_$paperId') ?? '[]';
+      final List<dynamic> paperList = jsonDecode(existingPaperStr);
+
+      for (var newQ in cleanPayloads) {
+        final gIdx = globalList.indexWhere((g) => g['id'] == newQ['id']);
+        if (gIdx != -1) {
+          globalList[gIdx] = newQ;
+        } else {
+          globalList.insert(0, newQ);
+        }
+
+        final pIdx = paperList.indexWhere((p) => p['id'] == newQ['id']);
+        if (pIdx != -1) {
+          paperList[pIdx] = newQ;
+        } else {
+          paperList.add(newQ);
+        }
+      }
+
+      await prefs.setString('cosmyra_saved_custom_questions', jsonEncode(globalList));
+      await prefs.setString('cosmyra_paper_questions_$paperId', jsonEncode(paperList));
+
+      final rawPapers = prefs.getString('cosmyra_saved_papers') ?? '[]';
+      final List<dynamic> papersList = jsonDecode(rawPapers);
+      final pIdx = papersList.indexWhere((p) => p['id'] == paperId);
+      if (pIdx != -1) {
+        papersList[pIdx]['saved_questions_count'] = paperList.length;
+        if (papersList[pIdx]['saved_questions_count'] >= (papersList[pIdx]['question_count'] ?? 200)) {
+          papersList[pIdx]['status'] = 'Completed';
+        } else {
+          papersList[pIdx]['status'] = 'Partially Uploaded';
+        }
+        await prefs.setString('cosmyra_saved_papers', jsonEncode(papersList));
+      }
+    } catch (e) {
+      debugPrint('Error persisting questions to SharedPreferences: $e');
+    }
+
+    return true;
+  }
+
+  /// Fetch saved questions for a given paper ID
+  static Future<List<Map<String, dynamic>>> fetchQuestionsForPaper(String paperId) async {
+    final List<Map<String, dynamic>> results = [];
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final paperQStr = prefs.getString('cosmyra_paper_questions_$paperId');
+      if (paperQStr != null && paperQStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(paperQStr);
+        results.addAll(decoded.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+    } catch (e) {
+      debugPrint('Error loading paper questions from SharedPreferences: $e');
+    }
+
+    try {
+      final res = await client.from('questions').select().eq('paper_id', paperId).order('question_number', ascending: true);
+      if (res != null && (res as List).isNotEmpty) {
+        final dbQuestions = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        for (var dbQ in dbQuestions) {
+          final idx = results.indexWhere((r) => r['id'] == dbQ['id'] || r['question_number'] == dbQ['question_number']);
+          if (idx != -1) {
+            results[idx] = dbQ;
+          } else {
+            results.add(dbQ);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Supabase fetchQuestionsForPaper notice: $e');
+    }
+
+    return results;
+  }
 }
 
 

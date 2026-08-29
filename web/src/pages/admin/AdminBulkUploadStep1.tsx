@@ -55,7 +55,46 @@ export const AdminBulkUploadStep1: React.FC = () => {
   };
 
   const handleProceed = () => {
-    navigate('/admin/upload-step2');
+    const paperId = `paper_${Date.now()}`;
+    const paperData = {
+      id: paperId,
+      sourceCategory,
+      examName,
+      year,
+      phaseSession,
+      paperType,
+      paperName: paperName || 'NEET 2026 Phase 1',
+      paperCode,
+      language,
+      conductingBody,
+      questionCount: parseInt(questionCount, 10) || 200,
+      totalMarks: parseFloat(totalMarks) || 720,
+      durationMinutes: parseInt(duration, 10) || 180,
+      negativeMarking,
+      negativeMarks: parseFloat(negativeMarks) || -4,
+      positiveMarks: parseFloat(positiveMarks) || 4,
+      subjects: Object.keys(subjects).filter((s) => subjects[s]),
+      shift: paperShift,
+      instructions,
+      testSeriesOption,
+      existingTestSeries,
+      newTestSeriesName,
+      status: 'Draft',
+      savedQuestionsCount: 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      localStorage.setItem('cosmyra_active_upload_paper_session', JSON.stringify(paperData));
+      const rawPapers = localStorage.getItem('cosmyra_saved_papers') || '[]';
+      const papers = JSON.parse(rawPapers);
+      papers.unshift(paperData);
+      localStorage.setItem('cosmyra_saved_papers', JSON.stringify(papers));
+    } catch (e) {
+      console.warn('Error saving paper session to localStorage', e);
+    }
+
+    navigate('/admin/upload-step2', { state: { paper: paperData } });
   };
 
   return (
