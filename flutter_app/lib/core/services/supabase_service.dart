@@ -582,8 +582,9 @@ class SupabaseService {
         final cNameLower = cName.toLowerCase();
 
         if (!existingChapterNames.contains(cNameLower)) {
-          final cId = seed['id']?.toString() ?? 'b_${DateTime.now().millisecondsSinceEpoch}_$order';
-          final cCode = seed['code'] ?? '';
+          final rawCId = seed['id']?.toString() ?? 'b_${DateTime.now().millisecondsSinceEpoch}_$order';
+          final cId = toValidUuid(rawCId);
+          final cCode = seed['code'] ?? 'CHAP_$order';
 
           try {
             await client.from('chapters').insert({
@@ -598,13 +599,14 @@ class SupabaseService {
 
             final topicsList = (seed['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
             for (var t in topicsList) {
-              final tId = t['id']?.toString() ?? 't_${DateTime.now().millisecondsSinceEpoch}';
+              final rawTId = t['id']?.toString() ?? 't_${DateTime.now().millisecondsSinceEpoch}';
+              final tId = toValidUuid(rawTId);
               try {
                 await client.from('topics').insert({
                   'id': tId,
                   'chapter_id': cId,
                   'name': t['name'] ?? '',
-                  'code': t['code'] ?? '',
+                  'code': t['code'] ?? 'TOPIC_${DateTime.now().millisecondsSinceEpoch}',
                   'is_active': t['status'] == 'Active',
                 });
               } catch (e) {
@@ -740,75 +742,75 @@ class SupabaseService {
     if (subject.toUpperCase() == 'PHYSICS') {
       return [
         {
-          'id': 'phys_c1',
+          'id': toValidUuid('phys_c1'),
           'name': '1. Mechanics',
           'code': 'PHYS_MECH',
           'topics': 8,
           'questions': 1248,
           'status': 'Active',
           'topicsList': [
-            {'id': 'phys_t1_1', 'name': '1.1 Units and Dimensions', 'questions': 156, 'status': 'Active'},
-            {'id': 'phys_t1_2', 'name': '1.2 Kinematics & Projectile Motion', 'questions': 312, 'status': 'Active'},
-            {'id': 'phys_t1_3', 'name': '1.3 Laws of Motion & Friction', 'questions': 298, 'status': 'Active'},
-            {'id': 'phys_t1_4', 'name': '1.4 Work, Energy and Power', 'questions': 246, 'status': 'Active'},
-            {'id': 'phys_t1_5', 'name': '1.5 Centre of Mass & Collisions', 'questions': 128, 'status': 'Active'},
-            {'id': 'phys_t1_6', 'name': '1.6 Rotational Dynamics & Moment of Inertia', 'questions': 108, 'status': 'Active'},
+            {'id': toValidUuid('phys_t1_1'), 'name': '1.1 Units and Dimensions', 'questions': 156, 'status': 'Active'},
+            {'id': toValidUuid('phys_t1_2'), 'name': '1.2 Kinematics & Projectile Motion', 'questions': 312, 'status': 'Active'},
+            {'id': toValidUuid('phys_t1_3'), 'name': '1.3 Laws of Motion & Friction', 'questions': 298, 'status': 'Active'},
+            {'id': toValidUuid('phys_t1_4'), 'name': '1.4 Work, Energy and Power', 'questions': 246, 'status': 'Active'},
+            {'id': toValidUuid('phys_t1_5'), 'name': '1.5 Centre of Mass & Collisions', 'questions': 128, 'status': 'Active'},
+            {'id': toValidUuid('phys_t1_6'), 'name': '1.6 Rotational Dynamics & Moment of Inertia', 'questions': 108, 'status': 'Active'},
           ],
         },
         {
-          'id': 'phys_c2',
+          'id': toValidUuid('phys_c2'),
           'name': '2. Thermodynamics & Kinetic Theory',
           'code': 'PHYS_THERMO',
           'topics': 6,
           'questions': 896,
           'status': 'Active',
           'topicsList': [
-            {'id': 'phys_t2_1', 'name': '2.1 Thermal Properties of Matter', 'questions': 180, 'status': 'Active'},
-            {'id': 'phys_t2_2', 'name': '2.2 First & Second Law of Thermodynamics', 'questions': 240, 'status': 'Active'},
-            {'id': 'phys_t2_3', 'name': '2.3 Heat Engines & Carnot Cycle', 'questions': 190, 'status': 'Active'},
-            {'id': 'phys_t2_4', 'name': '2.4 Kinetic Theory of Gases', 'questions': 286, 'status': 'Active'},
+            {'id': toValidUuid('phys_t2_1'), 'name': '2.1 Thermal Properties of Matter', 'questions': 180, 'status': 'Active'},
+            {'id': toValidUuid('phys_t2_2'), 'name': '2.2 First & Second Law of Thermodynamics', 'questions': 240, 'status': 'Active'},
+            {'id': toValidUuid('phys_t2_3'), 'name': '2.3 Heat Engines & Carnot Cycle', 'questions': 190, 'status': 'Active'},
+            {'id': toValidUuid('phys_t2_4'), 'name': '2.4 Kinetic Theory of Gases', 'questions': 286, 'status': 'Active'},
           ],
         },
         {
-          'id': 'phys_c3',
+          'id': toValidUuid('phys_c3'),
           'name': '3. Oscillations and Waves',
           'code': 'PHYS_WAVES',
           'topics': 5,
           'questions': 642,
           'status': 'Active',
           'topicsList': [
-            {'id': 'phys_t3_1', 'name': '3.1 Simple Harmonic Motion (SHM)', 'questions': 210, 'status': 'Active'},
-            {'id': 'phys_t3_2', 'name': '3.2 Wave Motion & Doppler Effect', 'questions': 220, 'status': 'Active'},
-            {'id': 'phys_t3_3', 'name': '3.3 Sound Waves & Organ Pipes', 'questions': 212, 'status': 'Active'},
+            {'id': toValidUuid('phys_t3_1'), 'name': '3.1 Simple Harmonic Motion (SHM)', 'questions': 210, 'status': 'Active'},
+            {'id': toValidUuid('phys_t3_2'), 'name': '3.2 Wave Motion & Doppler Effect', 'questions': 220, 'status': 'Active'},
+            {'id': toValidUuid('phys_t3_3'), 'name': '3.3 Sound Waves & Organ Pipes', 'questions': 212, 'status': 'Active'},
           ],
         },
         {
-          'id': 'phys_c4',
+          'id': toValidUuid('phys_c4'),
           'name': '4. Electromagnetism & Circuits',
           'code': 'PHYS_EM',
           'topics': 12,
           'questions': 1856,
           'status': 'Active',
           'topicsList': [
-            {'id': 'phys_t4_1', 'name': '4.1 Electrostatics & Coulomb\'s Law', 'questions': 340, 'status': 'Active'},
-            {'id': 'phys_t4_2', 'name': '4.2 Capacitors & Dielectrics', 'questions': 280, 'status': 'Active'},
-            {'id': 'phys_t4_3', 'name': '4.3 Current Electricity & Kirchhoff\'s Laws', 'questions': 450, 'status': 'Active'},
-            {'id': 'phys_t4_4', 'name': '4.4 Magnetic Effects of Current & EMI', 'questions': 420, 'status': 'Active'},
-            {'id': 'phys_t4_5', 'name': '4.5 Alternating Current (AC)', 'questions': 366, 'status': 'Active'},
+            {'id': toValidUuid('phys_t4_1'), 'name': '4.1 Electrostatics & Coulomb\'s Law', 'questions': 340, 'status': 'Active'},
+            {'id': toValidUuid('phys_t4_2'), 'name': '4.2 Capacitors & Dielectrics', 'questions': 280, 'status': 'Active'},
+            {'id': toValidUuid('phys_t4_3'), 'name': '4.3 Current Electricity & Kirchhoff\'s Laws', 'questions': 450, 'status': 'Active'},
+            {'id': toValidUuid('phys_t4_4'), 'name': '4.4 Magnetic Effects of Current & EMI', 'questions': 420, 'status': 'Active'},
+            {'id': toValidUuid('phys_t4_5'), 'name': '4.5 Alternating Current (AC)', 'questions': 366, 'status': 'Active'},
           ],
         },
         {
-          'id': 'phys_c5',
+          'id': toValidUuid('phys_c5'),
           'name': '5. Optics & Modern Physics',
           'code': 'PHYS_OPTICS',
           'topics': 9,
           'questions': 1346,
           'status': 'Active',
           'topicsList': [
-            {'id': 'phys_t5_1', 'name': '5.1 Ray Optics & Optical Instruments', 'questions': 390, 'status': 'Active'},
-            {'id': 'phys_t5_2', 'name': '5.2 Wave Optics & Interference', 'questions': 280, 'status': 'Active'},
-            {'id': 'phys_t5_3', 'name': '5.3 Dual Nature of Matter & Photoelectric Effect', 'questions': 310, 'status': 'Active'},
-            {'id': 'phys_t5_4', 'name': '5.4 Atoms & Nuclei', 'questions': 366, 'status': 'Active'},
+            {'id': toValidUuid('phys_t5_1'), 'name': '5.1 Ray Optics & Optical Instruments', 'questions': 390, 'status': 'Active'},
+            {'id': toValidUuid('phys_t5_2'), 'name': '5.2 Wave Optics & Interference', 'questions': 280, 'status': 'Active'},
+            {'id': toValidUuid('phys_t5_3'), 'name': '5.3 Dual Nature of Matter & Photoelectric Effect', 'questions': 310, 'status': 'Active'},
+            {'id': toValidUuid('phys_t5_4'), 'name': '5.4 Atoms & Nuclei', 'questions': 366, 'status': 'Active'},
           ],
         },
       ];
@@ -817,47 +819,47 @@ class SupabaseService {
     if (subject.toUpperCase() == 'CHEMISTRY') {
       return [
         {
-          'id': 'chem_c1',
+          'id': toValidUuid('chem_c1'),
           'name': '1. Physical Chemistry',
           'code': 'CHEM_PHYS',
           'topics': 6,
           'questions': 1120,
           'status': 'Active',
           'topicsList': [
-            {'id': 'chem_t1_1', 'name': '1.1 Some Basic Concepts of Chemistry (Mole Concept)', 'questions': 240, 'status': 'Active'},
-            {'id': 'chem_t1_2', 'name': '1.2 Atomic Structure & Quantum Numbers', 'questions': 210, 'status': 'Active'},
-            {'id': 'chem_t1_3', 'name': '1.3 Chemical Bonding & Molecular Structure', 'questions': 310, 'status': 'Active'},
-            {'id': 'chem_t1_4', 'name': '1.4 Chemical & Ionic Equilibrium', 'questions': 210, 'status': 'Active'},
-            {'id': 'chem_t1_5', 'name': '1.5 Electrochemistry & Redox Reactions', 'questions': 150, 'status': 'Active'},
+            {'id': toValidUuid('chem_t1_1'), 'name': '1.1 Some Basic Concepts of Chemistry (Mole Concept)', 'questions': 240, 'status': 'Active'},
+            {'id': toValidUuid('chem_t1_2'), 'name': '1.2 Atomic Structure & Quantum Numbers', 'questions': 210, 'status': 'Active'},
+            {'id': toValidUuid('chem_t1_3'), 'name': '1.3 Chemical Bonding & Molecular Structure', 'questions': 310, 'status': 'Active'},
+            {'id': toValidUuid('chem_t1_4'), 'name': '1.4 Chemical & Ionic Equilibrium', 'questions': 210, 'status': 'Active'},
+            {'id': toValidUuid('chem_t1_5'), 'name': '1.5 Electrochemistry & Redox Reactions', 'questions': 150, 'status': 'Active'},
           ],
         },
         {
-          'id': 'chem_c2',
+          'id': toValidUuid('chem_c2'),
           'name': '2. Organic Chemistry',
           'code': 'CHEM_ORG',
           'topics': 8,
           'questions': 1480,
           'status': 'Active',
           'topicsList': [
-            {'id': 'chem_t2_1', 'name': '2.1 GOC & Isomerism', 'questions': 380, 'status': 'Active'},
-            {'id': 'chem_t2_2', 'name': '2.2 Hydrocarbons (Alkanes, Alkenes, Alkynes)', 'questions': 320, 'status': 'Active'},
-            {'id': 'chem_t2_3', 'name': '2.3 Haloalkanes & Haloarenes', 'questions': 260, 'status': 'Active'},
-            {'id': 'chem_t2_4', 'name': '2.4 Alcohols, Phenols & Ethers', 'questions': 280, 'status': 'Active'},
-            {'id': 'chem_t2_5', 'name': '2.5 Aldehydes, Ketones & Carboxylic Acids', 'questions': 240, 'status': 'Active'},
+            {'id': toValidUuid('chem_t2_1'), 'name': '2.1 GOC & Isomerism', 'questions': 380, 'status': 'Active'},
+            {'id': toValidUuid('chem_t2_2'), 'name': '2.2 Hydrocarbons (Alkanes, Alkenes, Alkynes)', 'questions': 320, 'status': 'Active'},
+            {'id': toValidUuid('chem_t2_3'), 'name': '2.3 Haloalkanes & Haloarenes', 'questions': 260, 'status': 'Active'},
+            {'id': toValidUuid('chem_t2_4'), 'name': '2.4 Alcohols, Phenols & Ethers', 'questions': 280, 'status': 'Active'},
+            {'id': toValidUuid('chem_t2_5'), 'name': '2.5 Aldehydes, Ketones & Carboxylic Acids', 'questions': 240, 'status': 'Active'},
           ],
         },
         {
-          'id': 'chem_c3',
+          'id': toValidUuid('chem_c3'),
           'name': '3. Inorganic Chemistry',
           'code': 'CHEM_INORG',
           'topics': 5,
           'questions': 940,
           'status': 'Active',
           'topicsList': [
-            {'id': 'chem_t3_1', 'name': '3.1 Periodic Classification & Periodicity', 'questions': 220, 'status': 'Active'},
-            {'id': 'chem_t3_2', 'name': '3.2 p-Block Elements', 'questions': 240, 'status': 'Active'},
-            {'id': 'chem_t3_3', 'name': '3.3 d & f Block Elements', 'questions': 210, 'status': 'Active'},
-            {'id': 'chem_t3_4', 'name': '3.4 Coordination Compounds', 'questions': 270, 'status': 'Active'},
+            {'id': toValidUuid('chem_t3_1'), 'name': '3.1 Periodic Classification & Periodicity', 'questions': 220, 'status': 'Active'},
+            {'id': toValidUuid('chem_t3_2'), 'name': '3.2 p-Block Elements', 'questions': 240, 'status': 'Active'},
+            {'id': toValidUuid('chem_t3_3'), 'name': '3.3 d & f Block Elements', 'questions': 210, 'status': 'Active'},
+            {'id': toValidUuid('chem_t3_4'), 'name': '3.4 Coordination Compounds', 'questions': 270, 'status': 'Active'},
           ],
         },
       ];
@@ -866,58 +868,58 @@ class SupabaseService {
     if (isNeet && (subject.toUpperCase() == 'BIOLOGY' || subject.toUpperCase().contains('BIOLOGY'))) {
       return [
         {
-          'id': 'bio_c1',
+          'id': toValidUuid('bio_c1'),
           'name': '1. Diversity in Living World',
           'code': 'BIO_DIV',
           'topics': 4,
           'questions': 650,
           'status': 'Active',
           'topicsList': [
-            {'id': 'bio_t1_1', 'name': '1.1 The Living World', 'questions': 120, 'status': 'Active'},
-            {'id': 'bio_t1_2', 'name': '1.2 Biological Classification', 'questions': 180, 'status': 'Active'},
-            {'id': 'bio_t1_3', 'name': '1.3 Plant Kingdom', 'questions': 170, 'status': 'Active'},
-            {'id': 'bio_t1_4', 'name': '1.4 Animal Kingdom', 'questions': 180, 'status': 'Active'},
+            {'id': toValidUuid('bio_t1_1'), 'name': '1.1 The Living World', 'questions': 120, 'status': 'Active'},
+            {'id': toValidUuid('bio_t1_2'), 'name': '1.2 Biological Classification', 'questions': 180, 'status': 'Active'},
+            {'id': toValidUuid('bio_t1_3'), 'name': '1.3 Plant Kingdom', 'questions': 170, 'status': 'Active'},
+            {'id': toValidUuid('bio_t1_4'), 'name': '1.4 Animal Kingdom', 'questions': 180, 'status': 'Active'},
           ],
         },
         {
-          'id': 'bio_c2',
+          'id': toValidUuid('bio_c2'),
           'name': '2. Cell Structure & Functions',
           'code': 'BIO_CELL',
           'topics': 3,
           'questions': 780,
           'status': 'Active',
           'topicsList': [
-            {'id': 'bio_t2_1', 'name': '2.1 Cell: The Unit of Life', 'questions': 280, 'status': 'Active'},
-            {'id': 'bio_t2_2', 'name': '2.2 Biomolecules', 'questions': 240, 'status': 'Active'},
-            {'id': 'bio_t2_3', 'name': '2.3 Cell Cycle & Cell Division', 'questions': 260, 'status': 'Active'},
+            {'id': toValidUuid('bio_t2_1'), 'name': '2.1 Cell: The Unit of Life', 'questions': 280, 'status': 'Active'},
+            {'id': toValidUuid('bio_t2_2'), 'name': '2.2 Biomolecules', 'questions': 240, 'status': 'Active'},
+            {'id': toValidUuid('bio_t2_3'), 'name': '2.3 Cell Cycle & Cell Division', 'questions': 260, 'status': 'Active'},
           ],
         },
         {
-          'id': 'bio_c3',
+          'id': toValidUuid('bio_c3'),
           'name': '3. Genetics & Evolution',
           'code': 'BIO_GEN',
           'topics': 3,
           'questions': 920,
           'status': 'Active',
           'topicsList': [
-            {'id': 'bio_t3_1', 'name': '3.1 Principles of Inheritance & Variation', 'questions': 340, 'status': 'Active'},
-            {'id': 'bio_t3_2', 'name': '3.2 Molecular Basis of Inheritance', 'questions': 320, 'status': 'Active'},
-            {'id': 'bio_t3_3', 'name': '3.3 Evolution', 'questions': 260, 'status': 'Active'},
+            {'id': toValidUuid('bio_t3_1'), 'name': '3.1 Principles of Inheritance & Variation', 'questions': 340, 'status': 'Active'},
+            {'id': toValidUuid('bio_t3_2'), 'name': '3.2 Molecular Basis of Inheritance', 'questions': 320, 'status': 'Active'},
+            {'id': toValidUuid('bio_t3_3'), 'name': '3.3 Evolution', 'questions': 260, 'status': 'Active'},
           ],
         },
         {
-          'id': 'bio_c4',
+          'id': toValidUuid('bio_c4'),
           'name': '4. Human Physiology',
           'code': 'BIO_PHYS',
           'topics': 5,
           'questions': 1140,
           'status': 'Active',
           'topicsList': [
-            {'id': 'bio_t4_1', 'name': '4.1 Breathing & Exchange of Gases', 'questions': 220, 'status': 'Active'},
-            {'id': 'bio_t4_2', 'name': '4.2 Body Fluids & Circulation', 'questions': 240, 'status': 'Active'},
-            {'id': 'bio_t4_3', 'name': '4.3 Excretory Products & Elimination', 'questions': 210, 'status': 'Active'},
-            {'id': 'bio_t4_4', 'name': '4.4 Locomotion & Movement', 'questions': 210, 'status': 'Active'},
-            {'id': 'bio_t4_5', 'name': '4.5 Neural Control & Chemical Coordination', 'questions': 260, 'status': 'Active'},
+            {'id': toValidUuid('bio_t4_1'), 'name': '4.1 Breathing & Exchange of Gases', 'questions': 220, 'status': 'Active'},
+            {'id': toValidUuid('bio_t4_2'), 'name': '4.2 Body Fluids & Circulation', 'questions': 240, 'status': 'Active'},
+            {'id': toValidUuid('bio_t4_3'), 'name': '4.3 Excretory Products & Elimination', 'questions': 210, 'status': 'Active'},
+            {'id': toValidUuid('bio_t4_4'), 'name': '4.4 Locomotion & Movement', 'questions': 210, 'status': 'Active'},
+            {'id': toValidUuid('bio_t4_5'), 'name': '4.5 Neural Control & Chemical Coordination', 'questions': 260, 'status': 'Active'},
           ],
         },
       ];
@@ -926,16 +928,16 @@ class SupabaseService {
     // Default for Mathematics
     return [
       {
-        'id': 'math_c1',
+        'id': toValidUuid('math_c1'),
         'name': '1. Sets, Relations & Functions',
         'code': 'MATH_SETS',
         'topics': 3,
         'questions': 540,
         'status': 'Active',
         'topicsList': [
-          {'id': 'math_t1_1', 'name': '1.1 Sets & Relations', 'questions': 180, 'status': 'Active'},
-          {'id': 'math_t1_2', 'name': '1.2 Functions & Domain/Range', 'questions': 210, 'status': 'Active'},
-          {'id': 'math_t1_3', 'name': '1.3 Inverse Trigonometric Functions', 'questions': 150, 'status': 'Active'},
+          {'id': toValidUuid('math_t1_1'), 'name': '1.1 Sets & Relations', 'questions': 180, 'status': 'Active'},
+          {'id': toValidUuid('math_t1_2'), 'name': '1.2 Functions & Domain/Range', 'questions': 210, 'status': 'Active'},
+          {'id': toValidUuid('math_t1_3'), 'name': '1.3 Inverse Trigonometric Functions', 'questions': 150, 'status': 'Active'},
         ],
       },
       {
