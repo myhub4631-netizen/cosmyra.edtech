@@ -171,44 +171,24 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
     };
 
     await SupabaseService.saveQuestionMap(newQuestion);
-    _saveToPrefs(newQuestion);
 
     if (widget.onQuestionSaved != null) {
       widget.onQuestionSaved!(newQuestion);
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(isDraft ? 'Draft saved successfully!' : 'Question added to Question Bank successfully!'),
-        backgroundColor: isDraft ? const Color(0xFF4F46E5) : const Color(0xFF16A34A),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isDraft ? 'Draft saved successfully!' : 'Question added to Question Bank successfully!'),
+          backgroundColor: isDraft ? const Color(0xFF4F46E5) : const Color(0xFF16A34A),
+        ),
+      );
 
-    if (widget.onBack != null) {
-      widget.onBack!();
-    } else if (Navigator.canPop(context)) {
-      Navigator.pop(context, newQuestion);
-    }
-  }
-
-  Future<void> _saveToPrefs(Map<String, dynamic> newQuestion) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
-      List<Map<String, dynamic>> list = [];
-      if (jsonStr != null && jsonStr.isNotEmpty) {
-        final List<dynamic> decoded = jsonDecode(jsonStr);
-        list = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      if (widget.onBack != null) {
+        widget.onBack!();
+      } else if (Navigator.canPop(context)) {
+        Navigator.pop(context, newQuestion);
       }
-      final idx = list.indexWhere((q) => q['id'] == newQuestion['id']);
-      if (idx != -1) {
-        list[idx] = newQuestion;
-      } else {
-        list.insert(0, newQuestion);
-      }
-      await prefs.setString('cosmyra_saved_custom_questions', jsonEncode(list));
-    } catch (e) {
-      debugPrint('Error saving question to prefs: $e');
     }
   }
 

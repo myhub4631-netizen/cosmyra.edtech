@@ -2056,26 +2056,11 @@ class SupabaseService {
 
     try {
       await client.from('questions').upsert(payload);
+      return true;
     } catch (e) {
-      debugPrint('Supabase insert error (saving to local storage): $e');
+      debugPrint('Supabase insert error: $e');
+      return false;
     }
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final existingStr = prefs.getString('cosmyra_saved_custom_questions') ?? '[]';
-      final List<dynamic> list = jsonDecode(existingStr);
-      final idx = list.indexWhere((q) => q['id'] == qId);
-      if (idx != -1) {
-        list[idx] = payload;
-      } else {
-        list.insert(0, payload);
-      }
-      await prefs.setString('cosmyra_saved_custom_questions', jsonEncode(list));
-    } catch (e) {
-      debugPrint('Error saving question to local storage: $e');
-    }
-
-    return true;
   }
 
   static Future<bool> updateQuestionInSupabase(String id, Map<String, dynamic> data) async {
@@ -2979,59 +2964,11 @@ class SupabaseService {
     try {
       await client.from('questions').upsert(cleanPayloads);
       debugPrint('✓ Successfully upserted ${cleanPayloads.length} questions to remote Supabase DB!');
+      return true;
     } catch (e) {
       debugPrint('Supabase incremental question upsert error: $e');
+      return false;
     }
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      final existingGlobalStr = prefs.getString('cosmyra_saved_custom_questions') ?? '[]';
-      final List<dynamic> globalList = jsonDecode(existingGlobalStr);
-
-      final existingPaperStr = prefs.getString('cosmyra_paper_questions_$paperId') ?? '[]';
-      final List<dynamic> paperList = jsonDecode(existingPaperStr);
-
-      for (var newQ in cleanPayloads) {
-        final qNum = newQ['question_number'];
-        final gIdx = globalList.indexWhere((g) =>
-            g['id'] == newQ['id'] ||
-            (g['paper_id'] == paperId && (g['question_number'] == qNum || g['questionNumber'] == qNum)));
-        if (gIdx != -1) {
-          globalList[gIdx] = newQ;
-        } else {
-          globalList.insert(0, newQ);
-        }
-
-        final pIdx = paperList.indexWhere((p) =>
-            p['id'] == newQ['id'] || (p['question_number'] == qNum || p['questionNumber'] == qNum));
-        if (pIdx != -1) {
-          paperList[pIdx] = newQ;
-        } else {
-          paperList.add(newQ);
-        }
-      }
-
-      await prefs.setString('cosmyra_saved_custom_questions', jsonEncode(globalList));
-      await prefs.setString('cosmyra_paper_questions_$paperId', jsonEncode(paperList));
-
-      final rawPapers = prefs.getString('cosmyra_saved_papers') ?? '[]';
-      final List<dynamic> papersList = jsonDecode(rawPapers);
-      final pIdx = papersList.indexWhere((p) => p['id'] == paperId);
-      if (pIdx != -1) {
-        papersList[pIdx]['saved_questions_count'] = paperList.length;
-        if (papersList[pIdx]['saved_questions_count'] >= (papersList[pIdx]['question_count'] ?? 200)) {
-          papersList[pIdx]['status'] = 'Completed';
-        } else {
-          papersList[pIdx]['status'] = 'Partially Uploaded';
-        }
-        await prefs.setString('cosmyra_saved_papers', jsonEncode(papersList));
-      }
-    } catch (e) {
-      debugPrint('Error persisting questions to SharedPreferences: $e');
-    }
-
-    return true;
   }
 
   /// Fetch saved questions for a given paper ID
