@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../auth/login_screen.dart';
@@ -531,8 +532,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   // 5. Mobile Quick Actions Horizontal Row
   Widget _buildMobileQuickActions() {
     final actions = [
-      {'label': 'Custom Practice', 'icon': Icons.track_changes_rounded, 'color': const Color(0xFF16A34A), 'bg': const Color(0xFFDCFCE7), 'tap': widget.onOpenPractice},
-      {'label': 'Custom Test', 'icon': Icons.assignment_outlined, 'color': const Color(0xFF2563EB), 'bg': const Color(0xFFDBEAFE), 'tap': widget.onOpenCustomTest ?? widget.onOpenMockTests},
+      {'label': 'Custom Practice', 'icon': Icons.track_changes_rounded, 'color': const Color(0xFF16A34A), 'bg': const Color(0xFFDCFCE7), 'tap': () => context.go('/custom-practice')},
+      {'label': 'Custom Test', 'icon': Icons.assignment_outlined, 'color': const Color(0xFF2563EB), 'bg': const Color(0xFFDBEAFE), 'tap': () => context.go('/custom-test')},
       {'label': 'PYQ Practice', 'icon': Icons.menu_book_rounded, 'color': const Color(0xFF7C3AED), 'bg': const Color(0xFFDDD6FE), 'tap': widget.onOpenPyqs},
       {'label': 'NTA Questions', 'icon': Icons.shield_outlined, 'color': const Color(0xFFEA580C), 'bg': const Color(0xFFFFEDD5), 'tap': widget.onOpenPyqs},
       {'label': 'Test Series', 'icon': Icons.calendar_today_outlined, 'color': const Color(0xFFDB2777), 'bg': const Color(0xFFFCE7F3), 'tap': widget.onOpenMockTests},
@@ -1088,9 +1089,9 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                         }
                         return;
                       }
-                      if (item['label'] == 'Practice' || item['label'] == 'Custom Practice') widget.onOpenPractice();
+                      if (item['label'] == 'Practice' || item['label'] == 'Custom Practice') context.go('/custom-practice');
                       if (item['label'] == 'Custom Test') {
-                        (widget.onOpenCustomTest ?? widget.onOpenMockTests)();
+                        context.go('/custom-test');
                       } else if (item['label'] == 'Test Series') {
                         widget.onOpenMockTests();
                       }
@@ -1587,7 +1588,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         'cardBg': const Color(0xFFF0FDF4),
         'borderColor': const Color(0xFFDCFCE7),
         'iconBg': const Color(0xFFDCFCE7),
-        'onTap': widget.onOpenPractice,
+        'onTap': () => context.go('/custom-practice'),
       },
       {
         'title': 'Custom Test',
@@ -1597,7 +1598,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         'cardBg': const Color(0xFFEFF6FF),
         'borderColor': const Color(0xFFDBEAFE),
         'iconBg': const Color(0xFFDBEAFE),
-        'onTap': widget.onOpenCustomTest ?? widget.onOpenMockTests,
+        'onTap': () => context.go('/custom-test'),
       },
       {
         'title': 'PYQ Practice',

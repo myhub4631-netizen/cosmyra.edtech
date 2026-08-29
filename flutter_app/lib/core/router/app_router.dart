@@ -34,6 +34,12 @@ import '../../features/admin/admin_pdf_import_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
+List<QuestionModel>? _activeTestQuestions;
+int _activeTestTimerMinutes = 30;
+TestAttemptModel? _lastTestAttempt;
+Map<int, String>? _lastTestUserAnswers;
+List<QuestionModel>? _lastTestQuestions;
+
 UserProfileModel _getEffectiveProfile() {
   if (SupabaseService.activeUserSession != null) {
     return SupabaseService.activeUserSession!;
@@ -214,20 +220,108 @@ final GoRouter appRouter = GoRouter(
         ),
       ),
     ),
+    // Custom Practice & Custom Test Routes
+    GoRoute(
+      path: '/custom-practice',
+      builder: (context, state) => CustomPracticeWizardModal(
+        initialExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        mode: PracticeTestMode.practice,
+        onClose: () => context.go('/dashboard'),
+        onStartPractice: (questions, timerMins) {
+          _activeTestQuestions = questions;
+          _activeTestTimerMinutes = timerMins;
+          context.go('/practice/session');
+        },
+      ),
+    ),
+    GoRoute(
+      path: '/custom-test',
+      builder: (context, state) => CustomPracticeWizardModal(
+        initialExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        mode: PracticeTestMode.test,
+        onClose: () => context.go('/dashboard'),
+        onStartPractice: (questions, timerMins) {
+          _activeTestQuestions = questions;
+          _activeTestTimerMinutes = timerMins;
+          final String attemptId = 'attempt_${DateTime.now().millisecondsSinceEpoch}';
+          context.go('/custom-test/attempt/$attemptId');
+        },
+      ),
+    ),
+    GoRoute(
+      path: '/custom-test/attempt/:attemptId',
+      builder: (context, state) {
+        final attemptId = state.pathParameters['attemptId'] ?? 'attempt_1';
+        final questions = _activeTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        return CustomTestScreen(
+          questions: questions,
+          durationMinutes: _activeTestTimerMinutes > 0 ? _activeTestTimerMinutes : 30,
+          onTestSubmitted: (attempt, answers) {
+            _lastTestAttempt = attempt;
+            _lastTestUserAnswers = answers;
+            _lastTestQuestions = List<QuestionModel>.from(questions);
+            _activeTestQuestions = null;
+            context.go('/custom-test/result/$attemptId');
+          },
+        );
+      },
+    ),
+    GoRoute(
+      path: '/custom-test/result/:attemptId',
+      builder: (context, state) {
+        final attempt = _lastTestAttempt ??
+            TestAttemptModel(
+              id: state.pathParameters['attemptId'] ?? 'attempt_1',
+              userId: 'student_1',
+              testTemplateId: 'template_1',
+              testTitle: 'Custom Test Score Report',
+              startedAt: DateTime.now().subtract(const Duration(minutes: 30)),
+              expiresAt: DateTime.now(),
+              submittedAt: DateTime.now(),
+              status: 'submitted',
+              totalScore: 140,
+              maxMarks: 160,
+              totalQuestions: 40,
+              attemptedCount: 38,
+              correctCount: 35,
+              incorrectCount: 3,
+              unattemptedCount: 2,
+              accuracy: 92.1,
+              timeSpentSeconds: 1800,
+            );
+        final questions = _lastTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        final userAnswers = _lastTestUserAnswers ?? const {0: 'A', 1: 'B', 2: 'C'};
+
+        return Scaffold(
+          body: TestResultScreen(
+            attempt: attempt,
+            questions: questions,
+            userAnswers: userAnswers,
+            onBackToDashboard: () => context.go('/dashboard'),
+          ),
+        );
+      },
+    ),
     GoRoute(
       path: '/practice',
       builder: (context, state) => CustomPracticeWizardModal(
         initialExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        mode: PracticeTestMode.practice,
         onClose: () => context.go('/dashboard'),
-        onStartPractice: (questions, timerMins) {},
+        onStartPractice: (questions, timerMins) {
+          _activeTestQuestions = questions;
+          _activeTestTimerMinutes = timerMins;
+          context.go('/practice/session');
+        },
       ),
     ),
     GoRoute(
       path: '/practice/:subject',
       builder: (context, state) {
+        final questions = _activeTestQuestions ?? SupabaseService.getSampleQuestions(20);
         return PracticeScreen(
-          questions: SupabaseService.getSampleQuestions(20),
-          timerMinutes: 30,
+          questions: questions,
+          timerMinutes: _activeTestTimerMinutes,
           onFinish: () => context.go('/dashboard'),
         );
       },
