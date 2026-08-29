@@ -1869,7 +1869,7 @@ class SupabaseService {
         'created_at': qMap['created_at'] ?? DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       };
-      await client.from('questions').upsert(qData, onConflict: 'id');
+      await client.from('questions').upsert(qData);
       return true;
     } catch (e) {
       debugPrint('Supabase saveQuestion error: $e');

@@ -1319,12 +1319,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [
-            _buildQuickActionCard('Questions Bank', 'Manage & organize all question modules', Icons.quiz_outlined, const Color(0xFF4F46E5), () {
-              Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
+            _buildQuickActionCard('Questions Bank', 'Manage & organize all question modules', Icons.quiz_outlined, const Color(0xFF4F46E5), () async {
+              await Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
+              _loadAdminData();
             }),
             _buildQuickActionCard('Dashboard Layout', 'Manage banners, stats & sections', Icons.dashboard_customize_rounded, const Color(0xFF4F46E5), () => Navigator.pushNamed(context, '/admin/sections')),
-            _buildQuickActionCard('Add New Question', 'Create single question', Icons.add_circle_outline_rounded, const Color(0xFF6366F1), () {
-              Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionBuilderScreen(userProfile: widget.userProfile)));
+            _buildQuickActionCard('Add New Question', 'Create single question', Icons.add_circle_outline_rounded, const Color(0xFF6366F1), () async {
+              await Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionBuilderScreen(userProfile: widget.userProfile)));
+              _loadAdminData();
             }),
             _buildQuickActionCard('Bulk Import Questions', 'Upload via CSV/Excel', Icons.cloud_upload_outlined, const Color(0xFF10B981), () {
               Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));

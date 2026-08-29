@@ -122,7 +122,7 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
     });
   }
 
-  void _saveAndSubmitQuestion({bool isDraft = false}) {
+  Future<void> _saveAndSubmitQuestion({bool isDraft = false}) async {
     final usedIn = <String>[];
     if (_showInCustomPractice) usedIn.add('Custom Practice');
     if (_showInCustomTest) usedIn.add('Custom Test');
@@ -170,7 +170,7 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
       'isDraft': isDraft,
     };
 
-    SupabaseService.saveQuestionMap(newQuestion);
+    await SupabaseService.saveQuestionMap(newQuestion);
     _saveToPrefs(newQuestion);
 
     if (widget.onQuestionSaved != null) {
