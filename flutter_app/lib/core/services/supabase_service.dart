@@ -1945,7 +1945,7 @@ class SupabaseService {
         };
       }).toList();
 
-      await client.from('questions').upsert(payloads, onConflict: 'id');
+      await client.from('questions').upsert(payloads);
       debugPrint('✓ Successfully seeded ${payloads.length} questions to remote Supabase DB!');
     } catch (e) {
       debugPrint('Background seed notice: $e');
@@ -2048,10 +2048,12 @@ class SupabaseService {
     final String timeIso = DateTime.now().toIso8601String();
     final String qId = data['id'] ?? 'Q_${DateTime.now().millisecondsSinceEpoch}';
     final rawCat = data['category'] ?? data['sourceType'] ?? 'Custom Practice';
-    final canonicalMap = getCanonicalCategoryAndSourceType(rawCat);
+    final canonicalMap = getCanonicalCategoryAndSourceType(rawCat.toString());
 
     final payload = {
       'id': qId,
+      'paper_id': data['paper_id'] ?? data['paperId'] ?? '',
+      'question_number': (data['question_number'] ?? data['questionNumber'] ?? -1) as int,
       'question_text': data['questionText'] ?? data['question_text'] ?? '',
       'question_image': data['questionImage'] ?? data['question_image'] ?? '',
       'subject': data['subject'] ?? 'Physics',
@@ -2067,16 +2069,18 @@ class SupabaseService {
       'status': data['status'] ?? 'Active',
       'options': data['options'] ?? [],
       'option_images': data['optionImages'] ?? data['option_images'] ?? [null, null, null, null],
-      'correct_answer': data['correctAnswer'] ?? 'Option A',
+      'correct_answer': data['correctAnswer'] ?? data['correct_answer'] ?? 'Option A',
+      'correct_option_index': data['correctOptionIndex'] ?? data['correct_option_index'],
       'explanation': data['explanation'] ?? '',
       'solution': data['solution'] ?? '',
       'year': data['year'] ?? '2026',
       'exam': data['exam'] ?? 'NEET 2026',
       'created_at': timeIso,
+      'updated_at': timeIso,
     };
 
     try {
-      await client.from('questions').upsert(payload, onConflict: 'id');
+      await client.from('questions').upsert(payload);
     } catch (e) {
       debugPrint('Supabase insert error (saving to local storage): $e');
     }
@@ -2998,7 +3002,7 @@ class SupabaseService {
     }).toList();
 
     try {
-      await client.from('questions').upsert(cleanPayloads, onConflict: 'id');
+      await client.from('questions').upsert(cleanPayloads);
       debugPrint('✓ Successfully upserted ${cleanPayloads.length} questions to remote Supabase DB!');
     } catch (e) {
       debugPrint('Supabase incremental question upsert error: $e');
