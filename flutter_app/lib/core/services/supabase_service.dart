@@ -1984,27 +1984,26 @@ class SupabaseService {
       }
     }
 
-    // 1. Pre-populate initial 20 practice questions
-    final practice20 = get20RealQuestionsMap();
-    for (var pQ in practice20) {
-      addOrUpdate(pQ);
-    }
-
-    // 2. Fetch custom saved questions from SharedPreferences
+    // One-time sync of initial practice questions & local storage items to remote Supabase DB
     try {
+      final List<Map<String, dynamic>> itemsToMigrate = [];
+      itemsToMigrate.addAll(get20RealQuestionsMap());
+
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(jsonStr);
         for (var item in decoded) {
-          addOrUpdate(Map<String, dynamic>.from(item as Map));
+          itemsToMigrate.add(Map<String, dynamic>.from(item as Map));
         }
       }
+
+      await _seedLocalQuestionsToSupabase(itemsToMigrate);
     } catch (e) {
-      debugPrint('Notice merging saved local questions: $e');
+      debugPrint('Notice during one-time DB migration sync: $e');
     }
 
-    // 3. Fetch live questions directly from Supabase DB as the ultimate source of truth
+    // Fetch live questions directly from Supabase DB as the exclusive single source of truth
     try {
       final res = await client.from('questions').select('*').order('created_at', ascending: false);
       if (res != null && (res as List).isNotEmpty) {
