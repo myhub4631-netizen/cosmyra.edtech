@@ -1899,12 +1899,55 @@ class SupabaseService {
     }
   }
 
-  /// Fetch all real questions from Supabase DB, local storage cache, and 20 practice questions
+  /// Background sync to upsert any local / practice questions to remote Supabase DB so Desktop and Mobile match 100%
+  static Future<void> _seedLocalQuestionsToSupabase(List<Map<String, dynamic>> items) async {
+    if (items.isEmpty) return;
+    try {
+      final List<Map<String, dynamic>> payloads = items.map((qMap) {
+        final rawCat = (qMap['category'] ?? qMap['sourceType'] ?? 'Custom Practice').toString();
+        final canonicalMap = getCanonicalCategoryAndSourceType(rawCat);
+        return {
+          'id': qMap['id'],
+          'paper_id': qMap['paper_id'] ?? '',
+          'question_number': qMap['question_number'] ?? -1,
+          'question_text': qMap['questionText'] ?? qMap['question_text'] ?? '',
+          'question_image': qMap['questionImage'] ?? qMap['question_image'] ?? '',
+          'subject': qMap['subject'] ?? 'Physics',
+          'chapter': qMap['chapter'] ?? '1. Mechanics',
+          'topic': qMap['topic'] ?? 'Kinematics',
+          'category': canonicalMap['category'],
+          'source_type': canonicalMap['source_type'],
+          'source': canonicalMap['source'],
+          'difficulty': qMap['difficulty'] ?? 'Medium',
+          'q_type': qMap['type'] ?? qMap['q_type'] ?? 'MCQ',
+          'marks': qMap['marks'] ?? 4,
+          'negative_marks': qMap['negativeMarks'] ?? 1.0,
+          'status': qMap['status'] ?? 'Active',
+          'options': qMap['options'] ?? [],
+          'option_images': qMap['optionImages'] ?? qMap['option_images'] ?? [null, null, null, null],
+          'correct_answer': qMap['correct_answer'] ?? qMap['correctAnswer'] ?? 'Option A',
+          'correct_option_index': qMap['correct_option_index'] ?? qMap['correctOptionIndex'],
+          'explanation': qMap['explanation'] ?? '',
+          'solution': qMap['solution'] ?? qMap['explanation'] ?? '',
+          'year': qMap['year']?.toString() ?? '2026',
+          'exam': qMap['exam']?.toString() ?? 'NEET 2026',
+          'created_at': qMap['created_at'] ?? DateTime.now().toIso8601String(),
+        };
+      }).toList();
+
+      await client.from('questions').upsert(payloads, onConflict: 'id');
+      debugPrint('✓ Successfully seeded ${payloads.length} questions to remote Supabase DB!');
+    } catch (e) {
+      debugPrint('Background seed notice: $e');
+    }
+  }
+
+  /// Fetch all real questions from Supabase DB, synchronizing local/sample questions to DB
   static Future<List<Map<String, dynamic>>> fetchAllQuestionsFromSupabase() async {
     final List<Map<String, dynamic>> allQuestions = [];
+    final List<Map<String, dynamic>> toSeedToSupabase = [];
 
-    // Helper to add or update question by ID / paper_id + question_number
-    void addOrUpdate(Map<String, dynamic> qMap) {
+    void addOrUpdate(Map<String, dynamic> qMap, {bool fromRemote = false}) {
       final String id = qMap['id']?.toString() ?? '';
       final String paperId = (qMap['paper_id'] ?? qMap['paperId'] ?? '').toString();
       final int qNum = (qMap['question_number'] ?? qMap['questionNumber'] ?? -1) as int;
@@ -1950,6 +1993,8 @@ class SupabaseService {
         'options': qMap['options'] is List ? List<String>.from(qMap['options']) : [],
         'optionImages': qMap['optionImages'] is List ? List<String?>.from(qMap['optionImages']) : (qMap['option_images'] is List ? List<String?>.from(qMap['option_images']) : [null, null, null, null]),
         'correctAnswer': qMap['correctAnswer'] ?? qMap['correct_answer'] ?? 'Option A',
+        'correct_answer': qMap['correct_answer'] ?? qMap['correctAnswer'] ?? 'Option A',
+        'correct_option_index': qMap['correct_option_index'] ?? qMap['correctOptionIndex'],
         'explanation': qMap['explanation'] ?? '',
         'solution': qMap['solution'] ?? qMap['explanation'] ?? '',
         'year': qMap['year']?.toString() ?? '2026',
@@ -1962,40 +2007,48 @@ class SupabaseService {
         allQuestions[idx] = normalized;
       } else {
         allQuestions.add(normalized);
-      }
-    }
-
-    // 1. Load from SharedPreferences saved custom questions
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
-      if (jsonStr != null && jsonStr.isNotEmpty) {
-        final List<dynamic> decoded = jsonDecode(jsonStr);
-        for (var item in decoded) {
-          addOrUpdate(Map<String, dynamic>.from(item as Map));
+        if (!fromRemote) {
+          toSeedToSupabase.add(normalized);
         }
       }
-    } catch (e) {
-      debugPrint('Notice loading custom saved questions: $e');
     }
 
-    // 2. Load from Supabase DB questions table
+    // 1. Load remote questions from Supabase DB FIRST as single source of truth
     try {
       final res = await client.from('questions').select('*').order('created_at', ascending: false);
       if (res != null && (res as List).isNotEmpty) {
         final dbList = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         for (var dbQ in dbList) {
-          addOrUpdate(dbQ);
+          addOrUpdate(dbQ, fromRemote: true);
         }
       }
     } catch (e) {
       debugPrint('Notice querying Supabase questions table: $e');
     }
 
-    // 3. Load 20 practice questions so they are visible in Admin Questions & Practice
+    // 2. Load SharedPreferences saved custom questions
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(jsonStr);
+        for (var item in decoded) {
+          addOrUpdate(Map<String, dynamic>.from(item as Map), fromRemote: false);
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice loading custom saved questions: $e');
+    }
+
+    // 3. Load 20 practice questions so they are present everywhere
     final practice20 = get20RealQuestionsMap();
     for (var pQ in practice20) {
-      addOrUpdate(pQ);
+      addOrUpdate(pQ, fromRemote: false);
+    }
+
+    // 4. Background seed any unsynced local questions to Supabase DB so Mobile & Desktop match 100%
+    if (toSeedToSupabase.isNotEmpty) {
+      _seedLocalQuestionsToSupabase(toSeedToSupabase);
     }
 
     return allQuestions;
