@@ -173,6 +173,30 @@ export const AdminBulkUploadStep2: React.FC = () => {
 
       let newlySavedCount = 0;
 
+      const rawCat = paperData?.sourceCategory || paperData?.source_category || 'PYQ';
+      let canonicalCat = 'pyq_practice';
+      let canonicalSourceType = 'pyq';
+      let canonicalSource = 'pyq';
+
+      const catUpper = rawCat.trim().toUpperCase();
+      if (catUpper === 'NTA' || catUpper === 'NTA_QUESTION' || catUpper === 'NTA QUESTIONS') {
+        canonicalCat = 'nta_question';
+        canonicalSourceType = 'nta';
+        canonicalSource = 'nta';
+      } else if (catUpper === 'TEST SERIES' || catUpper === 'MOCK TEST' || catUpper === 'TEST_SERIES' || catUpper === 'MOCK_TEST') {
+        canonicalCat = 'mock_test';
+        canonicalSourceType = 'test_series';
+        canonicalSource = 'mock_test';
+      } else if (catUpper === 'CUSTOM TEST' || catUpper === 'CUSTOM_TEST') {
+        canonicalCat = 'custom_test';
+        canonicalSourceType = 'custom_test';
+        canonicalSource = 'custom_test';
+      } else if (catUpper === 'QUESTIONS' || catUpper === 'CUSTOM_PRACTICE') {
+        canonicalCat = 'custom_practice';
+        canonicalSourceType = 'practice';
+        canonicalSource = 'practice';
+      }
+
       batchToSave.forEach((q) => {
         const qId = `q_${pId}_${q.id}`;
         let correctAnsText = 'Option A';
@@ -204,11 +228,13 @@ export const AdminBulkUploadStep2: React.FC = () => {
           subject: q.subject || 'Physics',
           chapter: q.chapter || 'General',
           topic: q.topic || 'General',
-          category: paperData?.sourceCategory || 'PYQ',
-          sourceType: paperData?.sourceCategory || 'PYQ',
-          exam: paperData?.examName || 'NEET',
+          category: canonicalCat,
+          sourceType: canonicalSourceType,
+          source_type: canonicalSourceType,
+          source: canonicalSource,
+          exam: paperData?.examName || paperData?.exam || 'NEET',
           year: parseInt(paperData?.year || '2026', 10),
-          paperName: paperData?.paperName || 'NEET 2026 Phase 1',
+          paperName: paperData?.paperName || paperData?.paper_name || 'NEET 2026 Phase 1',
           status: 'Active',
           created_at: new Date().toISOString(),
         };

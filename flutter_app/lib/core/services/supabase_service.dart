@@ -1629,102 +1629,151 @@ class SupabaseService {
     return models;
   }
 
+  /// Convert user-selected category to canonical category & source_type
+  static Map<String, String> getCanonicalCategoryAndSourceType(String rawCat) {
+    final cat = rawCat.trim().toUpperCase();
+    if (cat == 'PYQ' || cat == 'PYQ_PRACTICE' || cat == 'PYQ PRACTICE') {
+      return {'category': 'pyq_practice', 'source_type': 'pyq', 'source': 'pyq'};
+    } else if (cat == 'NTA' || cat == 'NTA_QUESTION' || cat == 'NTA QUESTIONS') {
+      return {'category': 'nta_question', 'source_type': 'nta', 'source': 'nta'};
+    } else if (cat == 'TEST SERIES' || cat == 'MOCK TEST' || cat == 'MOCK_TEST' || cat == 'TEST_SERIES') {
+      return {'category': 'mock_test', 'source_type': 'test_series', 'source': 'mock_test'};
+    } else if (cat == 'CUSTOM TEST' || cat == 'CUSTOM_TEST') {
+      return {'category': 'custom_test', 'source_type': 'custom_test', 'source': 'custom_test'};
+    } else {
+      return {'category': 'custom_practice', 'source_type': 'practice', 'source': 'practice'};
+    }
+  }
+
   static Future<List<QuestionModel>> fetchQuestions({
     String? examId,
     String? subjectId,
     String? chapterId,
     String? topicId,
     String? source,
+    String? category,
     String? difficulty,
     String? query,
     int limit = 50,
   }) async {
-    final allMaps = List<Map<String, dynamic>>.from(get20RealQuestionsMap());
+    final List<Map<String, dynamic>> allMaps = [];
 
-    // Merge custom saved questions from SharedPreferences
+    // 1. Merge custom saved questions from SharedPreferences
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(jsonStr);
-        final saved = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        for (var q in saved) {
-          final idx = allMaps.indexWhere((m) => m['id'] == q['id']);
-          if (idx != -1) {
-            allMaps[idx] = q;
-          } else {
-            allMaps.insert(0, q);
-          }
-        }
+        allMaps.addAll(decoded.map((e) => Map<String, dynamic>.from(e as Map)));
       }
     } catch (e) {
       debugPrint('Error merging saved questions: $e');
     }
 
-    // Try fetching from Supabase DB questions table
+    // 2. Fetch from Supabase DB questions table
     try {
-      var req = client.from('questions').select('*, options:question_options(*)');
-      if (examId != null && examId.isNotEmpty) req = req.eq('exam_id', examId);
-      if (subjectId != null && subjectId.isNotEmpty) req = req.eq('subject_id', subjectId);
-      if (chapterId != null && chapterId.isNotEmpty) req = req.eq('chapter_id', chapterId);
-      if (source != null && source.isNotEmpty && source != 'all') req = req.eq('source', source);
-      if (difficulty != null && difficulty.isNotEmpty && difficulty != 'all') req = req.eq('difficulty', difficulty);
+      var req = client.from('questions').select('*');
+      if (examId != null && examId.isNotEmpty) {
+        req = req.or('exam.ilike.%$examId%,exam_id.eq.$examId');
+      }
+      if (subjectId != null && subjectId.isNotEmpty) {
+        req = req.or('subject.ilike.%$subjectId%,subject_id.eq.$subjectId');
+      }
+      if (chapterId != null && chapterId.isNotEmpty) {
+        req = req.or('chapter.ilike.%$chapterId%,chapter_id.eq.$chapterId');
+      }
 
-      final res = await req.limit(limit);
+      if (category != null && category.isNotEmpty && category != 'all') {
+        req = req.or('category.eq.$category,source_type.eq.$category,source.eq.$category');
+      } else if (source != null && source.isNotEmpty && source != 'all') {
+        final sLower = source.toLowerCase();
+        if (sLower == 'pyq' || sLower == 'pyq_practice') {
+          req = req.or('category.eq.pyq_practice,category.eq.PYQ,source.eq.pyq,source_type.eq.pyq,source_type.eq.PYQ');
+        } else if (sLower == 'nta' || sLower == 'nta_question') {
+          req = req.or('category.eq.nta_question,category.eq.NTA,source.eq.nta,source_type.eq.nta,source_type.eq.NTA');
+        } else {
+          req = req.or('source.eq.$source,source_type.eq.$source,category.eq.$source');
+        }
+      }
+
+      if (difficulty != null && difficulty.isNotEmpty && difficulty != 'all') {
+        req = req.ilike('difficulty', difficulty);
+      }
+
+      final res = await req.limit(limit * 2);
       if (res != null && (res as List).isNotEmpty) {
-        final dbList = (res as List).map((q) => QuestionModel.fromJson(q)).toList();
+        final dbList = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         for (var dbQ in dbList) {
-          if (!allMaps.any((m) => m['id'] == dbQ.id)) {
-            allMaps.insert(0, {
-              'id': dbQ.id,
-              'questionText': dbQ.questionText,
-              'subject': dbQ.subjectId ?? 'Physics',
-              'chapter': dbQ.chapterId ?? 'General',
-              'sourceType': dbQ.source ?? 'NTA',
-              'difficulty': dbQ.difficulty ?? 'Medium',
-              'marks': dbQ.marks.toString(),
-              'negativeMarks': dbQ.negativeMarks.toString(),
-              'options': dbQ.options.map((o) => o.optionText).toList(),
-              'correctAnswer': dbQ.options.isNotEmpty ? dbQ.options.firstWhere((o) => o.isCorrect, orElse: () => dbQ.options[0]).optionText : '',
-              'explanation': dbQ.explanation ?? '',
-            });
+          final idx = allMaps.indexWhere((m) => m['id'] == dbQ['id'] || (m['paper_id'] == dbQ['paper_id'] && m['question_number'] == dbQ['question_number']));
+          if (idx != -1) {
+            allMaps[idx] = dbQ;
+          } else {
+            allMaps.add(dbQ);
           }
         }
       }
     } catch (e) {
-      debugPrint('Error fetching questions from Supabase: $e');
+      debugPrint('Notice fetching questions from Supabase: $e');
     }
 
-    final models = allMaps.map((map) {
+    if (allMaps.isEmpty) {
+      allMaps.addAll(get20RealQuestionsMap());
+    }
+
+    final List<QuestionModel> models = [];
+    for (var map in allMaps) {
+      final qSource = (map['sourceType'] ?? map['source_type'] ?? map['source'] ?? map['category'] ?? 'pyq').toString().toLowerCase();
+      final qCategory = (map['category'] ?? map['source_category'] ?? map['sourceCategory'] ?? '').toString().toLowerCase();
+
+      // Apply source filtering if requested
+      if (source != null && source.isNotEmpty && source != 'all') {
+        final sLower = source.toLowerCase();
+        final isPyqMatch = sLower.contains('pyq') && (qSource.contains('pyq') || qCategory.contains('pyq'));
+        final isNtaMatch = sLower.contains('nta') && (qSource.contains('nta') || qCategory.contains('nta'));
+        final isMatch = isPyqMatch || isNtaMatch || qSource == sLower || qCategory == sLower;
+        if (!isMatch && allMaps.length > 5) continue;
+      }
+
       final optsRaw = map['options'] is List ? List<String>.from(map['options']) : <String>[];
+      final optImgsRaw = map['optionImages'] is List
+          ? List<String?>.from(map['optionImages'])
+          : (map['option_images'] is List ? List<String?>.from(map['option_images']) : <String?>[]);
+
       final opts = optsRaw.asMap().entries.map((e) {
+        final idx = e.key;
+        final text = e.value;
+        final img = idx < optImgsRaw.length ? optImgsRaw[idx] : null;
+        final isCorr = text == map['correctAnswer'] || text == map['correct_answer'] || idx == map['correctOptionIndex'];
         return QuestionOptionModel(
-          id: 'opt_${map['id']}_${e.key}',
+          id: 'opt_${map['id']}_$idx',
           questionId: map['id']?.toString() ?? '',
-          optionIndex: e.key,
-          optionText: e.value,
-          isCorrect: e.value == map['correctAnswer'],
+          optionIndex: idx,
+          optionText: text,
+          isCorrect: isCorr,
+          optionImage: img,
         );
       }).toList();
 
-      return QuestionModel(
+      models.add(QuestionModel(
         id: map['id']?.toString() ?? '',
-        examId: '11111111-1111-1111-1111-111111111111',
-        subjectId: map['subject'] == 'Physics' ? 'a1111111' : (map['subject'] == 'Chemistry' ? 'a2222222' : 'a3333333'),
-        chapterId: 'b1111111',
-        questionText: map['questionText']?.toString() ?? '',
-        qType: 'single_correct',
+        examId: map['exam']?.toString() ?? map['exam_id']?.toString() ?? 'NEET',
+        subjectId: map['subject']?.toString() ?? map['subject_id']?.toString() ?? 'Physics',
+        chapterId: map['chapter']?.toString() ?? map['chapter_id']?.toString() ?? 'General',
+        topicId: map['topic']?.toString() ?? map['topic_id']?.toString() ?? 'General',
+        questionText: map['questionText']?.toString() ?? map['question_text']?.toString() ?? '',
+        questionImage: map['questionImage']?.toString() ?? map['question_image']?.toString(),
+        qType: map['qType']?.toString() ?? map['question_type']?.toString() ?? 'single_correct',
         difficulty: (map['difficulty']?.toString() ?? 'medium').toLowerCase(),
-        source: (map['sourceType']?.toString() ?? 'nta').toLowerCase(),
-        sourceName: map['sourceType']?.toString() ?? 'Practice Question',
-        year: 2024,
-        marks: double.tryParse(map['marks']?.toString() ?? '4') ?? 4.0,
-        negativeMarks: double.tryParse(map['negativeMarks']?.toString() ?? '1') ?? 1.0,
+        source: qSource,
+        sourceName: map['paperName']?.toString() ?? map['paper_name']?.toString() ?? map['sourceType']?.toString() ?? 'PYQ Question',
+        year: (map['year'] is num) ? (map['year'] as num).toInt() : int.tryParse(map['year']?.toString() ?? '2026'),
+        marks: (map['marks'] is num) ? (map['marks'] as num).toDouble() : double.tryParse(map['marks']?.toString() ?? '4') ?? 4.0,
+        negativeMarks: (map['negativeMarks'] is num) ? (map['negativeMarks'] as num).toDouble() : double.tryParse(map['negativeMarks']?.toString() ?? '1') ?? 1.0,
         explanation: map['explanation']?.toString() ?? '',
         solution: map['explanation']?.toString() ?? '',
         options: opts,
-      );
-    }).toList();
+      ));
+    }
 
     if (limit <= models.length) {
       return models.sublist(0, limit);
@@ -2573,9 +2622,15 @@ class SupabaseService {
   /// Save or update paper details record in Supabase 'papers' table and local storage
   static Future<Map<String, dynamic>> savePaperRecord(Map<String, dynamic> paperData) async {
     final String paperId = paperData['id'] ?? 'paper_${DateTime.now().millisecondsSinceEpoch}';
+    final rawCat = paperData['sourceCategory'] ?? paperData['source_category'] ?? 'PYQ';
+    final canonical = getCanonicalCategoryAndSourceType(rawCat);
+
     final fullData = {
       'id': paperId,
-      'source_category': paperData['sourceCategory'] ?? paperData['source_category'] ?? 'PYQ',
+      'source_category': canonical['category'],
+      'category': canonical['category'],
+      'source_type': canonical['source_type'],
+      'source': canonical['source'],
       'exam': paperData['exam'] ?? paperData['exam_name'] ?? 'NEET',
       'year': paperData['year']?.toString() ?? '2026',
       'phase_session': paperData['phaseSession'] ?? paperData['phase_session'] ?? 'Phase 1',
@@ -2691,6 +2746,9 @@ class SupabaseService {
           ? List<String?>.from(q['optionImages'])
           : (q['option_images'] is List ? List<String?>.from(q['option_images']) : <String?>[]);
 
+      final rawCat = q['category'] ?? q['sourceType'] ?? q['source_category'] ?? 'PYQ';
+      final canonical = getCanonicalCategoryAndSourceType(rawCat);
+
       return {
         'id': qId,
         'paper_id': paperId,
@@ -2698,11 +2756,14 @@ class SupabaseService {
         'question_text': q['questionText'] ?? q['question_text'] ?? '',
         'question_image': q['questionImage'] ?? q['question_image'] ?? '',
         'subject': q['subject'] ?? 'Physics',
+        'subject_id': q['subject'] ?? 'Physics',
         'chapter': q['chapter'] ?? 'General',
+        'chapter_id': q['chapter'] ?? 'General',
         'topic': q['topic'] ?? 'General',
-        'category': q['category'] ?? q['sourceType'] ?? 'PYQ',
-        'source_type': q['sourceType'] ?? q['source_type'] ?? 'PYQ',
-        'source': (q['sourceType'] ?? q['source'] ?? 'pyq').toString().toLowerCase(),
+        'topic_id': q['topic'] ?? 'General',
+        'category': canonical['category'],
+        'source_type': canonical['source_type'],
+        'source': canonical['source'],
         'difficulty': q['difficulty'] ?? 'Medium',
         'q_type': q['qType'] ?? q['question_type'] ?? 'Single Choice (MCQ)',
         'marks': (q['marks'] is num) ? (q['marks'] as num).toInt() : int.tryParse(q['marks']?.toString() ?? '4') ?? 4,
