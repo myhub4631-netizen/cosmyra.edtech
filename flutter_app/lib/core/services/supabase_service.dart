@@ -1738,21 +1738,9 @@ class SupabaseService {
   }) async {
     final List<Map<String, dynamic>> allMaps = [];
 
-    // 1. Merge custom saved questions from SharedPreferences
+    // Fetch live questions directly from Supabase DB
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
-      if (jsonStr != null && jsonStr.isNotEmpty) {
-        final List<dynamic> decoded = jsonDecode(jsonStr);
-        allMaps.addAll(decoded.map((e) => Map<String, dynamic>.from(e as Map)));
-      }
-    } catch (e) {
-      debugPrint('Error merging saved questions: $e');
-    }
-
-    // 2. Fetch from Supabase DB questions table
-    try {
-      var req = client.from('questions').select('*');
+      dynamic req = client.from('questions').select('*');
       if (examId != null && examId.isNotEmpty) {
         req = req.or('exam.ilike.%$examId%,exam_id.eq.$examId');
       }
@@ -1763,28 +1751,12 @@ class SupabaseService {
         req = req.or('chapter.ilike.%$chapterId%,chapter_id.eq.$chapterId');
       }
 
-      if (category != null && category.isNotEmpty && category != 'all') {
-        req = req.or('category.eq.$category,source_type.eq.$category,source.eq.$category');
-      } else if (source != null && source.isNotEmpty && source != 'all') {
-        final sLower = source.toLowerCase();
-        if (sLower == 'pyq' || sLower == 'pyq_practice') {
-          req = req.or('category.eq.pyq_practice,category.eq.PYQ,source.eq.pyq,source_type.eq.pyq,source_type.eq.PYQ');
-        } else if (sLower == 'nta' || sLower == 'nta_question') {
-          req = req.or('category.eq.nta_question,category.eq.NTA,source.eq.nta,source_type.eq.nta,source_type.eq.NTA');
-        } else {
-          req = req.or('source.eq.$source,source_type.eq.$source,category.eq.$source');
-        }
-      }
-
-      if (difficulty != null && difficulty.isNotEmpty && difficulty != 'all') {
-        req = req.ilike('difficulty', difficulty);
-      }
-
-      final res = await req.limit(limit * 2);
+      final res = await req.order('created_at', ascending: false).limit(limit * 2);
       if (res != null && (res as List).isNotEmpty) {
         final dbList = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         for (var dbQ in dbList) {
-          final idx = allMaps.indexWhere((m) => m['id'] == dbQ['id'] || (m['paper_id'] == dbQ['paper_id'] && m['question_number'] == dbQ['question_number']));
+          final qId = dbQ['id']?.toString() ?? '';
+          final idx = qId.isNotEmpty ? allMaps.indexWhere((m) => m['id'] == qId) : -1;
           if (idx != -1) {
             allMaps[idx] = dbQ;
           } else {
@@ -1794,10 +1766,6 @@ class SupabaseService {
       }
     } catch (e) {
       debugPrint('Notice fetching questions from Supabase: $e');
-    }
-
-    if (allMaps.isEmpty) {
-      allMaps.addAll(get20RealQuestionsMap());
     }
 
     final List<QuestionModel> models = [];
