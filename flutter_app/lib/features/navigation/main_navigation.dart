@@ -374,6 +374,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         return TestSeriesScreen(
           onBackToDashboard: () => setState(() => _selectedIndex = 0),
           onNavigateTab: (idx) => setState(() => _selectedIndex = idx),
+          onStartTestSeriesSession: (questions, timerMins) {
+            setState(() {
+              _activeTestQuestions = questions;
+              _activeTestDurationMinutes = timerMins;
+            });
+          },
         );
       case 3:
         return PyqNtaScreen(

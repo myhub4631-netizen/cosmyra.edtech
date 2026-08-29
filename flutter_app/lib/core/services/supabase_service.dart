@@ -2873,6 +2873,188 @@ class SupabaseService {
 
     return results;
   }
+
+  /// Fetch all saved papers/test series records from DB and local cache
+  static Future<List<Map<String, dynamic>>> fetchAllPapersAndTestSeries() async {
+    final List<Map<String, dynamic>> papers = [];
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString('cosmyra_saved_papers');
+      if (str != null && str.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(str);
+        papers.addAll(decoded.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+    } catch (e) {
+      debugPrint('Notice reading local saved papers: $e');
+    }
+
+    try {
+      final res = await client.from('papers').select().order('created_at', ascending: false);
+      if (res != null && (res as List).isNotEmpty) {
+        final dbPapers = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        for (var dbP in dbPapers) {
+          final idx = papers.indexWhere((p) => p['id'] == dbP['id']);
+          if (idx != -1) {
+            papers[idx] = dbP;
+          } else {
+            papers.add(dbP);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice reading Supabase papers table: $e');
+    }
+
+    return papers;
+  }
+
+  /// Fetch QuestionModels for Test Series / Paper directly from Supabase DB & cache
+  static Future<List<QuestionModel>> fetchTestSeriesQuestions({
+    required String paperId,
+    String? category,
+    String? exam,
+    int limit = 200,
+  }) async {
+    final List<Map<String, dynamic>> rawMaps = [];
+
+    // 1. Fetch by paperId from fetchQuestionsForPaper
+    if (paperId.isNotEmpty && paperId != 'all') {
+      final paperQuestions = await fetchQuestionsForPaper(paperId);
+      rawMaps.addAll(paperQuestions);
+    }
+
+    // 2. Check global saved questions for matching paper_id or test_series_id
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final globalStr = prefs.getString('cosmyra_saved_custom_questions');
+      if (globalStr != null && globalStr.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(globalStr);
+        for (var item in list) {
+          final Map<String, dynamic> map = Map<String, dynamic>.from(item as Map);
+          final pId = map['paper_id'] ?? map['paperId'];
+          if (pId == paperId || map['test_series_id'] == paperId) {
+            final idx = rawMaps.indexWhere((m) => m['id'] == map['id'] || (m['paper_id'] == map['paper_id'] && m['question_number'] == map['question_number']));
+            if (idx != -1) {
+              rawMaps[idx] = map;
+            } else {
+              rawMaps.add(map);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice checking global saved questions: $e');
+    }
+
+    // 3. Query Supabase DB questions table for matching paper_id or test_series_id
+    try {
+      var req = client.from('questions').select('*');
+      if (paperId.isNotEmpty && paperId != 'all') {
+        req = req.or('paper_id.eq.$paperId,test_series_id.eq.$paperId');
+      }
+      final res = await req.order('question_number', ascending: true).limit(limit);
+      if (res != null && (res as List).isNotEmpty) {
+        final dbList = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        for (var dbQ in dbList) {
+          final idx = rawMaps.indexWhere((m) => m['id'] == dbQ['id'] || (m['paper_id'] == dbQ['paper_id'] && m['question_number'] == dbQ['question_number']));
+          if (idx != -1) {
+            rawMaps[idx] = dbQ;
+          } else {
+            rawMaps.add(dbQ);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice querying Supabase questions table: $e');
+    }
+
+    // 4. If still empty, query all active questions from Supabase for test_series / mock_test or category
+    if (rawMaps.isEmpty) {
+      try {
+        final catFilter = (category != null && category.isNotEmpty) ? category : 'mock_test';
+        final res = await client
+            .from('questions')
+            .select('*')
+            .or('category.eq.$catFilter,category.eq.mock_test,category.eq.pyq_practice,category.eq.custom_practice,status.eq.Active')
+            .order('created_at', ascending: false)
+            .limit(limit);
+        if (res != null && (res as List).isNotEmpty) {
+          rawMaps.addAll((res as List).map((row) => Map<String, dynamic>.from(row as Map)));
+        }
+      } catch (e) {
+        debugPrint('Notice querying fallback questions from Supabase: $e');
+      }
+    }
+
+    // 5. Fallback to all saved custom questions if still empty
+    if (rawMaps.isEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final globalStr = prefs.getString('cosmyra_saved_custom_questions');
+        if (globalStr != null && globalStr.isNotEmpty) {
+          final List<dynamic> list = jsonDecode(globalStr);
+          rawMaps.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        }
+      } catch (e) {
+        debugPrint('Notice loading all saved questions fallback: $e');
+      }
+    }
+
+    // 6. Final fallback: sample questions if no questions exist anywhere
+    if (rawMaps.isEmpty) {
+      return getSampleQuestions(20);
+    }
+
+    // Sort by question_number if available
+    rawMaps.sort((a, b) {
+      final numA = (a['question_number'] ?? a['questionNumber'] ?? 999) as int;
+      final numB = (b['question_number'] ?? b['questionNumber'] ?? 999) as int;
+      return numA.compareTo(numB);
+    });
+
+    return rawMaps.map((map) {
+      final optsRaw = map['options'] is List ? List<String>.from(map['options']) : <String>[];
+      final optImgsRaw = map['optionImages'] is List
+          ? List<String?>.from(map['optionImages'])
+          : (map['option_images'] is List ? List<String?>.from(map['option_images']) : <String?>[]);
+
+      final opts = optsRaw.asMap().entries.map((e) {
+        final idx = e.key;
+        final text = e.value;
+        final img = idx < optImgsRaw.length ? optImgsRaw[idx] : null;
+        final isCorr = text == map['correctAnswer'] || text == map['correct_answer'] || idx == map['correctOptionIndex'];
+        return QuestionOptionModel(
+          id: 'opt_${map['id']}_$idx',
+          questionId: map['id']?.toString() ?? '',
+          optionIndex: idx,
+          optionText: text,
+          isCorrect: isCorr,
+          optionImage: img,
+        );
+      }).toList();
+
+      return QuestionModel(
+        id: map['id']?.toString() ?? '',
+        examId: map['exam']?.toString() ?? map['exam_id']?.toString() ?? 'NEET',
+        subjectId: map['subject']?.toString() ?? map['subject_id']?.toString() ?? 'Physics',
+        chapterId: map['chapter']?.toString() ?? map['chapter_id']?.toString() ?? 'General',
+        topicId: map['topic']?.toString() ?? map['topic_id']?.toString() ?? 'General',
+        questionText: map['questionText']?.toString() ?? map['question_text']?.toString() ?? '',
+        questionImage: map['questionImage']?.toString() ?? map['question_image']?.toString(),
+        qType: map['qType']?.toString() ?? map['question_type']?.toString() ?? 'single_correct',
+        difficulty: (map['difficulty']?.toString() ?? 'medium').toLowerCase(),
+        source: (map['sourceType'] ?? map['source_type'] ?? map['source'] ?? map['category'] ?? 'pyq').toString().toLowerCase(),
+        sourceName: map['paperName']?.toString() ?? map['paper_name']?.toString() ?? map['sourceType']?.toString() ?? 'Test Series Question',
+        year: (map['year'] is num) ? (map['year'] as num).toInt() : int.tryParse(map['year']?.toString() ?? '2026'),
+        marks: (map['marks'] is num) ? (map['marks'] as num).toDouble() : double.tryParse(map['marks']?.toString() ?? '4') ?? 4.0,
+        negativeMarks: (map['negativeMarks'] is num) ? (map['negativeMarks'] as num).toDouble() : double.tryParse(map['negativeMarks']?.toString() ?? '1') ?? 1.0,
+        explanation: map['explanation']?.toString() ?? '',
+        solution: map['explanation']?.toString() ?? '',
+        options: opts,
+      );
+    }).toList();
+  }
 }
 
 
