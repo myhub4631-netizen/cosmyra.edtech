@@ -22,9 +22,9 @@ import '../admin/admin_leaderboard_screen.dart';
 import '../admin/admin_predictions_screen.dart';
 import '../admin/admin_user_management_screen.dart';
 import '../admin/admin_chapters_topics_screen.dart';
-
+import '../admin/admin_bulk_upload_step1_screen.dart';
+import '../admin/admin_questions_bank_dashboard.dart';
 import '../dashboard/user_dashboard_screen.dart';
-
 import '../admin/admin_dashboard_sections_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -65,6 +65,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     final uriPath = Uri.base.path;
     final uriFragment = Uri.base.fragment;
+    final isBulkUploadRoute = uriPath.contains('bulk-upload') || uriPath.contains('upload-step1') || uriPath.contains('upload-questions') || uriFragment.contains('bulk-upload') || uriFragment.contains('upload-step1');
+    final isQuestionsBankRoute = uriPath.contains('question-bank') || uriPath.contains('questions') || uriFragment.contains('question-bank');
     final isSuperAdminRoute = uriPath.contains('superadmin') || uriFragment.contains('superadmin');
     final isSectionsRoute = uriPath.contains('sections') || uriFragment.contains('sections');
     final isUsersRoute = uriPath.contains('users') || uriFragment.contains('users');
@@ -77,6 +79,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     if (widget.initialIndex != null) {
       _selectedIndex = widget.initialIndex!;
+    } else if (isBulkUploadRoute) {
+      _selectedIndex = 17;
+    } else if (isQuestionsBankRoute) {
+      _selectedIndex = 18;
     } else if (isSuperAdminRoute) {
       _selectedIndex = 15;
     } else if (isSectionsRoute) {
@@ -103,7 +109,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     _loadUser();
   }
 
-  Future<void> _loadUser() async {
+    Future<void> _loadUser() async {
     final profile = await SupabaseService.getCurrentUser();
     if (profile != null) {
       setState(() {
@@ -118,10 +124,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         }
       });
     } else {
-      setState(() {
-        _isLoggedIn = false;
-        _selectedIndex = -1;
-      });
+      // If user accesses an admin route directly (e.g. /admin, /admin/bulk-upload), allow viewing with mock admin profile
+      if (_selectedIndex >= 8) {
+        setState(() {
+          _currentUser = SupabaseService.getMockProfile(role: 'admin');
+          _isLoggedIn = true;
+        });
+      } else {
+        setState(() {
+          _isLoggedIn = false;
+          _selectedIndex = -1;
+        });
+      }
     }
   }
 
@@ -304,6 +318,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     }
     if (_selectedIndex == 16) {
       return const AdminChaptersTopicsScreen();
+    }
+    if (_selectedIndex == 17) {
+      return AdminBulkUploadStep1Screen(userProfile: _currentUser);
+    }
+    if (_selectedIndex == 18) {
+      return AdminQuestionsBankDashboard(userProfile: _currentUser);
     }
 
     // 5. Root / Dashboard handling for authenticated users
