@@ -36,7 +36,7 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
 
     if (mounted) {
       setState(() {
-        _chaptersList = List<Map<String, dynamic>>.from(chapters);
+        _chaptersList = SupabaseService.sortTaxonomyChapters(List<Map<String, dynamic>>.from(chapters));
         if (_chaptersList.isNotEmpty) {
           final selected = _chaptersList.firstWhere(
             (c) => c['id'] == _selectedChapterId || c['name'] == _selectedChapterForTopics,

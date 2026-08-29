@@ -644,7 +644,7 @@ class SupabaseService {
           .order('display_order', ascending: true);
 
       if (res != null && (res as List).isNotEmpty) {
-        final List<Map<String, dynamic>> dbChapters = (res as List).map<Map<String, dynamic>>((e) {
+        final List<Map<String, dynamic>> dbChapters = sortTaxonomyChapters((res as List).map<Map<String, dynamic>>((e) {
           final topicsList = (e['topics'] as List?)?.map<Map<String, dynamic>>((t) {
             return {
               'id': t['id']?.toString() ?? '',
@@ -664,7 +664,7 @@ class SupabaseService {
             'questions': e['questions_count'] ?? 0,
             'status': (e['is_active'] ?? true) ? 'Active' : 'Inactive',
           };
-        }).toList();
+        }).toList());
 
         if (dbChapters.isNotEmpty) {
           _dynamicTaxonomyStore[storeKey] = dbChapters;
@@ -686,7 +686,7 @@ class SupabaseService {
       debugPrint('Notice loading chapters from Supabase DB: $e');
     }
 
-    final cached = _dynamicTaxonomyStore[storeKey] ?? [];
+    final cached = sortTaxonomyChapters(List<Map<String, dynamic>>.from(_dynamicTaxonomyStore[storeKey] ?? []));
     if (!includeInactive) {
       return cached.where((c) => c['status'] == 'Active').map((c) {
         final copy = Map<String, dynamic>.from(c);
@@ -697,6 +697,51 @@ class SupabaseService {
       }).toList();
     }
     return cached;
+  }
+
+  static List<Map<String, dynamic>> sortTaxonomyChapters(List<Map<String, dynamic>> chapters) {
+    final list = List<Map<String, dynamic>>.from(chapters);
+
+    int extractLeadingNumber(String name) {
+      final match = RegExp(r'^\s*(\d+)').firstMatch(name);
+      if (match != null) {
+        return int.tryParse(match.group(1)!) ?? 999999;
+      }
+      return 999999;
+    }
+
+    list.sort((a, b) {
+      final nameA = (a['name'] ?? '').toString().trim();
+      final nameB = (b['name'] ?? '').toString().trim();
+
+      final numA = extractLeadingNumber(nameA);
+      final numB = extractLeadingNumber(nameB);
+
+      if (numA != numB) {
+        return numA.compareTo(numB);
+      }
+
+      return nameA.toLowerCase().compareTo(nameB.toLowerCase());
+    });
+
+    for (var chap in list) {
+      if (chap['topicsList'] is List) {
+        final tList = List<Map<String, dynamic>>.from(chap['topicsList']);
+        tList.sort((a, b) {
+          final tNameA = (a['name'] ?? '').toString().trim();
+          final tNameB = (b['name'] ?? '').toString().trim();
+          final tNumA = extractLeadingNumber(tNameA);
+          final tNumB = extractLeadingNumber(tNameB);
+          if (tNumA != tNumB) {
+            return tNumA.compareTo(tNumB);
+          }
+          return tNameA.toLowerCase().compareTo(tNameB.toLowerCase());
+        });
+        chap['topicsList'] = tList;
+      }
+    }
+
+    return list;
   }
 
   static Future<List<Map<String, dynamic>>> fetchAllChaptersForDropdown({String? exam, String? subject}) async {
@@ -728,7 +773,7 @@ class SupabaseService {
             .order('display_order', ascending: true);
 
         if (res != null && (res as List).isNotEmpty) {
-          return (res as List).map<Map<String, dynamic>>((e) {
+          return sortTaxonomyChapters((res as List).map<Map<String, dynamic>>((e) {
             return {
               'id': e['id']?.toString() ?? '',
               'name': e['name']?.toString() ?? '',
@@ -736,14 +781,14 @@ class SupabaseService {
               'subject_id': e['subject_id']?.toString() ?? '',
               'status': 'Active',
             };
-          }).toList();
+          }).toList());
         }
       } catch (e) {
         debugPrint('Notice in fetchAllChaptersForDropdown direct query fallback: $e');
       }
     }
 
-    return combined;
+    return sortTaxonomyChapters(combined);
   }
 
   static List<Map<String, dynamic>> _getSeedChaptersForSubject(String exam, String subject) {
