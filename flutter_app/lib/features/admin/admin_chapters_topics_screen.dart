@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/services/supabase_service.dart';
 
 class AdminChaptersTopicsScreen extends StatefulWidget {
@@ -404,30 +405,20 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
-                _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/admin');
-                }),
-                _buildSidebarItem(Icons.people_outline, 'Users Management', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/admin/users');
-                }),
-                _buildSidebarItem(Icons.menu_book_outlined, 'Courses', false),
-                _buildSidebarItem(Icons.assignment_outlined, 'Exams', false),
-                _buildSidebarItem(Icons.science_outlined, 'Subjects', false),
-                _buildSidebarItem(Icons.auto_stories_rounded, 'Chapters & Topics', true),
-                _buildSidebarItem(Icons.help_outline_rounded, 'Questions', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/admin/questions');
-                }),
-                _buildSidebarItem(Icons.insert_drive_file_outlined, 'PYQ Papers', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/admin/questions');
-                }),
-                _buildSidebarItem(Icons.timer_outlined, 'Test Series', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/admin/tests');
-                }),
+                _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', false, onTap: () => context.go('/admin')),
+                _buildSidebarItem(Icons.people_outline, 'Users Management', false, onTap: () => context.go('/admin/users')),
+                _buildSidebarItem(Icons.menu_book_outlined, 'Courses', false, onTap: () => context.go('/admin/courses')),
+                _buildSidebarItem(Icons.assignment_outlined, 'Exams', false, onTap: () => context.go('/admin/exams')),
+                _buildSidebarItem(Icons.science_outlined, 'Subjects', false, onTap: () => context.go('/admin/subjects')),
+                _buildSidebarItem(Icons.auto_stories_rounded, 'Chapters & Topics', true, onTap: () => context.go('/admin/chapters')),
+                _buildSidebarItem(Icons.help_outline_rounded, 'Questions', false, onTap: () => context.go('/admin/questions')),
+                _buildSidebarItem(Icons.insert_drive_file_outlined, 'PYQ Papers', false, onTap: () => context.go('/admin/papers')),
+                _buildSidebarItem(Icons.timer_outlined, 'Test Series', false, onTap: () => context.go('/admin/test-series')),
                 _buildSidebarItem(Icons.video_call_outlined, 'Live Classes', false),
-                _buildSidebarItem(Icons.analytics_outlined, 'Reports & Analytics', false),
-                _buildSidebarItem(Icons.notifications_none_rounded, 'Notifications', false),
+                _buildSidebarItem(Icons.analytics_outlined, 'Reports & Analytics', false, onTap: () => context.go('/admin/analytics')),
+                _buildSidebarItem(Icons.notifications_none_rounded, 'Notifications', false, onTap: () => context.go('/admin/notifications')),
                 _buildSidebarItem(Icons.confirmation_number_outlined, 'Support Tickets', false),
-                _buildSidebarItem(Icons.settings_outlined, 'System Settings', false),
+                _buildSidebarItem(Icons.settings_outlined, 'System Settings', false, onTap: () => context.go('/admin/settings')),
               ],
             ),
           ),

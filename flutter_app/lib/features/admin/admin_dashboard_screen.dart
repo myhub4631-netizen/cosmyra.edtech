@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
@@ -357,7 +358,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
-                _buildSidebarTile('Dashboard', Icons.dashboard_rounded, true, onTap: () => Navigator.pushNamed(context, '/admin')),
+                _buildSidebarTile('Dashboard', Icons.dashboard_rounded, true, onTap: () => context.go('/admin')),
                 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('CONTENT MANAGEMENT'),
@@ -367,9 +368,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(SmoothPageRoute(child: AdminBulkUploadStep1Screen(userProfile: widget.userProfile)));
-                    },
+                    onPressed: () => context.go('/admin/questions/upload'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4F46E5),
                       foregroundColor: Colors.white,
@@ -387,48 +386,36 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 ),
                 const SizedBox(height: 6),
 
-                _buildSidebarTile('Dashboard Sections', Icons.dashboard_customize_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/sections')),
-                _buildSidebarTile('Paper Predictions', Icons.note_alt_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
-                _buildSidebarTile('Question & Paper Bank', Icons.quiz_outlined, false, onTap: () {
-                  Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
-                }),
-                _buildSidebarTile('Upload Questions (Step 1)', Icons.cloud_upload_outlined, false, onTap: () {
-                  Navigator.of(context).push(SmoothPageRoute(child: AdminBulkUploadStep1Screen(userProfile: widget.userProfile)));
-                }),
-                _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false, onTap: () {
-                  Navigator.of(context).push(SmoothPageRoute(child: AdminBulkUploadStep1Screen(userProfile: widget.userProfile)));
-                }),
-                _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
-                _buildSidebarTile('Pricing & Plans', Icons.sell_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/pricing')),
-                _buildSidebarTile('Chapters & Topics', Icons.auto_stories_rounded, false, onTap: () {
-                  Navigator.of(context).push(SmoothPageRoute(child: const AdminChaptersTopicsScreen()));
-                }),
-                _buildSidebarTile('Tags & Topics', Icons.label_outline_rounded, false),
-                _buildSidebarTile('PYQs & Papers', Icons.description_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
-                _buildSidebarTile('Mistake Book', Icons.history_edu_outlined, false),
-                _buildSidebarTile('Bookmarks', Icons.bookmark_outline_rounded, false),
+                _buildSidebarTile('Dashboard Sections', Icons.dashboard_customize_outlined, false, onTap: () => context.go('/admin/sections')),
+                _buildSidebarTile('Paper Predictions', Icons.note_alt_outlined, false, onTap: () => context.go('/admin/predictions')),
+                _buildSidebarTile('Question & Paper Bank', Icons.quiz_outlined, false, onTap: () => context.go('/admin/questions')),
+                _buildSidebarTile('Upload Questions (Step 1)', Icons.cloud_upload_outlined, false, onTap: () => context.go('/admin/questions/upload')),
+                _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false, onTap: () => context.go('/admin/questions/upload')),
+                _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => context.go('/admin/hierarchy')),
+                _buildSidebarTile('Pricing & Plans', Icons.sell_outlined, false, onTap: () => context.go('/admin/pricing')),
+                _buildSidebarTile('Chapters & Topics', Icons.auto_stories_rounded, false, onTap: () => context.go('/admin/chapters')),
+                _buildSidebarTile('Tags & Topics', Icons.label_outline_rounded, false, onTap: () => context.go('/admin/topics')),
+                _buildSidebarTile('PYQs & Papers', Icons.description_outlined, false, onTap: () => context.go('/admin/papers')),
+                _buildSidebarTile('Mistake Book', Icons.history_edu_outlined, false, onTap: () => context.go('/mistakes')),
+                _buildSidebarTile('Bookmarks', Icons.bookmark_outline_rounded, false, onTap: () => context.go('/bookmarks')),
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('USERS & ROLES'),
-                _buildSidebarTile('User Management', Icons.people_outline_rounded, false, onTap: () {
-                  Navigator.of(context).push(SmoothPageRoute(child: AdminUserManagementScreen(userProfile: widget.userProfile)));
-                }),
-                _buildSidebarTile('Roles & Permissions', Icons.admin_panel_settings_outlined, false),
-                _buildSidebarTile('Activity Logs', Icons.list_alt_rounded, false),
+                _buildSidebarTile('User Management', Icons.people_outline_rounded, false, onTap: () => context.go('/admin/users')),
+                _buildSidebarTile('Roles & Permissions', Icons.admin_panel_settings_outlined, false, onTap: () => context.go('/superadmin/roles')),
+                _buildSidebarTile('Activity Logs', Icons.list_alt_rounded, false, onTap: () => context.go('/superadmin/audit-logs')),
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('REPORTS & ANALYTICS'),
-                _buildSidebarTile('Analytics Dashboard', Icons.bar_chart_rounded, false),
-                _buildSidebarTile('Question Reports', Icons.outlined_flag_rounded, false, onTap: () {
-                  Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
-                }),
-                _buildSidebarTile('Student Performance', Icons.insights_rounded, false),
-                _buildSidebarTile('Leaderboard', Icons.leaderboard_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),
+                _buildSidebarTile('Analytics Dashboard', Icons.bar_chart_rounded, false, onTap: () => context.go('/admin/analytics')),
+                _buildSidebarTile('Question Reports', Icons.outlined_flag_rounded, false, onTap: () => context.go('/admin/questions')),
+                _buildSidebarTile('Student Performance', Icons.insights_rounded, false, onTap: () => context.go('/admin/analytics')),
+                _buildSidebarTile('Leaderboard', Icons.leaderboard_outlined, false, onTap: () => context.go('/admin/leaderboard')),
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('SYSTEM & SETTINGS'),
-                _buildSidebarTile('System Settings', Icons.settings_outlined, false),
-                _buildSidebarTile('Notification Center', Icons.notifications_none_rounded, false),
+                _buildSidebarTile('System Settings', Icons.settings_outlined, false, onTap: () => context.go('/admin/settings')),
+                _buildSidebarTile('Notification Center', Icons.notifications_none_rounded, false, onTap: () => context.go('/admin/notifications')),
                 _buildSidebarTile('Backup & Restore', Icons.cloud_sync_outlined, false),
                 _buildSidebarTile('Integrations', Icons.hub_outlined, false),
 

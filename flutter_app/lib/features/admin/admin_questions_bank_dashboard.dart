@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
@@ -764,9 +765,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
               children: [
-                _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/admin');
-                }),
+                _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard', false, onTap: () => context.go('/admin')),
 
                 const SizedBox(height: 14),
                 if (!_isSidebarCollapsed)
@@ -775,22 +774,12 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                     child: Text('CONTENT MANAGEMENT', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
                   ),
 
-                _buildSidebarItem(Icons.assignment_outlined, 'Exams', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/admin');
-                }),
-                _buildSidebarItem(Icons.science_outlined, 'Subjects', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/admin/chapters');
-                }),
-                _buildSidebarItem(Icons.menu_book_outlined, 'Chapters', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/admin/chapters');
-                }),
-                _buildSidebarItem(Icons.grid_view_rounded, 'Topics', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/admin/chapters');
-                }),
-                _buildSidebarItem(Icons.help_outline_rounded, 'Questions', true),
-                _buildSidebarItem(Icons.description_outlined, 'NTA Mock Papers', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/pyq');
-                }),
+                _buildSidebarItem(Icons.assignment_outlined, 'Exams', false, onTap: () => context.go('/admin/exams')),
+                _buildSidebarItem(Icons.science_outlined, 'Subjects', false, onTap: () => context.go('/admin/subjects')),
+                _buildSidebarItem(Icons.menu_book_outlined, 'Chapters', false, onTap: () => context.go('/admin/chapters')),
+                _buildSidebarItem(Icons.grid_view_rounded, 'Topics', false, onTap: () => context.go('/admin/topics')),
+                _buildSidebarItem(Icons.help_outline_rounded, 'Questions', true, onTap: () => context.go('/admin/questions')),
+                _buildSidebarItem(Icons.description_outlined, 'NTA Mock Papers', false, onTap: () => context.go('/admin/mock-papers')),
 
                 const SizedBox(height: 14),
                 if (!_isSidebarCollapsed)
@@ -799,18 +788,10 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                     child: Text('PRACTICE & TEST', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
                   ),
 
-                _buildSidebarItem(Icons.edit_note_rounded, 'Custom Practice', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/custom-practice');
-                }),
-                _buildSidebarItem(Icons.assignment_turned_in_outlined, 'Custom Tests', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/custom-test');
-                }),
-                _buildSidebarItem(Icons.history_edu_rounded, 'PYQ Practice', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/pyq');
-                }),
-                _buildSidebarItem(Icons.quiz_outlined, 'Mock Tests', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/pyq');
-                }),
+                _buildSidebarItem(Icons.edit_note_rounded, 'Custom Practice', false, onTap: () => context.go('/practice')),
+                _buildSidebarItem(Icons.assignment_turned_in_outlined, 'Custom Tests', false, onTap: () => context.go('/mock-tests')),
+                _buildSidebarItem(Icons.history_edu_rounded, 'PYQ Practice', false, onTap: () => context.go('/pyq')),
+                _buildSidebarItem(Icons.quiz_outlined, 'Mock Tests', false, onTap: () => context.go('/mock-tests')),
 
                 const SizedBox(height: 14),
                 if (!_isSidebarCollapsed)
@@ -819,9 +800,9 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                     child: Text('TEST MANAGEMENT', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
                   ),
 
-                _buildSidebarItem(Icons.fact_check_outlined, 'Test Attempts', false),
-                _buildSidebarItem(Icons.analytics_outlined, 'Analytics', false),
-                _buildSidebarItem(Icons.insert_chart_outlined_rounded, 'Reports', false),
+                _buildSidebarItem(Icons.fact_check_outlined, 'Test Attempts', false, onTap: () => context.go('/admin/test-series')),
+                _buildSidebarItem(Icons.analytics_outlined, 'Analytics', false, onTap: () => context.go('/admin/analytics')),
+                _buildSidebarItem(Icons.insert_chart_outlined_rounded, 'Reports', false, onTap: () => context.go('/admin/analytics')),
 
                 const SizedBox(height: 14),
                 if (!_isSidebarCollapsed)
@@ -830,9 +811,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                     child: Text('USER MANAGEMENT', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8))),
                   ),
 
-                _buildSidebarItem(Icons.people_outline, 'Users', false, onTap: () {
-                  Navigator.pushReplacementNamed(context, '/admin/users');
-                }),
+                _buildSidebarItem(Icons.people_outline, 'Users', false, onTap: () => context.go('/admin/users')),
                 _buildSidebarItem(Icons.admin_panel_settings_outlined, 'Roles & Permissions', false),
 
                 const SizedBox(height: 14),
