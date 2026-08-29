@@ -174,7 +174,7 @@ export const AdminBulkUploadStep2: React.FC = () => {
       let newlySavedCount = 0;
 
       batchToSave.forEach((q) => {
-        const qId = q.questionId || `q_${pId}_${q.id}`;
+        const qId = `q_${pId}_${q.id}`;
         let correctAnsText = 'Option A';
         if (q.correctOptionIndex >= 0 && q.correctOptionIndex < q.options.length) {
           correctAnsText = q.options[q.correctOptionIndex] || `Option ${String.fromCharCode(65 + q.correctOptionIndex)}`;
@@ -213,37 +213,42 @@ export const AdminBulkUploadStep2: React.FC = () => {
           created_at: new Date().toISOString(),
         };
 
-        const pIdx = paperQuestions.findIndex((pq: any) => pq.id === qId || pq.questionNumber === q.id);
+        const pIdx = paperQuestions.findIndex(
+          (pq: any) => pq.id === qId || (pq.paper_id === pId && (pq.questionNumber === q.id || pq.question_number === q.id))
+        );
         if (pIdx !== -1) {
           paperQuestions[pIdx] = payload;
         } else {
           paperQuestions.push(payload);
         }
 
-        const gIdx = globalQuestions.findIndex((gq: any) => gq.id === qId);
+        const gIdx = globalQuestions.findIndex(
+          (gq: any) => gq.id === qId || (gq.paper_id === pId && (gq.questionNumber === q.id || gq.question_number === q.id))
+        );
         if (gIdx !== -1) {
           globalQuestions[gIdx] = payload;
         } else {
           globalQuestions.unshift(payload);
         }
-
-        if (!q.isSaved) newlySavedCount++;
       });
 
       localStorage.setItem(`cosmyra_paper_questions_${pId}`, JSON.stringify(paperQuestions));
       localStorage.setItem('cosmyra_saved_custom_questions', JSON.stringify(globalQuestions));
 
-      // Update isSaved state on current items
-      setQuestions((prev) =>
-        prev.map((q) => {
-          if (batchToSave.some((b) => b.id === q.id)) {
-            return { ...q, isSaved: true, questionId: `q_${pId}_${q.id}` };
+      // Update isSaved state and compute unique saved count dynamically
+      setQuestions((prev) => {
+        const nextQ = prev.map((qItem) => {
+          if (batchToSave.some((b) => b.id === qItem.id)) {
+            return { ...qItem, isSaved: true, questionId: `q_${pId}_${qItem.id}` };
           }
-          return q;
-        })
-      );
+          return qItem;
+        });
 
-      setAddedCount((prev) => prev + newlySavedCount);
+        const uniqueSavedCount = nextQ.filter((qItem) => qItem.isSaved).length;
+        setAddedCount(uniqueSavedCount);
+
+        return nextQ;
+      });
 
       if (showToast) {
         alert(`✓ Persisted ${batchToSave.length} question(s) to Question Bank!`);

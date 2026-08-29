@@ -2683,9 +2683,8 @@ class SupabaseService {
     final String timeIso = DateTime.now().toIso8601String();
 
     final cleanPayloads = questionsData.map((q) {
-      final qId = q['id'] != null && q['id'].toString().isNotEmpty
-          ? q['id'].toString()
-          : 'q_${paperId}_${q['questionNumber']}';
+      final int qNum = (q['questionNumber'] ?? q['question_number'] ?? 1) as int;
+      final String qId = 'q_${paperId}_$qNum';
 
       final optionsList = q['options'] is List ? List<String>.from(q['options']) : <String>[];
       final optionImagesList = q['optionImages'] is List
@@ -2695,7 +2694,7 @@ class SupabaseService {
       return {
         'id': qId,
         'paper_id': paperId,
-        'question_number': q['questionNumber'] ?? 1,
+        'question_number': qNum,
         'question_text': q['questionText'] ?? q['question_text'] ?? '',
         'question_image': q['questionImage'] ?? q['question_image'] ?? '',
         'subject': q['subject'] ?? 'Physics',
@@ -2738,14 +2737,18 @@ class SupabaseService {
       final List<dynamic> paperList = jsonDecode(existingPaperStr);
 
       for (var newQ in cleanPayloads) {
-        final gIdx = globalList.indexWhere((g) => g['id'] == newQ['id']);
+        final qNum = newQ['question_number'];
+        final gIdx = globalList.indexWhere((g) =>
+            g['id'] == newQ['id'] ||
+            (g['paper_id'] == paperId && (g['question_number'] == qNum || g['questionNumber'] == qNum)));
         if (gIdx != -1) {
           globalList[gIdx] = newQ;
         } else {
           globalList.insert(0, newQ);
         }
 
-        final pIdx = paperList.indexWhere((p) => p['id'] == newQ['id']);
+        final pIdx = paperList.indexWhere((p) =>
+            p['id'] == newQ['id'] || (p['question_number'] == qNum || p['questionNumber'] == qNum));
         if (pIdx != -1) {
           paperList[pIdx] = newQ;
         } else {

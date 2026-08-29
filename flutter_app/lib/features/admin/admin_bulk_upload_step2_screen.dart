@@ -226,16 +226,17 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       );
 
       if (success) {
-        int newlySaved = 0;
         for (int i = startIndex; i < endIndex; i++) {
           final q = _questionsList[i];
-          if (q.text.trim().isNotEmpty) {
-            if (!q.isSaved) newlySaved++;
+          final bool hasContent = q.text.trim().isNotEmpty ||
+              (q.questionImage != null && q.questionImage!.isNotEmpty) ||
+              q.optionImages.any((img) => img != null && img.isNotEmpty);
+          if (hasContent) {
             q.isSaved = true;
-            if (q.id.isEmpty) q.id = 'q_${_paperId}_${q.number}';
+            q.id = 'q_${_paperId}_${q.number}';
           }
         }
-        _addedCount += newlySaved;
+        _addedCount = _questionsList.where((q) => q.isSaved).length;
 
         if (showToast && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
