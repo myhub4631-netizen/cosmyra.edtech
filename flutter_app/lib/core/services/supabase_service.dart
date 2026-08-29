@@ -1984,7 +1984,27 @@ class SupabaseService {
       }
     }
 
-    // Fetch live questions directly from Supabase DB as the exclusive single source of truth
+    // 1. Pre-populate initial 20 practice questions
+    final practice20 = get20RealQuestionsMap();
+    for (var pQ in practice20) {
+      addOrUpdate(pQ);
+    }
+
+    // 2. Fetch custom saved questions from SharedPreferences
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(jsonStr);
+        for (var item in decoded) {
+          addOrUpdate(Map<String, dynamic>.from(item as Map));
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice merging saved local questions: $e');
+    }
+
+    // 3. Fetch live questions directly from Supabase DB as the ultimate source of truth
     try {
       final res = await client.from('questions').select('*').order('created_at', ascending: false);
       if (res != null && (res as List).isNotEmpty) {
@@ -1995,23 +2015,6 @@ class SupabaseService {
       }
     } catch (e) {
       debugPrint('Error querying Supabase questions table: $e');
-    }
-
-    // If Supabase DB table is completely empty, seed the 20 practice questions INTO Supabase DB once
-    if (allQuestions.isEmpty) {
-      final practice20 = get20RealQuestionsMap();
-      await _seedLocalQuestionsToSupabase(practice20);
-      try {
-        final seededRes = await client.from('questions').select('*').order('created_at', ascending: false);
-        if (seededRes != null && (seededRes as List).isNotEmpty) {
-          final dbList = (seededRes as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
-          for (var dbQ in dbList) {
-            addOrUpdate(dbQ);
-          }
-        }
-      } catch (e) {
-        debugPrint('Error fetching seeded questions from Supabase DB: $e');
-      }
     }
 
     return allQuestions;
@@ -2966,7 +2969,7 @@ class SupabaseService {
           'correct_option_index': cIdxRaw,
           'explanation': q['explanation'] ?? '',
           'solution': q['explanation'] ?? '',
-          'year': q['year'] ?? 2026,
+          'year': q['year']?.toString() ?? '2026',
           'paper_name': q['paperName'] ?? 'NEET 2026 Phase 1',
           'exam': q['exam'] ?? 'NEET',
           'created_at': q['created_at'] ?? timeIso,
