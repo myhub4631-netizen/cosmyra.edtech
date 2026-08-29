@@ -143,11 +143,20 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         final opts = savedMatch['options'] is List ? List<String>.from(savedMatch['options']) : <String>['', '', '', ''];
         while (opts.length < 4) opts.add('');
 
-        String correctOptText = savedMatch['correct_answer'] ?? savedMatch['correctAnswer'] ?? '';
-        int correctIdx = opts.indexOf(correctOptText);
-        if (correctIdx == -1 && correctOptText.startsWith('Option ')) {
-          int optNum = int.tryParse(correctOptText.replaceAll('Option ', '')) ?? 1;
-          correctIdx = optNum - 1;
+        int correctIdx = 0;
+        if (savedMatch['correct_option_index'] != null) {
+          correctIdx = (savedMatch['correct_option_index'] as num).toInt();
+        } else if (savedMatch['correctOptionIndex'] != null) {
+          correctIdx = (savedMatch['correctOptionIndex'] as num).toInt();
+        } else {
+          String correctOptText = (savedMatch['correct_answer'] ?? savedMatch['correctAnswer'] ?? '').toString();
+          if (correctOptText.startsWith('Option ')) {
+            int optNum = int.tryParse(correctOptText.replaceAll('Option ', '')) ?? 1;
+            correctIdx = (optNum - 1).clamp(0, opts.length > 0 ? opts.length - 1 : 0);
+          } else if (correctOptText.isNotEmpty) {
+            int foundIdx = opts.indexOf(correctOptText);
+            if (foundIdx != -1) correctIdx = foundIdx;
+          }
         }
 
         final optImgsRaw = savedMatch['option_images'] ?? savedMatch['optionImages'];

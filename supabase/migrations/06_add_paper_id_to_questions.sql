@@ -33,4 +33,6 @@ DROP POLICY IF EXISTS "Papers full public access" ON public.papers;
 CREATE POLICY "Papers full public access" ON public.papers FOR ALL USING (true) WITH CHECK (true);
 
 ALTER TABLE public.questions ADD COLUMN IF NOT EXISTS paper_id UUID REFERENCES public.papers(id) ON DELETE SET NULL;
+ALTER TABLE public.questions ADD COLUMN IF NOT EXISTS options JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.questions ADD COLUMN IF NOT EXISTS option_images JSONB DEFAULT '[]'::jsonb;
 CREATE INDEX IF NOT EXISTS idx_questions_paper_id ON public.questions(paper_id);
