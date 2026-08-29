@@ -193,7 +193,10 @@ class SupabaseService {
     return newProfile;
   }
 
+  static UserProfileModel? activeUserSession;
+
   static Future<void> setActiveUserSession(UserProfileModel profile) async {
+    activeUserSession = profile;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cosmyra_active_user_session', jsonEncode(profile.toJson()));
@@ -204,6 +207,7 @@ class SupabaseService {
   }
 
   static Future<void> logoutUserSession() async {
+    activeUserSession = null;
     try {
       await client.auth.signOut();
       final prefs = await SharedPreferences.getInstance();
@@ -339,6 +343,7 @@ class SupabaseService {
       if (!isLoggedOut && rawActiveUser != null && rawActiveUser.isNotEmpty) {
         final decoded = jsonDecode(rawActiveUser) as Map<String, dynamic>;
         final profile = _ensureSuperAdminRole(UserProfileModel.fromJson(decoded));
+        activeUserSession = profile;
         return profile;
       }
 

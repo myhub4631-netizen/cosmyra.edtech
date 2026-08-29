@@ -35,6 +35,9 @@ import '../../features/admin/admin_pdf_import_screen.dart';
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 UserProfileModel _getEffectiveProfile() {
+  if (SupabaseService.activeUserSession != null) {
+    return SupabaseService.activeUserSession!;
+  }
   return SupabaseService.getMockProfile(role: 'student');
 }
 

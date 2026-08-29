@@ -37,12 +37,31 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   int _activeSidebarIndex = 0;
   int _mobileBottomNavIndex = 0;
 
+  late UserProfileModel _currentUserProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUserProfile = widget.userProfile;
+    _loadCurrentUser();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final currentUser = await SupabaseService.getCurrentUser();
+    if (currentUser != null && mounted) {
+      setState(() {
+        _currentUserProfile = currentUser;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final displayName = widget.userProfile.fullName.trim().isNotEmpty
-        ? widget.userProfile.fullName.trim()
-        : (widget.userProfile.email.contains('@')
-            ? widget.userProfile.email.split('@').first
+    final profileToUse = _currentUserProfile;
+    final displayName = profileToUse.fullName.trim().isNotEmpty
+        ? profileToUse.fullName.trim()
+        : (profileToUse.email.contains('@')
+            ? profileToUse.email.split('@').first
             : 'Aman Kumar');
 
     return LayoutBuilder(
@@ -173,7 +192,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             ),
             const SizedBox(height: 2),
             Text(
-              "Let's achieve your ${widget.activeExam} ${widget.userProfile.targetYear} goal!",
+              "Let's achieve your ${widget.activeExam} ${_currentUserProfile.targetYear} goal!",
               style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
             ),
           ],
@@ -977,7 +996,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
                       ),
                       Text(
-                        '${widget.activeExam} ${widget.userProfile.targetYear}',
+                        '${widget.activeExam} ${_currentUserProfile.targetYear}',
                         style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                       ),
                     ],
@@ -1191,7 +1210,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              "Let's continue your ${widget.activeExam} ${widget.userProfile.targetYear} preparation.",
+              "Let's continue your ${widget.activeExam} ${_currentUserProfile.targetYear} preparation.",
               style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w400),
             ),
           ],
