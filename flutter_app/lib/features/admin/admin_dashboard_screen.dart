@@ -11,6 +11,7 @@ import 'admin_user_management_screen.dart';
 import 'admin_questions_bank_dashboard.dart';
 import 'admin_question_builder_screen.dart';
 import 'admin_chapters_topics_screen.dart';
+import 'admin_bulk_upload_step1_screen.dart';
 import '../auth/login_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
@@ -365,8 +366,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 _buildSidebarTile('Question Bank', Icons.quiz_outlined, false, hasDropdown: true, onTap: () {
                   Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
                 }),
+                _buildSidebarTile('Bulk Upload (Step 1)', Icons.cloud_upload_outlined, false, onTap: () {
+                  Navigator.of(context).push(SmoothPageRoute(child: AdminBulkUploadStep1Screen(userProfile: widget.userProfile)));
+                }),
                 _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false, onTap: () {
-                  Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
+                  Navigator.of(context).push(SmoothPageRoute(child: AdminBulkUploadStep1Screen(userProfile: widget.userProfile)));
                 }),
                 _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/hierarchy')),
                 _buildSidebarTile('Pricing & Plans', Icons.sell_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/pricing')),
