@@ -8,6 +8,7 @@ import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/latex_view.dart';
 import 'admin_question_builder_screen.dart';
 import 'admin_pdf_import_screen.dart';
+import 'admin_bulk_upload_step1_screen.dart';
 
 class AdminQuestionsBankDashboard extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -1141,6 +1142,32 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
               label: const Text(
                 'Import Questions',
                 style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Bulk Upload (Step 1) Button
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (ctx) => AdminBulkUploadStep1Screen(
+                      userProfile: widget.userProfile,
+                      onBack: () => Navigator.pop(ctx),
+                    ),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6366F1),
+                elevation: 2,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.cloud_upload_outlined, color: Colors.white, size: 18),
+              label: const Text(
+                'Bulk Upload (Step 1)',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ),
           ],
