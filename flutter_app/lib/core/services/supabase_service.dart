@@ -1961,11 +1961,8 @@ class SupabaseService {
       final String paperId = (qMap['paper_id'] ?? qMap['paperId'] ?? '').toString();
       final int qNum = (qMap['question_number'] ?? qMap['questionNumber'] ?? -1) as int;
 
-      final idx = allQuestions.indexWhere((item) {
-        if (id.isNotEmpty && item['id'] == id) return true;
-        if (paperId.isNotEmpty && qNum != -1 && item['paper_id'] == paperId && item['question_number'] == qNum) return true;
-        return false;
-      });
+      // Match strictly by unique database ID
+      final idx = id.isNotEmpty ? allQuestions.indexWhere((item) => item['id'] == id) : -1;
 
       final rawCat = (qMap['category'] ?? qMap['source_type'] ?? qMap['sourceType'] ?? qMap['source'] ?? '').toString();
       final canonicalMap = getCanonicalCategoryAndSourceType(rawCat);
@@ -2019,7 +2016,7 @@ class SupabaseService {
       }
     }
 
-    // 1. Fetch live questions directly from Supabase DB as single source of truth
+    // Fetch live questions directly from Supabase DB as the exclusive source of truth
     try {
       final res = await client.from('questions').select('*').order('created_at', ascending: false);
       if (res != null && (res as List).isNotEmpty) {
@@ -2029,16 +2026,7 @@ class SupabaseService {
         }
       }
     } catch (e) {
-      debugPrint('Notice querying Supabase questions table: $e');
-    }
-
-    // 2. If Supabase DB is completely empty (0 rows), seed initial 20 practice questions once
-    if (allQuestions.isEmpty) {
-      final practice20 = get20RealQuestionsMap();
-      for (var pQ in practice20) {
-        addOrUpdate(pQ);
-      }
-      _seedLocalQuestionsToSupabase(allQuestions);
+      debugPrint('Error querying Supabase questions table: $e');
     }
 
     return allQuestions;
