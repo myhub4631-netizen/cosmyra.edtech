@@ -116,25 +116,29 @@ CREATE POLICY "Taxonomy full public access" ON public.chapters FOR ALL TO anon, 
 CREATE POLICY "Taxonomy full public access" ON public.topics FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- 5. QUESTIONS & OPTIONS
+ALTER TABLE public.questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.question_options ENABLE ROW LEVEL SECURITY;
+
 DROP POLICY IF EXISTS "Published questions viewable by authenticated users" ON public.questions;
 DROP POLICY IF EXISTS "Questions viewable by users" ON public.questions;
 DROP POLICY IF EXISTS "Teachers and admins can insert questions" ON public.questions;
 DROP POLICY IF EXISTS "Admins and creators can update questions" ON public.questions;
 DROP POLICY IF EXISTS "Admins can delete questions" ON public.questions;
+DROP POLICY IF EXISTS "Questions select policy" ON public.questions;
+DROP POLICY IF EXISTS "Questions insert policy" ON public.questions;
+DROP POLICY IF EXISTS "Questions update policy" ON public.questions;
+DROP POLICY IF EXISTS "Questions delete policy" ON public.questions;
 
 -- SELECT Policy
 CREATE POLICY "Questions select policy"
 ON public.questions FOR SELECT TO anon, authenticated 
-USING (status = 'published' OR status = 'Active' OR created_by = auth.uid() OR public.is_admin(auth.uid()));
+USING (status = 'published' OR status = 'Active' OR status = 'draft' OR created_by = auth.uid() OR public.is_admin(auth.uid()));
 
 -- INSERT Policy
 CREATE POLICY "Questions insert policy"
 ON public.questions FOR INSERT TO anon, authenticated 
 WITH CHECK (
-  auth.uid() IS NOT NULL AND (
-    public.is_admin(auth.uid()) OR 
-    public.is_teacher(auth.uid())
-  )
+  (auth.uid() IS NOT NULL AND (public.is_admin(auth.uid()) OR public.is_teacher(auth.uid())))
   OR auth.role() = 'anon'
 );
 
@@ -142,23 +146,25 @@ WITH CHECK (
 CREATE POLICY "Questions update policy"
 ON public.questions FOR UPDATE TO anon, authenticated 
 USING (
-  created_by = auth.uid() OR 
-  public.is_admin(auth.uid()) OR 
-  auth.role() = 'anon'
+  (auth.uid() IS NOT NULL AND (public.is_admin(auth.uid()) OR public.is_teacher(auth.uid()) OR created_by = auth.uid()))
+  OR auth.role() = 'anon'
 );
 
 -- DELETE Policy
 CREATE POLICY "Questions delete policy"
 ON public.questions FOR DELETE TO anon, authenticated 
 USING (
-  created_by = auth.uid() OR 
-  public.is_admin(auth.uid()) OR 
-  auth.role() = 'anon'
+  (auth.uid() IS NOT NULL AND (public.is_admin(auth.uid()) OR public.is_teacher(auth.uid()) OR created_by = auth.uid()))
+  OR auth.role() = 'anon'
 );
 
 -- Question Options Policies
 DROP POLICY IF EXISTS "Options viewable by authenticated users" ON public.question_options;
 DROP POLICY IF EXISTS "Teachers and admins manage options" ON public.question_options;
+DROP POLICY IF EXISTS "Options select policy" ON public.question_options;
+DROP POLICY IF EXISTS "Options insert policy" ON public.question_options;
+DROP POLICY IF EXISTS "Options update policy" ON public.question_options;
+DROP POLICY IF EXISTS "Options delete policy" ON public.question_options;
 
 CREATE POLICY "Options select policy"
 ON public.question_options FOR SELECT TO anon, authenticated USING (true);
