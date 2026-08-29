@@ -104,11 +104,22 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     _loadPaperAndSavedQuestions();
   }
 
+  List<Map<String, dynamic>> _loadedDbChapters = [];
+
   Future<void> _loadPaperAndSavedQuestions() async {
     setState(() => _isLoading = true);
 
     _paperData = widget.paperRecord ?? await SupabaseService.loadActiveUploadPaperSession();
     _paperId = _paperData?['id'] ?? 'paper_${DateTime.now().millisecondsSinceEpoch}';
+
+    final String exam = _paperData?['exam'] ?? _paperData?['exam_name'] ?? 'NEET';
+    final String subject = _paperData?['subject'] ?? 'Physics';
+
+    try {
+      _loadedDbChapters = await SupabaseService.fetchAllChaptersForDropdown(exam: exam, subject: subject);
+    } catch (e) {
+      debugPrint('Notice loading db chapters for step2: $e');
+    }
 
     final int qCount = (int.tryParse(_paperData?['question_count']?.toString() ?? '') ?? widget.totalQuestionsCount).clamp(1, 1000);
     if (_questionsList.length != qCount) {
@@ -145,6 +156,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
             : <String?>[null, null, null, null];
         while (optImgs.length < opts.length) optImgs.add(null);
 
+        final String chapIdFromMatch = savedMatch['chapter_id']?.toString() ?? '';
+
         _questionsList[i] = QuestionItemData(
           id: savedMatch['id'] ?? 'q_${_paperId}_$qNum',
           number: qNum,
@@ -158,15 +171,21 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           positiveMarks: savedMatch['marks']?.toString() ?? '4',
           negativeMarks: savedMatch['negative_marks']?.toString() ?? '-1',
           questionType: savedMatch['q_type'] ?? savedMatch['question_type'] ?? 'MCQ (Single Correct)',
-          subject: savedMatch['subject'] ?? 'Physics',
+          subject: savedMatch['subject'] ?? subject,
           chapter: savedMatch['chapter'] ?? 'General',
           topic: savedMatch['topic'] ?? 'General',
-          chapterTopic: '${savedMatch['subject'] ?? 'Physics'} > ${savedMatch['chapter'] ?? 'General'}',
+          chapterTopic: savedMatch['chapter'] ?? 'General',
+          chapterId: chapIdFromMatch.isNotEmpty ? chapIdFromMatch : (_loadedDbChapters.isNotEmpty ? _loadedDbChapters.first['id'].toString() : 'b2222222-2222-2222-2222-222222222222'),
           isSaved: true,
         );
       } else {
         if (firstUnsavedIndex == -1) {
           firstUnsavedIndex = i;
+        }
+        if (_loadedDbChapters.isNotEmpty) {
+          _questionsList[i].chapterId = _loadedDbChapters.first['id'].toString();
+          _questionsList[i].chapterTopic = _loadedDbChapters.first['name'].toString();
+          _questionsList[i].chapter = _loadedDbChapters.first['name'].toString();
         }
       }
     }
@@ -177,7 +196,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       _currentPageIndex = (firstUnsavedIndex ~/ _itemsPerPage) + 1;
     }
 
-    if (mounted) setState(() => _isLoading = false);
+    setState(() => _isLoading = false);
   }
 
   Future<void> _saveAllQuestions({bool showToast = true}) async {
@@ -1777,38 +1796,46 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
-              value: (q.chapterTopic.isNotEmpty && ['Physics - Kinematics', 'Physics - Laws of Motion', 'Chemistry - Organic', 'Biology - Cell Structure'].contains(q.chapterTopic))
-                  ? q.chapterTopic
-                  : 'Physics - Kinematics',
+              value: () {
+                if (_loadedDbChapters.any((c) => c['id'].toString() == q.chapterId)) {
+                  return q.chapterId;
+                }
+                if (_loadedDbChapters.any((c) => c['name'] == q.chapterTopic || c['name'] == q.chapter)) {
+                  final m = _loadedDbChapters.firstWhere((c) => c['name'] == q.chapterTopic || c['name'] == q.chapter);
+                  q.chapterId = m['id'].toString();
+                  return q.chapterId;
+                }
+                if (_loadedDbChapters.isNotEmpty) {
+                  q.chapterId = _loadedDbChapters.first['id'].toString();
+                  q.chapterTopic = _loadedDbChapters.first['name'].toString();
+                  q.chapter = _loadedDbChapters.first['name'].toString();
+                  return q.chapterId;
+                }
+                return null;
+              }(),
+              hint: Text(_loadedDbChapters.isNotEmpty ? 'Select Chapter' : 'Loading chapters...', style: GoogleFonts.inter(fontSize: 12)),
               isExpanded: true,
-              items: [
-                {'label': 'Physics - Kinematics', 'chapterId': 'b2222222-2222-2222-2222-222222222222', 'topicId': 'c2222222-2222-2222-2222-222222222222', 'subject': 'Physics', 'chapter': 'Kinematics', 'topic': 'Kinematics'},
-                {'label': 'Physics - Laws of Motion', 'chapterId': 'b1111111-1111-1111-1111-111111111111', 'topicId': 'c1111111-1111-1111-1111-111111111111', 'subject': 'Physics', 'chapter': 'Laws of Motion', 'topic': 'Laws of Motion'},
-                {'label': 'Chemistry - Organic', 'chapterId': 'b3333333-3333-3333-3333-333333333333', 'topicId': 'c3333333-3333-3333-3333-333333333333', 'subject': 'Chemistry', 'chapter': 'Organic Chemistry', 'topic': 'Organic Chemistry'},
-                {'label': 'Biology - Cell Structure', 'chapterId': 'b4444444-4444-4444-4444-444444444444', 'topicId': 'c4444444-4444-4444-4444-444444444444', 'subject': 'Biology', 'chapter': 'Cell Structure', 'topic': 'Cell Structure'},
-              ]
-                  .map((item) => DropdownMenuItem<String>(
-                        value: item['label'] as String,
-                        child: Text(item['label'] as String, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
-                      ))
-                  .toList(),
+              items: _loadedDbChapters.map((c) {
+                final String cId = c['id'].toString();
+                final String cName = c['name']?.toString() ?? 'Chapter';
+                return DropdownMenuItem<String>(
+                  value: cId,
+                  child: Text(cName, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
+                );
+              }).toList(),
               onChanged: (val) {
                 if (val != null) {
-                  final Map<String, String> matched = [
-                    {'label': 'Physics - Kinematics', 'chapterId': 'b2222222-2222-2222-2222-222222222222', 'topicId': 'c2222222-2222-2222-2222-222222222222', 'subject': 'Physics', 'chapter': 'Kinematics', 'topic': 'Kinematics'},
-                    {'label': 'Physics - Laws of Motion', 'chapterId': 'b1111111-1111-1111-1111-111111111111', 'topicId': 'c1111111-1111-1111-1111-111111111111', 'subject': 'Physics', 'chapter': 'Laws of Motion', 'topic': 'Laws of Motion'},
-                    {'label': 'Chemistry - Organic', 'chapterId': 'b3333333-3333-3333-3333-333333333333', 'topicId': 'c3333333-3333-3333-3333-333333333333', 'subject': 'Chemistry', 'chapter': 'Organic Chemistry', 'topic': 'Organic Chemistry'},
-                    {'label': 'Biology - Cell Structure', 'chapterId': 'b4444444-4444-4444-4444-444444444444', 'topicId': 'c4444444-4444-4444-4444-444444444444', 'subject': 'Biology', 'chapter': 'Cell Structure', 'topic': 'Cell Structure'},
-                  ].firstWhere((item) => item['label'] == val, orElse: () => {'label': 'Physics - Kinematics', 'chapterId': 'b2222222-2222-2222-2222-222222222222', 'topicId': 'c2222222-2222-2222-2222-222222222222', 'subject': 'Physics', 'chapter': 'Kinematics', 'topic': 'Kinematics'});
-
-                  setState(() {
-                    q.chapterTopic = matched['label']!;
-                    q.chapterId = matched['chapterId']!;
-                    q.topicId = matched['topicId']!;
-                    q.subject = matched['subject']!;
-                    q.chapter = matched['chapter']!;
-                    q.topic = matched['topic']!;
-                  });
+                  final matched = _loadedDbChapters.firstWhere(
+                    (c) => c['id'].toString() == val,
+                    orElse: () => {},
+                  );
+                  if (matched.isNotEmpty) {
+                    setState(() {
+                      q.chapterId = val;
+                      q.chapterTopic = matched['name']?.toString() ?? '';
+                      q.chapter = matched['name']?.toString() ?? '';
+                    });
+                  }
                 }
               },
             ),

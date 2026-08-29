@@ -697,6 +697,43 @@ class SupabaseService {
     return cached;
   }
 
+  static Future<List<Map<String, dynamic>>> fetchAllChaptersForDropdown({String? exam, String? subject}) async {
+    try {
+      final String examName = (exam != null && exam.trim().isNotEmpty) ? exam.trim() : 'NEET';
+      final String subjectName = (subject != null && subject.trim().isNotEmpty) ? subject.trim() : 'Physics';
+
+      final chapters = await fetchTaxonomyForSubject(exam: examName, subject: subjectName, includeInactive: true);
+      if (chapters.isNotEmpty) {
+        return chapters;
+      }
+    } catch (e) {
+      debugPrint('Notice in fetchAllChaptersForDropdown via fetchTaxonomyForSubject: $e');
+    }
+
+    try {
+      final res = await client
+          .from('chapters')
+          .select('id, name, code, subject_id, is_active, display_order')
+          .order('display_order', ascending: true);
+
+      if (res != null && (res as List).isNotEmpty) {
+        return (res as List).map<Map<String, dynamic>>((e) {
+          return {
+            'id': e['id']?.toString() ?? '',
+            'name': e['name']?.toString() ?? '',
+            'code': e['code']?.toString() ?? '',
+            'subject_id': e['subject_id']?.toString() ?? '',
+            'status': (e['is_active'] ?? true) ? 'Active' : 'Inactive',
+          };
+        }).toList();
+      }
+    } catch (e) {
+      debugPrint('Notice in fetchAllChaptersForDropdown direct query: $e');
+    }
+
+    return [];
+  }
+
   static List<Map<String, dynamic>> _getSeedChaptersForSubject(String exam, String subject) {
     final isNeet = exam.toUpperCase().contains('NEET');
 
