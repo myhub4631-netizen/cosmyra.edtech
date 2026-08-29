@@ -2240,74 +2240,15 @@ class SupabaseService {
   }
 
   static Future<bool> insertQuestionToSupabase(Map<String, dynamic> data) async {
-    final String timeIso = DateTime.now().toIso8601String();
-    final String qId = data['id'] ?? 'Q_${DateTime.now().millisecondsSinceEpoch}';
-    final rawCat = data['category'] ?? data['sourceType'] ?? 'Custom Practice';
-    final canonicalMap = getCanonicalCategoryAndSourceType(rawCat.toString());
-
-    final payload = {
-      'id': qId,
-      'paper_id': data['paper_id'] ?? data['paperId'] ?? '',
-      'question_number': (data['question_number'] ?? data['questionNumber'] ?? -1) as int,
-      'question_text': data['questionText'] ?? data['question_text'] ?? '',
-      'question_image': data['questionImage'] ?? data['question_image'] ?? '',
-      'subject': data['subject'] ?? 'Physics',
-      'chapter': data['chapter'] ?? '1. Mechanics',
-      'topic': data['topic'] ?? 'Kinematics',
-      'source_type': canonicalMap['source_type'],
-      'source': canonicalMap['source'],
-      'difficulty': data['difficulty'] ?? 'Medium',
-      'q_type': data['type'] ?? data['q_type'] ?? 'MCQ',
-      'marks': data['marks'] ?? 4,
-      'negative_marks': data['negativeMarks'] ?? 1.0,
-      'status': data['status'] ?? 'Active',
-      'options': data['options'] ?? [],
-      'option_images': data['optionImages'] ?? data['option_images'] ?? [null, null, null, null],
-      'correct_answer': data['correctAnswer'] ?? data['correct_answer'] ?? 'Option A',
-      'correct_option_index': data['correctOptionIndex'] ?? data['correct_option_index'],
-      'explanation': data['explanation'] ?? '',
-      'solution': data['solution'] ?? '',
-      'year': data['year'] ?? '2026',
-      'exam': data['exam'] ?? 'NEET 2026',
-      'created_at': timeIso,
-      'updated_at': timeIso,
-    };
-
-    try {
-      await client.from('questions').upsert(payload);
-      return true;
-    } catch (e) {
-      debugPrint('Supabase insert error: $e');
-      return false;
-    }
+    final res = await saveQuestionMapWithStatus(data);
+    return res['success'] == true;
   }
 
   static Future<bool> updateQuestionInSupabase(String id, Map<String, dynamic> data) async {
-    try {
-      final payload = {
-        'question_text': data['questionText'] ?? data['question_text'] ?? '',
-        'question_image': data['questionImage'] ?? '',
-        'subject': data['subject'] ?? 'Physics',
-        'chapter': data['chapter'] ?? '1. Mechanics',
-        'topic': data['topic'] ?? 'Kinematics',
-        'category': data['category'] ?? 'Custom Practice',
-        'difficulty': data['difficulty'] ?? 'Medium',
-        'q_type': data['type'] ?? data['q_type'] ?? 'MCQ',
-        'marks': data['marks'] ?? 4,
-        'negative_marks': data['negativeMarks'] ?? 1.0,
-        'status': data['status'] ?? 'Active',
-        'options': data['options'] ?? [],
-        'correct_answer': data['correctAnswer'] ?? 'Option A',
-        'explanation': data['explanation'] ?? '',
-        'solution': data['solution'] ?? '',
-        'updated_at': DateTime.now().toIso8601String(),
-      };
-      await client.from('questions').update(payload).eq('id', id);
-      return true;
-    } catch (e) {
-      debugPrint('Error updating question in Supabase: $e');
-      return true;
-    }
+    final Map<String, dynamic> map = Map<String, dynamic>.from(data);
+    map['id'] = id;
+    final res = await saveQuestionMapWithStatus(map);
+    return res['success'] == true;
   }
 
   static Future<bool> deleteQuestionFromSupabase(String id) async {
