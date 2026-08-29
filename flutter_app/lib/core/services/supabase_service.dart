@@ -1984,7 +1984,7 @@ class SupabaseService {
       }
     }
 
-    // Fetch live questions directly from Supabase DB as the exclusive source of truth
+    // Fetch live questions directly from Supabase DB as the exclusive single source of truth
     try {
       final res = await client.from('questions').select('*').order('created_at', ascending: false);
       if (res != null && (res as List).isNotEmpty) {
@@ -1995,6 +1995,23 @@ class SupabaseService {
       }
     } catch (e) {
       debugPrint('Error querying Supabase questions table: $e');
+    }
+
+    // If Supabase DB table is completely empty, seed the 20 practice questions INTO Supabase DB once
+    if (allQuestions.isEmpty) {
+      final practice20 = get20RealQuestionsMap();
+      await _seedLocalQuestionsToSupabase(practice20);
+      try {
+        final seededRes = await client.from('questions').select('*').order('created_at', ascending: false);
+        if (seededRes != null && (seededRes as List).isNotEmpty) {
+          final dbList = (seededRes as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
+          for (var dbQ in dbList) {
+            addOrUpdate(dbQ);
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching seeded questions from Supabase DB: $e');
+      }
     }
 
     return allQuestions;
