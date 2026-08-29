@@ -106,6 +106,34 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
   List<Map<String, dynamic>> _loadedDbChapters = [];
 
+  Map<String, dynamic> _parseOptionsFromQuestionText(String rawText, List<String> existingOpts) {
+    if (existingOpts.any((o) => o.trim().isNotEmpty)) {
+      return {'text': rawText, 'options': existingOpts};
+    }
+
+    final RegExp optionReg = RegExp(r'^\s*[\(\[]?(?:[1-4]|[A-Da-d])[\)\.\:]\s*(.*)', multiLine: true);
+    final matches = optionReg.allMatches(rawText).toList();
+
+    if (matches.length >= 2) {
+      final List<String> parsedOpts = [];
+      for (var m in matches) {
+        final val = m.group(1)?.trim() ?? '';
+        if (val.isNotEmpty) parsedOpts.add(val);
+      }
+      while (parsedOpts.length < 4) parsedOpts.add('');
+
+      final firstMatchIndex = rawText.indexOf(matches.first.group(0)!);
+      final cleanText = (firstMatchIndex != -1 ? rawText.substring(0, firstMatchIndex) : rawText).trim();
+
+      return {
+        'text': cleanText.isNotEmpty ? cleanText : rawText,
+        'options': parsedOpts.sublist(0, 4),
+      };
+    }
+
+    return {'text': rawText, 'options': existingOpts};
+  }
+
   Future<void> _loadPaperAndSavedQuestions() async {
     setState(() => _isLoading = true);
 
@@ -140,7 +168,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
       if (savedMatch.isNotEmpty) {
         savedCounter++;
-        final opts = savedMatch['options'] is List ? List<String>.from(savedMatch['options']) : <String>['', '', '', ''];
+        String rawQText = savedMatch['question_text'] ?? savedMatch['questionText'] ?? '';
+        List<String> opts = savedMatch['options'] is List ? List<String>.from(savedMatch['options']) : <String>[];
+
+        final parsed = _parseOptionsFromQuestionText(rawQText, opts);
+        rawQText = parsed['text'] as String;
+        opts = List<String>.from(parsed['options'] as List);
         while (opts.length < 4) opts.add('');
 
         int correctIdx = 0;
@@ -159,6 +192,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           }
         }
 
+        String normDiff = (savedMatch['difficulty'] ?? 'Medium').toString().toLowerCase();
+        if (normDiff == 'easy') normDiff = 'Easy';
+        else if (normDiff == 'hard') normDiff = 'Hard';
+        else normDiff = 'Medium';
+
         final optImgsRaw = savedMatch['option_images'] ?? savedMatch['optionImages'];
         final List<String?> optImgs = optImgsRaw is List
             ? List<String?>.from(optImgsRaw)
@@ -166,25 +204,47 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         while (optImgs.length < opts.length) optImgs.add(null);
 
         final String chapIdFromMatch = savedMatch['chapter_id']?.toString() ?? '';
+        final String chapNameFromMatch = savedMatch['chapter']?.toString() ?? savedMatch['chapterTopic']?.toString() ?? '';
+        final String qSubject = savedMatch['subject']?.toString() ?? subject;
+
+        String finalChapId = '';
+        String finalChapName = '';
+
+        if (chapIdFromMatch.isNotEmpty && _loadedDbChapters.any((c) => c['id'].toString() == chapIdFromMatch)) {
+          final matchedC = _loadedDbChapters.firstWhere((c) => c['id'].toString() == chapIdFromMatch);
+          finalChapId = matchedC['id'].toString();
+          finalChapName = matchedC['name'].toString();
+        } else if (chapNameFromMatch.isNotEmpty && _loadedDbChapters.any((c) => c['name'].toString().trim().toLowerCase() == chapNameFromMatch.trim().toLowerCase())) {
+          final matchedC = _loadedDbChapters.firstWhere((c) => c['name'].toString().trim().toLowerCase() == chapNameFromMatch.trim().toLowerCase());
+          finalChapId = matchedC['id'].toString();
+          finalChapName = matchedC['name'].toString();
+        } else if (qSubject.isNotEmpty && _loadedDbChapters.any((c) => c['subject_name']?.toString().toLowerCase() == qSubject.toLowerCase() || c['subject']?.toString().toLowerCase() == qSubject.toLowerCase())) {
+          final matchedC = _loadedDbChapters.firstWhere((c) => c['subject_name']?.toString().toLowerCase() == qSubject.toLowerCase() || c['subject']?.toString().toLowerCase() == qSubject.toLowerCase());
+          finalChapId = matchedC['id'].toString();
+          finalChapName = matchedC['name'].toString();
+        } else if (_loadedDbChapters.isNotEmpty) {
+          finalChapId = _loadedDbChapters.first['id'].toString();
+          finalChapName = _loadedDbChapters.first['name'].toString();
+        }
 
         _questionsList[i] = QuestionItemData(
           id: savedMatch['id'] ?? 'q_${_paperId}_$qNum',
           number: qNum,
-          text: savedMatch['question_text'] ?? savedMatch['questionText'] ?? '',
+          text: rawQText,
           questionImage: savedMatch['question_image'] ?? savedMatch['questionImage'],
           options: opts,
           optionImages: optImgs,
           correctOptionIndex: correctIdx >= 0 ? correctIdx : 0,
           explanation: savedMatch['explanation'] ?? '',
-          difficulty: savedMatch['difficulty'] ?? 'Medium',
+          difficulty: normDiff,
           positiveMarks: savedMatch['marks']?.toString() ?? '4',
           negativeMarks: savedMatch['negative_marks']?.toString() ?? '-1',
           questionType: savedMatch['q_type'] ?? savedMatch['question_type'] ?? 'MCQ (Single Correct)',
-          subject: savedMatch['subject'] ?? subject,
-          chapter: savedMatch['chapter'] ?? 'General',
+          subject: qSubject,
+          chapter: finalChapName.isNotEmpty ? finalChapName : 'General',
           topic: savedMatch['topic'] ?? 'General',
-          chapterTopic: savedMatch['chapter'] ?? 'General',
-          chapterId: chapIdFromMatch.isNotEmpty ? chapIdFromMatch : (_loadedDbChapters.isNotEmpty ? _loadedDbChapters.first['id'].toString() : 'b2222222-2222-2222-2222-222222222222'),
+          chapterTopic: finalChapName.isNotEmpty ? finalChapName : 'General',
+          chapterId: finalChapId.isNotEmpty ? finalChapId : (_loadedDbChapters.isNotEmpty ? _loadedDbChapters.first['id'].toString() : 'b2222222-2222-2222-2222-222222222222'),
           isSaved: true,
         );
       } else {
