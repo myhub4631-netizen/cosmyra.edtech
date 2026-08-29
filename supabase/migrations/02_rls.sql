@@ -135,7 +135,7 @@ DROP POLICY IF EXISTS "Questions delete policy" ON public.questions;
 -- SELECT Policy
 CREATE POLICY "Questions select policy"
 ON public.questions FOR SELECT TO anon, authenticated 
-USING (status = 'published' OR status = 'Active' OR status = 'draft' OR created_by = auth.uid() OR public.is_admin(auth.uid()));
+USING (status::text IN ('published', 'active', 'Active', 'draft', 'submitted', 'under_review', 'approved') OR created_by = auth.uid() OR public.is_admin(auth.uid()));
 
 -- INSERT Policy
 CREATE POLICY "Questions insert policy"
