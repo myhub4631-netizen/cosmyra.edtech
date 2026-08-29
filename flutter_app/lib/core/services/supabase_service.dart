@@ -971,6 +971,50 @@ class SupabaseService {
     ];
   }
 
+  static Future<String> ensureSubjectExists(String examName, String subjectName) async {
+    try {
+      await ensureTaxonomySeeded();
+      final examId = await getOrCreateValidExamId(examName);
+
+      final existing = await client
+          .from('subjects')
+          .select('id')
+          .eq('exam_id', examId)
+          .ilike('name', '%${subjectName.trim()}%')
+          .limit(1);
+
+      if (existing != null && (existing as List).isNotEmpty) {
+        return existing[0]['id'].toString();
+      }
+
+      final mappedId = _getSubjectId(examName, subjectName);
+      final existingMapped = await client
+          .from('subjects')
+          .select('id')
+          .eq('id', mappedId)
+          .limit(1);
+
+      if (existingMapped != null && (existingMapped as List).isNotEmpty) {
+        return mappedId;
+      }
+
+      final subCode = '${examName.replaceAll(' ', '_').toUpperCase()}_${subjectName.replaceAll(' ', '_').toUpperCase()}';
+      await client.from('subjects').upsert({
+        'id': mappedId,
+        'exam_id': examId,
+        'name': subjectName.trim(),
+        'code': subCode,
+        'is_active': true,
+        'display_order': 1,
+      });
+
+      return mappedId;
+    } catch (e) {
+      debugPrint('Notice in ensureSubjectExists: $e');
+    }
+    return _getSubjectId(examName, subjectName);
+  }
+
   static Future<String> addChapterToDatabase({
     required String exam,
     required String subject,
@@ -980,10 +1024,10 @@ class SupabaseService {
     bool isActive = true,
   }) async {
     final storeKey = '${exam.toUpperCase()}_${subject.toUpperCase()}';
-    final subjectId = _getSubjectId(exam, subject);
+    final subjectId = await ensureSubjectExists(exam, subject);
     final trimmedName = name.trim();
     final trimmedCode = code.trim().toUpperCase().isEmpty 
-        ? trimmedName.toUpperCase().replaceAll(' ', '_') 
+        ? 'CHAP_${DateTime.now().millisecondsSinceEpoch}' 
         : code.trim().toUpperCase();
 
     // 1. Prevent duplicate chapter creation for the same Exam + Subject
@@ -1007,36 +1051,20 @@ class SupabaseService {
 
     String finalChapterId = toValidUuid('c_${DateTime.now().millisecondsSinceEpoch}');
 
-    // 2. Remote Supabase Database Insert with fallback
-    try {
-      final res = await client.from('chapters').insert({
-        'id': finalChapterId,
-        'subject_id': subjectId,
-        'name': trimmedName,
-        'code': trimmedCode,
-        'is_active': isActive,
-        'display_order': 99,
-      }).select();
+    // 2. Remote Supabase Database Insert
+    final res = await client.from('chapters').insert({
+      'id': finalChapterId,
+      'subject_id': subjectId,
+      'name': trimmedName,
+      'code': trimmedCode,
+      'is_active': isActive,
+      'display_order': 99,
+    }).select();
 
-      if (res != null && (res as List).isNotEmpty) {
-        final dbId = res.first['id']?.toString();
-        if (dbId != null && dbId.isNotEmpty) {
-          finalChapterId = dbId;
-        }
-      }
-    } catch (e) {
-      debugPrint('Supabase remote chapter insert notice (fallback to custom ID): $e');
-      try {
-        await client.from('chapters').insert({
-          'id': finalChapterId,
-          'subject_id': subjectId,
-          'name': trimmedName,
-          'code': trimmedCode,
-          'is_active': isActive,
-          'display_order': 99,
-        });
-      } catch (e2) {
-        debugPrint('Supabase remote chapter insert fallback notice: $e2');
+    if (res != null && (res as List).isNotEmpty) {
+      final dbId = res.first['id']?.toString();
+      if (dbId != null && dbId.isNotEmpty) {
+        finalChapterId = dbId;
       }
     }
 

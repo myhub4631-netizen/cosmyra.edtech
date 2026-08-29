@@ -100,20 +100,40 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1)),
             onPressed: () async {
               if (nameCtrl.text.trim().isEmpty) return;
+              final chapterName = nameCtrl.text.trim();
               Navigator.pop(ctx);
-              final code = codeCtrl.text.trim().isNotEmpty ? codeCtrl.text : nameCtrl.text.toUpperCase().replaceAll(' ', '_');
-              final newId = await SupabaseService.addChapterToDatabase(
-                exam: _selectedExam,
-                subject: _selectedSubject,
-                name: nameCtrl.text,
-                code: code,
-                isActive: isActive,
-              );
-              setState(() {
-                _selectedChapterId = newId;
-                _selectedChapterForTopics = nameCtrl.text.trim();
-              });
-              _loadTaxonomyFromService(forceRefresh: true);
+              try {
+                final code = codeCtrl.text.trim().isNotEmpty ? codeCtrl.text : chapterName.toUpperCase().replaceAll(' ', '_');
+                final newId = await SupabaseService.addChapterToDatabase(
+                  exam: _selectedExam,
+                  subject: _selectedSubject,
+                  name: chapterName,
+                  code: code,
+                  isActive: isActive,
+                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('✓ Chapter "$chapterName" added successfully!'),
+                      backgroundColor: const Color(0xFF10B981),
+                    ),
+                  );
+                }
+                setState(() {
+                  _selectedChapterId = newId;
+                  _selectedChapterForTopics = chapterName;
+                });
+                await _loadTaxonomyFromService(forceRefresh: true);
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to add chapter: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Add Chapter', style: TextStyle(color: Colors.white)),
           ),
