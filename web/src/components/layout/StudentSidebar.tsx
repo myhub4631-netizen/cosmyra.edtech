@@ -134,6 +134,18 @@ export const StudentSidebar: React.FC = () => {
           </button>
 
           <button
+            onClick={() => navigate('/test-series')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+              isNavActive('/test-series')
+                ? 'bg-purple-50 text-indigo-600 font-bold'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4 text-gray-400" />
+            <span>Test Series</span>
+          </button>
+
+          <button
             onClick={() => navigate('/student/test')}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
           >

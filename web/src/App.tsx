@@ -34,6 +34,7 @@ import { ActivePracticeInterface } from './pages/student/ActivePracticeInterface
 import { InstantFeedbackInterface } from './pages/student/InstantFeedbackInterface';
 import { DetailedSolutionView } from './pages/student/DetailedSolutionView';
 import { MobilePricingScreen } from './pages/student/MobilePricingScreen';
+import { TestSeriesScreen } from './pages/student/TestSeriesScreen';
 
 // Teacher Pages
 import { TeacherDashboardView } from './pages/teacher/TeacherDashboard';
@@ -155,6 +156,8 @@ export function App() {
           <Route path="/student/app-pricing" element={<MobilePricingScreen />} />
           <Route path="/test" element={<CustomTestEngine />} />
           <Route path="/student/test" element={<CustomTestEngine />} />
+          <Route path="/test-series" element={<TestSeriesScreen />} />
+          <Route path="/student/test-series" element={<TestSeriesScreen />} />
           <Route path="/pyq" element={<PYQSection />} />
           <Route path="/student/pyq" element={<PYQSection />} />
           <Route path="/nta" element={<PYQSection />} />

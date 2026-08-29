@@ -10,6 +10,7 @@ import '../practice/custom_practice_wizard.dart';
 import '../tests/mock_tests_screen.dart';
 import '../tests/test_screen.dart';
 import '../tests/test_result_screen.dart';
+import '../student/test_series_screen.dart';
 import '../pyq_nta/pyq_nta_screen.dart';
 import '../mistakes_bookmarks/mistakes_bookmarks_screen.dart';
 import '../analytics/analytics_screen.dart';
@@ -370,8 +371,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           },
         );
       case 2:
-        return MockTestsScreen(
-          onStartTest: _startCustomTest,
+        return TestSeriesScreen(
+          onBackToDashboard: () => setState(() => _selectedIndex = 0),
+          onNavigateTab: (idx) => setState(() => _selectedIndex = idx),
         );
       case 3:
         return PyqNtaScreen(

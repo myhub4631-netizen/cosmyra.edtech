@@ -62,6 +62,7 @@ class CosmyraApp extends StatelessWidget {
         '/practice': (context) => const MainNavigationScreen(initialIndex: 1),
         '/tests': (context) => const MainNavigationScreen(initialIndex: 2),
         '/mock-tests': (context) => const MainNavigationScreen(initialIndex: 2),
+        '/test-series': (context) => const MainNavigationScreen(initialIndex: 2),
         '/pyq': (context) => const MainNavigationScreen(initialIndex: 3),
         '/mistakes': (context) => const MainNavigationScreen(initialIndex: 4),
         '/bookmarks': (context) => const MainNavigationScreen(initialIndex: 4),
