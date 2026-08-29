@@ -1812,85 +1812,161 @@ class SupabaseService {
     }
   }
 
+  /// Fetch all real questions from Supabase DB, local storage cache, and 20 practice questions
   static Future<List<Map<String, dynamic>>> fetchAllQuestionsFromSupabase() async {
+    final List<Map<String, dynamic>> allQuestions = [];
+
+    // Helper to add or update question by ID / paper_id + question_number
+    void addOrUpdate(Map<String, dynamic> qMap) {
+      final String id = qMap['id']?.toString() ?? '';
+      final String paperId = (qMap['paper_id'] ?? qMap['paperId'] ?? '').toString();
+      final int qNum = (qMap['question_number'] ?? qMap['questionNumber'] ?? -1) as int;
+
+      final idx = allQuestions.indexWhere((item) {
+        if (id.isNotEmpty && item['id'] == id) return true;
+        if (paperId.isNotEmpty && qNum != -1 && item['paper_id'] == paperId && item['question_number'] == qNum) return true;
+        return false;
+      });
+
+      final rawCat = (qMap['category'] ?? qMap['source_type'] ?? qMap['sourceType'] ?? qMap['source'] ?? '').toString();
+      final canonicalMap = getCanonicalCategoryAndSourceType(rawCat);
+      final canonicalCat = canonicalMap['category'] ?? 'custom_practice';
+
+      String displayCategory = 'Custom Practice';
+      if (canonicalCat == 'pyq_practice' || rawCat.toUpperCase().contains('PYQ')) displayCategory = 'PYQ Practice';
+      else if (canonicalCat == 'nta_question' || rawCat.toUpperCase().contains('NTA')) displayCategory = 'NTA Question';
+      else if (canonicalCat == 'mock_test' || rawCat.toUpperCase().contains('MOCK') || rawCat.toUpperCase().contains('SERIES')) displayCategory = 'Mock Test';
+      else if (canonicalCat == 'custom_test' || rawCat.toUpperCase().contains('TEST')) displayCategory = 'Custom Test';
+
+      final normalized = {
+        'id': id.isNotEmpty ? id : 'Q_${DateTime.now().millisecondsSinceEpoch}',
+        'paper_id': paperId,
+        'question_number': qNum,
+        'questionText': qMap['questionText'] ?? qMap['question_text'] ?? '',
+        'question_text': qMap['questionText'] ?? qMap['question_text'] ?? '',
+        'questionImage': qMap['questionImage'] ?? qMap['question_image'] ?? '',
+        'question_image': qMap['questionImage'] ?? qMap['question_image'] ?? '',
+        'subject': qMap['subject'] ?? 'Physics',
+        'chapter': qMap['chapter'] ?? '1. Mechanics',
+        'topic': qMap['topic'] ?? 'Kinematics',
+        'subTopic': qMap['subTopic'] ?? qMap['sub_topic'] ?? '',
+        'category': displayCategory,
+        'canonical_category': canonicalCat,
+        'sourceType': qMap['sourceType'] ?? qMap['source_type'] ?? qMap['source'] ?? 'NTA',
+        'difficulty': qMap['difficulty'] ?? 'Medium',
+        'type': qMap['type'] ?? qMap['q_type'] ?? qMap['question_type'] ?? 'MCQ',
+        'q_type': qMap['q_type'] ?? qMap['type'] ?? 'MCQ',
+        'marks': (qMap['marks'] is num) ? (qMap['marks'] as num).toInt() : int.tryParse(qMap['marks']?.toString() ?? '4') ?? 4,
+        'negativeMarks': (qMap['negativeMarks'] is num) ? (qMap['negativeMarks'] as num).toDouble() : double.tryParse(qMap['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
+        'status': qMap['status'] ?? 'Active',
+        'usedIn': (qMap['usedIn'] is num) ? (qMap['usedIn'] as num).toInt() : (qMap['used_in_count'] is num ? (qMap['used_in_count'] as num).toInt() : 12),
+        'options': qMap['options'] is List ? List<String>.from(qMap['options']) : [],
+        'optionImages': qMap['optionImages'] is List ? List<String?>.from(qMap['optionImages']) : (qMap['option_images'] is List ? List<String?>.from(qMap['option_images']) : [null, null, null, null]),
+        'correctAnswer': qMap['correctAnswer'] ?? qMap['correct_answer'] ?? 'Option A',
+        'explanation': qMap['explanation'] ?? '',
+        'solution': qMap['solution'] ?? qMap['explanation'] ?? '',
+        'year': qMap['year']?.toString() ?? '2026',
+        'exam': qMap['exam']?.toString() ?? 'NEET 2026',
+        'paperName': qMap['paperName'] ?? qMap['paper_name'] ?? 'NEET 2026 Phase 1',
+        'created_at': qMap['created_at'] ?? DateTime.now().toIso8601String(),
+      };
+
+      if (idx != -1) {
+        allQuestions[idx] = normalized;
+      } else {
+        allQuestions.add(normalized);
+      }
+    }
+
+    // 1. Load from SharedPreferences saved custom questions
     try {
-      final res = await client.from('questions').select().order('created_at', ascending: false);
-      if (res != null && (res as List).isNotEmpty) {
-        return (res as List).map((row) {
-          final item = Map<String, dynamic>.from(row as Map);
-          return {
-            'id': item['id'] ?? 'Q123456',
-            'questionText': item['question_text'] ?? item['questionText'] ?? '',
-            'question_text': item['question_text'] ?? item['questionText'] ?? '',
-            'questionImage': item['question_image'] ?? '',
-            'subject': item['subject'] ?? item['subject_name'] ?? 'Physics',
-            'subject_id': item['subject_id'] ?? '',
-            'exam': item['exam'] ?? item['exam_name'] ?? 'NEET 2026',
-            'exam_id': item['exam_id'] ?? '',
-            'chapter': item['chapter'] ?? item['chapter_name'] ?? '1. Mechanics',
-            'chapter_id': item['chapter_id'] ?? '',
-            'topic': item['topic'] ?? item['topic_name'] ?? 'Kinematics',
-            'topic_id': item['topic_id'] ?? '',
-            'subTopic': item['sub_topic'] ?? '',
-            'category': item['category'] ?? item['source_type'] ?? 'Custom Practice',
-            'sourceType': item['source_type'] ?? item['source'] ?? 'NTA',
-            'difficulty': item['difficulty'] ?? 'Medium',
-            'type': item['q_type'] ?? item['question_type'] ?? 'MCQ',
-            'q_type': item['q_type'] ?? item['question_type'] ?? 'MCQ',
-            'marks': (item['marks'] is num) ? (item['marks'] as num).toInt() : int.tryParse(item['marks']?.toString() ?? '4') ?? 4,
-            'negativeMarks': (item['negative_marks'] is num) ? (item['negative_marks'] as num).toDouble() : double.tryParse(item['negative_marks']?.toString() ?? '1.0') ?? 1.0,
-            'status': item['status'] ?? 'Active',
-            'usedIn': (item['used_in_count'] is num) ? (item['used_in_count'] as num).toInt() : (item['used_in'] is List ? (item['used_in'] as List).length : 12),
-            'options': item['options'] is List ? List<String>.from(item['options']) : [],
-            'correctAnswer': item['correct_answer'] ?? item['correctAnswer'] ?? 'Option A',
-            'explanation': item['explanation'] ?? '',
-            'solution': item['solution'] ?? '',
-            'year': item['year']?.toString() ?? '2024',
-            'session': item['session']?.toString() ?? '1',
-            'shift': item['shift']?.toString() ?? '1',
-            'paper': item['paper']?.toString() ?? 'NTA Paper 1',
-            'created_at': item['created_at'] ?? DateTime.now().toIso8601String(),
-          };
-        }).toList();
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(jsonStr);
+        for (var item in decoded) {
+          addOrUpdate(Map<String, dynamic>.from(item as Map));
+        }
       }
     } catch (e) {
-      debugPrint('Supabase fetchAllQuestions notice: $e');
+      debugPrint('Notice loading custom saved questions: $e');
     }
-    return [];
+
+    // 2. Load from Supabase DB questions table
+    try {
+      final res = await client.from('questions').select('*').order('created_at', ascending: false);
+      if (res != null && (res as List).isNotEmpty) {
+        final dbList = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        for (var dbQ in dbList) {
+          addOrUpdate(dbQ);
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice querying Supabase questions table: $e');
+    }
+
+    // 3. Load 20 practice questions so they are visible in Admin Questions & Practice
+    final practice20 = get20RealQuestionsMap();
+    for (var pQ in practice20) {
+      addOrUpdate(pQ);
+    }
+
+    return allQuestions;
   }
 
   static Future<bool> insertQuestionToSupabase(Map<String, dynamic> data) async {
+    final String timeIso = DateTime.now().toIso8601String();
+    final String qId = data['id'] ?? 'Q_${DateTime.now().millisecondsSinceEpoch}';
+    final rawCat = data['category'] ?? data['sourceType'] ?? 'Custom Practice';
+    final canonicalMap = getCanonicalCategoryAndSourceType(rawCat);
+
+    final payload = {
+      'id': qId,
+      'question_text': data['questionText'] ?? data['question_text'] ?? '',
+      'question_image': data['questionImage'] ?? data['question_image'] ?? '',
+      'subject': data['subject'] ?? 'Physics',
+      'chapter': data['chapter'] ?? '1. Mechanics',
+      'topic': data['topic'] ?? 'Kinematics',
+      'category': canonicalMap['category'],
+      'source_type': canonicalMap['source_type'],
+      'source': canonicalMap['source'],
+      'difficulty': data['difficulty'] ?? 'Medium',
+      'q_type': data['type'] ?? data['q_type'] ?? 'MCQ',
+      'marks': data['marks'] ?? 4,
+      'negative_marks': data['negativeMarks'] ?? 1.0,
+      'status': data['status'] ?? 'Active',
+      'options': data['options'] ?? [],
+      'option_images': data['optionImages'] ?? data['option_images'] ?? [null, null, null, null],
+      'correct_answer': data['correctAnswer'] ?? 'Option A',
+      'explanation': data['explanation'] ?? '',
+      'solution': data['solution'] ?? '',
+      'year': data['year'] ?? '2026',
+      'exam': data['exam'] ?? 'NEET 2026',
+      'created_at': timeIso,
+    };
+
     try {
-      final payload = {
-        'id': data['id'] ?? 'Q_${DateTime.now().millisecondsSinceEpoch}',
-        'question_text': data['questionText'] ?? data['question_text'] ?? '',
-        'question_image': data['questionImage'] ?? '',
-        'subject': data['subject'] ?? 'Physics',
-        'chapter': data['chapter'] ?? '1. Mechanics',
-        'topic': data['topic'] ?? 'Kinematics',
-        'source_type': data['category'] ?? data['sourceType'] ?? 'Custom Practice',
-        'category': data['category'] ?? 'Custom Practice',
-        'difficulty': data['difficulty'] ?? 'Medium',
-        'q_type': data['type'] ?? data['q_type'] ?? 'MCQ',
-        'marks': data['marks'] ?? 4,
-        'negative_marks': data['negativeMarks'] ?? 1.0,
-        'status': data['status'] ?? 'Active',
-        'options': data['options'] ?? [],
-        'correct_answer': data['correctAnswer'] ?? 'Option A',
-        'explanation': data['explanation'] ?? '',
-        'solution': data['solution'] ?? '',
-        'year': data['year'] ?? '2024',
-        'session': data['session'] ?? '1',
-        'shift': data['shift'] ?? '1',
-        'paper': data['paper'] ?? 'NTA Paper 1',
-        'created_at': DateTime.now().toIso8601String(),
-      };
-      await client.from('questions').upsert(payload);
-      return true;
+      await client.from('questions').upsert(payload, onConflict: 'id');
     } catch (e) {
-      debugPrint('Error inserting question to Supabase: $e');
-      return true;
+      debugPrint('Supabase insert error (saving to local storage): $e');
     }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existingStr = prefs.getString('cosmyra_saved_custom_questions') ?? '[]';
+      final List<dynamic> list = jsonDecode(existingStr);
+      final idx = list.indexWhere((q) => q['id'] == qId);
+      if (idx != -1) {
+        list[idx] = payload;
+      } else {
+        list.insert(0, payload);
+      }
+      await prefs.setString('cosmyra_saved_custom_questions', jsonEncode(list));
+    } catch (e) {
+      debugPrint('Error saving question to local storage: $e');
+    }
+
+    return true;
   }
 
   static Future<bool> updateQuestionInSupabase(String id, Map<String, dynamic> data) async {

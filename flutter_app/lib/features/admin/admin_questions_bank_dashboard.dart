@@ -66,135 +66,16 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     setState(() => _isLoading = true);
     try {
       final dbQuestions = await SupabaseService.fetchAllQuestionsFromSupabase();
-
-      if (dbQuestions.isNotEmpty) {
-        _allQuestionsData = dbQuestions;
-      } else {
-        // Fallback seed data if DB is completely fresh
-        _allQuestionsData = _getSeedQuestionsData();
+      if (mounted) {
+        setState(() {
+          _allQuestionsData = dbQuestions;
+        });
       }
-    } catch (_) {
-      _allQuestionsData = _getSeedQuestionsData();
+    } catch (e) {
+      debugPrint('Error loading questions from Supabase: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  List<Map<String, dynamic>> _getSeedQuestionsData() {
-    return [
-      {
-        'id': 'Q125678',
-        'questionText': 'The velocity-time graph of a particle moving in a straight line is shown below...',
-        'category': 'Custom Practice',
-        'subject': 'Physics',
-        'chapter': '1. Mechanics',
-        'topic': 'Kinematics',
-        'type': 'MCQ',
-        'marks': 4,
-        'negativeMarks': 1.0,
-        'status': 'Active',
-        'usedIn': 12,
-        'options': ['Option A', 'Option B', 'Option C', 'Option D'],
-        'correctAnswer': 'Option A',
-        'explanation': 'Acceleration is constant as the slope is linear.',
-      },
-      {
-        'id': 'Q125677',
-        'questionText': 'Two bodies A and B of masses 2m and m are connected by a light string...',
-        'category': 'Custom Test',
-        'subject': 'Physics',
-        'chapter': '2. Thermodynamics',
-        'topic': 'Thermal Properties',
-        'type': 'MCQ',
-        'marks': 4,
-        'negativeMarks': 1.0,
-        'status': 'Active',
-        'usedIn': 8,
-        'options': ['T1 > T2', 'T1 < T2', 'T1 = T2', 'None'],
-        'correctAnswer': 'T1 = T2',
-        'explanation': 'Thermal equilibrium implies equal temperatures.',
-      },
-      {
-        'id': 'Q125676',
-        'questionText': r'If y = \sin^{-1}\left(\frac{2x}{1+x^2}\right), \text{ then } \frac{dy}{dx} \text{ is equal to?}',
-        'category': 'PYQ Practice',
-        'subject': 'Mathematics',
-        'chapter': '3. Trigonometry',
-        'topic': 'Inverse Trigonometric Functions',
-        'type': 'MCQ',
-        'marks': 4,
-        'negativeMarks': 1.0,
-        'status': 'Active',
-        'usedIn': 15,
-        'options': [r'\frac{2}{1+x^2}', r'\frac{1}{1+x^2}', r'\frac{-2}{1+x^2}', '0'],
-        'correctAnswer': r'\frac{2}{1+x^2}',
-        'explanation': 'Substitute x = tan(theta).',
-      },
-      {
-        'id': 'Q125675',
-        'questionText': 'Match List-I with List-II regarding chemical stoichiometry.',
-        'category': 'NTA Question',
-        'subject': 'Chemistry',
-        'chapter': '1. Some Basic Concepts',
-        'topic': 'Mole Concept',
-        'type': 'Match',
-        'marks': 4,
-        'negativeMarks': 1.0,
-        'status': 'Active',
-        'usedIn': 24,
-        'options': ['A-I, B-II', 'A-II, B-III', 'A-III, B-I', 'A-IV, B-II'],
-        'correctAnswer': 'A-I, B-II',
-        'explanation': '1 mole of gas at STP occupies 22.4 L.',
-      },
-      {
-        'id': 'Q125674',
-        'questionText': 'Which of the following is not a primary organelle in eukaryotic cells?',
-        'category': 'NTA Question',
-        'subject': 'Biology',
-        'chapter': '2. Cell: The Unit of Life',
-        'topic': 'Cell Organelles',
-        'type': 'MCQ',
-        'marks': 4,
-        'negativeMarks': 1.0,
-        'status': 'Active',
-        'usedIn': 18,
-        'options': ['Mitochondria', 'Chloroplast', 'Ribosome', 'Nucleus'],
-        'correctAnswer': 'Ribosome',
-        'explanation': 'Ribosome is non-membrane bound.',
-      },
-      {
-        'id': 'Q125673',
-        'questionText': 'Consider the following statements regarding Kirchhoff\'s current law.',
-        'category': 'Mock Test',
-        'subject': 'Physics',
-        'chapter': '4. Electromagnetism',
-        'topic': 'Current Electricity',
-        'type': 'Assertion',
-        'marks': 4,
-        'negativeMarks': 1.0,
-        'status': 'Active',
-        'usedIn': 30,
-        'options': ['Both A and R true', 'A true R false', 'A false R true', 'Both false'],
-        'correctAnswer': 'Both A and R true',
-        'explanation': 'KCL is based on conservation of charge.',
-      },
-      {
-        'id': 'Q125672',
-        'questionText': 'A hydrogen-like atom in the ground state absorbs a photon of energy...',
-        'category': 'Mock Test',
-        'subject': 'Physics',
-        'chapter': '5. Modern Physics',
-        'topic': 'Atomic Structure',
-        'type': 'MCQ',
-        'marks': 4,
-        'negativeMarks': 1.0,
-        'status': 'Active',
-        'usedIn': 22,
-        'options': ['13.6 eV', '10.2 eV', '3.4 eV', '1.51 eV'],
-        'correctAnswer': '10.2 eV',
-        'explanation': 'E2 - E1 = -3.4 - (-13.6) = 10.2 eV.',
-      },
-    ];
   }
 
   // Filter Logic
@@ -205,8 +86,26 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     return _allQuestionsData.where((q) {
       // Category Tab Filter
       if (activeTabName != 'All') {
-        final cat = (q['category'] ?? '').toString();
-        if (!cat.toLowerCase().contains(activeTabName.toLowerCase())) return false;
+        final cat = (q['category'] ?? '').toString().toLowerCase();
+        final canonCat = (q['canonical_category'] ?? '').toString().toLowerCase();
+        final source = (q['sourceType'] ?? q['source_type'] ?? q['source'] ?? '').toString().toLowerCase();
+        final searchTarget = activeTabName.toLowerCase();
+
+        bool matches = false;
+        if (searchTarget.contains('pyq')) {
+          matches = cat.contains('pyq') || canonCat.contains('pyq') || source.contains('pyq');
+        } else if (searchTarget.contains('nta')) {
+          matches = cat.contains('nta') || canonCat.contains('nta') || source.contains('nta');
+        } else if (searchTarget.contains('mock')) {
+          matches = cat.contains('mock') || canonCat.contains('mock') || source.contains('mock') || source.contains('series');
+        } else if (searchTarget.contains('custom test') || searchTarget.contains('test')) {
+          matches = cat.contains('test') || canonCat.contains('test');
+        } else {
+          // Custom Practice
+          matches = cat.contains('practice') || canonCat.contains('practice') || source.contains('practice');
+        }
+
+        if (!matches) return false;
       }
 
       // Subject Filter
