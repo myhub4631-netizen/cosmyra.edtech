@@ -1392,6 +1392,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: TextFormField(
+                  key: ValueKey('q_text_${q.id}_${q.text}'),
                   initialValue: q.text,
                   maxLines: 4,
                   onChanged: (val) => q.text = val,
@@ -1500,6 +1501,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                           border: Border.all(color: const Color(0xFFCBD5E1)),
                         ),
                         child: TextFormField(
+                          key: ValueKey('q_opt_${q.id}_${optIdx}_${q.options[optIdx]}'),
                           initialValue: q.options[optIdx],
                           onChanged: (val) => q.options[optIdx] = val,
                           decoration: InputDecoration(
@@ -1658,6 +1660,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: TextFormField(
+              key: ValueKey('q_exp_${q.id}_${q.explanation}'),
               initialValue: q.explanation,
               maxLines: 3,
               onChanged: (val) => q.explanation = val,
@@ -1719,6 +1722,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       border: Border.all(color: const Color(0xFFCBD5E1)),
                     ),
                     child: TextFormField(
+                      key: ValueKey('q_pos_${q.id}_${q.positiveMarks}'),
                       initialValue: q.positiveMarks,
                       onChanged: (val) => q.positiveMarks = val,
                       decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 10)),
@@ -1744,6 +1748,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       border: Border.all(color: const Color(0xFFCBD5E1)),
                     ),
                     child: TextFormField(
+                      key: ValueKey('q_neg_${q.id}_${q.negativeMarks}'),
                       initialValue: q.negativeMarks,
                       onChanged: (val) => q.negativeMarks = val,
                       decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 10)),
