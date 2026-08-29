@@ -26,6 +26,7 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> with SingleTickerProviderStateMixin {
   String _activeTab = 'Dashboard';
   bool _isLoading = false;
+  bool _isQuestionBankExpanded = true;
 
   List<QuestionModel> _questionBank = [];
   List<ReportModel> _reports = [];
@@ -363,9 +364,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 _buildSidebarSectionLabel('CONTENT MANAGEMENT'),
                 _buildSidebarTile('Dashboard Sections', Icons.dashboard_customize_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/sections')),
                 _buildSidebarTile('Paper Predictions', Icons.note_alt_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/predictions')),
-                _buildSidebarTile('Question Bank', Icons.quiz_outlined, false, hasDropdown: true, onTap: () {
-                  Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
+                _buildSidebarTile('Question Bank', Icons.quiz_outlined, false, hasDropdown: true, isExpanded: _isQuestionBankExpanded, onTap: () {
+                  setState(() => _isQuestionBankExpanded = !_isQuestionBankExpanded);
                 }),
+                if (_isQuestionBankExpanded) ...[
+                  _buildSubSidebarTile('• All Questions', () {
+                    Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
+                  }),
+                  _buildSubSidebarTile('• Upload Questions (Step 1)', () {
+                    Navigator.of(context).push(SmoothPageRoute(child: AdminBulkUploadStep1Screen(userProfile: widget.userProfile)));
+                  }, isHighlighted: true),
+                  _buildSubSidebarTile('• Add Question (Step 2)', () {
+                    Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionBuilderScreen(userProfile: widget.userProfile)));
+                  }),
+                ],
                 _buildSidebarTile('Bulk Upload (Step 1)', Icons.cloud_upload_outlined, false, onTap: () {
                   Navigator.of(context).push(SmoothPageRoute(child: AdminBulkUploadStep1Screen(userProfile: widget.userProfile)));
                 }),
@@ -510,7 +522,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     );
   }
 
-  Widget _buildSidebarTile(String title, IconData icon, bool isActive, {bool hasDropdown = false, VoidCallback? onTap}) {
+  Widget _buildSubSidebarTile(String title, VoidCallback onTap, {bool isHighlighted = false}) {
+    return Container(
+      margin: const EdgeInsets.only(left: 20, top: 2, bottom: 2),
+      decoration: BoxDecoration(
+        color: isHighlighted ? const Color(0xFF4F46E5).withOpacity(0.2) : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: ListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: isHighlighted ? FontWeight.bold : FontWeight.w500,
+            color: isHighlighted ? const Color(0xFFA5B4FC) : const Color(0xFF94A3B8),
+          ),
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  Widget _buildSidebarTile(String title, IconData icon, bool isActive, {bool hasDropdown = false, bool isExpanded = false, VoidCallback? onTap}) {
     return InkWell(
       onTap: onTap ?? () => setState(() => _activeTab = title),
       borderRadius: BorderRadius.circular(10),
@@ -535,7 +570,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               ),
             ),
             if (hasDropdown)
-              Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: isActive ? Colors.white : const Color(0xFF64748B)),
+              Icon(
+                isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                size: 16,
+                color: isActive ? Colors.white : const Color(0xFF64748B),
+              ),
           ],
         ),
       ),
