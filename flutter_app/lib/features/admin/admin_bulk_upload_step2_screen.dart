@@ -69,9 +69,9 @@ class QuestionItemData {
     this.isSaved = false,
     this.isUploadingQuestionImage = false,
     List<bool>? isUploadingOptionImage,
-  })  : options = options ?? ['', '', '', ''],
-        optionImages = optionImages ?? [null, null, null, null],
-        isUploadingOptionImage = isUploadingOptionImage ?? [false, false, false, false];
+  })  : options = options != null ? List<String>.from(options) : ['', '', '', ''],
+        optionImages = optionImages != null ? List<String?>.from(optionImages) : [null, null, null, null],
+        isUploadingOptionImage = isUploadingOptionImage != null ? List<bool>.from(isUploadingOptionImage) : [false, false, false, false];
 }
 
 class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen> {

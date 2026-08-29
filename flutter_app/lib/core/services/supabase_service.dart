@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/models.dart';
 import '../../models/pyq_models.dart';
+import 'supabase_question_mapper.dart';
 
 class SupabaseService {
   // Supports dynamic injection via --dart-define=SUPABASE_URL=... and --dart-define=SUPABASE_ANON_KEY=...
@@ -1916,30 +1917,39 @@ class SupabaseService {
       final String rawId = (qMap['id'] != null && qMap['id'].toString().isNotEmpty)
           ? qMap['id'].toString()
           : 'Q_${DateTime.now().millisecondsSinceEpoch}';
-      final String rawPaperId = (qMap['paper_id'] ?? qMap['paperId'] ?? '').toString();
 
       final Map<String, dynamic> qData = {
         'id': toValidUuid(rawId),
-        'paper_id': rawPaperId.isNotEmpty ? toValidUuid(rawPaperId) : toValidUuid('default_paper'),
-        'question_number': qNum,
+        'exam_id': (qMap['exam_id'] != null && isValidUuid(qMap['exam_id'].toString()))
+            ? qMap['exam_id'].toString()
+            : '11111111-1111-1111-1111-111111111111',
+        'subject_id': (qMap['subject_id'] != null && isValidUuid(qMap['subject_id'].toString()))
+            ? qMap['subject_id'].toString()
+            : 'a1111111-1111-1111-1111-111111111111',
+        'chapter_id': (qMap['chapter_id'] != null && isValidUuid(qMap['chapter_id'].toString()))
+            ? qMap['chapter_id'].toString()
+            : 'b1111111-1111-1111-1111-111111111111',
+        'topic_id': (qMap['topic_id'] != null && isValidUuid(qMap['topic_id'].toString()))
+            ? qMap['topic_id'].toString()
+            : 'c1111111-1111-1111-1111-111111111111',
         'question_text': qMap['questionText'] ?? qMap['question_text'] ?? '',
         'question_image': qMap['questionImage'] ?? qMap['question_image'] ?? '',
-        'subject': qMap['subject'] ?? 'Physics',
-        'source_type': canonicalMap['source_type'],
-        'source': canonicalMap['source'],
-        'difficulty': (qMap['difficulty'] ?? 'medium').toString().toLowerCase(),
-        'q_type': (qMap['qType'] ?? qMap['q_type'] ?? qMap['questionType'] ?? 'MCQ').toString().startsWith('MCQ') ? 'MCQ' : (qMap['qType'] ?? qMap['q_type'] ?? 'MCQ').toString(),
-        'marks': (qMap['marks'] is num) ? (qMap['marks'] as num).toInt() : int.tryParse(qMap['marks']?.toString() ?? '4') ?? 4,
+        'q_type': SupabaseQuestionMapper.toDbQuestionType(qMap['qType'] ?? qMap['q_type'] ?? qMap['questionType']),
+        'difficulty': SupabaseQuestionMapper.toDbDifficulty(qMap['difficulty']),
+        'source': SupabaseQuestionMapper.toDbQuestionSource(qMap['source'] ?? qMap['category'] ?? qMap['sourceType']),
+        'status': SupabaseQuestionMapper.toDbQuestionStatus(qMap['status']),
+        'marks': (qMap['marks'] is num) ? (qMap['marks'] as num).toDouble() : double.tryParse(qMap['marks']?.toString() ?? '4.0') ?? 4.0,
         'negative_marks': (qMap['negativeMarks'] is num) ? (qMap['negativeMarks'] as num).toDouble() : double.tryParse(qMap['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
-        'status': (qMap['status'] ?? 'active').toString().toLowerCase(),
-        'options': optionsList,
-        'option_images': optionImagesList,
         'correct_answer': normCorrectAns,
         'correct_option_index': cIdx,
         'explanation': qMap['explanation'] ?? '',
         'solution': qMap['solution'] ?? qMap['explanation'] ?? '',
-        'year': qMap['year']?.toString() ?? '2026',
-        'exam': qMap['exam']?.toString() ?? 'NEET 2026',
+        'year': (qMap['year'] is num) ? (qMap['year'] as num).toInt() : int.tryParse(qMap['year']?.toString() ?? '2026') ?? 2026,
+        'question_number': (qMap['question_number'] ?? qMap['questionNumber'] is num)
+            ? (qMap['question_number'] ?? qMap['questionNumber'] as num).toInt()
+            : int.tryParse((qMap['question_number'] ?? qMap['questionNumber'])?.toString() ?? '1') ?? 1,
+        'options': optionsList,
+        'option_images': optionImagesList,
         'created_at': qMap['created_at'] ?? DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       };
@@ -1950,6 +1960,30 @@ class SupabaseService {
         attempts++;
         try {
           await client.from('questions').upsert(qData);
+
+          // Secondary insert/upsert to question_options table for database relational consistency
+          try {
+            final String qUuid = qData['id'].toString();
+            await client.from('question_options').delete().eq('question_id', qUuid);
+            final List<Map<String, dynamic>> optRows = [];
+            for (int i = 0; i < optionsList.length; i++) {
+              final String optTxt = optionsList[i];
+              final String? optImg = (i < optionImagesList.length) ? optionImagesList[i] : null;
+              optRows.add({
+                'question_id': qUuid,
+                'option_index': i,
+                'option_text': optTxt,
+                'option_image': optImg,
+                'is_correct': (i == cIdx),
+              });
+            }
+            if (optRows.isNotEmpty) {
+              await client.from('question_options').upsert(optRows);
+            }
+          } catch (optErr) {
+            debugPrint('Notice saving question_options: $optErr');
+          }
+
           return {'success': true};
         } catch (e) {
           final errStr = e.toString();
@@ -1973,13 +2007,8 @@ class SupabaseService {
             if (col != null && qData.containsKey(col)) {
               debugPrint('Auto-repair: Resolving not-null constraint for column "$col"...');
               if (col == 'paper_id') {
-                if (qData['paper_id'] == null) {
-                  qData['paper_id'] = toValidUuid('default_paper');
-                  repaired = true;
-                } else {
-                  qData.remove('paper_id');
-                  repaired = true;
-                }
+                qData.remove('paper_id');
+                repaired = true;
               } else if (col == 'created_at' || col == 'updated_at') {
                 qData[col] = DateTime.now().toIso8601String();
                 repaired = true;
@@ -1999,6 +2028,18 @@ class SupabaseService {
               debugPrint('Auto-repair: Removing paper_id foreign key...');
               qData.remove('paper_id');
               repaired = true;
+            } else if (errStr.contains('exam_id') && qData.containsKey('exam_id')) {
+              qData.remove('exam_id');
+              repaired = true;
+            } else if (errStr.contains('subject_id') && qData.containsKey('subject_id')) {
+              qData.remove('subject_id');
+              repaired = true;
+            } else if (errStr.contains('chapter_id') && qData.containsKey('chapter_id')) {
+              qData.remove('chapter_id');
+              repaired = true;
+            } else if (errStr.contains('topic_id') && qData.containsKey('topic_id')) {
+              qData.remove('topic_id');
+              repaired = true;
             }
           }
 
@@ -2015,59 +2056,12 @@ class SupabaseService {
             }
             if (!repaired && (errStr.contains('question_status') || errStr.contains('status'))) {
               if (qData.containsKey('status')) {
-                final cur = qData['status']?.toString() ?? '';
-                if (cur == 'active' || cur == 'Active') {
-                  qData['status'] = 'ACTIVE';
-                  repaired = true;
-                } else if (cur == 'ACTIVE') {
-                  qData['status'] = 'Published';
-                  repaired = true;
-                } else if (cur == 'Published') {
-                  qData['status'] = 'published';
-                  repaired = true;
-                } else {
-                  debugPrint('Auto-repair: Removing status enum column from payload...');
-                  qData.remove('status');
-                  repaired = true;
-                }
+                qData.remove('status');
+                repaired = true;
               }
             }
             if (!repaired && (errStr.contains('question_type') || errStr.contains('q_type'))) {
               if (qData.containsKey('q_type')) {
-                final cur = qData['q_type']?.toString() ?? '';
-                if (cur == 'MCQ') {
-                  qData['q_type'] = 'mcq';
-                  repaired = true;
-                } else if (cur == 'mcq') {
-                  qData['q_type'] = 'Single Choice';
-                  repaired = true;
-                } else {
-                  debugPrint('Auto-repair: Removing q_type enum column from payload...');
-                  qData.remove('q_type');
-                  repaired = true;
-                }
-              }
-            }
-            if (!repaired && errStr.contains('difficulty') && qData.containsKey('difficulty')) {
-              final cur = qData['difficulty']?.toString() ?? '';
-              if (cur == 'medium' || cur == 'Medium') {
-                qData['difficulty'] = 'MEDIUM';
-                repaired = true;
-              } else if (cur == 'MEDIUM') {
-                qData['difficulty'] = 'Easy';
-                repaired = true;
-              } else {
-                debugPrint('Auto-repair: Removing difficulty enum column from payload...');
-                qData.remove('difficulty');
-                repaired = true;
-              }
-            }
-            if (!repaired && errStr.contains('difficulty') && qData.containsKey('difficulty')) {
-              final cur = qData['difficulty']?.toString() ?? '';
-              if (cur != cur.toLowerCase()) {
-                qData['difficulty'] = cur.toLowerCase();
-                repaired = true;
-              } else {
                 qData.remove('difficulty');
                 repaired = true;
               }
@@ -3149,29 +3143,29 @@ class SupabaseService {
         'id': toValidUuid(rawQId),
         'paper_id': paperId.trim().isNotEmpty ? toValidUuid(paperId) : null,
         'question_number': qNum,
-          'question_text': q['questionText'] ?? q['question_text'] ?? '',
-          'question_image': q['questionImage'] ?? q['question_image'] ?? '',
-          'subject': q['subject'] ?? 'Physics',
-          'chapter': q['chapter'] ?? 'General',
-          'topic': q['topic'] ?? 'General',
-          'source_type': canonical['source_type'],
-          'source': canonical['source'],
-          'difficulty': (q['difficulty'] ?? 'medium').toString().toLowerCase(),
-          'q_type': (q['qType'] ?? q['q_type'] ?? q['question_type'] ?? 'MCQ').toString().startsWith('MCQ') ? 'MCQ' : (q['qType'] ?? q['q_type'] ?? 'MCQ').toString(),
-          'marks': (q['marks'] is num) ? (q['marks'] as num).toInt() : int.tryParse(q['marks']?.toString() ?? '4') ?? 4,
-          'negative_marks': (q['negativeMarks'] is num) ? (q['negativeMarks'] as num).toDouble() : double.tryParse(q['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
-          'status': 'Active',
-          'options': optionsList,
-          'option_images': optionImagesList,
-          'correct_answer': normCorrectAns,
-          'correct_option_index': cIdxRaw,
-          'explanation': q['explanation'] ?? '',
-          'solution': q['solution'] ?? q['explanation'] ?? '',
-          'year': q['year']?.toString() ?? '2026',
-          'exam': q['exam'] ?? 'NEET',
-          'created_at': q['created_at'] ?? timeIso,
-          'updated_at': timeIso,
-        };
+        'question_text': q['questionText'] ?? q['question_text'] ?? '',
+        'question_image': q['questionImage'] ?? q['question_image'] ?? '',
+        'subject': q['subject'] ?? 'Physics',
+        'chapter': q['chapter'] ?? 'General',
+        'topic': q['topic'] ?? 'General',
+        'source_type': canonical['source_type'],
+        'source': SupabaseQuestionMapper.toDbQuestionSource(q['source'] ?? q['category'] ?? q['sourceType']),
+        'difficulty': SupabaseQuestionMapper.toDbDifficulty(q['difficulty']),
+        'q_type': SupabaseQuestionMapper.toDbQuestionType(q['qType'] ?? q['q_type'] ?? q['question_type']),
+        'marks': (q['marks'] is num) ? (q['marks'] as num).toDouble() : double.tryParse(q['marks']?.toString() ?? '4.0') ?? 4.0,
+        'negative_marks': (q['negativeMarks'] is num) ? (q['negativeMarks'] as num).toDouble() : double.tryParse(q['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
+        'status': SupabaseQuestionMapper.toDbQuestionStatus(q['status']),
+        'options': optionsList,
+        'option_images': optionImagesList,
+        'correct_answer': normCorrectAns,
+        'correct_option_index': cIdxRaw,
+        'explanation': q['explanation'] ?? '',
+        'solution': q['solution'] ?? q['explanation'] ?? '',
+        'year': (q['year'] is num) ? (q['year'] as num).toInt() : int.tryParse(q['year']?.toString() ?? '2026') ?? 2026,
+        'exam': q['exam'] ?? 'NEET',
+        'created_at': q['created_at'] ?? timeIso,
+        'updated_at': timeIso,
+      };
     }).toList();
 
     int attempts = 0;
@@ -3180,6 +3174,33 @@ class SupabaseService {
       try {
         await client.from('questions').upsert(cleanPayloads);
         debugPrint('✓ Successfully upserted ${cleanPayloads.length} questions to remote Supabase DB!');
+
+        // Save options to question_options table for relational completeness
+        for (var p in cleanPayloads) {
+          try {
+            final String qUuid = p['id'].toString();
+            final List<String> opts = (p['options'] is List) ? List<String>.from(p['options']) : [];
+            final List<String?> optImgs = (p['option_images'] is List) ? List<String?>.from(p['option_images']) : [];
+            final int cIdx = (p['correct_option_index'] is num) ? (p['correct_option_index'] as num).toInt() : 0;
+            await client.from('question_options').delete().eq('question_id', qUuid);
+            final List<Map<String, dynamic>> optRows = [];
+            for (int i = 0; i < opts.length; i++) {
+              optRows.add({
+                'question_id': qUuid,
+                'option_index': i,
+                'option_text': opts[i],
+                'option_image': (i < optImgs.length) ? optImgs[i] : null,
+                'is_correct': (i == cIdx),
+              });
+            }
+            if (optRows.isNotEmpty) {
+              await client.from('question_options').upsert(optRows);
+            }
+          } catch (optErr) {
+            debugPrint('Notice batch saving question_options: $optErr');
+          }
+        }
+
         return true;
       } catch (e) {
         final errStr = e.toString();
@@ -3193,6 +3214,28 @@ class SupabaseService {
           }
           continue;
         }
+
+        if (errStr.contains('22P02') || errStr.contains('invalid input')) {
+          if (errStr.contains('question_type') || errStr.contains('q_type')) {
+            for (var p in cleanPayloads) {
+              p.remove('q_type');
+            }
+            continue;
+          }
+          if (errStr.contains('question_status') || errStr.contains('status')) {
+            for (var p in cleanPayloads) {
+              p.remove('status');
+            }
+            continue;
+          }
+          if (errStr.contains('difficulty')) {
+            for (var p in cleanPayloads) {
+              p.remove('difficulty');
+            }
+            continue;
+          }
+        }
+
         return false;
       }
     }
