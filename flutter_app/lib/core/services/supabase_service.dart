@@ -748,12 +748,13 @@ class SupabaseService {
     final List<Map<String, dynamic>> combined = [];
     final String activeExam = (exam != null && exam.trim().isNotEmpty) ? exam.trim() : 'NEET';
 
-    // 1. Load chapters across all core subjects (Physics, Chemistry, Biology, Mathematics)
-    final subjectsToLoad = ['Physics', 'Chemistry', 'Biology', 'Mathematics'];
+    // 1. Order subjects: Physics FIRST, then Chemistry, then Biology / Botany / Zoology, then Mathematics
+    final subjectsToLoad = ['Physics', 'Chemistry', 'Biology', 'Botany', 'Zoology', 'Mathematics'];
     for (final sub in subjectsToLoad) {
       try {
         final chaps = await fetchTaxonomyForSubject(exam: activeExam, subject: sub, includeInactive: true);
-        for (var c in chaps) {
+        final sortedSubChaps = sortTaxonomyChapters(chaps);
+        for (var c in sortedSubChaps) {
           final cId = c['id']?.toString() ?? '';
           if (cId.isNotEmpty && !combined.any((item) => item['id'].toString() == cId)) {
             combined.add(c);
@@ -764,31 +765,33 @@ class SupabaseService {
       }
     }
 
-    // 2. Direct query fallback from DB chapters table if combined is empty
-    if (combined.isEmpty) {
-      try {
-        final res = await client
-            .from('chapters')
-            .select('id, name, code, subject_id, display_order')
-            .order('display_order', ascending: true);
-
-        if (res != null && (res as List).isNotEmpty) {
-          return sortTaxonomyChapters((res as List).map<Map<String, dynamic>>((e) {
-            return {
-              'id': e['id']?.toString() ?? '',
-              'name': e['name']?.toString() ?? '',
-              'code': e['code']?.toString() ?? '',
-              'subject_id': e['subject_id']?.toString() ?? '',
-              'status': 'Active',
-            };
-          }).toList());
-        }
-      } catch (e) {
-        debugPrint('Notice in fetchAllChaptersForDropdown direct query fallback: $e');
-      }
+    if (combined.isNotEmpty) {
+      return combined;
     }
 
-    return sortTaxonomyChapters(combined);
+    // 2. Direct query fallback from DB chapters table if combined is empty
+    try {
+      final res = await client
+          .from('chapters')
+          .select('id, name, code, subject_id, display_order')
+          .order('display_order', ascending: true);
+
+      if (res != null && (res as List).isNotEmpty) {
+        return sortTaxonomyChapters((res as List).map<Map<String, dynamic>>((e) {
+          return {
+            'id': e['id']?.toString() ?? '',
+            'name': e['name']?.toString() ?? '',
+            'code': e['code']?.toString() ?? '',
+            'subject_id': e['subject_id']?.toString() ?? '',
+            'status': 'Active',
+          };
+        }).toList());
+      }
+    } catch (e) {
+      debugPrint('Notice in fetchAllChaptersForDropdown direct query fallback: $e');
+    }
+
+    return combined;
   }
 
   static List<Map<String, dynamic>> _getSeedChaptersForSubject(String exam, String subject) {
