@@ -1920,7 +1920,7 @@ class SupabaseService {
 
       final Map<String, dynamic> qData = {
         'id': toValidUuid(rawId),
-        'paper_id': rawPaperId.isNotEmpty ? toValidUuid(rawPaperId) : null,
+        'paper_id': rawPaperId.isNotEmpty ? toValidUuid(rawPaperId) : toValidUuid('default_paper'),
         'question_number': qNum,
         'question_text': qMap['questionText'] ?? qMap['question_text'] ?? '',
         'question_image': qMap['questionImage'] ?? qMap['question_image'] ?? '',
@@ -1954,22 +1954,42 @@ class SupabaseService {
           final errStr = e.toString();
           debugPrint('Supabase saveQuestion attempt $attempts error: $errStr');
 
+          bool repaired = false;
+
+          // 1. Check for PGRST204 missing column in schema cache
           final missingCol = extractMissingColumnFromError(errStr);
           if (missingCol != null && qData.containsKey(missingCol)) {
             debugPrint('Auto-repair: Removing non-existent column "$missingCol" from payload and retrying...');
             qData.remove(missingCol);
-            continue;
+            repaired = true;
           }
 
-          if (errStr.contains('22P02') || errStr.toLowerCase().contains('invalid input')) {
+          // 2. Check for 23502 NOT NULL constraint violation
+          if (!repaired && (errStr.contains('23502') || errStr.toLowerCase().contains('violates not-null constraint'))) {
+            if (errStr.contains('paper_id') && qData.containsKey('paper_id')) {
+              qData['paper_id'] = toValidUuid('default_paper');
+              repaired = true;
+            }
+          }
+
+          // 3. Check for 23503 Foreign Key constraint violation
+          if (!repaired && (errStr.contains('23503') || errStr.toLowerCase().contains('violates foreign key constraint'))) {
+            if (errStr.contains('paper_id') && qData.containsKey('paper_id')) {
+              qData.remove('paper_id');
+              repaired = true;
+            }
+          }
+
+          // 4. Check for 22P02 invalid input syntax (UUID, ENUM)
+          if (!repaired && (errStr.contains('22P02') || errStr.toLowerCase().contains('invalid input'))) {
             if (errStr.contains('uuid')) {
               if (qData['id'] != null && !isValidUuid(qData['id'].toString())) {
                 qData['id'] = toValidUuid(qData['id'].toString());
-                continue;
+                repaired = true;
               }
               if (qData['paper_id'] != null && !isValidUuid(qData['paper_id'].toString())) {
                 qData['paper_id'] = toValidUuid(qData['paper_id'].toString());
-                continue;
+                repaired = true;
               }
             }
             if (errStr.contains('question_type') || errStr.contains('q_type')) {
@@ -1977,10 +1997,10 @@ class SupabaseService {
                 final cur = qData['q_type']?.toString() ?? '';
                 if (cur != 'MCQ') {
                   qData['q_type'] = 'MCQ';
-                  continue;
+                  repaired = true;
                 } else {
                   qData.remove('q_type');
-                  continue;
+                  repaired = true;
                 }
               }
             }
@@ -1988,23 +2008,25 @@ class SupabaseService {
               final cur = qData['difficulty']?.toString() ?? '';
               if (cur != cur.toLowerCase()) {
                 qData['difficulty'] = cur.toLowerCase();
-                continue;
+                repaired = true;
               } else {
                 qData.remove('difficulty');
-                continue;
+                repaired = true;
               }
             }
             if (errStr.contains('status') && qData.containsKey('status')) {
               qData.remove('status');
-              continue;
+              repaired = true;
             }
             if (errStr.contains('source_type') && qData.containsKey('source_type')) {
               qData.remove('source_type');
-              continue;
+              repaired = true;
             }
           }
 
-          return {'success': false, 'error': errStr};
+          if (!repaired) {
+            return {'success': false, 'error': errStr};
+          }
         }
       }
 
