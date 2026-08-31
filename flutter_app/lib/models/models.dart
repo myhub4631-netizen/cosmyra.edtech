@@ -359,6 +359,8 @@ class QuestionModel {
       }
     }
 
+    debugPrint('[QuestionModel.fromJson] QID: ${json['id']} | TargetCorrectIdx: $targetCorrectIdx (Option ${targetCorrectIdx != -1 ? String.fromCharCode(65 + targetCorrectIdx) : "None"})');
+
     var rawOptions = json['options'] as List? ?? json['question_options'] as List? ?? [];
     List<QuestionOptionModel> parsedOptions = [];
 

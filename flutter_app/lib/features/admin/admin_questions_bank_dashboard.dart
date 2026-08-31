@@ -442,7 +442,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     final opt3Ctrl = TextEditingController(text: opts.length > 2 ? opts[2].toString() : 'Option C');
     final opt4Ctrl = TextEditingController(text: opts.length > 3 ? opts[3].toString() : 'Option D');
 
-    int initCorrIdx = 0;
+    int initCorrIdx = -1;
     if (isEdit && initialData != null) {
       if (initialData['correct_option_index'] != null) {
         initCorrIdx = (initialData['correct_option_index'] as num).toInt();
@@ -451,21 +451,15 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
       } else {
         final String caStr = (initialData['correct_answer'] ?? initialData['correctAnswer'] ?? initialData['correctText'] ?? '').toString().trim();
         if (caStr.toUpperCase().startsWith('OPTION ')) {
-          int n = int.tryParse(caStr.substring(7).trim()) ?? 1;
-          initCorrIdx = (n - 1).clamp(0, 3);
+          int n = int.tryParse(caStr.substring(7).trim()) ?? -1;
+          if (n != -1) initCorrIdx = (n - 1).clamp(0, 3);
         } else if (caStr.length == 1 && RegExp(r'[A-D]', caseSensitive: false).hasMatch(caStr)) {
           initCorrIdx = caStr.toUpperCase().codeUnitAt(0) - 65;
-        } else if (caStr.isNotEmpty) {
-          int fIdx = [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text].indexOf(caStr);
-          if (fIdx != -1) initCorrIdx = fIdx;
         }
       }
     }
 
-    List<String> currentOptTexts = [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text];
-    String selCorrectOpt = (initCorrIdx >= 0 && initCorrIdx < currentOptTexts.length)
-        ? currentOptTexts[initCorrIdx]
-        : currentOptTexts.first;
+    int selCorrectIdx = (initCorrIdx >= 0 && initCorrIdx < 4) ? initCorrIdx : 0;
 
     List<String> initAvail = [];
     if (isEdit && initialData != null) {
@@ -654,13 +648,18 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                     Row(
                       children: [
                         Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: selCorrectOpt,
+                          child: DropdownButtonFormField<int>(
+                            value: selCorrectIdx,
                             decoration: const InputDecoration(labelText: 'Correct Option', border: OutlineInputBorder()),
-                            items: [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text].map((o) {
-                              return DropdownMenuItem(value: o, child: Text(o.isEmpty ? 'Option' : o));
-                            }).toList(),
-                            onChanged: (v) => setDlgState(() => selCorrectOpt = v!),
+                            items: [
+                              DropdownMenuItem(value: 0, child: Text('Option A ${opt1Ctrl.text.trim().isNotEmpty ? "(${opt1Ctrl.text.trim()})" : ""}')),
+                              DropdownMenuItem(value: 1, child: Text('Option B ${opt2Ctrl.text.trim().isNotEmpty ? "(${opt2Ctrl.text.trim()})" : ""}')),
+                              DropdownMenuItem(value: 2, child: Text('Option C ${opt3Ctrl.text.trim().isNotEmpty ? "(${opt3Ctrl.text.trim()})" : ""}')),
+                              DropdownMenuItem(value: 3, child: Text('Option D ${opt4Ctrl.text.trim().isNotEmpty ? "(${opt4Ctrl.text.trim()})" : ""}')),
+                            ],
+                            onChanged: (v) {
+                              if (v != null) setDlgState(() => selCorrectIdx = v);
+                            },
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -739,14 +738,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                 if (formKey.currentState!.validate()) {
                   Navigator.pop(ctx);
                   final List<String> formOpts = [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text];
-                  int cIdx = formOpts.indexOf(selCorrectOpt);
-                  if (cIdx == -1) {
-                    if (selCorrectOpt == 'Option A' || selCorrectOpt == opt1Ctrl.text) cIdx = 0;
-                    else if (selCorrectOpt == 'Option B' || selCorrectOpt == opt2Ctrl.text) cIdx = 1;
-                    else if (selCorrectOpt == 'Option C' || selCorrectOpt == opt3Ctrl.text) cIdx = 2;
-                    else if (selCorrectOpt == 'Option D' || selCorrectOpt == opt4Ctrl.text) cIdx = 3;
-                    else cIdx = 0;
-                  }
+                  int cIdx = selCorrectIdx;
                   final String corrAnsStr = 'Option ${String.fromCharCode(65 + cIdx)}';
 
                   final qMap = {

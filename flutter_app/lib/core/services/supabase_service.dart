@@ -1734,68 +1734,41 @@ class SupabaseService {
     dynamic correctAnswerRaw,
     dynamic correctOptionIndexRaw,
   }) {
-    final String letter = String.fromCharCode(65 + optionIndex); // 'A', 'B', 'C', 'D'
-
-    final List<String> targets = [];
-    if (correctAnswerRaw != null) {
-      if (correctAnswerRaw is List) {
-        targets.addAll(correctAnswerRaw.map((e) => e.toString().trim()));
-      } else {
-        final str = correctAnswerRaw.toString().trim();
-        if (str.contains(',')) {
-          targets.addAll(str.split(',').map((e) => e.trim()));
-        } else {
-          targets.add(str);
-        }
-      }
-    }
-
-    // 1. Direct letter / Option label / Option text / Option ID match from correctAnswerRaw
-    for (var target in targets) {
-      if (target.isEmpty) continue;
-      final tUpper = target.toUpperCase();
-      final tLower = target.toLowerCase();
-
-      // Letter / Option label match ('A', 'B', 'C', 'D' or 'OPTION A', 'OPTION B', 'OPTION C', etc.)
-      if (tUpper == letter ||
-          tUpper == 'OPTION $letter' ||
-          tUpper == 'OPTION_$letter' ||
-          tUpper == 'OPT_$letter' ||
-          tUpper == 'OPT $letter' ||
-          tLower == letter.toLowerCase()) {
-        return true;
-      }
-
-      // Option key / ID match
-      if (optionKey.isNotEmpty && (target == optionKey || tUpper == optionKey.toUpperCase())) {
-        return true;
-      }
-
-      // Exact option text match
-      if (optionText.trim().isNotEmpty && (target == optionText.trim() || tLower == optionText.trim().toLowerCase())) {
-        return true;
-      }
-    }
-
-    // 2. Direct index match if correctOptionIndex is numeric AND targets do not contradict it
-    int? explicitCorrIdx;
+    // 1. Absolute Primary Source of Truth: Canonical zero-based integer index
+    int? explicitIdx;
     if (correctOptionIndexRaw is num) {
-      explicitCorrIdx = correctOptionIndexRaw.toInt();
-    } else if (correctOptionIndexRaw != null) {
-      explicitCorrIdx = int.tryParse(correctOptionIndexRaw.toString().trim());
+      explicitIdx = correctOptionIndexRaw.toInt();
+    } else if (correctOptionIndexRaw != null && correctOptionIndexRaw.toString().trim().isNotEmpty) {
+      explicitIdx = int.tryParse(correctOptionIndexRaw.toString().trim());
     }
 
-    if (explicitCorrIdx != null && explicitCorrIdx == optionIndex) {
-      bool hasContradictoryTarget = false;
-      for (var target in targets) {
-        final tUpper = target.toUpperCase();
-        if (tUpper.startsWith('OPTION ') || (tUpper.length == 1 && RegExp(r'[A-D]').hasMatch(tUpper))) {
-          hasContradictoryTarget = true;
-          break;
-        }
+    if (explicitIdx != null && explicitIdx >= 0) {
+      final bool result = (optionIndex == explicitIdx);
+      if (result) {
+        debugPrint('[CorrectAnswerCheck] Canonical Index Match: OptIndex=$optionIndex (Option ${String.fromCharCode(65 + optionIndex)}) -> isCorrect=true');
       }
-      if (!hasContradictoryTarget) {
-        return true;
+      return result;
+    }
+
+    // 2. Secondary Fallback from correctAnswerRaw string if explicit index is missing
+    if (correctAnswerRaw != null) {
+      final str = correctAnswerRaw.toString().trim().toUpperCase();
+      if (str.startsWith('OPTION ')) {
+        final optNum = int.tryParse(str.substring(7).trim());
+        if (optNum != null) {
+          final bool result = (optionIndex == (optNum - 1));
+          if (result) {
+            debugPrint('[CorrectAnswerCheck] Fallback String Match "$str": OptIndex=$optionIndex -> isCorrect=true');
+          }
+          return result;
+        }
+      } else if (str.length == 1 && RegExp(r'[A-D]').hasMatch(str)) {
+        final letterIdx = str.codeUnitAt(0) - 65;
+        final bool result = (optionIndex == letterIdx);
+        if (result) {
+          debugPrint('[CorrectAnswerCheck] Fallback Letter Match "$str": OptIndex=$optionIndex -> isCorrect=true');
+        }
+        return result;
       }
     }
 
@@ -2606,6 +2579,7 @@ class SupabaseService {
   /// Automatic repair method to sync questions whose correct_option_index or correct_answer was inconsistent
   static Future<void> repairInconsistentCorrectAnswers() async {
     try {
+      // 1. Repair from question_options child table (where option is marked is_correct = true)
       final optRes = await client.from('question_options').select('*').eq('is_correct', true);
       if (optRes != null && (optRes as List).isNotEmpty) {
         final Map<String, int> correctIdxMap = {};
@@ -2625,6 +2599,37 @@ class SupabaseService {
             'correct_option_index': correctIdx,
             'correct_answer': correctLetter,
           }).eq('id', qId);
+        }
+      }
+
+      // 2. Repair questions table rows where correct_answer text specifies Option B, C, or D but correct_option_index is mismatching
+      final qRes = await client.from('questions').select('id, correct_answer, correct_option_index');
+      if (qRes != null && (qRes as List).isNotEmpty) {
+        for (var qRow in qRes) {
+          final qId = qRow['id']?.toString() ?? '';
+          final cAns = (qRow['correct_answer'] ?? '').toString().trim().toUpperCase();
+          final cIdx = (qRow['correct_option_index'] as num?)?.toInt();
+
+          int? expectedIdx;
+          if (cAns.startsWith('OPTION ')) {
+            final numVal = int.tryParse(cAns.substring(7).trim());
+            if (numVal != null) expectedIdx = numVal - 1;
+          } else if (cAns.length == 1 && RegExp(r'[A-D]').hasMatch(cAns)) {
+            expectedIdx = cAns.codeUnitAt(0) - 65;
+          }
+
+          if (expectedIdx != null && expectedIdx >= 0 && expectedIdx != cIdx && qId.isNotEmpty) {
+            final String correctLetter = 'Option ${String.fromCharCode(65 + expectedIdx)}';
+            await client.from('questions').update({
+              'correct_option_index': expectedIdx,
+              'correct_answer': correctLetter,
+            }).eq('id', qId);
+
+            try {
+              await client.from('question_options').update({'is_correct': false}).eq('question_id', qId);
+              await client.from('question_options').update({'is_correct': true}).eq('question_id', qId).eq('option_index', expectedIdx);
+            } catch (_) {}
+          }
         }
       }
     } catch (e) {
