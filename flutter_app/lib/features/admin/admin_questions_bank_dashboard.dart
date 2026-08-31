@@ -592,37 +592,39 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     }
   }
 
-  List<String> _getChaptersForSubject(String subject) {
+  List<String> _getAllChapters({String? preferredSubject}) {
     final List<String> result = [];
-    final lowerSub = subject.toLowerCase();
 
-    // 1. From DB chapters (using joined subjects table or subject fields)
-    for (var c in _dbChapters) {
-      final String chapName = c['name']?.toString() ?? '';
-      final String subName = (c['subjects'] != null && c['subjects'] is Map && c['subjects']['name'] != null)
-          ? c['subjects']['name'].toString()
-          : ((c['subject_name'] ?? c['subject'])?.toString() ?? '');
-      if (chapName.isNotEmpty) {
-        if (subName.isEmpty || subName.toLowerCase() == lowerSub) {
-          if (!result.contains(chapName)) result.add(chapName);
+    if (preferredSubject != null && preferredSubject.isNotEmpty) {
+      final preferredList = _subjectChaptersMap[preferredSubject] ?? [];
+      for (var chap in preferredList) {
+        final clean = chap.trim();
+        if (clean.isNotEmpty && !result.contains(clean) && !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-').hasMatch(clean)) {
+          result.add(clean);
         }
       }
     }
 
-    // 2. From comprehensive NEET/JEE syllabus map
-    final syllabusList = _subjectChaptersMap[subject] ?? [];
-    for (var chap in syllabusList) {
-      if (!result.contains(chap)) result.add(chap);
+    _subjectChaptersMap.forEach((sub, chapList) {
+      for (var chap in chapList) {
+        final clean = chap.trim();
+        if (clean.isNotEmpty && !result.contains(clean) && !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-').hasMatch(clean)) {
+          result.add(clean);
+        }
+      }
+    });
+
+    for (var c in _dbChapters) {
+      final chapName = c['name']?.toString().trim() ?? '';
+      if (chapName.isNotEmpty && !result.contains(chapName) && !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-').hasMatch(chapName)) {
+        result.add(chapName);
+      }
     }
 
-    // 3. From all loaded questions
     for (var q in _allQuestionsData) {
-      final qSub = _resolveSubjectName(q['subject'], q['subject_id']);
-      if (qSub.toLowerCase() == lowerSub) {
-        final cName = (q['chapter'] ?? q['chapter_name'] ?? q['chapterTopic'])?.toString().trim();
-        if (cName != null && cName.isNotEmpty && !result.contains(cName)) {
-          result.add(cName);
-        }
+      final cName = (q['chapter'] ?? q['chapter_name'] ?? q['chapterTopic'])?.toString().trim();
+      if (cName != null && cName.isNotEmpty && !result.contains(cName) && !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-').hasMatch(cName)) {
+        result.add(cName);
       }
     }
 
@@ -630,6 +632,23 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
       result.add('General');
     }
     return result;
+  }
+
+  String _resolveSubjectForChapter(String chapterName) {
+    for (var entry in _subjectChaptersMap.entries) {
+      if (entry.value.any((c) => c.toLowerCase() == chapterName.toLowerCase())) {
+        return entry.key;
+      }
+    }
+    for (var c in _dbChapters) {
+      if (c['name']?.toString().toLowerCase() == chapterName.toLowerCase()) {
+        final subName = (c['subjects'] != null && c['subjects'] is Map && c['subjects']['name'] != null)
+            ? c['subjects']['name'].toString()
+            : ((c['subject_name'] ?? c['subject'])?.toString() ?? '');
+        if (subName.isNotEmpty) return subName;
+      }
+    }
+    return '';
   }
 
   // Add/Edit Question Modal Form
@@ -644,10 +663,10 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
 
     String selSubject = _resolveSubjectName(initialData?['subject'], initialData?['subject_id']);
 
-    List<String> availableChapters = _getChaptersForSubject(selSubject);
+    List<String> availableChapters = _getAllChapters(preferredSubject: selSubject);
 
     String selChapter = _resolveChapterName(initialData?['chapter'], initialData?['chapter_id'], initialData?['chapter_name']);
-    if (selChapter.isNotEmpty && !availableChapters.contains(selChapter)) {
+    if (selChapter.isNotEmpty && !availableChapters.contains(selChapter) && !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-').hasMatch(selChapter)) {
       availableChapters.add(selChapter);
     }
     if (!availableChapters.contains(selChapter)) {
@@ -747,8 +766,10 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                             }).toList(),
                             onChanged: (v) => setDlgState(() {
                               selSubject = v!;
-                              availableChapters = _getChaptersForSubject(selSubject);
-                              selChapter = availableChapters.first;
+                              availableChapters = _getAllChapters(preferredSubject: selSubject);
+                              if (!availableChapters.contains(selChapter)) {
+                                selChapter = availableChapters.first;
+                              }
                             }),
                           ),
                         ),
@@ -760,7 +781,13 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                             items: availableChapters.map((c) {
                               return DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis));
                             }).toList(),
-                            onChanged: (v) => setDlgState(() => selChapter = v!),
+                            onChanged: (v) => setDlgState(() {
+                              selChapter = v!;
+                              final inferred = _resolveSubjectForChapter(selChapter);
+                              if (inferred.isNotEmpty) {
+                                selSubject = inferred;
+                              }
+                            }),
                           ),
                         ),
                       ],
