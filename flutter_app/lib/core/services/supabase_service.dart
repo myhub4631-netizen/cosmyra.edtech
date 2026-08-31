@@ -1877,16 +1877,16 @@ class SupabaseService {
 
   static List<String> parseOptionsFromQuestionMap(Map<String, dynamic> map) {
     if (map['options'] is List) {
-      final list = (map['options'] as List).map((e) => e?.toString() ?? '').where((s) => s.trim().isNotEmpty).toList();
-      if (list.isNotEmpty) return list;
+      final list = (map['options'] as List).map((e) => e?.toString() ?? '').toList();
+      if (list.any((s) => s.trim().isNotEmpty)) return list;
     }
     if (map['optionsList'] is List) {
-      final list = (map['optionsList'] as List).map((e) => e?.toString() ?? '').where((s) => s.trim().isNotEmpty).toList();
-      if (list.isNotEmpty) return list;
+      final list = (map['optionsList'] as List).map((e) => e?.toString() ?? '').toList();
+      if (list.any((s) => s.trim().isNotEmpty)) return list;
     }
     if (map['options_list'] is List) {
-      final list = (map['options_list'] as List).map((e) => e?.toString() ?? '').where((s) => s.trim().isNotEmpty).toList();
-      if (list.isNotEmpty) return list;
+      final list = (map['options_list'] as List).map((e) => e?.toString() ?? '').toList();
+      if (list.any((s) => s.trim().isNotEmpty)) return list;
     }
 
     if (map['options'] is String && (map['options'] as String).trim().isNotEmpty) {
@@ -1894,8 +1894,8 @@ class SupabaseService {
       if (str.startsWith('[') && str.endsWith(']')) {
         try {
           final List<dynamic> decoded = jsonDecode(str);
-          final list = decoded.map((e) => e?.toString() ?? '').where((s) => s.trim().isNotEmpty).toList();
-          if (list.isNotEmpty) return list;
+          final list = decoded.map((e) => e?.toString() ?? '').toList();
+          if (list.any((s) => s.trim().isNotEmpty)) return list;
         } catch (_) {}
       }
     }
@@ -1906,6 +1906,8 @@ class SupabaseService {
       ['option_2', 'option2', 'option_b', 'optionB', 'opt2', 'optB', 'opt_2', 'option_text_2'],
       ['option_3', 'option3', 'option_c', 'optionC', 'opt3', 'optC', 'opt_3', 'option_text_3'],
       ['option_4', 'option4', 'option_d', 'optionD', 'opt4', 'optD', 'opt_4', 'option_text_4'],
+      ['option_5', 'option5', 'option_e', 'optionE', 'opt5', 'optE', 'opt_5', 'option_text_5'],
+      ['option_6', 'option6', 'option_f', 'optionF', 'opt6', 'optF', 'opt_6', 'option_text_6'],
     ];
 
     for (var kGroup in keyGroups) {

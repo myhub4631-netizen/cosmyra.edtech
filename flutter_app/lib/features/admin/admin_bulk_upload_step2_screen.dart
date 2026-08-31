@@ -102,9 +102,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   bool _isSavingBatch = false;
 
   void _scheduleAutoSave(QuestionItemData q) {
+    if (_isLoading) return;
     _autoSaveTimer?.cancel();
     _autoSaveTimer = Timer(const Duration(milliseconds: 1500), () {
-      _saveSingleQuestion(q, showToast: false);
+      if (!_isLoading && mounted) {
+        _saveSingleQuestion(q, showToast: false);
+      }
     });
   }
 
@@ -308,7 +311,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   }
 
   Future<void> _saveAllQuestions({bool showToast = true}) async {
-    if (_isSavingBatch) return;
+    if (_isLoading || _isSavingBatch) return;
     setState(() => _isSavingBatch = true);
 
     int savedCount = 0;
@@ -397,6 +400,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   }
 
   Future<void> _saveSingleQuestion(QuestionItemData q, {bool showToast = true}) async {
+    if (_isLoading) return;
     final bool hasContent = q.text.trim().isNotEmpty ||
         (q.questionImage != null && q.questionImage!.isNotEmpty) ||
         q.options.any((opt) => opt.trim().isNotEmpty) ||
