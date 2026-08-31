@@ -438,23 +438,25 @@ class QuestionModel {
 
     for (int i = 0; i < rawOptions.length; i++) {
       final rawOpt = rawOptions[i];
-      if (rawOpt is Map<String, dynamic>) {
-        bool isOptCorrect = rawOpt['is_correct'] == true || rawOpt['isCorrect'] == true;
+      if (rawOpt is Map) {
+        final mapOpt = Map<String, dynamic>.from(rawOpt);
+        bool isOptCorrect = mapOpt['is_correct'] == true || mapOpt['isCorrect'] == true;
         if (targetCorrectIdx != -1) {
           isOptCorrect = (i == targetCorrectIdx);
         }
         parsedOptions.add(QuestionOptionModel.fromJson({
-          ...rawOpt,
-          'option_index': rawOpt['option_index'] ?? rawOpt['optionIndex'] ?? i,
+          ...mapOpt,
+          'option_index': mapOpt['option_index'] ?? mapOpt['optionIndex'] ?? i,
           'is_correct': isOptCorrect,
         }));
-      } else if (rawOpt is String) {
+      } else {
+        final String textVal = rawOpt?.toString() ?? '';
         final bool isOptCorrect = (targetCorrectIdx != -1) ? (i == targetCorrectIdx) : false;
         parsedOptions.add(QuestionOptionModel(
           id: 'opt_${json['id']}_$i',
           questionId: json['id']?.toString() ?? '',
           optionIndex: i,
-          optionText: rawOpt,
+          optionText: textVal,
           isCorrect: isOptCorrect,
         ));
       }

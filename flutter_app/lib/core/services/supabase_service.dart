@@ -2540,7 +2540,8 @@ class SupabaseService {
             debugPrint('Notice updating local paper questions cache: $e');
           }
 
-          return {'success': true};
+          _liveQuestionsCache.clear();
+          return {'success': true, 'data': qData};
         } catch (e) {
           final errStr = e.toString();
           lastErr = errStr;
@@ -2737,8 +2738,13 @@ class SupabaseService {
             // Rule 2: correct_option_index is missing. Try resolving from correct_answer text.
             int? resolved;
             if (cAns.startsWith('OPTION ')) {
-              final n = int.tryParse(cAns.substring(7).trim());
-              if (n != null && n >= 1 && n <= 4) resolved = n - 1;
+              final sub = cAns.substring(7).trim();
+              if (sub.length == 1 && RegExp(r'[A-D]').hasMatch(sub)) {
+                resolved = sub.codeUnitAt(0) - 65;
+              } else {
+                final n = int.tryParse(sub);
+                if (n != null && n >= 1 && n <= 4) resolved = n - 1;
+              }
             } else if (cAns.length == 1 && RegExp(r'[A-D]').hasMatch(cAns)) {
               resolved = cAns.codeUnitAt(0) - 65;
             }
@@ -2809,12 +2815,14 @@ class SupabaseService {
         optsFromMap = childRows.map((r) => r['option_text']?.toString() ?? '').toList();
         optImgsFromMap = childRows.map((r) => r['option_image']?.toString()).toList();
 
-        final int corrIdxInChild = childRows.indexWhere((r) => r['is_correct'] == true);
-        if (corrIdxInChild != -1) {
-          qMap['correct_option_index'] = corrIdxInChild;
-          qMap['correctOptionIndex'] = corrIdxInChild;
-          qMap['correct_answer'] = 'Option ${String.fromCharCode(65 + corrIdxInChild)}';
-          qMap['correctAnswer'] = 'Option ${String.fromCharCode(65 + corrIdxInChild)}';
+        if (qMap['correct_option_index'] == null && qMap['correctOptionIndex'] == null) {
+          final int corrIdxInChild = childRows.indexWhere((r) => r['is_correct'] == true);
+          if (corrIdxInChild != -1) {
+            qMap['correct_option_index'] = corrIdxInChild;
+            qMap['correctOptionIndex'] = corrIdxInChild;
+            qMap['correct_answer'] = 'Option ${String.fromCharCode(65 + corrIdxInChild)}';
+            qMap['correctAnswer'] = 'Option ${String.fromCharCode(65 + corrIdxInChild)}';
+          }
         }
       }
 
