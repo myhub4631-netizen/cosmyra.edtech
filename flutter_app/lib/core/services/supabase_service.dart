@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/models.dart';
 import '../../models/pyq_models.dart';
 import 'supabase_question_mapper.dart';
+import '../../shared/widgets/latex_view.dart';
 
 class SupabaseService {
   // Supports dynamic injection via --dart-define=SUPABASE_URL=... and --dart-define=SUPABASE_ANON_KEY=...
@@ -1880,58 +1881,54 @@ class SupabaseService {
   }
 
   static List<String> parseOptionsFromQuestionMap(Map<String, dynamic> map) {
+    List<String> resultList = [];
     if (map['options'] is List) {
       final list = (map['options'] as List).map((e) => e?.toString() ?? '').toList();
-      if (list.any((s) => s.trim().isNotEmpty)) return list;
-    }
-    if (map['optionsList'] is List) {
+      if (list.any((s) => s.trim().isNotEmpty)) resultList = list;
+    } else if (map['optionsList'] is List) {
       final list = (map['optionsList'] as List).map((e) => e?.toString() ?? '').toList();
-      if (list.any((s) => s.trim().isNotEmpty)) return list;
-    }
-    if (map['options_list'] is List) {
+      if (list.any((s) => s.trim().isNotEmpty)) resultList = list;
+    } else if (map['options_list'] is List) {
       final list = (map['options_list'] as List).map((e) => e?.toString() ?? '').toList();
-      if (list.any((s) => s.trim().isNotEmpty)) return list;
-    }
-
-    if (map['options'] is String && (map['options'] as String).trim().isNotEmpty) {
+      if (list.any((s) => s.trim().isNotEmpty)) resultList = list;
+    } else if (map['options'] is String && (map['options'] as String).trim().isNotEmpty) {
       final str = (map['options'] as String).trim();
       if (str.startsWith('[') && str.endsWith(']')) {
         try {
           final List<dynamic> decoded = jsonDecode(str);
           final list = decoded.map((e) => e?.toString() ?? '').toList();
-          if (list.any((s) => s.trim().isNotEmpty)) return list;
+          if (list.any((s) => s.trim().isNotEmpty)) resultList = list;
         } catch (_) {}
       }
     }
 
-    final List<String> fallbackOpts = [];
-    final keyGroups = [
-      ['option_1', 'option1', 'option_a', 'optionA', 'opt1', 'optA', 'opt_1', 'option_text_1'],
-      ['option_2', 'option2', 'option_b', 'optionB', 'opt2', 'optB', 'opt_2', 'option_text_2'],
-      ['option_3', 'option3', 'option_c', 'optionC', 'opt3', 'optC', 'opt_3', 'option_text_3'],
-      ['option_4', 'option4', 'option_d', 'optionD', 'opt4', 'optD', 'opt_4', 'option_text_4'],
-      ['option_5', 'option5', 'option_e', 'optionE', 'opt5', 'optE', 'opt_5', 'option_text_5'],
-      ['option_6', 'option6', 'option_f', 'optionF', 'opt6', 'optF', 'opt_6', 'option_text_6'],
-    ];
+    if (resultList.isEmpty) {
+      final List<String> fallbackOpts = [];
+      final keyGroups = [
+        ['option_1', 'option1', 'option_a', 'optionA', 'opt1', 'optA', 'opt_1', 'option_text_1'],
+        ['option_2', 'option2', 'option_b', 'optionB', 'opt2', 'optB', 'opt_2', 'option_text_2'],
+        ['option_3', 'option3', 'option_c', 'optionC', 'opt3', 'optC', 'opt_3', 'option_text_3'],
+        ['option_4', 'option4', 'option_d', 'optionD', 'opt4', 'optD', 'opt_4', 'option_text_4'],
+        ['option_5', 'option5', 'option_e', 'optionE', 'opt5', 'optE', 'opt_5', 'option_text_5'],
+        ['option_6', 'option6', 'option_f', 'optionF', 'opt6', 'optF', 'opt_6', 'option_text_6'],
+      ];
 
-    for (var kGroup in keyGroups) {
-      String? val;
-      for (var k in kGroup) {
-        if (map[k] != null && map[k].toString().trim().isNotEmpty) {
-          val = map[k].toString().trim();
-          break;
+      for (var kGroup in keyGroups) {
+        String? val;
+        for (var k in kGroup) {
+          if (map[k] != null && map[k].toString().trim().isNotEmpty) {
+            val = map[k].toString().trim();
+            break;
+          }
+        }
+        if (val != null) {
+          fallbackOpts.add(val);
         }
       }
-      if (val != null) {
-        fallbackOpts.add(val);
-      }
+      resultList = fallbackOpts;
     }
 
-    if (fallbackOpts.isNotEmpty) {
-      return fallbackOpts;
-    }
-
-    return <String>[];
+    return resultList.map((opt) => LaTeXView.normalizeText(opt)).toList();
   }
 
   static Future<List<QuestionModel>> fetchQuestions({

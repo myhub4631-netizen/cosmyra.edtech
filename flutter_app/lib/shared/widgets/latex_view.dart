@@ -17,13 +17,51 @@ class LaTeXView extends StatelessWidget {
     this.textAlign = TextAlign.start,
   }) : super(key: key);
 
+  /// Helper to normalize multiline vertical fraction copy artifacts like "120\n1\ns"
+  static String normalizeText(String raw) {
+    if (raw.trim().isEmpty) return raw;
+    String str = raw.trim();
+
+    // Fix multiline fraction copy artifact: "120\n1\ns" or "120 \n 1 \n s" -> "\frac{1}{120}\text{ s}"
+    final multilineRegex = RegExp(r'^(\d+)\s*[\r\n]+\s*(\d+)\s*[\r\n]+\s*([a-zA-Z°%]+)$');
+    final m = multilineRegex.firstMatch(str);
+    if (m != null) {
+      final p1 = m.group(1)!;
+      final p2 = m.group(2)!;
+      final u = m.group(3)!;
+      final n1 = int.tryParse(p1) ?? 0;
+      final n2 = int.tryParse(p2) ?? 0;
+      if (n1 < n2) {
+        return r'\frac{' + p1 + r'}{' + p2 + r'}\text{ ' + u + r'}';
+      } else {
+        return r'\frac{' + p2 + r'}{' + p1 + r'}\text{ ' + u + r'}';
+      }
+    }
+
+    return str;
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (text.isEmpty) {
+    final cleanText = normalizeText(text);
+    if (cleanText.isEmpty) {
       return const SizedBox.shrink();
     }
 
     final defaultStyle = style ?? Theme.of(context).textTheme.bodyMedium ?? const TextStyle(fontSize: 15, color: Color(0xFF0F172A));
+
+    String processed = cleanText;
+    if (!processed.contains('\$') && !processed.contains(r'\(') && !processed.contains(r'\[')) {
+      if (processed.contains(r'\frac') ||
+          processed.contains(r'\sqrt') ||
+          processed.contains(r'\alpha') ||
+          processed.contains(r'\beta') ||
+          processed.contains(r'\theta') ||
+          processed.contains(r'\pi') ||
+          processed.contains(r'\infty')) {
+        processed = '\$${processed}\$';
+      }
+    }
 
     // Regex for matching $$...$$, \[...\], \(...\), and $...$
     final RegExp mathRegex = RegExp(
@@ -31,11 +69,11 @@ class LaTeXView extends StatelessWidget {
       dotAll: true,
     );
 
-    final matches = mathRegex.allMatches(text);
+    final matches = mathRegex.allMatches(processed);
 
     if (matches.isEmpty) {
-      return Text(
-        text,
+      return SelectableText(
+        processed,
         style: defaultStyle,
         textAlign: textAlign,
       );
@@ -45,10 +83,9 @@ class LaTeXView extends StatelessWidget {
     int lastEnd = 0;
 
     for (final match in matches) {
-      // Append text preceding the math match
       if (match.start > lastEnd) {
         spans.add(TextSpan(
-          text: text.substring(lastEnd, match.start),
+          text: processed.substring(lastEnd, match.start),
           style: defaultStyle,
         ));
       }
@@ -57,7 +94,6 @@ class LaTeXView extends StatelessWidget {
       mathExpr = mathExpr.trim();
 
       if (mathExpr.isNotEmpty) {
-        // Sanitize math expressions with units like 5\,kg -> 5\text{ }kg
         final sanitizedExpr = mathExpr.replaceAll(r'\,', r'\text{ }');
 
         spans.add(WidgetSpan(
@@ -93,17 +129,22 @@ class LaTeXView extends StatelessWidget {
       lastEnd = match.end;
     }
 
-    // Append remaining text after last match
-    if (lastEnd < text.length) {
+    if (lastEnd < processed.length) {
       spans.add(TextSpan(
-        text: text.substring(lastEnd),
+        text: processed.substring(lastEnd),
         style: defaultStyle,
       ));
     }
 
-    return RichText(
-      textAlign: textAlign,
-      text: TextSpan(children: spans),
+    return Semantics(
+      label: cleanText,
+      value: cleanText,
+      child: SelectionArea(
+        child: RichText(
+          textAlign: textAlign,
+          text: TextSpan(children: spans),
+        ),
+      ),
     );
   }
 }
