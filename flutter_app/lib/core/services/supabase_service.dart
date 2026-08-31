@@ -1734,6 +1734,8 @@ class SupabaseService {
     dynamic correctAnswerRaw,
     dynamic correctOptionIndexRaw,
   }) {
+    final String letter = String.fromCharCode(65 + optionIndex); // 'A', 'B', 'C', 'D'
+
     // 1. Absolute Primary Source of Truth: Canonical zero-based integer index
     int? explicitIdx;
     if (correctOptionIndexRaw is num) {
@@ -1745,16 +1747,24 @@ class SupabaseService {
     if (explicitIdx != null && explicitIdx >= 0) {
       final bool result = (optionIndex == explicitIdx);
       if (result) {
-        debugPrint('[CorrectAnswerCheck] Canonical Index Match: OptIndex=$optionIndex (Option ${String.fromCharCode(65 + optionIndex)}) -> isCorrect=true');
+        debugPrint('[CorrectAnswerCheck] Canonical Index Match: OptIndex=$optionIndex (Option $letter) -> isCorrect=true');
       }
       return result;
     }
 
-    // 2. Secondary Fallback from correctAnswerRaw string if explicit index is missing
+    // 2. Secondary Fallbacks from correctAnswerRaw if explicit index is missing
     if (correctAnswerRaw != null) {
-      final str = correctAnswerRaw.toString().trim().toUpperCase();
-      if (str.startsWith('OPTION ')) {
-        final optNum = int.tryParse(str.substring(7).trim());
+      final str = correctAnswerRaw.toString().trim();
+      final uStr = str.toUpperCase();
+
+      // a. 'Option A', 'Option B', 'Option C', 'Option D' or 'Option 1', 'Option 2', etc.
+      if (uStr.startsWith('OPTION ')) {
+        final optSub = uStr.substring(7).trim();
+        if (optSub == letter || optSub == letter.toLowerCase()) {
+          debugPrint('[CorrectAnswerCheck] Fallback Letter Match "$str": OptIndex=$optionIndex -> isCorrect=true');
+          return true;
+        }
+        final optNum = int.tryParse(optSub);
         if (optNum != null) {
           final bool result = (optionIndex == (optNum - 1));
           if (result) {
@@ -1762,13 +1772,33 @@ class SupabaseService {
           }
           return result;
         }
-      } else if (str.length == 1 && RegExp(r'[A-D]').hasMatch(str)) {
-        final letterIdx = str.codeUnitAt(0) - 65;
-        final bool result = (optionIndex == letterIdx);
+      }
+
+      // b. Single letter 'A', 'B', 'C', 'D' or 1-based digit '1', '2', '3', '4'
+      if (uStr == letter || uStr == 'OPT_$letter' || uStr == 'OPT $letter') {
+        debugPrint('[CorrectAnswerCheck] Fallback Direct Letter Match "$str": OptIndex=$optionIndex -> isCorrect=true');
+        return true;
+      }
+      if (str.length == 1 && RegExp(r'[1-4]').hasMatch(str)) {
+        final bool result = (optionIndex == (int.parse(str) - 1));
         if (result) {
-          debugPrint('[CorrectAnswerCheck] Fallback Letter Match "$str": OptIndex=$optionIndex -> isCorrect=true');
+          debugPrint('[CorrectAnswerCheck] Fallback 1-based Digit Match "$str": OptIndex=$optionIndex -> isCorrect=true');
         }
         return result;
+      }
+
+      // c. Option Text match (e.g. correctAnswerRaw == '10.8 V' and optionText == '10.8 V')
+      final normOptText = optionText.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+      final normCorrText = str.replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+      if (normOptText.isNotEmpty && normCorrText.isNotEmpty && normOptText == normCorrText) {
+        debugPrint('[CorrectAnswerCheck] Fallback Option Text Match "$str" == "$optionText" -> OptIndex=$optionIndex isCorrect=true');
+        return true;
+      }
+
+      // d. Option Key / ID match
+      if (optionKey.isNotEmpty && (str == optionKey || uStr == optionKey.toUpperCase())) {
+        debugPrint('[CorrectAnswerCheck] Fallback Option Key Match "$str" == "$optionKey" -> OptIndex=$optionIndex isCorrect=true');
+        return true;
       }
     }
 

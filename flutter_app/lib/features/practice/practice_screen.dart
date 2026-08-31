@@ -454,8 +454,9 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       final String selectedLetter = selectedOptIndex != -1 ? String.fromCharCode(65 + selectedOptIndex) : 'Selected';
 
                       final correctOptIndex = question.options.indexWhere((o) => o.isCorrect);
-                      final int validCorrectIndex = correctOptIndex != -1 ? correctOptIndex : 0;
-                      final String correctLetter = String.fromCharCode(65 + validCorrectIndex);
+                      final String correctLetter = correctOptIndex != -1
+                          ? String.fromCharCode(65 + correctOptIndex)
+                          : 'Selected Correct Option';
 
                       final String feedbackTitle = isCorrect
                           ? '✅ Correct Answer! Option $correctLetter is correct.'

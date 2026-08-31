@@ -354,8 +354,20 @@ class QuestionModel {
         if (optNum != -1) {
           targetCorrectIdx = (optNum - 1).clamp(0, 5);
         }
-      } else if (corrStr.length == 1 && RegExp(r'[A-D]', caseSensitive: false).hasMatch(corrStr)) {
-        targetCorrectIdx = corrStr.toUpperCase().codeUnitAt(0) - 65;
+      } else if (corrStr.length == 1 && RegExp(r'[1-4]').hasMatch(corrStr)) {
+        targetCorrectIdx = int.parse(corrStr) - 1;
+      }
+
+      if (targetCorrectIdx == -1 && corrStr.isNotEmpty) {
+        var rawOptsTmp = json['options'] as List? ?? json['question_options'] as List? ?? [];
+        for (int i = 0; i < rawOptsTmp.length; i++) {
+          final rawOpt = rawOptsTmp[i];
+          final String optText = (rawOpt is Map ? (rawOpt['option_text'] ?? rawOpt['optionText'] ?? '') : rawOpt.toString()).trim();
+          if (optText.isNotEmpty && (optText.toLowerCase() == corrStr.toLowerCase() || optText.replaceAll(RegExp(r'\s+'), '').toLowerCase() == corrStr.replaceAll(RegExp(r'\s+'), '').toLowerCase())) {
+            targetCorrectIdx = i;
+            break;
+          }
+        }
       }
     }
 
