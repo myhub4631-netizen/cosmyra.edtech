@@ -1859,6 +1859,58 @@ class SupabaseService {
     }
   }
 
+  static bool isQuestionAvailableInModule(Map<String, dynamic> map, String? requestedSource) {
+    if (requestedSource == null || requestedSource.isEmpty || requestedSource.toLowerCase() == 'all') {
+      return true;
+    }
+
+    final reqLower = requestedSource.toLowerCase().replaceAll(' ', '_');
+
+    // Extract available_in list from question record
+    List<String> availList = [];
+    if (map['available_in'] is List) {
+      availList = (map['available_in'] as List).map((e) => e.toString().toLowerCase()).toList();
+    } else if (map['availableIn'] is List) {
+      availList = (map['availableIn'] as List).map((e) => e.toString().toLowerCase()).toList();
+    }
+
+    // If available_in is populated on the record, check containment directly
+    if (availList.isNotEmpty) {
+      if (reqLower.contains('custom_practice') || reqLower == 'practice' || reqLower == 'custom practice' || reqLower.contains('custom')) {
+        if (availList.contains('custom_practice') || availList.contains('custom practice') || availList.contains('custom_test')) return true;
+      }
+      if (reqLower.contains('custom_test') || reqLower == 'test' || reqLower == 'custom test') {
+        if (availList.contains('custom_test') || availList.contains('custom test')) return true;
+      }
+      if (reqLower.contains('pyq')) {
+        if (availList.contains('pyq_practice') || availList.contains('pyq practice')) return true;
+      }
+      if (reqLower.contains('nta')) {
+        if (availList.contains('nta_questions') || availList.contains('nta questions')) return true;
+      }
+      if (reqLower.contains('series')) {
+        if (availList.contains('test_series') || availList.contains('test series')) return true;
+      }
+
+      // Containment match
+      if (availList.contains(reqLower) || availList.any((a) => a.contains(reqLower) || reqLower.contains(a))) {
+        return true;
+      }
+    }
+
+    // Fallback: If available_in is not populated, match by sourceType or category
+    final qSource = (map['sourceType'] ?? map['source_type'] ?? map['source'] ?? map['category'] ?? 'pyq').toString().toLowerCase();
+    final qCategory = (map['category'] ?? map['source_category'] ?? map['sourceCategory'] ?? '').toString().toLowerCase();
+
+    final isPyqMatch = reqLower.contains('pyq') && (qSource.contains('pyq') || qCategory.contains('pyq'));
+    final isNtaMatch = reqLower.contains('nta') && (qSource.contains('nta') || qCategory.contains('nta'));
+    final isCustomMatch = (reqLower.contains('custom') || reqLower.contains('practice') || reqLower.contains('test')) &&
+        (qSource.contains('custom') || qSource.contains('practice') || qSource.contains('test') ||
+         qCategory.contains('custom') || qCategory.contains('practice') || qCategory.contains('test') || qCategory.contains('pyq') || qSource.contains('pyq'));
+
+    return isPyqMatch || isNtaMatch || isCustomMatch || qSource == reqLower || qCategory == reqLower;
+  }
+
   static Future<List<QuestionModel>> fetchQuestions({
     String? examId,
     String? subjectId,
@@ -1875,14 +1927,18 @@ class SupabaseService {
     // Fetch live questions directly from Supabase DB
     try {
       dynamic req = client.from('questions').select('*');
-      if (examId != null && examId.isNotEmpty) {
+      if (examId != null && examId.isNotEmpty && examId != 'all') {
         req = req.or('exam.ilike.%$examId%,exam_id.eq.$examId');
       }
-      if (subjectId != null && subjectId.isNotEmpty) {
-        req = req.or('subject.ilike.%$subjectId%,subject_id.eq.$subjectId');
+      if (subjectId != null && subjectId.isNotEmpty && subjectId != 'all') {
+        if (!isValidUuid(subjectId)) {
+          req = req.or('subject.ilike.%$subjectId%,subject_id.eq.$subjectId');
+        }
       }
-      if (chapterId != null && chapterId.isNotEmpty) {
-        req = req.or('chapter.ilike.%$chapterId%,chapter_id.eq.$chapterId');
+      if (chapterId != null && chapterId.isNotEmpty && chapterId != 'all') {
+        if (!isValidUuid(chapterId)) {
+          req = req.or('chapter.ilike.%$chapterId%,chapter_id.eq.$chapterId');
+        }
       }
 
       final res = await req.order('created_at', ascending: false).limit(limit * 2);
@@ -1898,6 +1954,15 @@ class SupabaseService {
           }
         }
       }
+
+      // If strict subjectId/chapterId filtering produced 0 maps, fetch all active questions from DB as fallback
+      if (allMaps.isEmpty) {
+        final fallbackRes = await client.from('questions').select('*').order('created_at', ascending: false).limit(100);
+        if (fallbackRes != null && (fallbackRes as List).isNotEmpty) {
+          final fallbackList = (fallbackRes as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
+          allMaps.addAll(fallbackList);
+        }
+      }
     } catch (e) {
       debugPrint('Notice fetching questions from Supabase: $e');
     }
@@ -1905,17 +1970,10 @@ class SupabaseService {
     final List<QuestionModel> models = [];
     for (var map in allMaps) {
       final qSource = (map['sourceType'] ?? map['source_type'] ?? map['source'] ?? map['category'] ?? 'pyq').toString().toLowerCase();
-      final qCategory = (map['category'] ?? map['source_category'] ?? map['sourceCategory'] ?? '').toString().toLowerCase();
 
-      // Apply source filtering if requested
+      // Apply source/module filtering using available_in array
       if (source != null && source.isNotEmpty && source != 'all') {
-        final sLower = source.toLowerCase();
-        final isPyqMatch = sLower.contains('pyq') && (qSource.contains('pyq') || qCategory.contains('pyq'));
-        final isNtaMatch = sLower.contains('nta') && (qSource.contains('nta') || qCategory.contains('nta'));
-        final isCustomMatch = (sLower.contains('custom') || sLower.contains('practice') || sLower.contains('test')) &&
-            (qSource.contains('custom') || qSource.contains('practice') || qSource.contains('test') ||
-             qCategory.contains('custom') || qCategory.contains('practice') || qCategory.contains('test') || qCategory.contains('pyq'));
-        final isMatch = isPyqMatch || isNtaMatch || isCustomMatch || qSource == sLower || qCategory == sLower;
+        final isMatch = isQuestionAvailableInModule(map, source);
         if (!isMatch && allMaps.length > 10) continue;
       }
 
@@ -1963,6 +2021,9 @@ class SupabaseService {
         negativeMarks: (map['negativeMarks'] is num) ? (map['negativeMarks'] as num).toDouble() : double.tryParse(map['negativeMarks']?.toString() ?? '1') ?? 1.0,
         explanation: map['explanation']?.toString() ?? '',
         solution: map['explanation']?.toString() ?? '',
+        availableIn: (map['available_in'] is List)
+            ? (map['available_in'] as List).map((v) => v.toString()).toList()
+            : ((map['availableIn'] is List) ? (map['availableIn'] as List).map((v) => v.toString()).toList() : const []),
         options: opts,
       ));
     }
@@ -2015,15 +2076,21 @@ class SupabaseService {
           negativeMarks: (map['negativeMarks'] is num) ? (map['negativeMarks'] as num).toDouble() : double.tryParse(map['negativeMarks']?.toString() ?? '1') ?? 1.0,
           explanation: map['explanation']?.toString() ?? '',
           solution: map['explanation']?.toString() ?? '',
+          availableIn: (map['available_in'] is List)
+              ? (map['available_in'] as List).map((v) => v.toString()).toList()
+              : ((map['availableIn'] is List) ? (map['availableIn'] as List).map((v) => v.toString()).toList() : const []),
           options: opts,
         ));
       }
     }
 
+    if (models.isEmpty) {
+      return getSampleQuestions(limit > 0 ? limit : 20);
+    }
+
     if (limit <= models.length) {
       return models.sublist(0, limit);
     }
-    return models;
     return models;
   }
 
