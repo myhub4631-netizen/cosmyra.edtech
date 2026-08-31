@@ -1797,7 +1797,14 @@ class SupabaseService {
     return false;
   }
 
+  static List<QuestionModel> _liveQuestionsCache = [];
+
   static List<QuestionModel> getSampleQuestions([int count = 50]) {
+    if (_liveQuestionsCache.isNotEmpty) {
+      final list = _liveQuestionsCache;
+      return count <= list.length ? list.sublist(0, count) : List<QuestionModel>.from(list);
+    }
+
     final realMaps = get20RealQuestionsMap();
     final models = realMaps.map((map) {
       final opts = (map['options'] as List<String>).asMap().entries.map((e) {
@@ -2084,14 +2091,20 @@ class SupabaseService {
       }
     }
 
-    if (models.isEmpty) {
-      return getSampleQuestions(limit > 0 ? limit : 20);
+    if (models.isNotEmpty) {
+      _liveQuestionsCache = List<QuestionModel>.from(models);
+      if (limit <= models.length) {
+        return models.sublist(0, limit);
+      }
+      return models;
     }
 
-    if (limit <= models.length) {
-      return models.sublist(0, limit);
+    if (_liveQuestionsCache.isNotEmpty) {
+      final list = _liveQuestionsCache;
+      return (limit > 0 && limit <= list.length) ? list.sublist(0, limit) : List<QuestionModel>.from(list);
     }
-    return models;
+
+    return getSampleQuestions(limit > 0 ? limit : 20);
   }
 
   // ================= ADMIN MANAGEMENT =================
@@ -2670,10 +2683,9 @@ class SupabaseService {
       }
     }
 
-    // One-time sync of initial practice questions & local storage items to remote Supabase DB
+    // One-time sync of local storage items to remote Supabase DB
     try {
       final List<Map<String, dynamic>> itemsToMigrate = [];
-      itemsToMigrate.addAll(get20RealQuestionsMap());
 
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
@@ -2684,7 +2696,9 @@ class SupabaseService {
         }
       }
 
-      await _seedLocalQuestionsToSupabase(itemsToMigrate);
+      if (itemsToMigrate.isNotEmpty) {
+        await _seedLocalQuestionsToSupabase(itemsToMigrate);
+      }
     } catch (e) {
       debugPrint('Notice during one-time DB migration sync: $e');
     }
