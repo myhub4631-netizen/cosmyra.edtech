@@ -2492,9 +2492,9 @@ class SupabaseService {
           }
 
           // Cache saved question locally by paper_id & paper_uuid for instant resumability
-          if (pIdRaw.trim().isNotEmpty) {
-            try {
-              final prefs = await SharedPreferences.getInstance();
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            if (pIdRaw.trim().isNotEmpty) {
               for (final key in ['cosmyra_paper_questions_$pIdRaw', 'cosmyra_paper_questions_${toValidUuid(pIdRaw)}']) {
                 final str = prefs.getString(key) ?? '[]';
                 final List<dynamic> list = jsonDecode(str);
@@ -2506,9 +2506,21 @@ class SupabaseService {
                 }
                 await prefs.setString(key, jsonEncode(list));
               }
-            } catch (e) {
-              debugPrint('Notice updating local paper questions cache: $e');
             }
+
+            final globalStr = prefs.getString('cosmyra_saved_custom_questions');
+            if (globalStr != null && globalStr.isNotEmpty) {
+              final List<dynamic> decoded = jsonDecode(globalStr);
+              final List<Map<String, dynamic>> gList = decoded.map((i) => Map<String, dynamic>.from(i as Map)).toList();
+              final targetId = qData['id']?.toString() ?? '';
+              final gIdx = gList.indexWhere((item) => item['id']?.toString() == targetId);
+              if (gIdx != -1) {
+                gList[gIdx] = qData;
+                await prefs.setString('cosmyra_saved_custom_questions', jsonEncode(gList));
+              }
+            }
+          } catch (e) {
+            debugPrint('Notice updating local paper questions cache: $e');
           }
 
           return {'success': true};
@@ -2851,16 +2863,20 @@ class SupabaseService {
       final List<Map<String, dynamic>> itemsToMigrate = [];
 
       final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
-      if (jsonStr != null && jsonStr.isNotEmpty) {
-        final List<dynamic> decoded = jsonDecode(jsonStr);
-        for (var item in decoded) {
-          itemsToMigrate.add(Map<String, dynamic>.from(item as Map));
+      final bool alreadySeeded = prefs.getBool('cosmyra_local_questions_seeded_v1') ?? false;
+      if (!alreadySeeded) {
+        final jsonStr = prefs.getString('cosmyra_saved_custom_questions');
+        if (jsonStr != null && jsonStr.isNotEmpty) {
+          final List<dynamic> decoded = jsonDecode(jsonStr);
+          for (var item in decoded) {
+            itemsToMigrate.add(Map<String, dynamic>.from(item as Map));
+          }
         }
-      }
 
-      if (itemsToMigrate.isNotEmpty) {
-        await _seedLocalQuestionsToSupabase(itemsToMigrate);
+        if (itemsToMigrate.isNotEmpty) {
+          await _seedLocalQuestionsToSupabase(itemsToMigrate);
+        }
+        await prefs.setBool('cosmyra_local_questions_seeded_v1', true);
       }
     } catch (e) {
       debugPrint('Notice during one-time DB migration sync: $e');

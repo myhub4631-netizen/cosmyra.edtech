@@ -572,6 +572,8 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     bool visNTA = initAvail.contains('nta_questions');
     bool visTS = initAvail.contains('test_series');
 
+    bool isSavingInModal = false;
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -839,7 +841,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                 }
 
                 if (formKey.currentState!.validate()) {
-                  Navigator.pop(ctx);
+                  setDlgState(() => isSavingInModal = true);
                   final List<String> formOpts = [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text];
                   int cIdx = selCorrectIdx;
                   final String corrAnsStr = 'Option ${String.fromCharCode(65 + cIdx)}';
@@ -880,21 +882,28 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                     'usedIn': isEdit ? (initialData!['usedIn'] ?? 0) : 0,
                   };
 
-                  if (isEdit) {
-                    await SupabaseService.updateQuestionInSupabase(qMap['id'].toString(), qMap);
+                  final res = await SupabaseService.saveQuestionMapWithStatus(qMap);
+                  if (res['success'] == true) {
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    await _loadSupabaseQuestions();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(isEdit ? 'Question updated successfully!' : 'Question created successfully!'), backgroundColor: Colors.green),
+                      );
+                    }
                   } else {
-                    await SupabaseService.saveQuestionMapWithStatus(qMap);
-                  }
-
-                  await _loadSupabaseQuestions();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(isEdit ? 'Question updated successfully!' : 'Question created successfully!')),
-                    );
+                    setDlgState(() => isSavingInModal = false);
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(content: Text(res['error']?.toString() ?? 'Failed to update question in database'), backgroundColor: Colors.red),
+                      );
+                    }
                   }
                 }
               },
-              child: Text(isEdit ? 'Save Changes' : 'Create Question', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: isSavingInModal
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : Text(isEdit ? 'Save Changes' : 'Create Question', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
         ],
       ),
