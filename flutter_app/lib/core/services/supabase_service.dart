@@ -2604,6 +2604,22 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> fetchAllQuestionsFromSupabase() async {
     final List<Map<String, dynamic>> allQuestions = [];
 
+    // Fetch question_options from Supabase child table
+    final Map<String, List<Map<String, dynamic>>> childOptsMap = {};
+    try {
+      final optRes = await client.from('question_options').select('*').order('option_index', ascending: true);
+      if (optRes != null && (optRes as List).isNotEmpty) {
+        for (var optRow in optRes) {
+          final qId = optRow['question_id']?.toString() ?? '';
+          if (qId.isNotEmpty) {
+            childOptsMap.putIfAbsent(qId, () => []).add(Map<String, dynamic>.from(optRow as Map));
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice fetching question_options child table in fetchAllQuestionsFromSupabase: $e');
+    }
+
     void addOrUpdate(Map<String, dynamic> qMap) {
       final String id = qMap['id']?.toString() ?? '';
       final String paperId = (qMap['paper_id'] ?? qMap['paperId'] ?? '').toString();
@@ -2622,6 +2638,28 @@ class SupabaseService {
       else if (canonicalCat == 'mock_test' || rawCat.toUpperCase().contains('MOCK') || rawCat.toUpperCase().contains('SERIES')) displayCategory = 'Mock Test';
       else if (canonicalCat == 'custom_test' || rawCat.toUpperCase().contains('TEST')) displayCategory = 'Custom Test';
 
+      List<String> optsFromMap = parseOptionsFromQuestionMap(qMap);
+      List<String?> optImgsFromMap = qMap['optionImages'] is List ? List<String?>.from(qMap['optionImages']) : (qMap['option_images'] is List ? List<String?>.from(qMap['option_images']) : <String?>[]);
+
+      if (optsFromMap.isEmpty && id.isNotEmpty && childOptsMap.containsKey(id)) {
+        final childRows = childOptsMap[id]!;
+        optsFromMap = childRows.map((r) => r['option_text']?.toString() ?? '').toList();
+        optImgsFromMap = childRows.map((r) => r['option_image']?.toString()).toList();
+
+        final int corrIdxInChild = childRows.indexWhere((r) => r['is_correct'] == true);
+        if (corrIdxInChild != -1) {
+          qMap['correct_option_index'] = corrIdxInChild;
+          qMap['correctOptionIndex'] = corrIdxInChild;
+          qMap['correct_answer'] = 'Option ${String.fromCharCode(65 + corrIdxInChild)}';
+          qMap['correctAnswer'] = 'Option ${String.fromCharCode(65 + corrIdxInChild)}';
+        }
+      }
+
+      String diffStr = (qMap['difficulty']?.toString() ?? 'Medium').trim();
+      if (diffStr.toLowerCase() == 'easy') diffStr = 'Easy';
+      else if (diffStr.toLowerCase() == 'hard') diffStr = 'Hard';
+      else diffStr = 'Medium';
+
       final normalized = {
         'id': id.isNotEmpty ? id : 'Q_${DateTime.now().millisecondsSinceEpoch}',
         'paper_id': paperId,
@@ -2630,22 +2668,22 @@ class SupabaseService {
         'question_text': qMap['questionText'] ?? qMap['question_text'] ?? '',
         'questionImage': qMap['questionImage'] ?? qMap['question_image'] ?? '',
         'question_image': qMap['questionImage'] ?? qMap['question_image'] ?? '',
-        'subject': qMap['subject'] ?? 'Physics',
-        'chapter': qMap['chapter'] ?? '1. Mechanics',
-        'topic': qMap['topic'] ?? 'Kinematics',
+        'subject': qMap['subject'] ?? qMap['subject_id'] ?? 'Physics',
+        'chapter': qMap['chapter'] ?? qMap['chapter_name'] ?? qMap['chapter_id'] ?? '1. Mechanics',
+        'topic': qMap['topic'] ?? qMap['topic_name'] ?? qMap['topic_id'] ?? 'Kinematics',
         'subTopic': qMap['subTopic'] ?? qMap['sub_topic'] ?? '',
         'category': displayCategory,
         'canonical_category': canonicalCat,
         'sourceType': qMap['sourceType'] ?? qMap['source_type'] ?? qMap['source'] ?? 'NTA',
-        'difficulty': qMap['difficulty'] ?? 'Medium',
+        'difficulty': diffStr,
         'type': qMap['type'] ?? qMap['q_type'] ?? qMap['question_type'] ?? 'MCQ',
         'q_type': qMap['q_type'] ?? qMap['type'] ?? 'MCQ',
         'marks': (qMap['marks'] is num) ? (qMap['marks'] as num).toInt() : int.tryParse(qMap['marks']?.toString() ?? '4') ?? 4,
         'negativeMarks': (qMap['negativeMarks'] is num) ? (qMap['negativeMarks'] as num).toDouble() : double.tryParse(qMap['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
         'status': ((qMap['status']?.toString().toLowerCase() == 'inactive' || qMap['status']?.toString().toLowerCase() == 'draft') ? 'Inactive' : 'Active'),
         'usedIn': (qMap['usedIn'] is num) ? (qMap['usedIn'] as num).toInt() : (qMap['used_in_count'] is num ? (qMap['used_in_count'] as num).toInt() : 12),
-        'options': qMap['options'] is List ? List<String>.from(qMap['options']) : [],
-        'optionImages': qMap['optionImages'] is List ? List<String?>.from(qMap['optionImages']) : (qMap['option_images'] is List ? List<String?>.from(qMap['option_images']) : [null, null, null, null]),
+        'options': optsFromMap,
+        'optionImages': optImgsFromMap,
         'correctAnswer': qMap['correctAnswer'] ?? qMap['correct_answer'] ?? 'Option A',
         'correct_answer': qMap['correct_answer'] ?? qMap['correctAnswer'] ?? 'Option A',
         'correct_option_index': qMap['correct_option_index'] ?? qMap['correctOptionIndex'],
@@ -2654,6 +2692,8 @@ class SupabaseService {
         'year': qMap['year']?.toString() ?? '2026',
         'exam': qMap['exam']?.toString() ?? 'NEET 2026',
         'paperName': qMap['paperName'] ?? qMap['paper_name'] ?? 'NEET 2026 Phase 1',
+        'available_in': qMap['available_in'] ?? qMap['availableIn'],
+        'availableIn': qMap['availableIn'] ?? qMap['available_in'],
         'created_at': qMap['created_at'] ?? DateTime.now().toIso8601String(),
       };
 

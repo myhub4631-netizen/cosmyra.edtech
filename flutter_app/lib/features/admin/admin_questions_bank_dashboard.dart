@@ -412,11 +412,28 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     final negCtrl = TextEditingController(text: (isEdit && initialData != null) ? (initialData['negativeMarks'] ?? 1.0).toString() : '1.0');
 
     String selSubject = (isEdit && initialData != null) ? (initialData['subject'] ?? 'Physics').toString() : 'Physics';
-    String selChapter = (isEdit && initialData != null) ? (initialData['chapter'] ?? '1. Mechanics').toString() : '1. Mechanics';
+
+    String rawChapter = (isEdit && initialData != null)
+        ? (initialData['chapter'] ?? initialData['chapter_name'] ?? initialData['chapter_id'] ?? '1. Mechanics').toString()
+        : '1. Mechanics';
+    List<String> availableChapters = List<String>.from(_subjectChaptersMap[selSubject] ?? ['1. Mechanics']);
+    if (rawChapter.isNotEmpty && !availableChapters.contains(rawChapter)) {
+      availableChapters.add(rawChapter);
+    }
+    String selChapter = availableChapters.contains(rawChapter)
+        ? rawChapter
+        : availableChapters.first;
+
     String selTopic = (isEdit && initialData != null) ? (initialData['topic'] ?? 'Kinematics').toString() : 'Kinematics';
     String selCategory = (isEdit && initialData != null) ? (initialData['category'] ?? 'Custom Practice').toString() : 'Custom Practice';
     String selType = (isEdit && initialData != null) ? (initialData['type'] ?? 'MCQ').toString() : 'MCQ';
-    String selDifficulty = (isEdit && initialData != null) ? (initialData['difficulty'] ?? 'Medium').toString() : 'Medium';
+
+    String rawDiff = (isEdit && initialData != null) ? (initialData['difficulty'] ?? 'Medium').toString().trim() : 'Medium';
+    String selDifficulty = 'Medium';
+    if (rawDiff.toLowerCase() == 'easy') selDifficulty = 'Easy';
+    else if (rawDiff.toLowerCase() == 'hard') selDifficulty = 'Hard';
+    else selDifficulty = 'Medium';
+
     String selStatus = (isEdit && initialData != null) ? (initialData['status'] ?? 'Active').toString() : 'Active';
 
     final opts = (isEdit && initialData != null && initialData['options'] is List) ? (initialData['options'] as List) : [];
@@ -502,9 +519,9 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _subjectChaptersMap[selSubject]?.contains(selChapter) == true ? selChapter : _subjectChaptersMap[selSubject]?.first,
+                            value: availableChapters.contains(selChapter) ? selChapter : availableChapters.first,
                             decoration: const InputDecoration(labelText: 'Chapter', border: OutlineInputBorder()),
-                            items: (_subjectChaptersMap[selSubject] ?? ['1. General']).map((c) {
+                            items: availableChapters.map((c) {
                               return DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis));
                             }).toList(),
                             onChanged: (v) => setDlgState(() => selChapter = v!),
