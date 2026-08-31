@@ -1888,58 +1888,30 @@ class SupabaseService {
   }) async {
     final List<Map<String, dynamic>> allMaps = [];
 
-    // Fetch live questions directly from Supabase DB
+    // 1. Primary DB fetch (using clean select to prevent PostgREST .or syntax errors)
     try {
-      dynamic req = client.from('questions').select('*');
-      if (examId != null && examId.isNotEmpty && examId != 'all') {
-        req = req.or('exam.ilike.%$examId%,exam_id.eq.$examId');
-      }
-      if (subjectId != null && subjectId.isNotEmpty && subjectId != 'all') {
-        if (!isValidUuid(subjectId)) {
-          req = req.or('subject.ilike.%$subjectId%,subject_id.eq.$subjectId');
-        }
-      }
-      if (chapterId != null && chapterId.isNotEmpty && chapterId != 'all') {
-        if (!isValidUuid(chapterId)) {
-          req = req.or('chapter.ilike.%$chapterId%,chapter_id.eq.$chapterId');
-        }
-      }
-
-      final res = await req.order('created_at', ascending: false).limit(limit * 2);
+      final res = await client.from('questions').select('*').order('created_at', ascending: false).limit(limit > 0 ? limit * 2 : 100);
       if (res != null && (res as List).isNotEmpty) {
         final dbList = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
-        for (var dbQ in dbList) {
-          final qId = dbQ['id']?.toString() ?? '';
-          final idx = qId.isNotEmpty ? allMaps.indexWhere((m) => m['id'] == qId) : -1;
-          if (idx != -1) {
-            allMaps[idx] = dbQ;
-          } else {
-            allMaps.add(dbQ);
-          }
-        }
-      }
-
-      // If strict subjectId/chapterId filtering produced 0 maps, fetch all active questions from DB as fallback
-      if (allMaps.isEmpty) {
-        final fallbackRes = await client.from('questions').select('*').order('created_at', ascending: false).limit(100);
-        if (fallbackRes != null && (fallbackRes as List).isNotEmpty) {
-          final fallbackList = (fallbackRes as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
-          allMaps.addAll(fallbackList);
-        }
+        allMaps.addAll(dbList);
       }
     } catch (e) {
       debugPrint('Notice fetching questions from Supabase: $e');
     }
 
+    // 2. Fallback to fetchAllQuestionsFromSupabase if direct select returned 0 rows
+    if (allMaps.isEmpty) {
+      try {
+        final dbQuestions = await fetchAllQuestionsFromSupabase();
+        allMaps.addAll(dbQuestions);
+      } catch (e) {
+        debugPrint('Notice fetching all questions fallback: $e');
+      }
+    }
+
     final List<QuestionModel> models = [];
     for (var map in allMaps) {
       final qSource = (map['sourceType'] ?? map['source_type'] ?? map['source'] ?? map['category'] ?? 'pyq').toString().toLowerCase();
-
-      // Apply source/module filtering using available_in array
-      if (source != null && source.isNotEmpty && source != 'all') {
-        final isMatch = isQuestionAvailableInModule(map, source);
-        if (!isMatch && allMaps.length > 10) continue;
-      }
 
       final optsRaw = map['options'] is List ? List<String>.from(map['options']) : <String>[];
       final optImgsRaw = map['optionImages'] is List
@@ -1992,65 +1964,9 @@ class SupabaseService {
       ));
     }
 
-    // Fallback: If strict filtering produced 0 models but DB has questions, include all available DB questions
-    if (models.isEmpty && allMaps.isNotEmpty) {
-      for (var map in allMaps) {
-        final qSource = (map['sourceType'] ?? map['source_type'] ?? map['source'] ?? map['category'] ?? 'pyq').toString().toLowerCase();
-        final optsRaw = map['options'] is List ? List<String>.from(map['options']) : <String>[];
-        final optImgsRaw = map['optionImages'] is List
-            ? List<String?>.from(map['optionImages'])
-            : (map['option_images'] is List ? List<String?>.from(map['option_images']) : <String?>[]);
-
-        final opts = optsRaw.asMap().entries.map((e) {
-          final idx = e.key;
-          final text = e.value;
-          final img = idx < optImgsRaw.length ? optImgsRaw[idx] : null;
-          final optKey = 'opt_${map['id']}_$idx';
-          final isCorr = checkOptionIsCorrect(
-            optionIndex: idx,
-            optionText: text,
-            optionKey: optKey,
-            correctAnswerRaw: map['correctAnswer'] ?? map['correct_answer'],
-            correctOptionIndexRaw: map['correctOptionIndex'] ?? map['correct_option_index'],
-          );
-          return QuestionOptionModel(
-            id: optKey,
-            questionId: map['id']?.toString() ?? '',
-            optionIndex: idx,
-            optionText: text,
-            isCorrect: isCorr,
-            optionImage: img,
-          );
-        }).toList();
-
-        models.add(QuestionModel(
-          id: map['id']?.toString() ?? '',
-          examId: map['exam']?.toString() ?? map['exam_id']?.toString() ?? 'NEET',
-          subjectId: map['subject']?.toString() ?? map['subject_id']?.toString() ?? 'Physics',
-          chapterId: map['chapter']?.toString() ?? map['chapter_id']?.toString() ?? 'General',
-          topicId: map['topic']?.toString() ?? map['topic_id']?.toString() ?? 'General',
-          questionText: map['questionText']?.toString() ?? map['question_text']?.toString() ?? '',
-          questionImage: map['questionImage']?.toString() ?? map['question_image']?.toString(),
-          qType: map['qType']?.toString() ?? map['question_type']?.toString() ?? 'single_correct',
-          difficulty: (map['difficulty']?.toString() ?? 'medium').toLowerCase(),
-          source: qSource,
-          sourceName: map['paperName']?.toString() ?? map['paper_name']?.toString() ?? map['sourceType']?.toString() ?? 'Practice Question',
-          year: (map['year'] is num) ? (map['year'] as num).toInt() : int.tryParse(map['year']?.toString() ?? '2026'),
-          marks: (map['marks'] is num) ? (map['marks'] as num).toDouble() : double.tryParse(map['marks']?.toString() ?? '4') ?? 4.0,
-          negativeMarks: (map['negativeMarks'] is num) ? (map['negativeMarks'] as num).toDouble() : double.tryParse(map['negativeMarks']?.toString() ?? '1') ?? 1.0,
-          explanation: map['explanation']?.toString() ?? '',
-          solution: map['explanation']?.toString() ?? '',
-          availableIn: (map['available_in'] is List)
-              ? (map['available_in'] as List).map((v) => v.toString()).toList()
-              : ((map['availableIn'] is List) ? (map['availableIn'] as List).map((v) => v.toString()).toList() : const []),
-          options: opts,
-        ));
-      }
-    }
-
     if (models.isNotEmpty) {
       _liveQuestionsCache = List<QuestionModel>.from(models);
-      if (limit <= models.length) {
+      if (limit > 0 && limit <= models.length) {
         return models.sublist(0, limit);
       }
       return models;
