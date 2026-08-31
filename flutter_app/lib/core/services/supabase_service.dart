@@ -1802,52 +1802,9 @@ class SupabaseService {
   static List<QuestionModel> getSampleQuestions([int count = 50]) {
     if (_liveQuestionsCache.isNotEmpty) {
       final list = _liveQuestionsCache;
-      return count <= list.length ? list.sublist(0, count) : List<QuestionModel>.from(list);
+      return (count > 0 && count <= list.length) ? list.sublist(0, count) : List<QuestionModel>.from(list);
     }
-
-    final realMaps = get20RealQuestionsMap();
-    final models = realMaps.map((map) {
-      final opts = (map['options'] as List<String>).asMap().entries.map((e) {
-        final optKey = 'opt_${map['id']}_${e.key}';
-        final isCorr = checkOptionIsCorrect(
-          optionIndex: e.key,
-          optionText: e.value,
-          optionKey: optKey,
-          correctAnswerRaw: map['correctAnswer'] ?? map['correct_answer'],
-          correctOptionIndexRaw: map['correctOptionIndex'] ?? map['correct_option_index'],
-        );
-        return QuestionOptionModel(
-          id: optKey,
-          questionId: map['id'],
-          optionIndex: e.key,
-          optionText: e.value,
-          isCorrect: isCorr,
-        );
-      }).toList();
-
-      return QuestionModel(
-        id: map['id'],
-        examId: '11111111-1111-1111-1111-111111111111',
-        subjectId: map['subject'] == 'Physics' ? 'a1111111' : (map['subject'] == 'Chemistry' ? 'a2222222' : 'a3333333'),
-        chapterId: 'b1111111',
-        questionText: map['questionText'],
-        qType: 'single_correct',
-        difficulty: (map['difficulty'] as String).toLowerCase(),
-        source: (map['sourceType'] as String).toLowerCase(),
-        sourceName: map['sourceType'],
-        year: 2024,
-        marks: 4.0,
-        negativeMarks: 1.0,
-        explanation: map['explanation'],
-        solution: map['explanation'],
-        options: opts,
-      );
-    }).toList();
-
-    if (count <= models.length) {
-      return models.sublist(0, count);
-    }
-    return models;
+    return <QuestionModel>[];
   }
 
   /// Convert user-selected category to canonical category & source_type
@@ -2104,7 +2061,7 @@ class SupabaseService {
       return (limit > 0 && limit <= list.length) ? list.sublist(0, limit) : List<QuestionModel>.from(list);
     }
 
-    return getSampleQuestions(limit > 0 ? limit : 20);
+    return <QuestionModel>[];
   }
 
   // ================= ADMIN MANAGEMENT =================
@@ -2714,6 +2671,59 @@ class SupabaseService {
       }
     } catch (e) {
       debugPrint('Error querying Supabase questions table: $e');
+    }
+
+    final List<QuestionModel> liveModels = [];
+    for (var map in allQuestions) {
+      final optsRaw = map['options'] is List ? List<String>.from(map['options']) : <String>[];
+      final optImgsRaw = map['optionImages'] is List ? List<String?>.from(map['optionImages']) : <String?>[];
+      final opts = optsRaw.asMap().entries.map((e) {
+        final idx = e.key;
+        final text = e.value;
+        final img = idx < optImgsRaw.length ? optImgsRaw[idx] : null;
+        final optKey = 'opt_${map['id']}_$idx';
+        final isCorr = checkOptionIsCorrect(
+          optionIndex: idx,
+          optionText: text,
+          optionKey: optKey,
+          correctAnswerRaw: map['correctAnswer'] ?? map['correct_answer'],
+          correctOptionIndexRaw: map['correctOptionIndex'] ?? map['correct_option_index'],
+        );
+        return QuestionOptionModel(
+          id: optKey,
+          questionId: map['id']?.toString() ?? '',
+          optionIndex: idx,
+          optionText: text,
+          isCorrect: isCorr,
+          optionImage: img,
+        );
+      }).toList();
+
+      liveModels.add(QuestionModel(
+        id: map['id']?.toString() ?? '',
+        examId: map['exam']?.toString() ?? map['exam_id']?.toString() ?? 'NEET',
+        subjectId: map['subject']?.toString() ?? map['subject_id']?.toString() ?? 'Physics',
+        chapterId: map['chapter']?.toString() ?? map['chapter_id']?.toString() ?? 'General',
+        topicId: map['topic']?.toString() ?? map['topic_id']?.toString() ?? 'General',
+        questionText: map['questionText']?.toString() ?? map['question_text']?.toString() ?? '',
+        questionImage: map['questionImage']?.toString() ?? map['question_image']?.toString(),
+        qType: map['qType']?.toString() ?? map['question_type']?.toString() ?? 'single_correct',
+        difficulty: (map['difficulty']?.toString() ?? 'medium').toLowerCase(),
+        source: (map['sourceType'] ?? map['source_type'] ?? map['source'] ?? 'pyq').toString().toLowerCase(),
+        sourceName: map['paperName']?.toString() ?? map['paper_name']?.toString() ?? 'Practice Question',
+        year: (map['year'] is num) ? (map['year'] as num).toInt() : int.tryParse(map['year']?.toString() ?? '2026'),
+        marks: (map['marks'] is num) ? (map['marks'] as num).toDouble() : double.tryParse(map['marks']?.toString() ?? '4') ?? 4.0,
+        negativeMarks: (map['negativeMarks'] is num) ? (map['negativeMarks'] as num).toDouble() : double.tryParse(map['negativeMarks']?.toString() ?? '1') ?? 1.0,
+        explanation: map['explanation']?.toString() ?? '',
+        solution: map['explanation']?.toString() ?? '',
+        availableIn: (map['available_in'] is List)
+            ? (map['available_in'] as List).map((v) => v.toString()).toList()
+            : ((map['availableIn'] is List) ? (map['availableIn'] as List).map((v) => v.toString()).toList() : const []),
+        options: opts,
+      ));
+    }
+    if (liveModels.isNotEmpty) {
+      _liveQuestionsCache = liveModels;
     }
 
     return allQuestions;
