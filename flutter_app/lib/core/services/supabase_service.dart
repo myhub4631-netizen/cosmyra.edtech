@@ -3730,9 +3730,17 @@ class SupabaseService {
         final dbQuestions = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         for (var dbQ in dbQuestions) {
           final pId = dbQ['paper_id']?.toString() ?? dbQ['paperId']?.toString() ?? dbQ['test_series_id']?.toString() ?? '';
-          if (pId == paperId || pId == paperUuid) {
+          final bool isPaperMatch = pId == paperId ||
+              pId == paperUuid ||
+              pId == toValidUuid(paperId) ||
+              (dbQ['paper_name']?.toString().toLowerCase().trim() == paperId.toLowerCase().trim()) ||
+              (dbQ['id']?.toString().startsWith('q_${paperId}_') == true) ||
+              (dbQ['id']?.toString() == toValidUuid('q_${paperId}_${dbQ['question_number'] ?? dbQ['questionNumber']}'));
+
+          if (isPaperMatch) {
             final qUuid = dbQ['id']?.toString() ?? '';
-            final qNum = (dbQ['question_number'] ?? dbQ['questionNumber'] ?? 0) as int;
+            final rawNum = dbQ['question_number'] ?? dbQ['questionNumber'];
+            final int qNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum?.toString() ?? '0') ?? 0;
 
             List<String> parsedOpts = parseOptionsFromQuestionMap(dbQ);
             if (parsedOpts.isNotEmpty) {
@@ -3775,7 +3783,11 @@ class SupabaseService {
               }
             }
 
-            final idx = results.indexWhere((r) => (r['question_number'] ?? r['questionNumber']) == qNum || r['id'] == dbQ['id']);
+            final idx = results.indexWhere((r) {
+              final rNum = r['question_number'] ?? r['questionNumber'];
+              final int? parsedRNum = rNum is num ? rNum.toInt() : int.tryParse(rNum?.toString() ?? '');
+              return (parsedRNum != null && parsedRNum == qNum) || r['id'] == dbQ['id'];
+            });
             if (idx != -1) {
               results[idx] = dbQ;
             } else {

@@ -184,8 +184,14 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
     for (int i = 0; i < _questionsList.length; i++) {
       final qNum = i + 1;
+      final String expectedUuid = SupabaseService.toValidUuid('q_${_paperId}_$qNum');
       final savedMatch = savedQList.firstWhere(
-        (sq) => sq['question_number'] == qNum || sq['id'] == 'q_${_paperId}_$qNum',
+        (sq) {
+          final rawNum = sq['question_number'] ?? sq['questionNumber'];
+          final int? parsedNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum?.toString() ?? '');
+          final String sqId = sq['id']?.toString() ?? '';
+          return (parsedNum != null && parsedNum == qNum) || sqId == 'q_${_paperId}_$qNum' || sqId == expectedUuid;
+        },
         orElse: () => {},
       );
 
