@@ -2708,56 +2708,48 @@ class SupabaseService {
   /// Automatic repair method to sync questions whose correct_option_index or correct_answer was inconsistent
   static Future<void> repairInconsistentCorrectAnswers() async {
     try {
-      // 1. Repair from question_options child table (where option is marked is_correct = true)
-      final optRes = await client.from('question_options').select('*').eq('is_correct', true);
-      if (optRes != null && (optRes as List).isNotEmpty) {
-        final Map<String, int> correctIdxMap = {};
-        for (var row in optRes) {
-          final qId = row['question_id']?.toString() ?? '';
-          final idx = (row['option_index'] as num?)?.toInt();
-          if (qId.isNotEmpty && idx != null) {
-            correctIdxMap[qId] = idx;
-          }
-        }
-
-        for (var entry in correctIdxMap.entries) {
-          final qId = entry.key;
-          final correctIdx = entry.value;
-          final correctLetter = 'Option ${String.fromCharCode(65 + correctIdx)}';
-          await client.from('questions').update({
-            'correct_option_index': correctIdx,
-            'correct_answer': correctLetter,
-          }).eq('id', qId);
-        }
-      }
-
-      // 2. Repair questions table rows where correct_answer text specifies Option B, C, or D but correct_option_index is mismatching
       final qRes = await client.from('questions').select('id, correct_answer, correct_option_index');
       if (qRes != null && (qRes as List).isNotEmpty) {
         for (var qRow in qRes) {
           final qId = qRow['id']?.toString() ?? '';
-          final cAns = (qRow['correct_answer'] ?? '').toString().trim().toUpperCase();
+          if (qId.isEmpty) continue;
+
           final cIdx = (qRow['correct_option_index'] as num?)?.toInt();
+          final cAns = (qRow['correct_answer'] ?? '').toString().trim().toUpperCase();
 
-          int? expectedIdx;
-          if (cAns.startsWith('OPTION ')) {
-            final numVal = int.tryParse(cAns.substring(7).trim());
-            if (numVal != null) expectedIdx = numVal - 1;
-          } else if (cAns.length == 1 && RegExp(r'[A-D]').hasMatch(cAns)) {
-            expectedIdx = cAns.codeUnitAt(0) - 65;
-          }
-
-          if (expectedIdx != null && expectedIdx >= 0 && expectedIdx != cIdx && qId.isNotEmpty) {
-            final String correctLetter = 'Option ${String.fromCharCode(65 + expectedIdx)}';
-            await client.from('questions').update({
-              'correct_option_index': expectedIdx,
-              'correct_answer': correctLetter,
-            }).eq('id', qId);
-
+          if (cIdx != null && cIdx >= 0 && cIdx <= 3) {
+            // Rule 1: correct_option_index is valid ground truth. Synchronize correct_answer text to match.
+            final String expectedAns = 'Option ${String.fromCharCode(65 + cIdx)}';
+            if (cAns != expectedAns.toUpperCase()) {
+              await client.from('questions').update({
+                'correct_answer': expectedAns,
+              }).eq('id', qId);
+            }
             try {
               await client.from('question_options').update({'is_correct': false}).eq('question_id', qId);
-              await client.from('question_options').update({'is_correct': true}).eq('question_id', qId).eq('option_index', expectedIdx);
+              await client.from('question_options').update({'is_correct': true}).eq('question_id', qId).eq('option_index', cIdx);
             } catch (_) {}
+          } else {
+            // Rule 2: correct_option_index is missing. Try resolving from correct_answer text.
+            int? resolved;
+            if (cAns.startsWith('OPTION ')) {
+              final n = int.tryParse(cAns.substring(7).trim());
+              if (n != null && n >= 1 && n <= 4) resolved = n - 1;
+            } else if (cAns.length == 1 && RegExp(r'[A-D]').hasMatch(cAns)) {
+              resolved = cAns.codeUnitAt(0) - 65;
+            }
+
+            if (resolved != null && resolved >= 0 && resolved <= 3) {
+              final String expectedAns = 'Option ${String.fromCharCode(65 + resolved)}';
+              await client.from('questions').update({
+                'correct_option_index': resolved,
+                'correct_answer': expectedAns,
+              }).eq('id', qId);
+              try {
+                await client.from('question_options').update({'is_correct': false}).eq('question_id', qId);
+                await client.from('question_options').update({'is_correct': true}).eq('question_id', qId).eq('option_index', resolved);
+              } catch (_) {}
+            }
           }
         }
       }
