@@ -66,14 +66,14 @@ class QuestionItemData {
     this.positiveMarks = '4',
     this.negativeMarks = '-1',
     this.questionType = 'MCQ (Single Correct)',
-    this.chapterTopic = 'Physics - Kinematics',
+    this.chapterTopic = '',
     this.subject = 'Physics',
-    this.chapter = 'Kinematics',
-    this.topic = 'Kinematics',
-    this.chapterId = 'b2222222-2222-2222-2222-222222222222',
-    this.topicId = 'c2222222-2222-2222-2222-222222222222',
-    this.subjectId = 'a1111111-1111-1111-1111-111111111111',
-    this.examId = '11111111-1111-1111-1111-111111111111',
+    this.chapter = '',
+    this.topic = '',
+    this.chapterId = '',
+    this.topicId = '',
+    this.subjectId = '',
+    this.examId = '',
     this.isMarkedForReview = false,
     this.isCollapsed = false,
     this.isSaved = false,
@@ -83,9 +83,7 @@ class QuestionItemData {
   })  : options = options != null ? List<String>.from(options) : ['', '', '', ''],
         optionImages = optionImages != null ? List<String?>.from(optionImages) : [null, null, null, null],
         isUploadingOptionImage = isUploadingOptionImage != null ? List<bool>.from(isUploadingOptionImage) : [false, false, false, false],
-        availableIn = availableIn != null
-            ? List<String>.from(availableIn)
-            : ['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
+        availableIn = availableIn != null ? List<String>.from(availableIn) : [];
 }
 
 class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen> {
@@ -298,7 +296,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         final dynamic availInRaw = savedMatch['available_in'] ?? savedMatch['availableIn'];
         final List<String> availInList = availInRaw is List
             ? List<String>.from(availInRaw)
-            : <String>['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
+            : <String>[];
 
         _questionsList[i] = QuestionItemData(
           id: savedMatch['id'] ?? 'q_${_paperId}_$qNum',
@@ -314,21 +312,16 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           negativeMarks: savedMatch['negative_marks']?.toString() ?? savedMatch['negativeMarks']?.toString() ?? '-1',
           questionType: savedMatch['q_type'] ?? savedMatch['question_type'] ?? savedMatch['qType'] ?? 'MCQ (Single Correct)',
           subject: qSubject,
-          chapter: finalChapName.isNotEmpty ? finalChapName : 'General',
+          chapter: finalChapName,
           topic: savedMatch['topic'] ?? finalChapName,
-          chapterTopic: finalChapName.isNotEmpty ? finalChapName : 'General',
-          chapterId: finalChapId.isNotEmpty ? finalChapId : (_loadedDbChapters.isNotEmpty ? _loadedDbChapters.first['id'].toString() : 'b2222222-2222-2222-2222-222222222222'),
+          chapterTopic: finalChapName,
+          chapterId: finalChapId,
           availableIn: availInList,
           isSaved: true,
         );
       } else {
         if (firstUnsavedIndex == -1) {
           firstUnsavedIndex = i;
-        }
-        if (_loadedDbChapters.isNotEmpty) {
-          _questionsList[i].chapterId = _loadedDbChapters.first['id'].toString();
-          _questionsList[i].chapterTopic = _loadedDbChapters.first['name'].toString();
-          _questionsList[i].chapter = _loadedDbChapters.first['name'].toString();
         }
       }
     }
