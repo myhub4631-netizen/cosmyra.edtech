@@ -2307,7 +2307,10 @@ class SupabaseService {
 
       final String finalExamId = await getOrCreateValidExamId(qMap['exam']?.toString() ?? 'NEET');
       final String finalSubjectId = await getOrCreateValidSubjectId(finalExamId, qMap['subject']?.toString() ?? 'Physics');
-      final String finalChapterId = await getOrCreateValidChapterId(finalSubjectId, qMap['chapter']?.toString() ?? qMap['chapterTopic']?.toString() ?? 'Kinematics');
+      final String? passedChapId = qMap['chapter_id']?.toString() ?? qMap['chapterId']?.toString();
+      final String finalChapterId = (passedChapId != null && isValidUuid(passedChapId))
+          ? passedChapId
+          : await getOrCreateValidChapterId(finalSubjectId, qMap['chapter']?.toString() ?? qMap['chapterTopic']?.toString() ?? 'Kinematics');
 
       final String pIdRaw = qMap['paper_id']?.toString() ?? qMap['paperId']?.toString() ?? '';
 
@@ -2316,9 +2319,6 @@ class SupabaseService {
         availableInList = (qMap['available_in'] as List).map((v) => v.toString()).toList();
       } else if (qMap['availableIn'] is List) {
         availableInList = (qMap['availableIn'] as List).map((v) => v.toString()).toList();
-      }
-      if (availableInList.isEmpty) {
-        availableInList = ['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
       }
 
       final Map<String, dynamic> qData = {
@@ -2347,6 +2347,8 @@ class SupabaseService {
             : int.tryParse((qMap['question_number'] ?? qMap['questionNumber'])?.toString() ?? '1') ?? 1,
         'options': optionsList,
         'option_images': optionImagesList,
+        'chapter': qMap['chapter'] ?? qMap['chapterTopic'] ?? '',
+        'subject': qMap['subject'] ?? 'Physics',
         'created_at': qMap['created_at'] ?? DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       };

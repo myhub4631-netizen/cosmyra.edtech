@@ -237,8 +237,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         final String chapNameFromMatch = savedMatch['chapter']?.toString() ?? savedMatch['chapterTopic']?.toString() ?? '';
         final String qSubject = savedMatch['subject']?.toString() ?? subject;
 
-        String finalChapId = '';
-        String finalChapName = '';
+        String finalChapId = chapIdFromMatch;
+        String finalChapName = chapNameFromMatch;
 
         if (chapIdFromMatch.isNotEmpty && _loadedDbChapters.any((c) => c['id'].toString() == chapIdFromMatch)) {
           final matchedC = _loadedDbChapters.firstWhere((c) => c['id'].toString() == chapIdFromMatch);
@@ -248,6 +248,9 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           final matchedC = _loadedDbChapters.firstWhere((c) => c['name'].toString().trim().toLowerCase() == chapNameFromMatch.trim().toLowerCase());
           finalChapId = matchedC['id'].toString();
           finalChapName = matchedC['name'].toString();
+        } else if (chapNameFromMatch.isNotEmpty || chapIdFromMatch.isNotEmpty) {
+          finalChapId = chapIdFromMatch;
+          finalChapName = chapNameFromMatch.isNotEmpty ? chapNameFromMatch : chapIdFromMatch;
         } else if (qSubject.isNotEmpty && _loadedDbChapters.any((c) => c['subject_name']?.toString().toLowerCase() == qSubject.toLowerCase() || c['subject']?.toString().toLowerCase() == qSubject.toLowerCase())) {
           final matchedC = _loadedDbChapters.firstWhere((c) => c['subject_name']?.toString().toLowerCase() == qSubject.toLowerCase() || c['subject']?.toString().toLowerCase() == qSubject.toLowerCase());
           finalChapId = matchedC['id'].toString();
@@ -257,6 +260,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           finalChapName = _loadedDbChapters.first['name'].toString();
         }
 
+        final dynamic availInRaw = savedMatch['available_in'] ?? savedMatch['availableIn'];
+        final List<String> availInList = availInRaw is List
+            ? List<String>.from(availInRaw)
+            : <String>['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
+
         _questionsList[i] = QuestionItemData(
           id: savedMatch['id'] ?? 'q_${_paperId}_$qNum',
           number: qNum,
@@ -265,16 +273,17 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           options: opts,
           optionImages: optImgs,
           correctOptionIndex: correctIdx >= 0 ? correctIdx : 0,
-          explanation: savedMatch['explanation'] ?? '',
+          explanation: savedMatch['explanation'] ?? savedMatch['solution'] ?? '',
           difficulty: normDiff,
-          positiveMarks: savedMatch['marks']?.toString() ?? '4',
-          negativeMarks: savedMatch['negative_marks']?.toString() ?? '-1',
-          questionType: savedMatch['q_type'] ?? savedMatch['question_type'] ?? 'MCQ (Single Correct)',
+          positiveMarks: savedMatch['marks']?.toString() ?? savedMatch['positiveMarks']?.toString() ?? '4',
+          negativeMarks: savedMatch['negative_marks']?.toString() ?? savedMatch['negativeMarks']?.toString() ?? '-1',
+          questionType: savedMatch['q_type'] ?? savedMatch['question_type'] ?? savedMatch['qType'] ?? 'MCQ (Single Correct)',
           subject: qSubject,
           chapter: finalChapName.isNotEmpty ? finalChapName : 'General',
-          topic: savedMatch['topic'] ?? 'General',
+          topic: savedMatch['topic'] ?? finalChapName,
           chapterTopic: finalChapName.isNotEmpty ? finalChapName : 'General',
           chapterId: finalChapId.isNotEmpty ? finalChapId : (_loadedDbChapters.isNotEmpty ? _loadedDbChapters.first['id'].toString() : 'b2222222-2222-2222-2222-222222222222'),
+          availableIn: availInList,
           isSaved: true,
         );
       } else {
@@ -1490,7 +1499,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: TextFormField(
-                  key: ValueKey('q_text_${q.id}_${q.text}'),
+                  key: ValueKey('q_text_${q.id}'),
                   initialValue: q.text,
                   maxLines: 4,
                   onChanged: (val) {
@@ -1602,7 +1611,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                           border: Border.all(color: const Color(0xFFCBD5E1)),
                         ),
                         child: TextFormField(
-                          key: ValueKey('q_opt_${q.id}_${optIdx}_${q.options[optIdx]}'),
+                          key: ValueKey('q_opt_${q.id}_$optIdx'),
                           initialValue: q.options[optIdx],
                           onChanged: (val) {
                             q.options[optIdx] = val;
@@ -1770,7 +1779,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: TextFormField(
-              key: ValueKey('q_exp_${q.id}_${q.explanation}'),
+              key: ValueKey('q_exp_${q.id}'),
               initialValue: q.explanation,
               maxLines: 3,
               onChanged: (val) {
@@ -1808,7 +1817,10 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                   .map((e) => DropdownMenuItem(value: e, child: Text(e, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500))))
                   .toList(),
               onChanged: (val) {
-                if (val != null) setState(() => q.difficulty = val);
+                if (val != null) {
+                  setState(() => q.difficulty = val);
+                  _scheduleAutoSave(q);
+                }
               },
             ),
           ),
@@ -1835,9 +1847,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       border: Border.all(color: const Color(0xFFCBD5E1)),
                     ),
                     child: TextFormField(
-                      key: ValueKey('q_pos_${q.id}_${q.positiveMarks}'),
+                      key: ValueKey('q_pos_${q.id}'),
                       initialValue: q.positiveMarks,
-                      onChanged: (val) => q.positiveMarks = val,
+                      onChanged: (val) {
+                        q.positiveMarks = val;
+                        _scheduleAutoSave(q);
+                      },
                       decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 10)),
                       style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
                     ),
@@ -1861,9 +1876,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       border: Border.all(color: const Color(0xFFCBD5E1)),
                     ),
                     child: TextFormField(
-                      key: ValueKey('q_neg_${q.id}_${q.negativeMarks}'),
+                      key: ValueKey('q_neg_${q.id}'),
                       initialValue: q.negativeMarks,
-                      onChanged: (val) => q.negativeMarks = val,
+                      onChanged: (val) {
+                        q.negativeMarks = val;
+                        _scheduleAutoSave(q);
+                      },
                       decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 10)),
                       style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
                     ),
@@ -1894,7 +1912,10 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                   .map((e) => DropdownMenuItem(value: e, child: Text(e, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500))))
                   .toList(),
               onChanged: (val) {
-                if (val != null) setState(() => q.questionType = val);
+                if (val != null) {
+                  setState(() => q.questionType = val);
+                  _scheduleAutoSave(q);
+                }
               },
             ),
           ),
@@ -1920,18 +1941,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                 }
                 if (_loadedDbChapters.any((c) => c['name'] == q.chapterTopic || c['name'] == q.chapter)) {
                   final m = _loadedDbChapters.firstWhere((c) => c['name'] == q.chapterTopic || c['name'] == q.chapter);
-                  q.chapterId = m['id'].toString();
-                  return q.chapterId;
-                }
-                if (_loadedDbChapters.isNotEmpty) {
-                  q.chapterId = _loadedDbChapters.first['id'].toString();
-                  q.chapterTopic = _loadedDbChapters.first['name'].toString();
-                  q.chapter = _loadedDbChapters.first['name'].toString();
-                  return q.chapterId;
+                  return m['id'].toString();
                 }
                 return null;
               }(),
-              hint: Text(_loadedDbChapters.isNotEmpty ? 'Select Chapter' : 'Loading chapters...', style: GoogleFonts.inter(fontSize: 12)),
+              hint: Text(_loadedDbChapters.isNotEmpty ? (q.chapter.isNotEmpty ? q.chapter : 'Select Chapter') : 'Loading chapters...', style: GoogleFonts.inter(fontSize: 12)),
               isExpanded: true,
               items: _loadedDbChapters.map((c) {
                 final String cId = c['id'].toString();
@@ -1953,6 +1967,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       q.chapterTopic = matched['name']?.toString() ?? '';
                       q.chapter = matched['name']?.toString() ?? '';
                     });
+                    _scheduleAutoSave(q);
                   }
                 }
               },
@@ -2010,6 +2025,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
             q.availableIn.remove(key);
           }
         });
+        _scheduleAutoSave(q);
       },
       selectedColor: const Color(0xFFE0E7FF),
       checkmarkColor: const Color(0xFF4F46E5),
