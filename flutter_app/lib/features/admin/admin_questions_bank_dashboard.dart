@@ -594,10 +594,12 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
 
   List<String> _getAllChapters({String? preferredSubject}) {
     final List<String> result = [];
+    final List<String> subjectsOrder = ['Physics', 'Chemistry', 'Biology', 'Mathematics'];
 
+    // 1. If preferredSubject is provided, load its chapters first
     if (preferredSubject != null && preferredSubject.isNotEmpty) {
-      final preferredList = _subjectChaptersMap[preferredSubject] ?? [];
-      for (var chap in preferredList) {
+      final prefList = _subjectChaptersMap[preferredSubject] ?? [];
+      for (var chap in prefList) {
         final clean = chap.trim();
         if (clean.isNotEmpty && !result.contains(clean) && !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-').hasMatch(clean)) {
           result.add(clean);
@@ -605,15 +607,18 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
       }
     }
 
-    _subjectChaptersMap.forEach((sub, chapList) {
+    // 2. Iterate in canonical subject order: Physics -> Chemistry -> Biology -> Mathematics
+    for (final sub in subjectsOrder) {
+      final chapList = _subjectChaptersMap[sub] ?? [];
       for (var chap in chapList) {
         final clean = chap.trim();
         if (clean.isNotEmpty && !result.contains(clean) && !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-').hasMatch(clean)) {
           result.add(clean);
         }
       }
-    });
+    }
 
+    // 3. Add chapters from database (_dbChapters)
     for (var c in _dbChapters) {
       final chapName = c['name']?.toString().trim() ?? '';
       if (chapName.isNotEmpty && !result.contains(chapName) && !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-').hasMatch(chapName)) {
@@ -621,6 +626,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
       }
     }
 
+    // 4. Add chapters from loaded questions (_allQuestionsData)
     for (var q in _allQuestionsData) {
       final cName = (q['chapter'] ?? q['chapter_name'] ?? q['chapterTopic'])?.toString().trim();
       if (cName != null && cName.isNotEmpty && !result.contains(cName) && !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-').hasMatch(cName)) {
