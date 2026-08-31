@@ -1805,6 +1805,66 @@ class SupabaseService {
     return false;
   }
 
+  static int resolveCorrectOptionIndex(Map<String, dynamic> map, List<String> opts) {
+    // 1. Direct numeric index in map
+    dynamic rawIdx = map['correct_option_index'] ?? map['correctOptionIndex'];
+    if (rawIdx is num && rawIdx >= 0 && rawIdx < opts.length) {
+      return rawIdx.toInt();
+    }
+    if (rawIdx != null) {
+      int? parsed = int.tryParse(rawIdx.toString().trim());
+      if (parsed != null && parsed >= 0 && parsed < opts.length) {
+        return parsed;
+      }
+    }
+
+    // 2. Parse correct_answer / correctAnswer string
+    final String caStr = (map['correct_answer'] ?? map['correctAnswer'] ?? map['correctText'] ?? '').toString().trim();
+    if (caStr.isNotEmpty) {
+      final uStr = caStr.toUpperCase();
+
+      // a. 'Option A', 'Option B', 'Option C', 'Option D' or 'Option 1', 'Option 2', etc.
+      if (uStr.startsWith('OPTION ') || uStr.startsWith('OPT ') || uStr.startsWith('OPT. ')) {
+        String sub = uStr.replaceAll(RegExp(r'^OPT(ION)?\.?\s*'), '').trim();
+        if (sub.length == 1 && RegExp(r'[A-D]').hasMatch(sub)) {
+          return sub.codeUnitAt(0) - 65;
+        }
+        int? n = int.tryParse(sub);
+        if (n != null && n >= 1 && n <= opts.length) {
+          return n - 1;
+        }
+      }
+
+      // b. Single letter 'A', 'B', 'C', 'D' or '(A)', '(B)', 'A.', 'B.'
+      final cleanLetter = uStr.replaceAll(RegExp(r'[\(\)\.]'), '').trim();
+      if (cleanLetter.length == 1 && RegExp(r'[A-D]').hasMatch(cleanLetter)) {
+        return cleanLetter.codeUnitAt(0) - 65;
+      }
+
+      // c. Single 1-based digit '1', '2', '3', '4'
+      if (cleanLetter.length == 1 && RegExp(r'[1-4]').hasMatch(cleanLetter)) {
+        return int.parse(cleanLetter) - 1;
+      }
+
+      // d. Compare string against option texts in opts
+      final normCa = caStr.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+      for (int i = 0; i < opts.length; i++) {
+        final normOpt = opts[i].replaceAll(RegExp(r'\s+'), '').toLowerCase();
+        if (normOpt.isNotEmpty && normCa.isNotEmpty && normOpt == normCa) {
+          return i;
+        }
+      }
+      for (int i = 0; i < opts.length; i++) {
+        final normOpt = opts[i].replaceAll(RegExp(r'\s+'), '').toLowerCase();
+        if (normOpt.isNotEmpty && normCa.isNotEmpty && (normOpt.contains(normCa) || normCa.contains(normOpt))) {
+          return i;
+        }
+      }
+    }
+
+    return 0; // Fallback to 0 if no metadata exists
+  }
+
   static List<QuestionModel> _liveQuestionsCache = [];
 
   static List<QuestionModel> getSampleQuestions([int count = 50]) {
@@ -2030,6 +2090,20 @@ class SupabaseService {
           optionImage: img,
         );
       }).toList();
+
+      if (opts.isNotEmpty && !opts.any((o) => o.isCorrect)) {
+        final resolvedIdx = QuestionModel.resolveCorrectOptionIndex(map, optsRaw);
+        if (resolvedIdx >= 0 && resolvedIdx < opts.length) {
+          opts[resolvedIdx] = QuestionOptionModel(
+            id: opts[resolvedIdx].id,
+            questionId: opts[resolvedIdx].questionId,
+            optionIndex: opts[resolvedIdx].optionIndex,
+            optionText: opts[resolvedIdx].optionText,
+            isCorrect: true,
+            optionImage: opts[resolvedIdx].optionImage,
+          );
+        }
+      }
 
       models.add(QuestionModel(
         id: map['id']?.toString() ?? '',

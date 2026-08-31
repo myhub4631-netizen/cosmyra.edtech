@@ -341,6 +341,60 @@ class QuestionModel {
     required this.options,
   });
 
+  static int resolveCorrectOptionIndex(Map<String, dynamic> map, List<String> opts) {
+    dynamic rawIdx = map['correct_option_index'] ?? map['correctOptionIndex'];
+    if (rawIdx is num && rawIdx >= 0 && rawIdx < opts.length) {
+      return rawIdx.toInt();
+    }
+    if (rawIdx != null) {
+      int? parsed = int.tryParse(rawIdx.toString().trim());
+      if (parsed != null && parsed >= 0 && parsed < opts.length) {
+        return parsed;
+      }
+    }
+
+    final String caStr = (map['correct_answer'] ?? map['correctAnswer'] ?? map['correctText'] ?? '').toString().trim();
+    if (caStr.isNotEmpty) {
+      final uStr = caStr.toUpperCase();
+
+      if (uStr.startsWith('OPTION ') || uStr.startsWith('OPT ') || uStr.startsWith('OPT. ')) {
+        String sub = uStr.replaceAll(RegExp(r'^OPT(ION)?\.?\s*'), '').trim();
+        if (sub.length == 1 && RegExp(r'[A-D]').hasMatch(sub)) {
+          return sub.codeUnitAt(0) - 65;
+        }
+        int? n = int.tryParse(sub);
+        if (n != null && n >= 1 && n <= opts.length) {
+          return n - 1;
+        }
+      }
+
+      final cleanLetter = uStr.replaceAll(RegExp(r'[\(\)\.]'), '').trim();
+      if (cleanLetter.length == 1 && RegExp(r'[A-D]').hasMatch(cleanLetter)) {
+        return cleanLetter.codeUnitAt(0) - 65;
+      }
+
+      if (cleanLetter.length == 1 && RegExp(r'[1-4]').hasMatch(cleanLetter)) {
+        return int.parse(cleanLetter) - 1;
+      }
+
+      final normCa = caStr.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+      for (int i = 0; i < opts.length; i++) {
+        final normOpt = opts[i].replaceAll(RegExp(r'\s+'), '').toLowerCase();
+        if (normOpt.isNotEmpty && normCa.isNotEmpty && normOpt == normCa) {
+          return i;
+        }
+      }
+      for (int i = 0; i < opts.length; i++) {
+        final normOpt = opts[i].replaceAll(RegExp(r'\s+'), '').toLowerCase();
+        if (normOpt.isNotEmpty && normCa.isNotEmpty && (normOpt.contains(normCa) || normCa.contains(normOpt))) {
+          return i;
+        }
+      }
+    }
+
+    return 0;
+  }
+
   factory QuestionModel.fromJson(Map<String, dynamic> json) {
     int targetCorrectIdx = -1;
     if (json['correct_option_index'] != null) {
@@ -401,17 +455,18 @@ class QuestionModel {
     }
 
     if (parsedOptions.isNotEmpty && !parsedOptions.any((o) => o.isCorrect)) {
-      if (targetCorrectIdx >= 0 && targetCorrectIdx < parsedOptions.length) {
-        parsedOptions[targetCorrectIdx] = QuestionOptionModel(
-          id: parsedOptions[targetCorrectIdx].id,
-          questionId: parsedOptions[targetCorrectIdx].questionId,
-          optionIndex: parsedOptions[targetCorrectIdx].optionIndex,
-          optionText: parsedOptions[targetCorrectIdx].optionText,
+      int fallbackIdx = (targetCorrectIdx >= 0 && targetCorrectIdx < parsedOptions.length)
+          ? targetCorrectIdx
+          : resolveCorrectOptionIndex(json, parsedOptions.map((o) => o.optionText).toList());
+      if (fallbackIdx >= 0 && fallbackIdx < parsedOptions.length) {
+        parsedOptions[fallbackIdx] = QuestionOptionModel(
+          id: parsedOptions[fallbackIdx].id,
+          questionId: parsedOptions[fallbackIdx].questionId,
+          optionIndex: parsedOptions[fallbackIdx].optionIndex,
+          optionText: parsedOptions[fallbackIdx].optionText,
           isCorrect: true,
-          optionImage: parsedOptions[targetCorrectIdx].optionImage,
+          optionImage: parsedOptions[fallbackIdx].optionImage,
         );
-      } else {
-        debugPrint('Warning: Question ${json['id']} has no correct option index assigned.');
       }
     }
 
