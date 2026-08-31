@@ -343,18 +343,16 @@ class QuestionModel {
 
   factory QuestionModel.fromJson(Map<String, dynamic> json) {
     int targetCorrectIdx = -1;
-    if (json['correct_option_index'] != null) {
+    final String corrStr = (json['correct_answer'] ?? json['correctAnswer'] ?? json['correctText'] ?? '').toString().trim();
+    if (corrStr.toUpperCase().startsWith('OPTION ')) {
+      final optNum = int.tryParse(corrStr.substring(7).trim()) ?? 1;
+      targetCorrectIdx = (optNum - 1).clamp(0, 5);
+    } else if (corrStr.length == 1 && RegExp(r'[A-D]', caseSensitive: false).hasMatch(corrStr)) {
+      targetCorrectIdx = corrStr.toUpperCase().codeUnitAt(0) - 65;
+    } else if (json['correct_option_index'] != null) {
       targetCorrectIdx = (json['correct_option_index'] as num).toInt();
     } else if (json['correctOptionIndex'] != null) {
       targetCorrectIdx = (json['correctOptionIndex'] as num).toInt();
-    } else {
-      final String corrStr = (json['correct_answer'] ?? json['correctAnswer'] ?? json['correctText'] ?? '').toString().trim();
-      if (corrStr.toUpperCase().startsWith('OPTION ')) {
-        final optNum = int.tryParse(corrStr.substring(7).trim()) ?? 1;
-        targetCorrectIdx = (optNum - 1).clamp(0, 5);
-      } else if (corrStr.length == 1 && RegExp(r'[A-D]', caseSensitive: false).hasMatch(corrStr)) {
-        targetCorrectIdx = corrStr.toUpperCase().codeUnitAt(0) - 65;
-      }
     }
 
     var rawOptions = json['options'] as List? ?? json['question_options'] as List? ?? [];

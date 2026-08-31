@@ -1735,43 +1735,27 @@ class SupabaseService {
   }) {
     final String letter = String.fromCharCode(65 + optionIndex); // 'A', 'B', 'C', 'D'
 
-    // 1. Direct index match if correctOptionIndex is numeric
-    if (correctOptionIndexRaw != null) {
-      if (correctOptionIndexRaw is num && correctOptionIndexRaw.toInt() == optionIndex) {
-        return true;
-      }
-      final parsedIdx = int.tryParse(correctOptionIndexRaw.toString().trim());
-      if (parsedIdx != null && parsedIdx == optionIndex) {
-        return true;
-      }
-    }
-
-    if (correctAnswerRaw == null) return false;
-
     final List<String> targets = [];
-    if (correctAnswerRaw is List) {
-      targets.addAll(correctAnswerRaw.map((e) => e.toString().trim()));
-    } else {
-      final str = correctAnswerRaw.toString().trim();
-      if (str.contains(',')) {
-        targets.addAll(str.split(',').map((e) => e.trim()));
+    if (correctAnswerRaw != null) {
+      if (correctAnswerRaw is List) {
+        targets.addAll(correctAnswerRaw.map((e) => e.toString().trim()));
       } else {
-        targets.add(str);
+        final str = correctAnswerRaw.toString().trim();
+        if (str.contains(',')) {
+          targets.addAll(str.split(',').map((e) => e.trim()));
+        } else {
+          targets.add(str);
+        }
       }
     }
 
+    // 1. Direct letter / Option label / Option text / Option ID match from correctAnswerRaw
     for (var target in targets) {
       if (target.isEmpty) continue;
       final tUpper = target.toUpperCase();
       final tLower = target.toLowerCase();
 
-      // Numeric index string match ("0", "1", "2", "3")
-      final numIdx = int.tryParse(target);
-      if (numIdx != null && numIdx == optionIndex) {
-        return true;
-      }
-
-      // Letter / Option label match ('A', 'B', 'C', 'D' or 'OPTION A', 'OPTION B', etc.)
+      // Letter / Option label match ('A', 'B', 'C', 'D' or 'OPTION A', 'OPTION B', 'OPTION C', etc.)
       if (tUpper == letter ||
           tUpper == 'OPTION $letter' ||
           tUpper == 'OPTION_$letter' ||
@@ -1786,11 +1770,31 @@ class SupabaseService {
         return true;
       }
 
-      // Exact text match (if optionText is not empty)
-      if (optionText.isNotEmpty) {
-        if (target == optionText || tLower == optionText.toLowerCase().trim()) {
-          return true;
+      // Exact option text match
+      if (optionText.trim().isNotEmpty && (target == optionText.trim() || tLower == optionText.trim().toLowerCase())) {
+        return true;
+      }
+    }
+
+    // 2. Direct index match if correctOptionIndex is numeric AND targets do not contradict it
+    int? explicitCorrIdx;
+    if (correctOptionIndexRaw is num) {
+      explicitCorrIdx = correctOptionIndexRaw.toInt();
+    } else if (correctOptionIndexRaw != null) {
+      explicitCorrIdx = int.tryParse(correctOptionIndexRaw.toString().trim());
+    }
+
+    if (explicitCorrIdx != null && explicitCorrIdx == optionIndex) {
+      bool hasContradictoryTarget = false;
+      for (var target in targets) {
+        final tUpper = target.toUpperCase();
+        if (tUpper.startsWith('OPTION ') || (tUpper.length == 1 && RegExp(r'[A-D]').hasMatch(tUpper))) {
+          hasContradictoryTarget = true;
+          break;
         }
+      }
+      if (!hasContradictoryTarget) {
+        return true;
       }
     }
 
