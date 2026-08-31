@@ -403,13 +403,19 @@ class QuestionModel {
       targetCorrectIdx = (json['correctOptionIndex'] as num).toInt();
     } else {
       final String corrStr = (json['correct_answer'] ?? json['correctAnswer'] ?? json['correctText'] ?? '').toString().trim();
-      if (corrStr.toUpperCase().startsWith('OPTION ')) {
-        final optNum = int.tryParse(corrStr.substring(7).trim()) ?? -1;
-        if (optNum != -1) {
-          targetCorrectIdx = (optNum - 1).clamp(0, 5);
+      final String uCorr = corrStr.toUpperCase();
+      if (uCorr.startsWith('OPTION ')) {
+        final sub = uCorr.substring(7).trim();
+        if (sub.length == 1 && RegExp(r'[A-D]').hasMatch(sub)) {
+          targetCorrectIdx = sub.codeUnitAt(0) - 65;
+        } else {
+          final optNum = int.tryParse(sub) ?? -1;
+          if (optNum != -1) targetCorrectIdx = (optNum - 1).clamp(0, 5);
         }
-      } else if (corrStr.length == 1 && RegExp(r'[1-4]').hasMatch(corrStr)) {
-        targetCorrectIdx = int.parse(corrStr) - 1;
+      } else if (uCorr.length == 1 && RegExp(r'[A-D]').hasMatch(uCorr)) {
+        targetCorrectIdx = uCorr.codeUnitAt(0) - 65;
+      } else if (uCorr.length == 1 && RegExp(r'[1-4]').hasMatch(uCorr)) {
+        targetCorrectIdx = int.parse(uCorr) - 1;
       }
 
       if (targetCorrectIdx == -1 && corrStr.isNotEmpty) {

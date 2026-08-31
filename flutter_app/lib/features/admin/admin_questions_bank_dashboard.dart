@@ -680,11 +680,17 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
         initCorrIdx = (initialData['correctOptionIndex'] as num).toInt();
       } else {
         final String caStr = (initialData['correct_answer'] ?? initialData['correctAnswer'] ?? initialData['correctText'] ?? '').toString().trim();
-        if (caStr.toUpperCase().startsWith('OPTION ')) {
-          int n = int.tryParse(caStr.substring(7).trim()) ?? -1;
-          if (n != -1) initCorrIdx = (n - 1).clamp(0, 3);
-        } else if (caStr.length == 1 && RegExp(r'[A-D]', caseSensitive: false).hasMatch(caStr)) {
-          initCorrIdx = caStr.toUpperCase().codeUnitAt(0) - 65;
+        final String uCa = caStr.toUpperCase();
+        if (uCa.startsWith('OPTION ')) {
+          final sub = uCa.substring(7).trim();
+          if (sub.length == 1 && RegExp(r'[A-D]').hasMatch(sub)) {
+            initCorrIdx = sub.codeUnitAt(0) - 65;
+          } else {
+            int n = int.tryParse(sub) ?? -1;
+            if (n != -1) initCorrIdx = (n - 1).clamp(0, 3);
+          }
+        } else if (uCa.length == 1 && RegExp(r'[A-D]').hasMatch(uCa)) {
+          initCorrIdx = uCa.codeUnitAt(0) - 65;
         }
       }
     }

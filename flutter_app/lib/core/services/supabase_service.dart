@@ -2374,13 +2374,17 @@ class SupabaseService {
       if (cIdx < 0 || cIdx >= (optionsList.isNotEmpty ? optionsList.length : 4)) {
         if (cAnsRaw != null && cAnsRaw.toString().trim().isNotEmpty) {
           final String str = cAnsRaw.toString().trim();
-          if (str.toUpperCase().startsWith('OPTION ')) {
-            int numVal = int.tryParse(str.substring(7).trim()) ?? -1;
-            if (numVal != -1) {
-              cIdx = (numVal - 1).clamp(0, 3);
+          final String uStr = str.toUpperCase();
+          if (uStr.startsWith('OPTION ')) {
+            final sub = uStr.substring(7).trim();
+            if (sub.length == 1 && RegExp(r'[A-D]').hasMatch(sub)) {
+              cIdx = sub.codeUnitAt(0) - 65;
+            } else {
+              int numVal = int.tryParse(sub) ?? -1;
+              if (numVal != -1) cIdx = (numVal - 1).clamp(0, 3);
             }
-          } else if (str.length == 1 && RegExp(r'[A-D]', caseSensitive: false).hasMatch(str)) {
-            cIdx = str.toUpperCase().codeUnitAt(0) - 65;
+          } else if (uStr.length == 1 && RegExp(r'[A-D]').hasMatch(uStr)) {
+            cIdx = uStr.codeUnitAt(0) - 65;
           } else if (optionsList.isNotEmpty) {
             int foundInList = optionsList.indexOf(str);
             if (foundInList != -1) {
