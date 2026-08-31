@@ -1980,6 +1980,11 @@ class SupabaseService {
 
     final List<QuestionModel> models = [];
     for (var map in allMaps) {
+      final statusStr = (map['status'] ?? map['question_status'] ?? '').toString().trim().toLowerCase();
+      if (statusStr == 'inactive' || statusStr == 'draft' || statusStr == 'disabled') {
+        continue;
+      }
+
       final qId = map['id']?.toString() ?? '';
       final qSource = (map['sourceType'] ?? map['source_type'] ?? map['source'] ?? map['category'] ?? 'pyq').toString().toLowerCase();
 
@@ -2614,7 +2619,7 @@ class SupabaseService {
         'q_type': qMap['q_type'] ?? qMap['type'] ?? 'MCQ',
         'marks': (qMap['marks'] is num) ? (qMap['marks'] as num).toInt() : int.tryParse(qMap['marks']?.toString() ?? '4') ?? 4,
         'negativeMarks': (qMap['negativeMarks'] is num) ? (qMap['negativeMarks'] as num).toDouble() : double.tryParse(qMap['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
-        'status': qMap['status'] ?? 'Active',
+        'status': ((qMap['status']?.toString().toLowerCase() == 'inactive' || qMap['status']?.toString().toLowerCase() == 'draft') ? 'Inactive' : 'Active'),
         'usedIn': (qMap['usedIn'] is num) ? (qMap['usedIn'] as num).toInt() : (qMap['used_in_count'] is num ? (qMap['used_in_count'] as num).toInt() : 12),
         'options': qMap['options'] is List ? List<String>.from(qMap['options']) : [],
         'optionImages': qMap['optionImages'] is List ? List<String?>.from(qMap['optionImages']) : (qMap['option_images'] is List ? List<String?>.from(qMap['option_images']) : [null, null, null, null]),

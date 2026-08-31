@@ -147,9 +147,15 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
 
   // Statistics Computations
   int get _totalQuestionsCount => _allQuestionsData.length;
-  int get _activeQuestionsCount => _allQuestionsData.where((q) => q['status'] == 'Active').length;
+  int get _activeQuestionsCount => _allQuestionsData.where((q) {
+    final s = q['status']?.toString().toLowerCase() ?? '';
+    return s == 'active' || s == 'published' || s == 'approved';
+  }).length;
   int get _usedInTestsCount => _allQuestionsData.where((q) => (q['usedIn'] as int? ?? 0) > 0).length;
-  int get _inactiveQuestionsCount => _allQuestionsData.where((q) => q['status'] == 'Inactive').length;
+  int get _inactiveQuestionsCount => _allQuestionsData.where((q) {
+    final s = q['status']?.toString().toLowerCase() ?? '';
+    return s == 'inactive' || s == 'draft';
+  }).length;
   int get _totalMarksSum {
     int sum = 0;
     for (var q in _allQuestionsData) {
@@ -1693,18 +1699,33 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                   ),
                 ),
                 DataCell(
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: q['status'] == 'Active' ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      q['status'] ?? 'Active',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: q['status'] == 'Active' ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
+                  InkWell(
+                    onTap: () async {
+                      final bool isCurrActive = q['status'] == 'Active' || q['status'] == 'published' || q['status'] == 'approved';
+                      final newStatus = isCurrActive ? 'Inactive' : 'Active';
+                      await SupabaseService.updateQuestionInSupabase(q['id'].toString(), {'status': newStatus});
+                      setState(() {
+                        q['status'] = newStatus;
+                      });
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Question status permanently updated to $newStatus.')),
+                        );
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: (q['status'] == 'Active' || q['status'] == 'published' || q['status'] == 'approved') ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        (q['status'] == 'Active' || q['status'] == 'published' || q['status'] == 'approved') ? 'Active' : 'Inactive',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: (q['status'] == 'Active' || q['status'] == 'published' || q['status'] == 'approved') ? const Color(0xFF16A34A) : const Color(0xFFEF4444),
+                        ),
                       ),
                     ),
                   ),
