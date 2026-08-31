@@ -445,45 +445,64 @@ class _PracticeScreenState extends State<PracticeScreen> {
                   // Immediate Feedback Box
                   if (isAnswered) ...[
                     const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: isCorrect ? Colors.green.withOpacity(0.08) : Colors.red.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: isCorrect ? Colors.green : Colors.red),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(isCorrect ? Icons.check_circle : Icons.error, color: isCorrect ? Colors.green : Colors.red),
-                              const SizedBox(width: 8),
-                              Text(
-                                isCorrect ? '✅ Correct Answer!' : '❌ Incorrect Answer',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: isCorrect ? Colors.green.shade800 : Colors.red.shade800,
+                    Builder(builder: (context) {
+                      final selectedOptIndex = question.options.indexWhere((opt) {
+                        final String optKey = (opt.id != null && opt.id.isNotEmpty) ? opt.id : 'opt_${question.id}_${opt.optionIndex}';
+                        final String optLetter = String.fromCharCode(65 + opt.optionIndex);
+                        return _isOptSelected(_selectedAnswers[_currentIndex], optKey, optLetter, opt.optionText);
+                      });
+                      final String selectedLetter = selectedOptIndex != -1 ? String.fromCharCode(65 + selectedOptIndex) : 'Selected';
+
+                      final correctOptIndex = question.options.indexWhere((o) => o.isCorrect);
+                      final int validCorrectIndex = correctOptIndex != -1 ? correctOptIndex : 0;
+                      final String correctLetter = String.fromCharCode(65 + validCorrectIndex);
+
+                      final String feedbackTitle = isCorrect
+                          ? '✅ Correct Answer! Option $correctLetter is correct.'
+                          : '❌ Option $selectedLetter is wrong. Correct answer is Option $correctLetter.';
+
+                      return Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: isCorrect ? Colors.green.withOpacity(0.08) : Colors.red.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: isCorrect ? Colors.green : Colors.red),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(isCorrect ? Icons.check_circle : Icons.error, color: isCorrect ? Colors.green : Colors.red),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    feedbackTitle,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: isCorrect ? Colors.green.shade800 : Colors.red.shade800,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
+                            ),
+                            if (question.explanation != null && question.explanation!.trim().isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              const Text('Explanation:', style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4),
+                              LaTeXView(text: question.explanation!),
                             ],
-                          ),
-                          if (question.explanation != null) ...[
-                            const SizedBox(height: 12),
-                            const Text('Explanation:', style: TextStyle(fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 4),
-                            LaTeXView(text: question.explanation!),
+                            if (question.solution != null && question.solution!.trim().isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              const Text('Step-by-Step Solution:', style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4),
+                              LaTeXView(text: question.solution!),
+                            ],
                           ],
-                          if (question.solution != null) ...[
-                            const SizedBox(height: 10),
-                            const Text('Step-by-Step Solution:', style: TextStyle(fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 4),
-                            LaTeXView(text: question.solution!),
-                          ],
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    }),
                   ],
 
                   const SizedBox(height: 32),
