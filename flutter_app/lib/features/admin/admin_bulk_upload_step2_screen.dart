@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -92,12 +93,26 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   int _itemsPerPage = 10;
   int _jumpToQuestionNumber = 1;
   int _addedCount = 0;
+  Timer? _autoSaveTimer;
 
   late List<QuestionItemData> _questionsList;
   Map<String, dynamic>? _paperData;
   String _paperId = '';
   bool _isLoading = true;
   bool _isSavingBatch = false;
+
+  void _scheduleAutoSave(QuestionItemData q) {
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer(const Duration(milliseconds: 1500), () {
+      _saveSingleQuestion(q, showToast: false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoSaveTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -174,7 +189,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       if (savedMatch.isNotEmpty) {
         savedCounter++;
         String rawQText = savedMatch['question_text'] ?? savedMatch['questionText'] ?? '';
-        List<String> opts = savedMatch['options'] is List ? List<String>.from(savedMatch['options']) : <String>[];
+        List<String> opts = SupabaseService.parseOptionsFromQuestionMap(savedMatch);
 
         final parsed = _parseOptionsFromQuestionText(rawQText, opts);
         rawQText = parsed['text'] as String;
@@ -187,13 +202,23 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         } else if (savedMatch['correctOptionIndex'] != null) {
           correctIdx = (savedMatch['correctOptionIndex'] as num).toInt();
         } else {
-          String correctOptText = (savedMatch['correct_answer'] ?? savedMatch['correctAnswer'] ?? '').toString();
+          String correctOptText = (savedMatch['correct_answer'] ?? savedMatch['correctAnswer'] ?? '').toString().trim();
           if (correctOptText.startsWith('Option ')) {
             int optNum = int.tryParse(correctOptText.replaceAll('Option ', '')) ?? 1;
             correctIdx = (optNum - 1).clamp(0, opts.length > 0 ? opts.length - 1 : 0);
           } else if (correctOptText.isNotEmpty) {
             int foundIdx = opts.indexOf(correctOptText);
-            if (foundIdx != -1) correctIdx = foundIdx;
+            if (foundIdx != -1) {
+              correctIdx = foundIdx;
+            } else if (correctOptText.toLowerCase() == 'option a' || correctOptText.toLowerCase() == 'a') {
+              correctIdx = 0;
+            } else if (correctOptText.toLowerCase() == 'option b' || correctOptText.toLowerCase() == 'b') {
+              correctIdx = 1;
+            } else if (correctOptText.toLowerCase() == 'option c' || correctOptText.toLowerCase() == 'c') {
+              correctIdx = 2;
+            } else if (correctOptText.toLowerCase() == 'option d' || correctOptText.toLowerCase() == 'd') {
+              correctIdx = 3;
+            }
           }
         }
 
@@ -1468,7 +1493,10 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                   key: ValueKey('q_text_${q.id}_${q.text}'),
                   initialValue: q.text,
                   maxLines: 4,
-                  onChanged: (val) => q.text = val,
+                  onChanged: (val) {
+                    q.text = val;
+                    _scheduleAutoSave(q);
+                  },
                   decoration: const InputDecoration(
                     hintText: 'Type or paste your question here...',
                     hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
@@ -1576,7 +1604,10 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                         child: TextFormField(
                           key: ValueKey('q_opt_${q.id}_${optIdx}_${q.options[optIdx]}'),
                           initialValue: q.options[optIdx],
-                          onChanged: (val) => q.options[optIdx] = val,
+                          onChanged: (val) {
+                            q.options[optIdx] = val;
+                            _scheduleAutoSave(q);
+                          },
                           decoration: InputDecoration(
                             hintText: 'Enter option $letter (or add image)',
                             hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
@@ -1609,7 +1640,10 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       value: optIdx,
                       groupValue: q.correctOptionIndex,
                       activeColor: const Color(0xFF4F46E5),
-                      onChanged: (val) => setState(() => q.correctOptionIndex = val ?? -1),
+                      onChanged: (val) {
+                        setState(() => q.correctOptionIndex = val ?? -1);
+                        _scheduleAutoSave(q);
+                      },
                     ),
                   ],
                 ),
@@ -1710,7 +1744,10 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                   child: Text('Option ${['A', 'B', 'C', 'D', 'E', 'F'][idx]}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
                 ),
               ),
-              onChanged: (val) => setState(() => q.correctOptionIndex = val ?? -1),
+              onChanged: (val) {
+                setState(() => q.correctOptionIndex = val ?? -1);
+                _scheduleAutoSave(q);
+              },
             ),
           ),
         ),
@@ -1736,7 +1773,10 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
               key: ValueKey('q_exp_${q.id}_${q.explanation}'),
               initialValue: q.explanation,
               maxLines: 3,
-              onChanged: (val) => q.explanation = val,
+              onChanged: (val) {
+                q.explanation = val;
+                _scheduleAutoSave(q);
+              },
               decoration: const InputDecoration(
                 hintText: 'Explain why this is the correct answer...',
                 hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),

@@ -3718,64 +3718,65 @@ class SupabaseService {
       debugPrint('Notice reading local paper questions: $e');
     }
 
-    // 2. Query Supabase DB questions table using paper_id UUID OR paper_id string
+    // 2. Query Supabase DB questions table safely
     try {
-      final res = await client
-          .from('questions')
-          .select()
-          .or('paper_id.eq.$paperUuid,paper_id.eq.$paperId')
-          .order('question_number', ascending: true);
+      final res = await client.from('questions').select().order('created_at', ascending: false).limit(500);
 
       if (res != null && (res as List).isNotEmpty) {
         final dbQuestions = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         for (var dbQ in dbQuestions) {
-          final qUuid = dbQ['id']?.toString() ?? '';
-          final qNum = (dbQ['question_number'] ?? dbQ['questionNumber'] ?? 0) as int;
+          final pId = dbQ['paper_id']?.toString() ?? dbQ['paperId']?.toString() ?? dbQ['test_series_id']?.toString() ?? '';
+          if (pId == paperId || pId == paperUuid) {
+            final qUuid = dbQ['id']?.toString() ?? '';
+            final qNum = (dbQ['question_number'] ?? dbQ['questionNumber'] ?? 0) as int;
 
-          // If options array is missing or empty, fetch from question_options table
-          if (dbQ['options'] == null || (dbQ['options'] is List && (dbQ['options'] as List).isEmpty)) {
-            try {
-              final optRes = await client
-                  .from('question_options')
-                  .select()
-                  .eq('question_id', qUuid)
-                  .order('option_index', ascending: true);
-              if (optRes != null && (optRes as List).isNotEmpty) {
-                final List<String> optTexts = [];
-                final List<String?> optImgs = [];
-                String? corrAns;
-                int corrIdx = 0;
+            List<String> parsedOpts = parseOptionsFromQuestionMap(dbQ);
+            if (parsedOpts.isNotEmpty) {
+              dbQ['options'] = parsedOpts;
+            } else {
+              try {
+                final optRes = await client
+                    .from('question_options')
+                    .select()
+                    .eq('question_id', qUuid)
+                    .order('option_index', ascending: true);
+                if (optRes != null && (optRes as List).isNotEmpty) {
+                  final List<String> optTexts = [];
+                  final List<String?> optImgs = [];
+                  String? corrAns;
+                  int corrIdx = 0;
 
-                for (var optRow in optRes) {
-                  final String txt = optRow['option_text']?.toString() ?? '';
-                  final String? img = optRow['option_image']?.toString();
-                  final bool isCorr = optRow['is_correct'] == true;
-                  final int oIdx = (optRow['option_index'] as num?)?.toInt() ?? optTexts.length;
+                  for (var optRow in optRes) {
+                    final String txt = optRow['option_text']?.toString() ?? '';
+                    final String? img = optRow['option_image']?.toString();
+                    final bool isCorr = optRow['is_correct'] == true;
+                    final int oIdx = (optRow['option_index'] as num?)?.toInt() ?? optTexts.length;
 
-                  optTexts.add(txt);
-                  optImgs.add(img);
+                    optTexts.add(txt);
+                    optImgs.add(img);
 
-                  if (isCorr) {
-                    corrIdx = oIdx;
-                    corrAns = 'Option ${String.fromCharCode(65 + oIdx)}';
+                    if (isCorr) {
+                      corrIdx = oIdx;
+                      corrAns = 'Option ${String.fromCharCode(65 + oIdx)}';
+                    }
                   }
+
+                  dbQ['options'] = optTexts;
+                  dbQ['option_images'] = optImgs;
+                  dbQ['correct_option_index'] = corrIdx;
+                  dbQ['correct_answer'] = corrAns ?? 'Option ${String.fromCharCode(65 + corrIdx)}';
                 }
-
-                dbQ['options'] = optTexts;
-                dbQ['option_images'] = optImgs;
-                dbQ['correct_option_index'] = corrIdx;
-                dbQ['correct_answer'] = corrAns ?? 'Option ${String.fromCharCode(65 + corrIdx)}';
+              } catch (e) {
+                debugPrint('Notice fetching question_options for $qUuid: $e');
               }
-            } catch (e) {
-              debugPrint('Notice fetching question_options for $qUuid: $e');
             }
-          }
 
-          final idx = results.indexWhere((r) => (r['question_number'] ?? r['questionNumber']) == qNum || r['id'] == dbQ['id']);
-          if (idx != -1) {
-            results[idx] = dbQ;
-          } else {
-            results.add(dbQ);
+            final idx = results.indexWhere((r) => (r['question_number'] ?? r['questionNumber']) == qNum || r['id'] == dbQ['id']);
+            if (idx != -1) {
+              results[idx] = dbQ;
+            } else {
+              results.add(dbQ);
+            }
           }
         }
       }
