@@ -57,6 +57,8 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     'Mathematics': ['1. Algebra', '2. Trigonometry', '3. Calculus', '4. Coordinate Geometry'],
   };
 
+  List<Map<String, dynamic>> _dbChapters = [];
+
   @override
   void initState() {
     super.initState();
@@ -66,6 +68,15 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
   Future<void> _loadSupabaseQuestions() async {
     setState(() => _isLoading = true);
     try {
+      try {
+        final cRes = await SupabaseService.client.from('chapters').select('*');
+        if (cRes != null && (cRes as List).isNotEmpty) {
+          _dbChapters = (cRes as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
+        }
+      } catch (e) {
+        debugPrint('Notice loading db chapters in admin dashboard: $e');
+      }
+
       final dbQuestions = await SupabaseService.fetchAllQuestionsFromSupabase();
       if (mounted) {
         setState(() {
@@ -76,6 +87,79 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
       debugPrint('Error loading questions from Supabase: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _resolveSubjectName(dynamic subjectRaw, dynamic subjectIdRaw) {
+    final s1 = subjectRaw?.toString().trim() ?? '';
+    final s2 = subjectIdRaw?.toString().trim() ?? '';
+    for (var sub in ['Physics', 'Chemistry', 'Biology', 'Mathematics']) {
+      if (s1.toLowerCase() == sub.toLowerCase() || s2.toLowerCase() == sub.toLowerCase()) {
+        return sub;
+      }
+    }
+    for (var c in _dbChapters) {
+      if (c['subject_id']?.toString() == s1 || c['subject_id']?.toString() == s2) {
+        final sub = (c['subject_name'] ?? c['subject'])?.toString();
+        if (sub != null && sub.isNotEmpty) {
+          for (var known in ['Physics', 'Chemistry', 'Biology', 'Mathematics']) {
+            if (sub.toLowerCase() == known.toLowerCase()) return known;
+          }
+        }
+      }
+    }
+    return 'Physics';
+  }
+
+  String _resolveChapterName(dynamic chapterRaw, dynamic chapterIdRaw, dynamic chapterNameRaw) {
+    final c1 = chapterRaw?.toString().trim() ?? '';
+    final c2 = chapterIdRaw?.toString().trim() ?? '';
+    final c3 = chapterNameRaw?.toString().trim() ?? '';
+
+    for (var c in _dbChapters) {
+      final cId = c['id']?.toString() ?? '';
+      final cName = c['name']?.toString() ?? '';
+      if (cId.isNotEmpty && (cId == c1 || cId == c2 || cId == c3)) {
+        return cName;
+      }
+    }
+    for (var c in _dbChapters) {
+      final cName = c['name']?.toString() ?? '';
+      if (cName.isNotEmpty && (cName.toLowerCase() == c1.toLowerCase() || cName.toLowerCase() == c2.toLowerCase() || cName.toLowerCase() == c3.toLowerCase())) {
+        return cName;
+      }
+    }
+
+    if (c1.isNotEmpty && !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-').hasMatch(c1)) {
+      return c1;
+    }
+    if (c3.isNotEmpty && !RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-').hasMatch(c3)) {
+      return c3;
+    }
+
+    return _dbChapters.isNotEmpty ? _dbChapters.first['name'].toString() : 'General';
+  }
+
+  String _resolveChapterId(String chapterName, String? preferredChapterId) {
+    if (preferredChapterId != null && preferredChapterId.isNotEmpty && RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-').hasMatch(preferredChapterId)) {
+      return preferredChapterId;
+    }
+    for (var c in _dbChapters) {
+      if (c['name']?.toString().toLowerCase() == chapterName.toLowerCase()) {
+        return c['id'].toString();
+      }
+    }
+    return _dbChapters.isNotEmpty ? _dbChapters.first['id'].toString() : 'b2222222-2222-2222-2222-222222222222';
+  }
+
+  String _normalizeQuestionType(dynamic qTypeRaw, dynamic typeRaw) {
+    final str = (qTypeRaw ?? typeRaw ?? '').toString().trim().toLowerCase();
+    if (str.contains('multi')) {
+      return 'MCQ (Multiple Correct)';
+    } else if (str.contains('num') || str.contains('integer')) {
+      return 'Numerical';
+    } else {
+      return 'MCQ (Single Correct)';
     }
   }
 
@@ -411,22 +495,31 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     final marksCtrl = TextEditingController(text: (isEdit && initialData != null) ? (initialData['marks'] ?? 4).toString() : '4');
     final negCtrl = TextEditingController(text: (isEdit && initialData != null) ? (initialData['negativeMarks'] ?? 1.0).toString() : '1.0');
 
-    String selSubject = (isEdit && initialData != null) ? (initialData['subject'] ?? 'Physics').toString() : 'Physics';
+    String selSubject = _resolveSubjectName(initialData?['subject'], initialData?['subject_id']);
 
-    String rawChapter = (isEdit && initialData != null)
-        ? (initialData['chapter'] ?? initialData['chapter_name'] ?? initialData['chapter_id'] ?? '1. Mechanics').toString()
-        : '1. Mechanics';
-    List<String> availableChapters = List<String>.from(_subjectChaptersMap[selSubject] ?? ['1. Mechanics']);
-    if (rawChapter.isNotEmpty && !availableChapters.contains(rawChapter)) {
-      availableChapters.add(rawChapter);
+    List<String> availableChapters = _dbChapters
+        .where((c) {
+          final sName = (c['subject_name'] ?? c['subject'])?.toString() ?? '';
+          return sName.toLowerCase() == selSubject.toLowerCase();
+        })
+        .map((c) => c['name'].toString())
+        .toList();
+
+    if (availableChapters.isEmpty) {
+      availableChapters = List<String>.from(_subjectChaptersMap[selSubject] ?? ['General']);
     }
-    String selChapter = availableChapters.contains(rawChapter)
-        ? rawChapter
-        : availableChapters.first;
 
-    String selTopic = (isEdit && initialData != null) ? (initialData['topic'] ?? 'Kinematics').toString() : 'Kinematics';
+    String selChapter = _resolveChapterName(initialData?['chapter'], initialData?['chapter_id'], initialData?['chapter_name']);
+    if (selChapter.isNotEmpty && !availableChapters.contains(selChapter)) {
+      availableChapters.add(selChapter);
+    }
+    if (!availableChapters.contains(selChapter)) {
+      selChapter = availableChapters.first;
+    }
+
+    String selTopic = (isEdit && initialData != null) ? (initialData['topic'] ?? selChapter).toString() : selChapter;
     String selCategory = (isEdit && initialData != null) ? (initialData['category'] ?? 'Custom Practice').toString() : 'Custom Practice';
-    String selType = (isEdit && initialData != null) ? (initialData['type'] ?? 'MCQ').toString() : 'MCQ';
+    String selType = _normalizeQuestionType(initialData?['q_type'] ?? initialData?['question_type'], initialData?['type']);
 
     String rawDiff = (isEdit && initialData != null) ? (initialData['difficulty'] ?? 'Medium').toString().trim() : 'Medium';
     String selDifficulty = 'Medium';
@@ -507,7 +600,17 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                             items: ['Physics', 'Chemistry', 'Biology', 'Mathematics'].map((s) {
                               return DropdownMenuItem(value: s, child: Text(s));
                             }).toList(),
-                            onChanged: (v) => setDlgState(() => selSubject = v!),
+                            onChanged: (v) => setDlgState(() {
+                              selSubject = v!;
+                              availableChapters = _dbChapters
+                                  .where((c) => ((c['subject_name'] ?? c['subject'])?.toString() ?? '').toLowerCase() == selSubject.toLowerCase())
+                                  .map((c) => c['name'].toString())
+                                  .toList();
+                              if (availableChapters.isEmpty) {
+                                availableChapters = List<String>.from(_subjectChaptersMap[selSubject] ?? ['General']);
+                              }
+                              selChapter = availableChapters.first;
+                            }),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -543,7 +646,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                           child: DropdownButtonFormField<String>(
                             value: selType,
                             decoration: const InputDecoration(labelText: 'Question Type', border: OutlineInputBorder()),
-                            items: ['MCQ', 'Multiple Correct', 'Match', 'Assertion', 'Numerical', 'True/False'].map((t) {
+                            items: ['MCQ (Single Correct)', 'MCQ (Multiple Correct)', 'Numerical'].map((t) {
                               return DropdownMenuItem(value: t, child: Text(t));
                             }).toList(),
                             onChanged: (v) => setDlgState(() => selType = v!),
@@ -740,22 +843,32 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                   final List<String> formOpts = [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text];
                   int cIdx = selCorrectIdx;
                   final String corrAnsStr = 'Option ${String.fromCharCode(65 + cIdx)}';
+                  final String selChapId = _resolveChapterId(selChapter, initialData?['chapter_id']);
 
                   final qMap = {
                     'id': isEdit ? initialData!['id'] : 'Q_${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
                     'questionText': qTextCtrl.text,
+                    'question_text': qTextCtrl.text,
                     'questionImage': qImageCtrl.text,
+                    'question_image': qImageCtrl.text,
                     'subject': selSubject,
+                    'subject_name': selSubject,
                     'chapter': selChapter,
+                    'chapter_name': selChapter,
+                    'chapter_id': selChapId,
+                    'chapterId': selChapId,
                     'topic': selTopic,
                     'category': selCategory,
                     'available_in': availableInSel,
                     'availableIn': availableInSel,
                     'type': selType,
+                    'q_type': selType,
+                    'question_type': selType,
                     'difficulty': selDifficulty,
                     'status': selStatus,
-                    'marks': int.tryParse(marksCtrl.text) ?? 4,
+                    'marks': double.tryParse(marksCtrl.text) ?? 4.0,
                     'negativeMarks': double.tryParse(negCtrl.text) ?? 1.0,
+                    'negative_marks': double.tryParse(negCtrl.text) ?? 1.0,
                     'options': formOpts,
                     'correct_option_index': cIdx,
                     'correctOptionIndex': cIdx,
@@ -763,31 +876,26 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                     'correctAnswer': corrAnsStr,
                     'correctText': formOpts[cIdx],
                     'explanation': expCtrl.text,
+                    'solution': expCtrl.text,
                     'usedIn': isEdit ? (initialData!['usedIn'] ?? 0) : 0,
                   };
 
-                if (isEdit) {
-                  await SupabaseService.updateQuestionInSupabase(qMap['id'].toString(), qMap);
-                  setState(() {
-                    final idx = _allQuestionsData.indexWhere((item) => item['id'] == qMap['id']);
-                    if (idx != -1) _allQuestionsData[idx] = qMap;
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Question updated successfully!')),
-                  );
-                } else {
-                  await SupabaseService.insertQuestionToSupabase(qMap);
-                  setState(() {
-                    _allQuestionsData.insert(0, qMap);
-                  });
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Question created successfully!')),
-                  );
+                  if (isEdit) {
+                    await SupabaseService.updateQuestionInSupabase(qMap['id'].toString(), qMap);
+                  } else {
+                    await SupabaseService.saveQuestionMapWithStatus(qMap);
+                  }
+
+                  await _loadSupabaseQuestions();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(isEdit ? 'Question updated successfully!' : 'Question created successfully!')),
+                    );
+                  }
                 }
-              }
-            },
-            child: Text(isEdit ? 'Save Changes' : 'Create Question', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
+              },
+              child: Text(isEdit ? 'Save Changes' : 'Create Question', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
         ],
       ),
     ),
