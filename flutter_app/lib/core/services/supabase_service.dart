@@ -1875,6 +1875,59 @@ class SupabaseService {
     return isPyqMatch || isNtaMatch || isCustomMatch || qSource == reqLower || qCategory == reqLower;
   }
 
+  static List<String> parseOptionsFromQuestionMap(Map<String, dynamic> map) {
+    if (map['options'] is List) {
+      final list = (map['options'] as List).map((e) => e?.toString() ?? '').where((s) => s.trim().isNotEmpty).toList();
+      if (list.isNotEmpty) return list;
+    }
+    if (map['optionsList'] is List) {
+      final list = (map['optionsList'] as List).map((e) => e?.toString() ?? '').where((s) => s.trim().isNotEmpty).toList();
+      if (list.isNotEmpty) return list;
+    }
+    if (map['options_list'] is List) {
+      final list = (map['options_list'] as List).map((e) => e?.toString() ?? '').where((s) => s.trim().isNotEmpty).toList();
+      if (list.isNotEmpty) return list;
+    }
+
+    if (map['options'] is String && (map['options'] as String).trim().isNotEmpty) {
+      final str = (map['options'] as String).trim();
+      if (str.startsWith('[') && str.endsWith(']')) {
+        try {
+          final List<dynamic> decoded = jsonDecode(str);
+          final list = decoded.map((e) => e?.toString() ?? '').where((s) => s.trim().isNotEmpty).toList();
+          if (list.isNotEmpty) return list;
+        } catch (_) {}
+      }
+    }
+
+    final List<String> fallbackOpts = [];
+    final keyGroups = [
+      ['option_1', 'option1', 'option_a', 'optionA', 'opt1', 'optA', 'opt_1', 'option_text_1'],
+      ['option_2', 'option2', 'option_b', 'optionB', 'opt2', 'optB', 'opt_2', 'option_text_2'],
+      ['option_3', 'option3', 'option_c', 'optionC', 'opt3', 'optC', 'opt_3', 'option_text_3'],
+      ['option_4', 'option4', 'option_d', 'optionD', 'opt4', 'optD', 'opt_4', 'option_text_4'],
+    ];
+
+    for (var kGroup in keyGroups) {
+      String? val;
+      for (var k in kGroup) {
+        if (map[k] != null && map[k].toString().trim().isNotEmpty) {
+          val = map[k].toString().trim();
+          break;
+        }
+      }
+      if (val != null) {
+        fallbackOpts.add(val);
+      }
+    }
+
+    if (fallbackOpts.isNotEmpty) {
+      return fallbackOpts;
+    }
+
+    return <String>[];
+  }
+
   static Future<List<QuestionModel>> fetchQuestions({
     String? examId,
     String? subjectId,
@@ -1909,14 +1962,41 @@ class SupabaseService {
       }
     }
 
+    // Fetch question_options from Supabase child table if present
+    final Map<String, List<Map<String, dynamic>>> childOptsMap = {};
+    try {
+      final optRes = await client.from('question_options').select('*').order('option_index', ascending: true);
+      if (optRes != null && (optRes as List).isNotEmpty) {
+        for (var optRow in optRes) {
+          final qId = optRow['question_id']?.toString() ?? '';
+          if (qId.isNotEmpty) {
+            childOptsMap.putIfAbsent(qId, () => []).add(Map<String, dynamic>.from(optRow as Map));
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice fetching question_options child table: $e');
+    }
+
     final List<QuestionModel> models = [];
     for (var map in allMaps) {
+      final qId = map['id']?.toString() ?? '';
       final qSource = (map['sourceType'] ?? map['source_type'] ?? map['source'] ?? map['category'] ?? 'pyq').toString().toLowerCase();
 
-      final optsRaw = map['options'] is List ? List<String>.from(map['options']) : <String>[];
-      final optImgsRaw = map['optionImages'] is List
+      List<String> optsRaw = parseOptionsFromQuestionMap(map);
+      List<String?> optImgsRaw = map['optionImages'] is List
           ? List<String?>.from(map['optionImages'])
           : (map['option_images'] is List ? List<String?>.from(map['option_images']) : <String?>[]);
+
+      if (optsRaw.isEmpty && qId.isNotEmpty && childOptsMap.containsKey(qId)) {
+        final childRows = childOptsMap[qId]!;
+        optsRaw = childRows.map((r) => r['option_text']?.toString() ?? '').toList();
+        optImgsRaw = childRows.map((r) => r['option_image']?.toString()).toList();
+      }
+
+      if (optsRaw.isEmpty) {
+        optsRaw = ['Option A', 'Option B', 'Option C', 'Option D'];
+      }
 
       final opts = optsRaw.asMap().entries.map((e) {
         final idx = e.key;
@@ -2591,8 +2671,14 @@ class SupabaseService {
 
     final List<QuestionModel> liveModels = [];
     for (var map in allQuestions) {
-      final optsRaw = map['options'] is List ? List<String>.from(map['options']) : <String>[];
-      final optImgsRaw = map['optionImages'] is List ? List<String?>.from(map['optionImages']) : <String?>[];
+      final qId = map['id']?.toString() ?? '';
+      List<String> optsRaw = parseOptionsFromQuestionMap(map);
+      List<String?> optImgsRaw = map['optionImages'] is List ? List<String?>.from(map['optionImages']) : <String?>[];
+
+      if (optsRaw.isEmpty) {
+        optsRaw = ['Option A', 'Option B', 'Option C', 'Option D'];
+      }
+
       final opts = optsRaw.asMap().entries.map((e) {
         final idx = e.key;
         final text = e.value;
