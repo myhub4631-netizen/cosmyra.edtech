@@ -150,6 +150,57 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
     _persistCurrentSession();
   }
 
+  Color _evaluateTestPaletteColor(int idx) {
+    final isCur = idx == _currentIndex;
+    final userAns = _userAnswers[idx];
+    final hasAns = userAns != null && userAns.trim().isNotEmpty;
+    final isRev = _markedForReview.contains(idx);
+    final question = widget.questions[idx];
+
+    if (hasAns) {
+      bool isCorrect = false;
+      bool isPartial = false;
+      final qType = question.qType.toLowerCase();
+
+      if (qType == 'numerical') {
+        final expected = (question.numericalAnswer ?? '').trim();
+        if (expected.isNotEmpty) {
+          final double? uNum = double.tryParse(userAns.trim());
+          final double? eNum = double.tryParse(expected);
+          if (uNum != null && eNum != null) {
+            isCorrect = (uNum - eNum).abs() < 0.01;
+          } else {
+            isCorrect = userAns.trim().toLowerCase() == expected.toLowerCase();
+          }
+        } else {
+          isCorrect = true;
+        }
+      } else {
+        for (int i = 0; i < question.options.length; i++) {
+          final opt = question.options[i];
+          final optKey = (opt.id != null && opt.id.isNotEmpty) ? opt.id : 'opt_${question.id}_$i';
+          final optLetter = String.fromCharCode(65 + i);
+          final isSelected = _isOptSelected(userAns, optKey, optLetter, opt.optionText);
+          if (isSelected) {
+            if (opt.isCorrect) {
+              isCorrect = true;
+            }
+          }
+        }
+      }
+
+      if (isCorrect) return const Color(0xFF22C55E);
+      if (isPartial) return const Color(0xFFEAB308);
+      return const Color(0xFFEF4444);
+    } else if (isRev) {
+      return const Color(0xFFEAB308);
+    } else if (isCur) {
+      return const Color(0xFF6366F1);
+    }
+
+    return const Color(0xFFCBD5E1);
+  }
+
   void _confirmSubmit() {
     final attemptedCount = _userAnswers.length;
     final totalCount = widget.questions.length;
@@ -504,14 +555,16 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('Question Palette', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A))),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   const Wrap(
-                    spacing: 8,
+                    spacing: 6,
                     runSpacing: 6,
                     children: [
-                      _PaletteLegend(color: Color(0xFF4F46E5), label: 'Answered'),
-                      _PaletteLegend(color: Colors.amber, label: 'Review'),
-                      _PaletteLegend(color: Color(0xFFCBD5E1), label: 'Unanswered'),
+                      _PaletteLegend(color: Color(0xFF22C55E), label: 'Correct'),
+                      _PaletteLegend(color: Color(0xFFEF4444), label: 'Wrong'),
+                      _PaletteLegend(color: Color(0xFFEAB308), label: 'Review'),
+                      _PaletteLegend(color: Color(0xFF6366F1), label: 'Current'),
+                      _PaletteLegend(color: Color(0xFFCBD5E1), label: 'Skipped'),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -525,21 +578,20 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                       itemCount: widget.questions.length,
                       itemBuilder: (ctx, idx) {
                         final isCur = idx == _currentIndex;
-                        final isAns = _userAnswers.containsKey(idx);
-                        final isRev = _markedForReview.contains(idx);
-
-                        Color bg = const Color(0xFFF1F5F9);
-                        if (isAns) bg = const Color(0xFF4F46E5);
-                        if (isRev) bg = Colors.amber;
+                        final bg = _evaluateTestPaletteColor(idx);
+                        final isGrey = bg == const Color(0xFFCBD5E1);
 
                         return InkWell(
-                          onTap: () => setState(() => _currentIndex = idx),
+                          onTap: () {
+                            setState(() => _currentIndex = idx);
+                            _persistCurrentSession();
+                          },
                           child: Container(
                             decoration: BoxDecoration(
                               color: bg,
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: isCur ? const Color(0xFF0F172A) : Colors.transparent,
+                                color: isCur ? const Color(0xFF1E1B4B) : Colors.transparent,
                                 width: isCur ? 3.0 : 0,
                               ),
                             ),
@@ -547,7 +599,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                               child: Text(
                                 '${idx + 1}',
                                 style: TextStyle(
-                                  color: isAns || isRev ? Colors.white : const Color(0xFF475569),
+                                  color: isGrey ? const Color(0xFF334155) : Colors.white,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),

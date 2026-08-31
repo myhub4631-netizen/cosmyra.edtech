@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/latex_view.dart';
 import '../../core/services/supabase_service.dart';
@@ -26,6 +28,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   final Map<int, bool> _hasAnswered = {};
   final Set<int> _markedForReview = {};
   final Map<int, bool> _isCorrectMap = {};
+  final Map<int, bool> _isPartialMap = {};
 
   Timer? _timer;
   int _secondsRemaining = 0;
@@ -36,6 +39,74 @@ class _PracticeScreenState extends State<PracticeScreen> {
     if (widget.timerMinutes > 0) {
       _secondsRemaining = widget.timerMinutes * 60;
       _startTimer();
+    }
+    _loadPracticeSession();
+  }
+
+  Future<void> _savePracticeSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final sessionKey = 'cosmyra_practice_session_${widget.questions.map((q) => q.id).join('_').hashCode}';
+      final Map<String, dynamic> data = {
+        'currentIndex': _currentIndex,
+        'selectedAnswers': _selectedAnswers.map((k, v) => MapEntry(k.toString(), v)),
+        'hasAnswered': _hasAnswered.map((k, v) => MapEntry(k.toString(), v)),
+        'isCorrectMap': _isCorrectMap.map((k, v) => MapEntry(k.toString(), v)),
+        'isPartialMap': _isPartialMap.map((k, v) => MapEntry(k.toString(), v)),
+        'markedForReview': _markedForReview.toList(),
+        'secondsRemaining': _secondsRemaining,
+      };
+      await prefs.setString(sessionKey, jsonEncode(data));
+    } catch (e) {
+      debugPrint('Notice saving practice session: $e');
+    }
+  }
+
+  Future<void> _loadPracticeSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final sessionKey = 'cosmyra_practice_session_${widget.questions.map((q) => q.id).join('_').hashCode}';
+      final str = prefs.getString(sessionKey);
+      if (str != null && str.isNotEmpty) {
+        final Map<String, dynamic> data = jsonDecode(str);
+        if (mounted) {
+          setState(() {
+            _currentIndex = data['currentIndex'] as int? ?? 0;
+            if (data['selectedAnswers'] is Map) {
+              (data['selectedAnswers'] as Map).forEach((k, v) {
+                final idx = int.tryParse(k.toString());
+                if (idx != null) _selectedAnswers[idx] = v.toString();
+              });
+            }
+            if (data['hasAnswered'] is Map) {
+              (data['hasAnswered'] as Map).forEach((k, v) {
+                final idx = int.tryParse(k.toString());
+                if (idx != null) _hasAnswered[idx] = v == true;
+              });
+            }
+            if (data['isCorrectMap'] is Map) {
+              (data['isCorrectMap'] as Map).forEach((k, v) {
+                final idx = int.tryParse(k.toString());
+                if (idx != null) _isCorrectMap[idx] = v == true;
+              });
+            }
+            if (data['isPartialMap'] is Map) {
+              (data['isPartialMap'] as Map).forEach((k, v) {
+                final idx = int.tryParse(k.toString());
+                if (idx != null) _isPartialMap[idx] = v == true;
+              });
+            }
+            if (data['markedForReview'] is List) {
+              _markedForReview.addAll((data['markedForReview'] as List).map((e) => int.tryParse(e.toString()) ?? 0));
+            }
+            if (data['secondsRemaining'] is int && (data['secondsRemaining'] as int) > 0) {
+              _secondsRemaining = data['secondsRemaining'] as int;
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice loading practice session: $e');
     }
   }
 
@@ -73,10 +144,32 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
     final question = widget.questions[_currentIndex];
     bool isCorrect = false;
+    bool isPartial = false;
 
     final textVal = optionText ?? optKey;
     if (question.qType == 'numerical') {
-      isCorrect = textVal.trim() == (question.numericalAnswer ?? '').trim();
+      final expected = (question.numericalAnswer ?? '').trim();
+      if (expected.isNotEmpty) {
+        final double? uNum = double.tryParse(textVal.trim());
+        final double? eNum = double.tryParse(expected);
+        if (uNum != null && eNum != null) {
+          isCorrect = (uNum - eNum).abs() < 0.01;
+        } else {
+          isCorrect = textVal.trim().toLowerCase() == expected.toLowerCase();
+        }
+      } else {
+        isCorrect = true;
+      }
+    } else if (question.qType == 'multiple_correct' || question.qType == 'multiple' || question.qType == 'multi_correct') {
+      final correctIndices = <int>{};
+      for (int i = 0; i < question.options.length; i++) {
+        if (question.options[i].isCorrect) correctIndices.add(i);
+      }
+      if (correctIndices.contains(optionIndex) && correctIndices.length > 1) {
+        isPartial = true;
+      } else if (question.options[optionIndex].isCorrect) {
+        isCorrect = true;
+      }
     } else {
       isCorrect = question.options[optionIndex].isCorrect;
     }
@@ -85,7 +178,25 @@ class _PracticeScreenState extends State<PracticeScreen> {
       _selectedAnswers[_currentIndex] = optKey;
       _hasAnswered[_currentIndex] = true;
       _isCorrectMap[_currentIndex] = isCorrect;
+      _isPartialMap[_currentIndex] = isPartial;
     });
+
+    _savePracticeSession();
+  }
+
+  Widget _buildPaletteLegendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 9,
+          height: 9,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+      ],
+    );
   }
 
   void _finishPracticeSession() {
@@ -406,7 +517,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
           // Question Palette Sidebar on Desktop
           if (MediaQuery.of(context).size.width >= 900)
             Container(
-              width: 220,
+              width: 230,
               decoration: BoxDecoration(
                 color: Theme.of(context).cardColor,
                 border: Border(left: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.1))),
@@ -416,7 +527,19 @@ class _PracticeScreenState extends State<PracticeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('Question Palette', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      _buildPaletteLegendDot(const Color(0xFF22C55E), 'Correct'),
+                      _buildPaletteLegendDot(const Color(0xFFEF4444), 'Wrong'),
+                      _buildPaletteLegendDot(const Color(0xFFEAB308), 'Partial/Review'),
+                      _buildPaletteLegendDot(const Color(0xFF6366F1), 'Current'),
+                      _buildPaletteLegendDot(const Color(0xFFCBD5E1), 'Skipped'),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
                   Expanded(
                     child: GridView.builder(
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -427,26 +550,52 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       itemCount: widget.questions.length,
                       itemBuilder: (ctx, idx) {
                         final isCur = idx == _currentIndex;
-                        final isAns = _hasAnswered[idx] == true;
+                        final hasAns = _hasAnswered[idx] == true || _selectedAnswers.containsKey(idx);
+                        final isCorr = _isCorrectMap[idx];
+                        final isPart = _isPartialMap[idx] == true;
                         final isRev = _markedForReview.contains(idx);
 
-                        Color bg = Colors.grey.withOpacity(0.15);
-                        if (isAns) bg = Colors.green;
-                        if (isRev) bg = Colors.amber;
+                        Color bg = const Color(0xFFCBD5E1); // Grey default
+                        Color textClr = const Color(0xFF334155);
+
+                        if (hasAns) {
+                          if (isCorr == true) {
+                            bg = const Color(0xFF22C55E); // Green = Correct
+                            textClr = Colors.white;
+                          } else if (isPart) {
+                            bg = const Color(0xFFEAB308); // Yellow = Partial
+                            textClr = Colors.white;
+                          } else {
+                            bg = const Color(0xFFEF4444); // Red = Wrong
+                            textClr = Colors.white;
+                          }
+                        } else if (isRev) {
+                          bg = const Color(0xFFEAB308); // Yellow = Review
+                          textClr = Colors.white;
+                        } else if (isCur) {
+                          bg = const Color(0xFF6366F1); // Purple/Blue = Current Unanswered
+                          textClr = Colors.white;
+                        }
 
                         return InkWell(
-                          onTap: () => setState(() => _currentIndex = idx),
+                          onTap: () {
+                            setState(() => _currentIndex = idx);
+                            _savePracticeSession();
+                          },
                           child: Container(
                             decoration: BoxDecoration(
                               color: bg,
                               shape: BoxShape.circle,
-                              border: Border.all(color: isCur ? Theme.of(context).primaryColor : Colors.transparent, width: 2),
+                              border: Border.all(
+                                color: isCur ? const Color(0xFF1E1B4B) : Colors.transparent,
+                                width: isCur ? 3.0 : 0,
+                              ),
                             ),
                             child: Center(
                               child: Text(
                                 '${idx + 1}',
                                 style: TextStyle(
-                                  color: isAns ? Colors.white : Colors.black87,
+                                  color: textClr,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
