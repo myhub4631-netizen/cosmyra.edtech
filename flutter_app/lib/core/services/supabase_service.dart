@@ -2282,21 +2282,36 @@ class SupabaseService {
           ? (qMap['question_number'] ?? qMap['questionNumber'] as num).toInt()
           : int.tryParse((qMap['question_number'] ?? qMap['questionNumber'])?.toString() ?? '1') ?? 1;
 
-      final dynamic cAnsRaw = qMap['correct_answer'] ?? qMap['correctAnswer'];
+      final dynamic cAnsRaw = qMap['correct_answer'] ?? qMap['correctAnswer'] ?? qMap['correctText'];
       final dynamic cIdxRaw = qMap['correct_option_index'] ?? qMap['correctOptionIndex'];
-      int cIdx = 0;
+      final optionsList = qMap['options'] is List ? List<String>.from(qMap['options']) : <String>[];
+
+      int cIdx = -1;
       if (cIdxRaw is num) {
         cIdx = cIdxRaw.toInt();
       } else if (cIdxRaw != null) {
-        cIdx = int.tryParse(cIdxRaw.toString()) ?? 0;
+        cIdx = int.tryParse(cIdxRaw.toString()) ?? -1;
       }
 
-      String normCorrectAns = 'Option ${String.fromCharCode(65 + cIdx)}';
-      if (cAnsRaw != null && cAnsRaw.toString().trim().isNotEmpty) {
-        normCorrectAns = cAnsRaw.toString().trim();
+      if (cIdx < 0 || cIdx >= (optionsList.isNotEmpty ? optionsList.length : 4)) {
+        if (cAnsRaw != null && cAnsRaw.toString().trim().isNotEmpty) {
+          final String str = cAnsRaw.toString().trim();
+          if (str.toUpperCase().startsWith('OPTION ')) {
+            int numVal = int.tryParse(str.substring(7).trim()) ?? 1;
+            cIdx = (numVal - 1).clamp(0, 3);
+          } else if (str.length == 1 && RegExp(r'[A-D]', caseSensitive: false).hasMatch(str)) {
+            cIdx = str.toUpperCase().codeUnitAt(0) - 65;
+          } else if (optionsList.isNotEmpty) {
+            int foundInList = optionsList.indexOf(str);
+            if (foundInList != -1) {
+              cIdx = foundInList;
+            }
+          }
+        }
       }
+      if (cIdx < 0) cIdx = 0;
 
-      final optionsList = qMap['options'] is List ? List<String>.from(qMap['options']) : <String>[];
+      final String normCorrectAns = 'Option ${String.fromCharCode(65 + cIdx)}';
       final optionImagesList = qMap['optionImages'] is List
           ? List<String?>.from(qMap['optionImages'])
           : (qMap['option_images'] is List ? List<String?>.from(qMap['option_images']) : <String?>[]);

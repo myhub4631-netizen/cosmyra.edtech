@@ -342,10 +342,61 @@ class QuestionModel {
   });
 
   factory QuestionModel.fromJson(Map<String, dynamic> json) {
+    int targetCorrectIdx = -1;
+    if (json['correct_option_index'] != null) {
+      targetCorrectIdx = (json['correct_option_index'] as num).toInt();
+    } else if (json['correctOptionIndex'] != null) {
+      targetCorrectIdx = (json['correctOptionIndex'] as num).toInt();
+    } else {
+      final String corrStr = (json['correct_answer'] ?? json['correctAnswer'] ?? json['correctText'] ?? '').toString().trim();
+      if (corrStr.toUpperCase().startsWith('OPTION ')) {
+        final optNum = int.tryParse(corrStr.substring(7).trim()) ?? 1;
+        targetCorrectIdx = (optNum - 1).clamp(0, 5);
+      } else if (corrStr.length == 1 && RegExp(r'[A-D]', caseSensitive: false).hasMatch(corrStr)) {
+        targetCorrectIdx = corrStr.toUpperCase().codeUnitAt(0) - 65;
+      }
+    }
+
     var rawOptions = json['options'] as List? ?? json['question_options'] as List? ?? [];
-    List<QuestionOptionModel> parsedOptions = rawOptions
-        .map((opt) => QuestionOptionModel.fromJson(opt as Map<String, dynamic>))
-        .toList();
+    List<QuestionOptionModel> parsedOptions = [];
+
+    for (int i = 0; i < rawOptions.length; i++) {
+      final rawOpt = rawOptions[i];
+      if (rawOpt is Map<String, dynamic>) {
+        bool isOptCorrect = rawOpt['is_correct'] == true || rawOpt['isCorrect'] == true;
+        if (targetCorrectIdx != -1) {
+          isOptCorrect = (i == targetCorrectIdx);
+        }
+        parsedOptions.add(QuestionOptionModel.fromJson({
+          ...rawOpt,
+          'option_index': rawOpt['option_index'] ?? rawOpt['optionIndex'] ?? i,
+          'is_correct': isOptCorrect,
+        }));
+      } else if (rawOpt is String) {
+        final bool isOptCorrect = (targetCorrectIdx != -1) ? (i == targetCorrectIdx) : (i == 0);
+        parsedOptions.add(QuestionOptionModel(
+          id: 'opt_${json['id']}_$i',
+          questionId: json['id']?.toString() ?? '',
+          optionIndex: i,
+          optionText: rawOpt,
+          isCorrect: isOptCorrect,
+        ));
+      }
+    }
+
+    if (parsedOptions.isNotEmpty && !parsedOptions.any((o) => o.isCorrect)) {
+      final int activeIndex = (targetCorrectIdx >= 0 && targetCorrectIdx < parsedOptions.length)
+          ? targetCorrectIdx
+          : 0;
+      parsedOptions[activeIndex] = QuestionOptionModel(
+        id: parsedOptions[activeIndex].id,
+        questionId: parsedOptions[activeIndex].questionId,
+        optionIndex: parsedOptions[activeIndex].optionIndex,
+        optionText: parsedOptions[activeIndex].optionText,
+        isCorrect: true,
+        optionImage: parsedOptions[activeIndex].optionImage,
+      );
+    }
 
     List<String> parsedTags = [];
     if (json['tags'] is List) {
@@ -359,70 +410,80 @@ class QuestionModel {
       parsedAvailableIn = (json['availableIn'] as List).map((v) => v.toString()).toList();
     }
     if (parsedAvailableIn.isEmpty) {
-      // Backfill with default all 5 modules for complete backward compatibility
       parsedAvailableIn = List<String>.from(allVisibilityKeys);
     }
 
     return QuestionModel(
-      id: json['id'] ?? '',
-      examId: json['exam_id'] ?? '',
-      subjectId: json['subject_id'] ?? '',
-      chapterId: json['chapter_id'] ?? '',
-      topicId: json['topic_id'],
-      questionText: json['question_text'] ?? '',
-      questionImage: json['question_image'],
-      qType: json['q_type'] ?? json['question_type'] ?? 'single_correct',
+      id: json['id']?.toString() ?? '',
+      examId: json['exam_id']?.toString() ?? '',
+      subjectId: json['subject_id']?.toString() ?? '',
+      chapterId: json['chapter_id']?.toString() ?? '',
+      topicId: json['topic_id']?.toString(),
+      questionText: json['question_text'] ?? json['questionText'] ?? '',
+      questionImage: json['question_image'] ?? json['questionImage'],
+      qType: json['q_type'] ?? json['question_type'] ?? json['qType'] ?? 'single_correct',
       difficulty: json['difficulty'] ?? 'medium',
       source: json['source'] ?? 'practice',
       sourceName: json['source_name'],
       marks: (json['marks'] as num?)?.toDouble() ?? 4.0,
       negativeMarks: (json['negative_marks'] as num?)?.toDouble() ?? 1.0,
       year: json['year'] as int?,
-      session: json['session'],
-      shift: json['shift'],
-      paper: json['paper'],
-      questionNumber: json['question_number'] as int?,
+      session: json['session']?.toString(),
+      shift: json['shift']?.toString(),
+      paper: json['paper']?.toString(),
+      questionNumber: (json['question_number'] ?? json['questionNumber']) as int?,
       numericalAnswer: json['numerical_answer']?.toString(),
       numericalTolerance: (json['numerical_tolerance'] as num?)?.toDouble(),
-      explanation: json['explanation'],
-      solution: json['solution'],
-      hint: json['hint'],
+      explanation: json['explanation']?.toString(),
+      solution: json['solution']?.toString(),
+      hint: json['hint']?.toString(),
       tags: parsedTags,
       availableIn: parsedAvailableIn,
-      status: json['status'] ?? 'published',
+      status: json['status']?.toString() ?? 'published',
       options: parsedOptions,
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'exam_id': examId,
-        'subject_id': subjectId,
-        'chapter_id': chapterId,
-        'topic_id': topicId,
-        'question_text': questionText,
-        'question_image': questionImage,
-        'q_type': qType,
-        'difficulty': difficulty,
-        'source': source,
-        'source_name': sourceName,
-        'marks': marks,
-        'negative_marks': negativeMarks,
-        'year': year,
-        'session': session,
-        'shift': shift,
-        'paper': paper,
-        'question_number': questionNumber,
-        'numerical_answer': numericalAnswer,
-        'numerical_tolerance': numericalTolerance,
-        'explanation': explanation,
-        'solution': solution,
-        'hint': hint,
-        'tags': tags,
-        'available_in': availableIn,
-        'availableIn': availableIn,
-        'status': status,
-      };
+  Map<String, dynamic> toJson() {
+    final int corrIdx = options.indexWhere((o) => o.isCorrect);
+    final int validCorrIdx = corrIdx != -1 ? corrIdx : 0;
+    final String corrAnsStr = 'Option ${String.fromCharCode(65 + validCorrIdx)}';
+
+    return {
+      'id': id,
+      'exam_id': examId,
+      'subject_id': subjectId,
+      'chapter_id': chapterId,
+      'topic_id': topicId,
+      'question_text': questionText,
+      'question_image': questionImage,
+      'q_type': qType,
+      'difficulty': difficulty,
+      'source': source,
+      'source_name': sourceName,
+      'marks': marks,
+      'negative_marks': negativeMarks,
+      'year': year,
+      'session': session,
+      'shift': shift,
+      'paper': paper,
+      'question_number': questionNumber,
+      'numerical_answer': numericalAnswer,
+      'numerical_tolerance': numericalTolerance,
+      'explanation': explanation,
+      'solution': solution,
+      'hint': hint,
+      'tags': tags,
+      'available_in': availableIn,
+      'availableIn': availableIn,
+      'status': status,
+      'options': options.map((o) => o.toJson()).toList(),
+      'correct_answer': corrAnsStr,
+      'correctAnswer': corrAnsStr,
+      'correct_option_index': validCorrIdx,
+      'correctOptionIndex': validCorrIdx,
+    };
+  }
 }
 
 /// Custom Test Template Model

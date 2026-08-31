@@ -424,7 +424,31 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     final opt2Ctrl = TextEditingController(text: opts.length > 1 ? opts[1].toString() : 'Option B');
     final opt3Ctrl = TextEditingController(text: opts.length > 2 ? opts[2].toString() : 'Option C');
     final opt4Ctrl = TextEditingController(text: opts.length > 3 ? opts[3].toString() : 'Option D');
-    String selCorrectOpt = (isEdit && initialData != null) ? (initialData['correctAnswer'] ?? opt1Ctrl.text).toString() : opt1Ctrl.text;
+
+    int initCorrIdx = 0;
+    if (isEdit && initialData != null) {
+      if (initialData['correct_option_index'] != null) {
+        initCorrIdx = (initialData['correct_option_index'] as num).toInt();
+      } else if (initialData['correctOptionIndex'] != null) {
+        initCorrIdx = (initialData['correctOptionIndex'] as num).toInt();
+      } else {
+        final String caStr = (initialData['correct_answer'] ?? initialData['correctAnswer'] ?? initialData['correctText'] ?? '').toString().trim();
+        if (caStr.toUpperCase().startsWith('OPTION ')) {
+          int n = int.tryParse(caStr.substring(7).trim()) ?? 1;
+          initCorrIdx = (n - 1).clamp(0, 3);
+        } else if (caStr.length == 1 && RegExp(r'[A-D]', caseSensitive: false).hasMatch(caStr)) {
+          initCorrIdx = caStr.toUpperCase().codeUnitAt(0) - 65;
+        } else if (caStr.isNotEmpty) {
+          int fIdx = [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text].indexOf(caStr);
+          if (fIdx != -1) initCorrIdx = fIdx;
+        }
+      }
+    }
+
+    List<String> currentOptTexts = [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text];
+    String selCorrectOpt = (initCorrIdx >= 0 && initCorrIdx < currentOptTexts.length)
+        ? currentOptTexts[initCorrIdx]
+        : currentOptTexts.first;
 
     List<String> initAvail = [];
     if (isEdit && initialData != null) {
@@ -697,6 +721,17 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
 
                 if (formKey.currentState!.validate()) {
                   Navigator.pop(ctx);
+                  final List<String> formOpts = [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text];
+                  int cIdx = formOpts.indexOf(selCorrectOpt);
+                  if (cIdx == -1) {
+                    if (selCorrectOpt == 'Option A' || selCorrectOpt == opt1Ctrl.text) cIdx = 0;
+                    else if (selCorrectOpt == 'Option B' || selCorrectOpt == opt2Ctrl.text) cIdx = 1;
+                    else if (selCorrectOpt == 'Option C' || selCorrectOpt == opt3Ctrl.text) cIdx = 2;
+                    else if (selCorrectOpt == 'Option D' || selCorrectOpt == opt4Ctrl.text) cIdx = 3;
+                    else cIdx = 0;
+                  }
+                  final String corrAnsStr = 'Option ${String.fromCharCode(65 + cIdx)}';
+
                   final qMap = {
                     'id': isEdit ? initialData!['id'] : 'Q_${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
                     'questionText': qTextCtrl.text,
@@ -712,8 +747,12 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                     'status': selStatus,
                     'marks': int.tryParse(marksCtrl.text) ?? 4,
                     'negativeMarks': double.tryParse(negCtrl.text) ?? 1.0,
-                    'options': [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text],
-                    'correctAnswer': selCorrectOpt,
+                    'options': formOpts,
+                    'correct_option_index': cIdx,
+                    'correctOptionIndex': cIdx,
+                    'correct_answer': corrAnsStr,
+                    'correctAnswer': corrAnsStr,
+                    'correctText': formOpts[cIdx],
                     'explanation': expCtrl.text,
                     'usedIn': isEdit ? (initialData!['usedIn'] ?? 0) : 0,
                   };
