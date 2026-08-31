@@ -51,10 +51,108 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
   };
 
   final Map<String, List<String>> _subjectChaptersMap = {
-    'Physics': ['1. Mechanics', '2. Thermodynamics', '3. Oscillations and Waves', '4. Electromagnetism', '5. Modern Physics'],
-    'Chemistry': ['1. Some Basic Concepts', '2. Organic Chemistry (GOC)', '3. Inorganic Periodic Table', '4. Physical Equilibrium'],
-    'Biology': ['1. Cell: The Unit of Life', '2. Genetics & Evolution', '3. Plant Physiology', '4. Human Physiology'],
-    'Mathematics': ['1. Algebra', '2. Trigonometry', '3. Calculus', '4. Coordinate Geometry'],
+    'Physics': [
+      '1. Physical World and Measurement',
+      '2. Kinematics',
+      '3. Laws of Motion',
+      '4. Work, Energy and Power',
+      '5. Motion of System of Particles and Rigid Body',
+      '6. Gravitation',
+      '7. Properties of Bulk Matter',
+      '8. Thermodynamics',
+      '9. Behavior of Perfect Gas and Kinetic Theory',
+      '10. Oscillations and Waves',
+      '11. Electrostatics',
+      '12. Current Electricity',
+      '13. Magnetic Effects of Current and Magnetism',
+      '14. Electromagnetic Induction and Alternating Currents',
+      '15. Electromagnetic Waves',
+      '16. Optics (Ray & Wave)',
+      '17. Dual Nature of Matter and Radiation',
+      '18. Atoms and Nuclei',
+      '19. Electronic Devices / Semiconductors',
+      '20. Experimental Physics',
+    ],
+    'Chemistry': [
+      '1. Some Basic Concepts of Chemistry',
+      '2. Structure of Atom',
+      '3. Classification of Elements and Periodicity in Properties',
+      '4. Chemical Bonding and Molecular Structure',
+      '5. States of Matter: Gases and Liquids',
+      '6. Chemical Thermodynamics',
+      '7. Equilibrium (Chemical & Ionic)',
+      '8. Redox Reactions',
+      '9. Hydrogen & s-Block Elements',
+      '10. p-Block Elements (Group 13 to 18)',
+      '11. Organic Chemistry: Basic Principles & Techniques (GOC)',
+      '12. Hydrocarbons',
+      '13. Environmental Chemistry',
+      '14. Solid State & Solutions',
+      '15. Electrochemistry & Chemical Kinetics',
+      '16. Surface Chemistry',
+      '17. Isolation of Elements (Metallurgy)',
+      '18. d and f Block Elements',
+      '19. Coordination Compounds',
+      '20. Haloalkanes and Haloarenes',
+      '21. Alcohols, Phenols and Ethers',
+      '22. Aldehydes, Ketones and Carboxylic Acids',
+      '23. Organic Compounds Containing Nitrogen (Amines)',
+      '24. Biomolecules, Polymers & Chemistry in Everyday Life',
+    ],
+    'Biology': [
+      '1. The Living World',
+      '2. Biological Classification',
+      '3. Plant Kingdom',
+      '4. Animal Kingdom',
+      '5. Morphology of Flowering Plants',
+      '6. Anatomy of Flowering Plants',
+      '7. Structural Organisation in Animals',
+      '8. Cell: The Unit of Life',
+      '9. Biomolecules',
+      '10. Cell Cycle and Cell Division',
+      '11. Transport in Plants',
+      '12. Mineral Nutrition',
+      '13. Photosynthesis in Higher Plants',
+      '14. Respiration in Plants',
+      '15. Plant Growth and Development',
+      '16. Digestion and Absorption',
+      '17. Breathing and Exchange of Gases',
+      '18. Body Fluids and Circulation',
+      '19. Excretory Products and Their Elimination',
+      '20. Locomotion and Movement',
+      '21. Neural Control and Coordination',
+      '22. Chemical Coordination and Integration',
+      '23. Reproduction in Organisms',
+      '24. Sexual Reproduction in Flowering Plants',
+      '25. Human Reproduction & Reproductive Health',
+      '26. Principles of Inheritance and Variation',
+      '27. Molecular Basis of Inheritance',
+      '28. Evolution',
+      '29. Human Health and Disease',
+      '30. Strategies for Enhancement in Food Production',
+      '31. Microbes in Human Welfare',
+      '32. Biotechnology: Principles and Processes',
+      '33. Biotechnology and Its Applications',
+      '34. Organisms and Populations',
+      '35. Ecosystem, Biodiversity and Conservation',
+      '36. Environmental Issues',
+    ],
+    'Mathematics': [
+      '1. Sets, Relations and Functions',
+      '2. Complex Numbers and Quadratic Equations',
+      '3. Matrices and Determinants',
+      '4. Permutations and Combinations',
+      '5. Mathematical Induction & Binomial Theorem',
+      '6. Sequences and Series',
+      '7. Limit, Continuity and Differentiability',
+      '8. Integral Calculus (Definite & Indefinite)',
+      '9. Differential Equations',
+      '10. Coordinate Geometry (Straight Lines & Conics)',
+      '11. Three Dimensional Geometry',
+      '12. Vector Algebra',
+      '13. Statistics and Probability',
+      '14. Trigonometry',
+    ],
   };
 
   List<Map<String, dynamic>> _dbChapters = [];
@@ -69,12 +167,17 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     setState(() => _isLoading = true);
     try {
       try {
-        final cRes = await SupabaseService.client.from('chapters').select('*');
+        final cRes = await SupabaseService.client.from('chapters').select('*, subjects(name)');
         if (cRes != null && (cRes as List).isNotEmpty) {
           _dbChapters = (cRes as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         }
       } catch (e) {
-        debugPrint('Notice loading db chapters in admin dashboard: $e');
+        try {
+          final cRes = await SupabaseService.client.from('chapters').select('*');
+          if (cRes != null && (cRes as List).isNotEmpty) {
+            _dbChapters = (cRes as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
+          }
+        } catch (_) {}
       }
 
       final dbQuestions = await SupabaseService.fetchAllQuestionsFromSupabase();
@@ -489,6 +592,46 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     }
   }
 
+  List<String> _getChaptersForSubject(String subject) {
+    final List<String> result = [];
+    final lowerSub = subject.toLowerCase();
+
+    // 1. From DB chapters (using joined subjects table or subject fields)
+    for (var c in _dbChapters) {
+      final String chapName = c['name']?.toString() ?? '';
+      final String subName = (c['subjects'] != null && c['subjects'] is Map && c['subjects']['name'] != null)
+          ? c['subjects']['name'].toString()
+          : ((c['subject_name'] ?? c['subject'])?.toString() ?? '');
+      if (chapName.isNotEmpty) {
+        if (subName.isEmpty || subName.toLowerCase() == lowerSub) {
+          if (!result.contains(chapName)) result.add(chapName);
+        }
+      }
+    }
+
+    // 2. From comprehensive NEET/JEE syllabus map
+    final syllabusList = _subjectChaptersMap[subject] ?? [];
+    for (var chap in syllabusList) {
+      if (!result.contains(chap)) result.add(chap);
+    }
+
+    // 3. From all loaded questions
+    for (var q in _allQuestionsData) {
+      final qSub = _resolveSubjectName(q['subject'], q['subject_id']);
+      if (qSub.toLowerCase() == lowerSub) {
+        final cName = (q['chapter'] ?? q['chapter_name'] ?? q['chapterTopic'])?.toString().trim();
+        if (cName != null && cName.isNotEmpty && !result.contains(cName)) {
+          result.add(cName);
+        }
+      }
+    }
+
+    if (result.isEmpty) {
+      result.add('General');
+    }
+    return result;
+  }
+
   // Add/Edit Question Modal Form
   void _showQuestionFormModal({required bool isEdit, Map<String, dynamic>? initialData}) {
     final formKey = GlobalKey<FormState>();
@@ -501,17 +644,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
 
     String selSubject = _resolveSubjectName(initialData?['subject'], initialData?['subject_id']);
 
-    List<String> availableChapters = _dbChapters
-        .where((c) {
-          final sName = (c['subject_name'] ?? c['subject'])?.toString() ?? '';
-          return sName.toLowerCase() == selSubject.toLowerCase();
-        })
-        .map((c) => c['name'].toString())
-        .toList();
-
-    if (availableChapters.isEmpty) {
-      availableChapters = List<String>.from(_subjectChaptersMap[selSubject] ?? ['General']);
-    }
+    List<String> availableChapters = _getChaptersForSubject(selSubject);
 
     String selChapter = _resolveChapterName(initialData?['chapter'], initialData?['chapter_id'], initialData?['chapter_name']);
     if (selChapter.isNotEmpty && !availableChapters.contains(selChapter)) {
@@ -608,13 +741,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                             }).toList(),
                             onChanged: (v) => setDlgState(() {
                               selSubject = v!;
-                              availableChapters = _dbChapters
-                                  .where((c) => ((c['subject_name'] ?? c['subject'])?.toString() ?? '').toLowerCase() == selSubject.toLowerCase())
-                                  .map((c) => c['name'].toString())
-                                  .toList();
-                              if (availableChapters.isEmpty) {
-                                availableChapters = List<String>.from(_subjectChaptersMap[selSubject] ?? ['General']);
-                              }
+                              availableChapters = _getChaptersForSubject(selSubject);
                               selChapter = availableChapters.first;
                             }),
                           ),
