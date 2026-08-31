@@ -101,12 +101,38 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   bool _isLoading = true;
   bool _isSavingBatch = false;
 
+  bool _hasEssentialDetails(QuestionItemData q) {
+    // 1. Question text or image must be provided
+    final bool hasTextOrImage = q.text.trim().isNotEmpty || (q.questionImage != null && q.questionImage!.isNotEmpty);
+    if (!hasTextOrImage) return false;
+
+    // 2. Options: At least 2 non-empty options (or option images)
+    final int filledOpts = q.options.where((opt) => opt.trim().isNotEmpty).length;
+    final int filledImgs = q.optionImages.where((img) => img != null && img.isNotEmpty).length;
+    if ((filledOpts + filledImgs) < 2) return false;
+
+    // 3. Correct Answer: Must have selected a valid option index (0..options.length-1)
+    if (q.correctOptionIndex < 0 || q.correctOptionIndex >= q.options.length) return false;
+
+    // 4. Chapter / Topic: Must have a chapter assigned
+    if (q.chapterId.isEmpty && q.chapter.isEmpty && q.chapterTopic.isEmpty) return false;
+
+    // 5. Visibility / Available In *: Must have at least 1 visibility tag selected
+    if (q.availableIn.isEmpty) return false;
+
+    return true;
+  }
+
   void _scheduleAutoSave(QuestionItemData q) {
     if (_isLoading) return;
     _autoSaveTimer?.cancel();
     _autoSaveTimer = Timer(const Duration(milliseconds: 1500), () {
       if (!_isLoading && mounted) {
-        _saveSingleQuestion(q, showToast: false);
+        if (_hasEssentialDetails(q)) {
+          _saveSingleQuestion(q, showToast: false);
+        } else {
+          debugPrint('Auto-save skipped for Question ${q.number}: Missing essential details marked with *.');
+        }
       }
     });
   }
@@ -324,12 +350,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
     for (int i = 0; i < _questionsList.length; i++) {
       final q = _questionsList[i];
-      final bool hasContent = q.text.trim().isNotEmpty ||
-          (q.questionImage != null && q.questionImage!.isNotEmpty) ||
-          q.options.any((opt) => opt.trim().isNotEmpty) ||
-          q.optionImages.any((img) => img != null && img.isNotEmpty);
-
-      if (hasContent) {
+      if (_hasEssentialDetails(q)) {
         int correctIdx = (q.correctOptionIndex >= 0 && q.correctOptionIndex < q.options.length) ? q.correctOptionIndex : 0;
         String correctLetter = String.fromCharCode(65 + correctIdx);
         String correctAnsText = q.options[correctIdx].isNotEmpty
@@ -407,16 +428,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
   Future<void> _saveSingleQuestion(QuestionItemData q, {bool showToast = true}) async {
     if (_isLoading) return;
-    final bool hasContent = q.text.trim().isNotEmpty ||
-        (q.questionImage != null && q.questionImage!.isNotEmpty) ||
-        q.options.any((opt) => opt.trim().isNotEmpty) ||
-        q.optionImages.any((img) => img != null && img.isNotEmpty);
-
-    if (!hasContent) {
+    if (!_hasEssentialDetails(q)) {
       if (mounted && showToast) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Question ${q.number} is empty. Please enter text or an image before saving.'),
+            content: Text('Please complete all essential details marked with * for Question ${q.number} (Text, Options, Correct Answer, Chapter, Visibility).'),
             backgroundColor: const Color(0xFFEF4444),
           ),
         );
@@ -1398,7 +1414,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('1. Question', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+        Row(
+          children: [
+            Text('1. Question ', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+            Text('*', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
+          ],
+        ),
         const SizedBox(height: 8),
 
         Container(
@@ -1574,7 +1595,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('2. Options', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+            Row(
+              children: [
+                Text('2. Options ', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                Text('*', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
+              ],
+            ),
             Text('Is Correct?', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
           ],
         ),
@@ -1741,7 +1767,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 3. Correct Answer
-        Text('3. Correct Answer', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+        Row(
+          children: [
+            Text('3. Correct Answer ', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+            Text('*', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
+          ],
+        ),
         const SizedBox(height: 6),
         Container(
           width: double.infinity,
@@ -1933,7 +1964,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         const SizedBox(height: 16),
 
         // 8. Topic / Chapter
-        Text('8. Topic / Chapter', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+        Row(
+          children: [
+            Text('8. Topic / Chapter ', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+            Text('*', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
+          ],
+        ),
         const SizedBox(height: 6),
         Container(
           width: double.infinity,
