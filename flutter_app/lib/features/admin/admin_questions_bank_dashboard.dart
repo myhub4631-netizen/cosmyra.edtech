@@ -140,16 +140,20 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     return _dbChapters.isNotEmpty ? _dbChapters.first['name'].toString() : 'General';
   }
 
-  String _resolveChapterId(String chapterName, String? preferredChapterId) {
-    if (preferredChapterId != null && preferredChapterId.isNotEmpty && RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-').hasMatch(preferredChapterId)) {
-      return preferredChapterId;
+  String? _resolveChapterId(String chapterName, String? preferredChapterId) {
+    if (preferredChapterId != null && preferredChapterId.isNotEmpty) {
+      for (var c in _dbChapters) {
+        if (c['id']?.toString() == preferredChapterId) {
+          return preferredChapterId;
+        }
+      }
     }
     for (var c in _dbChapters) {
       if (c['name']?.toString().toLowerCase() == chapterName.toLowerCase()) {
         return c['id'].toString();
       }
     }
-    return _dbChapters.isNotEmpty ? _dbChapters.first['id'].toString() : 'b2222222-2222-2222-2222-222222222222';
+    return _dbChapters.isNotEmpty ? _dbChapters.first['id'].toString() : null;
   }
 
   String _normalizeQuestionType(dynamic qTypeRaw, dynamic typeRaw) {
@@ -845,7 +849,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                   final List<String> formOpts = [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text];
                   int cIdx = selCorrectIdx;
                   final String corrAnsStr = 'Option ${String.fromCharCode(65 + cIdx)}';
-                  final String selChapId = _resolveChapterId(selChapter, initialData?['chapter_id']);
+                  final String? selChapId = _resolveChapterId(selChapter, initialData?['chapter_id']);
 
                   final qMap = {
                     'id': isEdit ? initialData!['id'] : 'Q_${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',

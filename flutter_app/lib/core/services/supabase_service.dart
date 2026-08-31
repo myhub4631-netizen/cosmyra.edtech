@@ -2408,10 +2408,23 @@ class SupabaseService {
 
       final String finalExamId = await getOrCreateValidExamId(qMap['exam']?.toString() ?? 'NEET');
       final String finalSubjectId = await getOrCreateValidSubjectId(finalExamId, qMap['subject']?.toString() ?? 'Physics');
+      String? finalChapterId;
       final String? passedChapId = qMap['chapter_id']?.toString() ?? qMap['chapterId']?.toString();
-      final String finalChapterId = (passedChapId != null && isValidUuid(passedChapId))
-          ? passedChapId
-          : await getOrCreateValidChapterId(finalSubjectId, qMap['chapter']?.toString() ?? qMap['chapterTopic']?.toString() ?? 'Kinematics');
+      if (passedChapId != null && passedChapId.isNotEmpty && isValidUuid(passedChapId)) {
+        try {
+          final checkRes = await client.from('chapters').select('id').eq('id', passedChapId).limit(1);
+          if (checkRes != null && (checkRes as List).isNotEmpty) {
+            finalChapterId = passedChapId;
+          }
+        } catch (_) {}
+      }
+
+      if (finalChapterId == null) {
+        finalChapterId = await getOrCreateValidChapterId(
+          finalSubjectId,
+          qMap['chapter']?.toString() ?? qMap['chapterTopic']?.toString() ?? 'General',
+        );
+      }
 
       final String pIdRaw = qMap['paper_id']?.toString() ?? qMap['paperId']?.toString() ?? '';
 
