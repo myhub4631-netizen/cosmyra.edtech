@@ -1912,8 +1912,11 @@ class SupabaseService {
         final sLower = source.toLowerCase();
         final isPyqMatch = sLower.contains('pyq') && (qSource.contains('pyq') || qCategory.contains('pyq'));
         final isNtaMatch = sLower.contains('nta') && (qSource.contains('nta') || qCategory.contains('nta'));
-        final isMatch = isPyqMatch || isNtaMatch || qSource == sLower || qCategory == sLower;
-        if (!isMatch && allMaps.length > 5) continue;
+        final isCustomMatch = (sLower.contains('custom') || sLower.contains('practice') || sLower.contains('test')) &&
+            (qSource.contains('custom') || qSource.contains('practice') || qSource.contains('test') ||
+             qCategory.contains('custom') || qCategory.contains('practice') || qCategory.contains('test') || qCategory.contains('pyq'));
+        final isMatch = isPyqMatch || isNtaMatch || isCustomMatch || qSource == sLower || qCategory == sLower;
+        if (!isMatch && allMaps.length > 10) continue;
       }
 
       final optsRaw = map['options'] is List ? List<String>.from(map['options']) : <String>[];
@@ -1954,7 +1957,7 @@ class SupabaseService {
         qType: map['qType']?.toString() ?? map['question_type']?.toString() ?? 'single_correct',
         difficulty: (map['difficulty']?.toString() ?? 'medium').toLowerCase(),
         source: qSource,
-        sourceName: map['paperName']?.toString() ?? map['paper_name']?.toString() ?? map['sourceType']?.toString() ?? 'PYQ Question',
+        sourceName: map['paperName']?.toString() ?? map['paper_name']?.toString() ?? map['sourceType']?.toString() ?? 'Practice Question',
         year: (map['year'] is num) ? (map['year'] as num).toInt() : int.tryParse(map['year']?.toString() ?? '2026'),
         marks: (map['marks'] is num) ? (map['marks'] as num).toDouble() : double.tryParse(map['marks']?.toString() ?? '4') ?? 4.0,
         negativeMarks: (map['negativeMarks'] is num) ? (map['negativeMarks'] as num).toDouble() : double.tryParse(map['negativeMarks']?.toString() ?? '1') ?? 1.0,
@@ -1964,9 +1967,63 @@ class SupabaseService {
       ));
     }
 
+    // Fallback: If strict filtering produced 0 models but DB has questions, include all available DB questions
+    if (models.isEmpty && allMaps.isNotEmpty) {
+      for (var map in allMaps) {
+        final qSource = (map['sourceType'] ?? map['source_type'] ?? map['source'] ?? map['category'] ?? 'pyq').toString().toLowerCase();
+        final optsRaw = map['options'] is List ? List<String>.from(map['options']) : <String>[];
+        final optImgsRaw = map['optionImages'] is List
+            ? List<String?>.from(map['optionImages'])
+            : (map['option_images'] is List ? List<String?>.from(map['option_images']) : <String?>[]);
+
+        final opts = optsRaw.asMap().entries.map((e) {
+          final idx = e.key;
+          final text = e.value;
+          final img = idx < optImgsRaw.length ? optImgsRaw[idx] : null;
+          final optKey = 'opt_${map['id']}_$idx';
+          final isCorr = checkOptionIsCorrect(
+            optionIndex: idx,
+            optionText: text,
+            optionKey: optKey,
+            correctAnswerRaw: map['correctAnswer'] ?? map['correct_answer'],
+            correctOptionIndexRaw: map['correctOptionIndex'] ?? map['correct_option_index'],
+          );
+          return QuestionOptionModel(
+            id: optKey,
+            questionId: map['id']?.toString() ?? '',
+            optionIndex: idx,
+            optionText: text,
+            isCorrect: isCorr,
+            optionImage: img,
+          );
+        }).toList();
+
+        models.add(QuestionModel(
+          id: map['id']?.toString() ?? '',
+          examId: map['exam']?.toString() ?? map['exam_id']?.toString() ?? 'NEET',
+          subjectId: map['subject']?.toString() ?? map['subject_id']?.toString() ?? 'Physics',
+          chapterId: map['chapter']?.toString() ?? map['chapter_id']?.toString() ?? 'General',
+          topicId: map['topic']?.toString() ?? map['topic_id']?.toString() ?? 'General',
+          questionText: map['questionText']?.toString() ?? map['question_text']?.toString() ?? '',
+          questionImage: map['questionImage']?.toString() ?? map['question_image']?.toString(),
+          qType: map['qType']?.toString() ?? map['question_type']?.toString() ?? 'single_correct',
+          difficulty: (map['difficulty']?.toString() ?? 'medium').toLowerCase(),
+          source: qSource,
+          sourceName: map['paperName']?.toString() ?? map['paper_name']?.toString() ?? map['sourceType']?.toString() ?? 'Practice Question',
+          year: (map['year'] is num) ? (map['year'] as num).toInt() : int.tryParse(map['year']?.toString() ?? '2026'),
+          marks: (map['marks'] is num) ? (map['marks'] as num).toDouble() : double.tryParse(map['marks']?.toString() ?? '4') ?? 4.0,
+          negativeMarks: (map['negativeMarks'] is num) ? (map['negativeMarks'] as num).toDouble() : double.tryParse(map['negativeMarks']?.toString() ?? '1') ?? 1.0,
+          explanation: map['explanation']?.toString() ?? '',
+          solution: map['explanation']?.toString() ?? '',
+          options: opts,
+        ));
+      }
+    }
+
     if (limit <= models.length) {
       return models.sublist(0, limit);
     }
+    return models;
     return models;
   }
 
@@ -2216,6 +2273,16 @@ class SupabaseService {
 
       final String pIdRaw = qMap['paper_id']?.toString() ?? qMap['paperId']?.toString() ?? '';
 
+      List<String> availableInList = [];
+      if (qMap['available_in'] is List) {
+        availableInList = (qMap['available_in'] as List).map((v) => v.toString()).toList();
+      } else if (qMap['availableIn'] is List) {
+        availableInList = (qMap['availableIn'] as List).map((v) => v.toString()).toList();
+      }
+      if (availableInList.isEmpty) {
+        availableInList = ['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
+      }
+
       final Map<String, dynamic> qData = {
         'id': toValidUuid(rawId),
         'paper_id': pIdRaw.trim().isNotEmpty ? toValidUuid(pIdRaw) : null,
@@ -2229,6 +2296,7 @@ class SupabaseService {
         'difficulty': SupabaseQuestionMapper.toDbDifficulty(qMap['difficulty']),
         'source': SupabaseQuestionMapper.toDbQuestionSource(qMap['source'] ?? qMap['category'] ?? qMap['sourceType']),
         'status': SupabaseQuestionMapper.toDbQuestionStatus(qMap['status']),
+        'available_in': availableInList,
         'marks': (qMap['marks'] is num) ? (qMap['marks'] as num).toDouble() : double.tryParse(qMap['marks']?.toString() ?? '4.0') ?? 4.0,
         'negative_marks': (qMap['negativeMarks'] is num) ? (qMap['negativeMarks'] as num).toDouble() : double.tryParse(qMap['negativeMarks']?.toString() ?? '1.0') ?? 1.0,
         'correct_answer': normCorrectAns,

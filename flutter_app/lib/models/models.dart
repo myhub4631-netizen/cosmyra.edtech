@@ -285,8 +285,25 @@ class QuestionModel {
   final String? solution;
   final String? hint;
   final List<String> tags;
+  final List<String> availableIn; // ['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series']
   final String status; // draft, published, archived
   final List<QuestionOptionModel> options;
+
+  static const List<String> allVisibilityKeys = [
+    'custom_practice',
+    'custom_test',
+    'pyq_practice',
+    'nta_questions',
+    'test_series',
+  ];
+
+  static const Map<String, String> visibilityLabelsMap = {
+    'custom_practice': 'Custom Practice',
+    'custom_test': 'Custom Test',
+    'pyq_practice': 'PYQ Practice',
+    'nta_questions': 'NTA Questions',
+    'test_series': 'Test Series',
+  };
 
   QuestionModel({
     required this.id,
@@ -313,6 +330,13 @@ class QuestionModel {
     this.solution,
     this.hint,
     this.tags = const [],
+    this.availableIn = const [
+      'custom_practice',
+      'custom_test',
+      'pyq_practice',
+      'nta_questions',
+      'test_series',
+    ],
     this.status = 'published',
     required this.options,
   });
@@ -326,6 +350,17 @@ class QuestionModel {
     List<String> parsedTags = [];
     if (json['tags'] is List) {
       parsedTags = (json['tags'] as List).map((t) => t.toString()).toList();
+    }
+
+    List<String> parsedAvailableIn = [];
+    if (json['available_in'] is List) {
+      parsedAvailableIn = (json['available_in'] as List).map((v) => v.toString()).toList();
+    } else if (json['availableIn'] is List) {
+      parsedAvailableIn = (json['availableIn'] as List).map((v) => v.toString()).toList();
+    }
+    if (parsedAvailableIn.isEmpty) {
+      // Backfill with default all 5 modules for complete backward compatibility
+      parsedAvailableIn = List<String>.from(allVisibilityKeys);
     }
 
     return QuestionModel(
@@ -353,6 +388,7 @@ class QuestionModel {
       solution: json['solution'],
       hint: json['hint'],
       tags: parsedTags,
+      availableIn: parsedAvailableIn,
       status: json['status'] ?? 'published',
       options: parsedOptions,
     );
@@ -383,6 +419,8 @@ class QuestionModel {
         'solution': solution,
         'hint': hint,
         'tags': tags,
+        'available_in': availableIn,
+        'availableIn': availableIn,
         'status': status,
       };
 }

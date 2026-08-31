@@ -1,11 +1,11 @@
 {
-    "name": "cosmyra_exam_app",
-    "short_name": "cosmyra_exam_app",
+    "name": "Cosmyra Edu Flutter",
+    "short_name": "Cosmyra Edu",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Cosmyra Edu Flutter - AI-Powered NEET & JEE Preparation Platform",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

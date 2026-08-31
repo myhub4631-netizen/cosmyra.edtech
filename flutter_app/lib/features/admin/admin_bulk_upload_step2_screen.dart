@@ -50,6 +50,7 @@ class QuestionItemData {
   bool isSaved;
   bool isUploadingQuestionImage;
   List<bool> isUploadingOptionImage;
+  List<String> availableIn;
 
   QuestionItemData({
     this.id = '',
@@ -77,9 +78,13 @@ class QuestionItemData {
     this.isSaved = false,
     this.isUploadingQuestionImage = false,
     List<bool>? isUploadingOptionImage,
+    List<String>? availableIn,
   })  : options = options != null ? List<String>.from(options) : ['', '', '', ''],
         optionImages = optionImages != null ? List<String?>.from(optionImages) : [null, null, null, null],
-        isUploadingOptionImage = isUploadingOptionImage != null ? List<bool>.from(isUploadingOptionImage) : [false, false, false, false];
+        isUploadingOptionImage = isUploadingOptionImage != null ? List<bool>.from(isUploadingOptionImage) : [false, false, false, false],
+        availableIn = availableIn != null
+            ? List<String>.from(availableIn)
+            : ['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
 }
 
 class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen> {
@@ -409,6 +414,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       'chapter': q.chapter,
       'topic': q.topic,
       'sourceType': _paperData?['source_category'] ?? _paperData?['sourceCategory'] ?? 'PYQ',
+      'available_in': q.availableIn,
+      'availableIn': q.availableIn,
       'exam': _paperData?['exam'] ?? _paperData?['exam_name'] ?? 'NEET',
       'year': _paperData?['year']?.toString() ?? '2026',
       'paperName': _paperData?['paper_name'] ?? _paperData?['paperName'] ?? widget.paperName,
@@ -1912,7 +1919,61 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
             ),
           ),
         ),
+        const SizedBox(height: 16),
+
+        // 9. Visibility / Available In *
+        Text('9. Visibility / Available In *', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: q.availableIn.isEmpty ? Colors.red : const Color(0xFFCBD5E1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  _buildVisibilityChip(q, 'custom_practice', 'Custom Practice'),
+                  _buildVisibilityChip(q, 'custom_test', 'Custom Test'),
+                  _buildVisibilityChip(q, 'pyq_practice', 'PYQ Practice'),
+                  _buildVisibilityChip(q, 'nta_questions', 'NTA Questions'),
+                  _buildVisibilityChip(q, 'test_series', 'Test Series'),
+                ],
+              ),
+              if (q.availableIn.isEmpty) ...[
+                const SizedBox(height: 6),
+                Text('⚠️ Select at least 1 module', style: GoogleFonts.inter(fontSize: 11, color: Colors.red, fontWeight: FontWeight.bold)),
+              ],
+            ],
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _buildVisibilityChip(QuestionItemData q, String key, String label) {
+    final isSel = q.availableIn.contains(key);
+    return FilterChip(
+      label: Text(label, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500)),
+      selected: isSel,
+      onSelected: (val) {
+        setState(() {
+          if (val) {
+            if (!q.availableIn.contains(key)) q.availableIn.add(key);
+          } else {
+            q.availableIn.remove(key);
+          }
+        });
+      },
+      selectedColor: const Color(0xFFE0E7FF),
+      checkmarkColor: const Color(0xFF4F46E5),
+      visualDensity: VisualDensity.compact,
     );
   }
 

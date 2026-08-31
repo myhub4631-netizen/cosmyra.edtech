@@ -420,202 +420,297 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
     final opt4Ctrl = TextEditingController(text: opts.length > 3 ? opts[3].toString() : 'Option D');
     String selCorrectOpt = (isEdit && initialData != null) ? (initialData['correctAnswer'] ?? opt1Ctrl.text).toString() : opt1Ctrl.text;
 
+    List<String> initAvail = [];
+    if (isEdit && initialData != null) {
+      if (initialData['available_in'] is List) {
+        initAvail = (initialData['available_in'] as List).map((v) => v.toString()).toList();
+      } else if (initialData['availableIn'] is List) {
+        initAvail = (initialData['availableIn'] as List).map((v) => v.toString()).toList();
+      }
+    }
+    if (initAvail.isEmpty) {
+      initAvail = ['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
+    }
+
+    bool visCP = initAvail.contains('custom_practice');
+    bool visCT = initAvail.contains('custom_test');
+    bool visPYQ = initAvail.contains('pyq_practice');
+    bool visNTA = initAvail.contains('nta_questions');
+    bool visTS = initAvail.contains('test_series');
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          isEdit ? 'Edit Question (${initialData?['id']})' : 'Add New Question',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF0F172A)),
-        ),
-        content: SizedBox(
-          width: 620,
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Form(
-              key: formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Row 1: Subject & Chapter
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: selSubject,
-                          decoration: const InputDecoration(labelText: 'Subject', border: OutlineInputBorder()),
-                          items: ['Physics', 'Chemistry', 'Biology', 'Mathematics'].map((s) {
-                            return DropdownMenuItem(value: s, child: Text(s));
-                          }).toList(),
-                          onChanged: (v) => selSubject = v!,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            isEdit ? 'Edit Question (${initialData?['id']})' : 'Add New Question',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF0F172A)),
+          ),
+          content: SizedBox(
+            width: 620,
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Row 1: Subject & Chapter
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: selSubject,
+                            decoration: const InputDecoration(labelText: 'Subject', border: OutlineInputBorder()),
+                            items: ['Physics', 'Chemistry', 'Biology', 'Mathematics'].map((s) {
+                              return DropdownMenuItem(value: s, child: Text(s));
+                            }).toList(),
+                            onChanged: (v) => setDlgState(() => selSubject = v!),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: _subjectChaptersMap[selSubject]?.contains(selChapter) == true ? selChapter : _subjectChaptersMap[selSubject]?.first,
-                          decoration: const InputDecoration(labelText: 'Chapter', border: OutlineInputBorder()),
-                          items: (_subjectChaptersMap[selSubject] ?? ['1. General']).map((c) {
-                            return DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis));
-                          }).toList(),
-                          onChanged: (v) => selChapter = v!,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: _subjectChaptersMap[selSubject]?.contains(selChapter) == true ? selChapter : _subjectChaptersMap[selSubject]?.first,
+                            decoration: const InputDecoration(labelText: 'Chapter', border: OutlineInputBorder()),
+                            items: (_subjectChaptersMap[selSubject] ?? ['1. General']).map((c) {
+                              return DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis));
+                            }).toList(),
+                            onChanged: (v) => setDlgState(() => selChapter = v!),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Row 2: Category & Question Type
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: selCategory,
-                          decoration: const InputDecoration(labelText: 'Category / Source Module', border: OutlineInputBorder()),
-                          items: ['Custom Practice', 'Custom Test', 'PYQ Practice', 'NTA Question', 'Mock Test'].map((c) {
-                            return DropdownMenuItem(value: c, child: Text(c));
-                          }).toList(),
-                          onChanged: (v) => selCategory = v!,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: selType,
-                          decoration: const InputDecoration(labelText: 'Question Type', border: OutlineInputBorder()),
-                          items: ['MCQ', 'Multiple Correct', 'Match', 'Assertion', 'Numerical', 'True/False'].map((t) {
-                            return DropdownMenuItem(value: t, child: Text(t));
-                          }).toList(),
-                          onChanged: (v) => selType = v!,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Question Text Input
-                  TextFormField(
-                    controller: qTextCtrl,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: r'Question Text (Supports LaTeX \$...\$)',
-                      border: OutlineInputBorder(),
+                      ],
                     ),
-                    validator: (v) => (v == null || v.isEmpty) ? 'Please enter question text' : null,
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
 
-                  // Options Inputs
-                  const Text('Answer Options:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Expanded(child: TextFormField(controller: opt1Ctrl, decoration: const InputDecoration(labelText: 'Option A', isDense: true, border: OutlineInputBorder()))),
-                      const SizedBox(width: 8),
-                      Expanded(child: TextFormField(controller: opt2Ctrl, decoration: const InputDecoration(labelText: 'Option B', isDense: true, border: OutlineInputBorder()))),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(child: TextFormField(controller: opt3Ctrl, decoration: const InputDecoration(labelText: 'Option C', isDense: true, border: OutlineInputBorder()))),
-                      const SizedBox(width: 8),
-                      Expanded(child: TextFormField(controller: opt4Ctrl, decoration: const InputDecoration(labelText: 'Option D', isDense: true, border: OutlineInputBorder()))),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Correct Answer & Difficulty
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: selCorrectOpt,
-                          decoration: const InputDecoration(labelText: 'Correct Option', border: OutlineInputBorder()),
-                          items: [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text].map((o) {
-                            return DropdownMenuItem(value: o, child: Text(o.isEmpty ? 'Option' : o));
-                          }).toList(),
-                          onChanged: (v) => selCorrectOpt = v!,
+                    // Row 2: Category & Question Type
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: selCategory,
+                            decoration: const InputDecoration(labelText: 'Primary Category', border: OutlineInputBorder()),
+                            items: ['Custom Practice', 'Custom Test', 'PYQ Practice', 'NTA Question', 'Mock Test'].map((c) {
+                              return DropdownMenuItem(value: c, child: Text(c));
+                            }).toList(),
+                            onChanged: (v) => setDlgState(() => selCategory = v!),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: selDifficulty,
-                          decoration: const InputDecoration(labelText: 'Difficulty', border: OutlineInputBorder()),
-                          items: ['Easy', 'Medium', 'Hard'].map((d) {
-                            return DropdownMenuItem(value: d, child: Text(d));
-                          }).toList(),
-                          onChanged: (v) => selDifficulty = v!,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: selType,
+                            decoration: const InputDecoration(labelText: 'Question Type', border: OutlineInputBorder()),
+                            items: ['MCQ', 'Multiple Correct', 'Match', 'Assertion', 'Numerical', 'True/False'].map((t) {
+                              return DropdownMenuItem(value: t, child: Text(t));
+                            }).toList(),
+                            onChanged: (v) => setDlgState(() => selType = v!),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Marks & Status Row
-                  Row(
-                    children: [
-                      Expanded(child: TextFormField(controller: marksCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Marks (+)', border: OutlineInputBorder()))),
-                      const SizedBox(width: 12),
-                      Expanded(child: TextFormField(controller: negCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Negative Marks (-)', border: OutlineInputBorder()))),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: selStatus,
-                          decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
-                          items: ['Active', 'Inactive'].map((s) {
-                            return DropdownMenuItem(value: s, child: Text(s));
-                          }).toList(),
-                          onChanged: (v) => selStatus = v!,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Explanation / Solution Input
-                  TextFormField(
-                    controller: expCtrl,
-                    maxLines: 2,
-                    decoration: const InputDecoration(
-                      labelText: 'Explanation / Solution Details',
-                      border: OutlineInputBorder(),
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 14),
+
+                    // Visibility / Available In Multi-Select Card
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: (!visCP && !visCT && !visPYQ && !visNTA && !visTS) ? Colors.red : const Color(0xFFCBD5E1)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Visibility / Available In * (Select all modules where this question appears)',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1E293B))),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: [
+                              FilterChip(
+                                label: const Text('Custom Practice', style: TextStyle(fontSize: 11)),
+                                selected: visCP,
+                                onSelected: (val) => setDlgState(() => visCP = val),
+                                selectedColor: const Color(0xFFE0E7FF),
+                              ),
+                              FilterChip(
+                                label: const Text('Custom Test', style: TextStyle(fontSize: 11)),
+                                selected: visCT,
+                                onSelected: (val) => setDlgState(() => visCT = val),
+                                selectedColor: const Color(0xFFE0E7FF),
+                              ),
+                              FilterChip(
+                                label: const Text('PYQ Practice', style: TextStyle(fontSize: 11)),
+                                selected: visPYQ,
+                                onSelected: (val) => setDlgState(() => visPYQ = val),
+                                selectedColor: const Color(0xFFE0E7FF),
+                              ),
+                              FilterChip(
+                                label: const Text('NTA Questions', style: TextStyle(fontSize: 11)),
+                                selected: visNTA,
+                                onSelected: (val) => setDlgState(() => visNTA = val),
+                                selectedColor: const Color(0xFFE0E7FF),
+                              ),
+                              FilterChip(
+                                label: const Text('Test Series', style: TextStyle(fontSize: 11)),
+                                selected: visTS,
+                                onSelected: (val) => setDlgState(() => visTS = val),
+                                selectedColor: const Color(0xFFE0E7FF),
+                              ),
+                            ],
+                          ),
+                          if (!visCP && !visCT && !visPYQ && !visNTA && !visTS) ...[
+                            const SizedBox(height: 6),
+                            const Text('⚠️ Select at least 1 module', style: TextStyle(fontSize: 11, color: Colors.red, fontWeight: FontWeight.bold)),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Question Text Input
+                    TextFormField(
+                      controller: qTextCtrl,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: r'Question Text (Supports LaTeX \$...\$)',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) => (v == null || v.isEmpty) ? 'Please enter question text' : null,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Options Inputs
+                    const Text('Answer Options:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(child: TextFormField(controller: opt1Ctrl, decoration: const InputDecoration(labelText: 'Option A', isDense: true, border: OutlineInputBorder()))),
+                        const SizedBox(width: 8),
+                        Expanded(child: TextFormField(controller: opt2Ctrl, decoration: const InputDecoration(labelText: 'Option B', isDense: true, border: OutlineInputBorder()))),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(child: TextFormField(controller: opt3Ctrl, decoration: const InputDecoration(labelText: 'Option C', isDense: true, border: OutlineInputBorder()))),
+                        const SizedBox(width: 8),
+                        Expanded(child: TextFormField(controller: opt4Ctrl, decoration: const InputDecoration(labelText: 'Option D', isDense: true, border: OutlineInputBorder()))),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Correct Answer & Difficulty
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: selCorrectOpt,
+                            decoration: const InputDecoration(labelText: 'Correct Option', border: OutlineInputBorder()),
+                            items: [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text].map((o) {
+                              return DropdownMenuItem(value: o, child: Text(o.isEmpty ? 'Option' : o));
+                            }).toList(),
+                            onChanged: (v) => setDlgState(() => selCorrectOpt = v!),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: selDifficulty,
+                            decoration: const InputDecoration(labelText: 'Difficulty', border: OutlineInputBorder()),
+                            items: ['Easy', 'Medium', 'Hard'].map((d) {
+                              return DropdownMenuItem(value: d, child: Text(d));
+                            }).toList(),
+                            onChanged: (v) => setDlgState(() => selDifficulty = v!),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Marks & Status Row
+                    Row(
+                      children: [
+                        Expanded(child: TextFormField(controller: marksCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Marks (+)', border: OutlineInputBorder()))),
+                        const SizedBox(width: 12),
+                        Expanded(child: TextFormField(controller: negCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Negative Marks (-)', border: OutlineInputBorder()))),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: selStatus,
+                            decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
+                            items: ['Active', 'Inactive'].map((s) {
+                              return DropdownMenuItem(value: s, child: Text(s));
+                            }).toList(),
+                            onChanged: (v) => setDlgState(() => selStatus = v!),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Explanation / Solution Input
+                    TextFormField(
+                      controller: expCtrl,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Explanation / Solution Details',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5)),
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(ctx);
-                final qMap = {
-                  'id': isEdit ? initialData!['id'] : 'Q_${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
-                  'questionText': qTextCtrl.text,
-                  'questionImage': qImageCtrl.text,
-                  'subject': selSubject,
-                  'chapter': selChapter,
-                  'topic': selTopic,
-                  'category': selCategory,
-                  'type': selType,
-                  'difficulty': selDifficulty,
-                  'status': selStatus,
-                  'marks': int.tryParse(marksCtrl.text) ?? 4,
-                  'negativeMarks': double.tryParse(negCtrl.text) ?? 1.0,
-                  'options': [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text],
-                  'correctAnswer': selCorrectOpt,
-                  'explanation': expCtrl.text,
-                  'usedIn': isEdit ? (initialData!['usedIn'] ?? 0) : 0,
-                };
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5)),
+              onPressed: () async {
+                final List<String> availableInSel = [
+                  if (visCP) 'custom_practice',
+                  if (visCT) 'custom_test',
+                  if (visPYQ) 'pyq_practice',
+                  if (visNTA) 'nta_questions',
+                  if (visTS) 'test_series',
+                ];
+
+                if (availableInSel.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please select at least 1 "Visibility / Available In" option.'), backgroundColor: Colors.red),
+                  );
+                  return;
+                }
+
+                if (formKey.currentState!.validate()) {
+                  Navigator.pop(ctx);
+                  final qMap = {
+                    'id': isEdit ? initialData!['id'] : 'Q_${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
+                    'questionText': qTextCtrl.text,
+                    'questionImage': qImageCtrl.text,
+                    'subject': selSubject,
+                    'chapter': selChapter,
+                    'topic': selTopic,
+                    'category': selCategory,
+                    'available_in': availableInSel,
+                    'availableIn': availableInSel,
+                    'type': selType,
+                    'difficulty': selDifficulty,
+                    'status': selStatus,
+                    'marks': int.tryParse(marksCtrl.text) ?? 4,
+                    'negativeMarks': double.tryParse(negCtrl.text) ?? 1.0,
+                    'options': [opt1Ctrl.text, opt2Ctrl.text, opt3Ctrl.text, opt4Ctrl.text],
+                    'correctAnswer': selCorrectOpt,
+                    'explanation': expCtrl.text,
+                    'usedIn': isEdit ? (initialData!['usedIn'] ?? 0) : 0,
+                  };
 
                 if (isEdit) {
                   await SupabaseService.updateQuestionInSupabase(qMap['id'].toString(), qMap);
@@ -641,8 +736,9 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {

@@ -1,4 +1,4 @@
-package com.example.cosmyra_exam_app
+package com.cosmyra.neetjee
 
 import io.flutter.embedding.android.FlutterActivity
 

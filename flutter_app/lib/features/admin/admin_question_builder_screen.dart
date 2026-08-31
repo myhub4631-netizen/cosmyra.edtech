@@ -75,12 +75,26 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
     super.initState();
     if (widget.initialQuestionData != null) {
       final q = widget.initialQuestionData!;
-      _selectedSourceType = q['sourceType'] ?? 'NTA';
+      _selectedSourceType = q['sourceType'] ?? q['source_type'] ?? 'NTA';
       _selectedSubject = q['subject'] ?? 'Physics';
       _selectedChapter = q['chapter'] ?? 'Laws of Motion';
       _selectedDifficulty = q['difficulty'] ?? 'Medium';
-      _questionTextController.text = q['questionText'] ?? '';
+      _questionTextController.text = q['questionText'] ?? q['question_text'] ?? '';
       _explanationController.text = q['explanation'] ?? '';
+
+      List<String> avail = [];
+      if (q['available_in'] is List) {
+        avail = (q['available_in'] as List).map((v) => v.toString()).toList();
+      } else if (q['availableIn'] is List) {
+        avail = (q['availableIn'] as List).map((v) => v.toString()).toList();
+      }
+      if (avail.isNotEmpty) {
+        _showInCustomPractice = avail.contains('custom_practice');
+        _showInCustomTest = avail.contains('custom_test');
+        _showInPYQPractice = avail.contains('pyq_practice');
+        _showInNTAQuestionPractice = avail.contains('nta_questions');
+        _showInTestSeries = avail.contains('test_series');
+      }
     }
   }
 
@@ -99,11 +113,11 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
 
   void _addOption() {
     if (_optionsList.length >= 6) return;
-    final nextLabel = String.fromCharCode(65 + _optionsList.length);
+    final nextChar = String.fromCharCode(65 + _optionsList.length);
     setState(() {
       _optionsList.add({
-        'label': nextLabel,
-        'controller': TextEditingController(text: 'Option $nextLabel'),
+        'label': nextChar,
+        'controller': TextEditingController(text: 'Option $nextChar'),
         'hasImage': false,
       });
     });
@@ -112,7 +126,8 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
   void _removeOption(int index) {
     if (_optionsList.length <= 2) return;
     setState(() {
-      _optionsList.removeAt(index);
+      final removed = _optionsList.removeAt(index);
+      (removed['controller'] as TextEditingController).dispose();
       for (int i = 0; i < _optionsList.length; i++) {
         _optionsList[i]['label'] = String.fromCharCode(65 + i);
       }
@@ -123,6 +138,24 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
   }
 
   Future<void> _saveAndSubmitQuestion({bool isDraft = false}) async {
+    final availableInModules = <String>[
+      if (_showInCustomPractice) 'custom_practice',
+      if (_showInCustomTest) 'custom_test',
+      if (_showInPYQPractice) 'pyq_practice',
+      if (_showInNTAQuestionPractice) 'nta_questions',
+      if (_showInTestSeries) 'test_series',
+    ];
+
+    if (availableInModules.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select at least one "Visibility / Available In" option for this question.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final usedIn = <String>[];
     if (_showInCustomPractice) usedIn.add('Custom Practice');
     if (_showInCustomTest) usedIn.add('Custom Test');
@@ -161,7 +194,9 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
       'negativeMarks': _negativeMarksController.text,
       'hasImage': _hasImageDiagram,
       'tags': _tags.isEmpty ? [_selectedSubject, 'General'] : List<String>.from(_tags),
-      'usedIn': usedIn.isEmpty ? ['Custom Practice', 'Custom Test'] : usedIn,
+      'usedIn': usedIn,
+      'available_in': availableInModules,
+      'availableIn': availableInModules,
       'addedOn': '$day $month $year $timeStr',
       'options': optionTexts,
       'correctAnswer': correctVal,

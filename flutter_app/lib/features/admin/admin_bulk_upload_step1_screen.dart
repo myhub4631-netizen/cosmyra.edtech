@@ -54,6 +54,13 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   bool _subjectBotany = true;
   bool _subjectZoology = true;
 
+  // Visibility / Available In Multi-Select Checkboxes
+  bool _visCustomPractice = true;
+  bool _visCustomTest = true;
+  bool _visPyqPractice = true;
+  bool _visNtaQuestions = true;
+  bool _visTestSeries = true;
+
   // Upload Method Radio
   String _uploadMethod = 'manual'; // 'manual', 'excel', 'paste'
 
@@ -92,12 +99,32 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   }
 
   Future<void> _handleProceed() async {
+    final List<String> availableInModules = [
+      if (_visCustomPractice) 'custom_practice',
+      if (_visCustomTest) 'custom_test',
+      if (_visPyqPractice) 'pyq_practice',
+      if (_visNtaQuestions) 'nta_questions',
+      if (_visTestSeries) 'test_series',
+    ];
+
+    if (availableInModules.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select at least one "Visibility / Available In" module for the questions.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final String pName = _paperNameCtrl.text.trim().isNotEmpty ? _paperNameCtrl.text.trim() : 'NEET 2026 Phase 1';
     final String paperId = SupabaseService.toValidUuid('paper_${_examName}_${_year}_${_phaseSession}_$pName');
 
     final Map<String, dynamic> paperDetails = {
       'id': paperId,
       'sourceCategory': _sourceCategory,
+      'available_in': availableInModules,
+      'availableIn': availableInModules,
       'examName': _examName,
       'year': _year,
       'phaseSession': _phaseSession,
@@ -674,6 +701,73 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                 ],
               );
             },
+          ),
+
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF4F46E5)),
+                    SizedBox(width: 8),
+                    Text(
+                      'Visibility / Available In * (Select all modules where these questions should appear)',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 8,
+                  children: [
+                    FilterChip(
+                      label: const Text('Custom Practice'),
+                      selected: _visCustomPractice,
+                      onSelected: (val) => setState(() => _visCustomPractice = val),
+                      selectedColor: const Color(0xFFE0E7FF),
+                      checkmarkColor: const Color(0xFF4F46E5),
+                    ),
+                    FilterChip(
+                      label: const Text('Custom Test'),
+                      selected: _visCustomTest,
+                      onSelected: (val) => setState(() => _visCustomTest = val),
+                      selectedColor: const Color(0xFFE0E7FF),
+                      checkmarkColor: const Color(0xFF4F46E5),
+                    ),
+                    FilterChip(
+                      label: const Text('PYQ Practice'),
+                      selected: _visPyqPractice,
+                      onSelected: (val) => setState(() => _visPyqPractice = val),
+                      selectedColor: const Color(0xFFE0E7FF),
+                      checkmarkColor: const Color(0xFF4F46E5),
+                    ),
+                    FilterChip(
+                      label: const Text('NTA Questions'),
+                      selected: _visNtaQuestions,
+                      onSelected: (val) => setState(() => _visNtaQuestions = val),
+                      selectedColor: const Color(0xFFE0E7FF),
+                      checkmarkColor: const Color(0xFF4F46E5),
+                    ),
+                    FilterChip(
+                      label: const Text('Test Series'),
+                      selected: _visTestSeries,
+                      onSelected: (val) => setState(() => _visTestSeries = val),
+                      selectedColor: const Color(0xFFE0E7FF),
+                      checkmarkColor: const Color(0xFF4F46E5),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
 
           // Conditional Test Series Card Block (When Source Category == 'Test Series')

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cosmyra_exam_app/main.dart';
+import 'package:cosmyra_edu_flutter/main.dart';
 
 void main() {
   testWidgets('Cosmyra App smoke test', (WidgetTester tester) async {
