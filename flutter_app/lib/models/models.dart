@@ -343,16 +343,20 @@ class QuestionModel {
 
   factory QuestionModel.fromJson(Map<String, dynamic> json) {
     int targetCorrectIdx = -1;
-    final String corrStr = (json['correct_answer'] ?? json['correctAnswer'] ?? json['correctText'] ?? '').toString().trim();
-    if (corrStr.toUpperCase().startsWith('OPTION ')) {
-      final optNum = int.tryParse(corrStr.substring(7).trim()) ?? 1;
-      targetCorrectIdx = (optNum - 1).clamp(0, 5);
-    } else if (corrStr.length == 1 && RegExp(r'[A-D]', caseSensitive: false).hasMatch(corrStr)) {
-      targetCorrectIdx = corrStr.toUpperCase().codeUnitAt(0) - 65;
-    } else if (json['correct_option_index'] != null) {
+    if (json['correct_option_index'] != null) {
       targetCorrectIdx = (json['correct_option_index'] as num).toInt();
     } else if (json['correctOptionIndex'] != null) {
       targetCorrectIdx = (json['correctOptionIndex'] as num).toInt();
+    } else {
+      final String corrStr = (json['correct_answer'] ?? json['correctAnswer'] ?? json['correctText'] ?? '').toString().trim();
+      if (corrStr.toUpperCase().startsWith('OPTION ')) {
+        final optNum = int.tryParse(corrStr.substring(7).trim()) ?? -1;
+        if (optNum != -1) {
+          targetCorrectIdx = (optNum - 1).clamp(0, 5);
+        }
+      } else if (corrStr.length == 1 && RegExp(r'[A-D]', caseSensitive: false).hasMatch(corrStr)) {
+        targetCorrectIdx = corrStr.toUpperCase().codeUnitAt(0) - 65;
+      }
     }
 
     var rawOptions = json['options'] as List? ?? json['question_options'] as List? ?? [];
@@ -371,7 +375,7 @@ class QuestionModel {
           'is_correct': isOptCorrect,
         }));
       } else if (rawOpt is String) {
-        final bool isOptCorrect = (targetCorrectIdx != -1) ? (i == targetCorrectIdx) : (i == 0);
+        final bool isOptCorrect = (targetCorrectIdx != -1) ? (i == targetCorrectIdx) : false;
         parsedOptions.add(QuestionOptionModel(
           id: 'opt_${json['id']}_$i',
           questionId: json['id']?.toString() ?? '',
@@ -383,17 +387,18 @@ class QuestionModel {
     }
 
     if (parsedOptions.isNotEmpty && !parsedOptions.any((o) => o.isCorrect)) {
-      final int activeIndex = (targetCorrectIdx >= 0 && targetCorrectIdx < parsedOptions.length)
-          ? targetCorrectIdx
-          : 0;
-      parsedOptions[activeIndex] = QuestionOptionModel(
-        id: parsedOptions[activeIndex].id,
-        questionId: parsedOptions[activeIndex].questionId,
-        optionIndex: parsedOptions[activeIndex].optionIndex,
-        optionText: parsedOptions[activeIndex].optionText,
-        isCorrect: true,
-        optionImage: parsedOptions[activeIndex].optionImage,
-      );
+      if (targetCorrectIdx >= 0 && targetCorrectIdx < parsedOptions.length) {
+        parsedOptions[targetCorrectIdx] = QuestionOptionModel(
+          id: parsedOptions[targetCorrectIdx].id,
+          questionId: parsedOptions[targetCorrectIdx].questionId,
+          optionIndex: parsedOptions[targetCorrectIdx].optionIndex,
+          optionText: parsedOptions[targetCorrectIdx].optionText,
+          isCorrect: true,
+          optionImage: parsedOptions[targetCorrectIdx].optionImage,
+        );
+      } else {
+        debugPrint('Warning: Question ${json['id']} has no correct option index assigned.');
+      }
     }
 
     List<String> parsedTags = [];
@@ -444,8 +449,7 @@ class QuestionModel {
 
   Map<String, dynamic> toJson() {
     final int corrIdx = options.indexWhere((o) => o.isCorrect);
-    final int validCorrIdx = corrIdx != -1 ? corrIdx : 0;
-    final String corrAnsStr = 'Option ${String.fromCharCode(65 + validCorrIdx)}';
+    final String? corrAnsStr = corrIdx != -1 ? 'Option ${String.fromCharCode(65 + corrIdx)}' : null;
 
     return {
       'id': id,
@@ -478,8 +482,8 @@ class QuestionModel {
       'options': options.map((o) => o.toJson()).toList(),
       'correct_answer': corrAnsStr,
       'correctAnswer': corrAnsStr,
-      'correct_option_index': validCorrIdx,
-      'correctOptionIndex': validCorrIdx,
+      'correct_option_index': corrIdx != -1 ? corrIdx : null,
+      'correctOptionIndex': corrIdx != -1 ? corrIdx : null,
     };
   }
 }

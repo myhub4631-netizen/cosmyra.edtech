@@ -2298,8 +2298,10 @@ class SupabaseService {
         if (cAnsRaw != null && cAnsRaw.toString().trim().isNotEmpty) {
           final String str = cAnsRaw.toString().trim();
           if (str.toUpperCase().startsWith('OPTION ')) {
-            int numVal = int.tryParse(str.substring(7).trim()) ?? 1;
-            cIdx = (numVal - 1).clamp(0, 3);
+            int numVal = int.tryParse(str.substring(7).trim()) ?? -1;
+            if (numVal != -1) {
+              cIdx = (numVal - 1).clamp(0, 3);
+            }
           } else if (str.length == 1 && RegExp(r'[A-D]', caseSensitive: false).hasMatch(str)) {
             cIdx = str.toUpperCase().codeUnitAt(0) - 65;
           } else if (optionsList.isNotEmpty) {
@@ -2310,7 +2312,11 @@ class SupabaseService {
           }
         }
       }
-      if (cIdx < 0) cIdx = 0;
+
+      if (cIdx < 0) {
+        debugPrint('Warning: Question map ${qMap['id']} saved without explicit correct_option_index.');
+        cIdx = 0; // Default fallback only for unassigned new saves
+      }
 
       final String normCorrectAns = 'Option ${String.fromCharCode(65 + cIdx)}';
       final optionImagesList = qMap['optionImages'] is List
@@ -2597,8 +2603,38 @@ class SupabaseService {
     }
   }
 
+  /// Automatic repair method to sync questions whose correct_option_index or correct_answer was inconsistent
+  static Future<void> repairInconsistentCorrectAnswers() async {
+    try {
+      final optRes = await client.from('question_options').select('*').eq('is_correct', true);
+      if (optRes != null && (optRes as List).isNotEmpty) {
+        final Map<String, int> correctIdxMap = {};
+        for (var row in optRes) {
+          final qId = row['question_id']?.toString() ?? '';
+          final idx = (row['option_index'] as num?)?.toInt();
+          if (qId.isNotEmpty && idx != null) {
+            correctIdxMap[qId] = idx;
+          }
+        }
+
+        for (var entry in correctIdxMap.entries) {
+          final qId = entry.key;
+          final correctIdx = entry.value;
+          final correctLetter = 'Option ${String.fromCharCode(65 + correctIdx)}';
+          await client.from('questions').update({
+            'correct_option_index': correctIdx,
+            'correct_answer': correctLetter,
+          }).eq('id', qId);
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice repairing inconsistent correct answers: $e');
+    }
+  }
+
   /// Fetch all real questions from Supabase DB as the live single source of truth
   static Future<List<Map<String, dynamic>>> fetchAllQuestionsFromSupabase() async {
+    repairInconsistentCorrectAnswers();
     final List<Map<String, dynamic>> allQuestions = [];
 
     // Fetch question_options from Supabase child table
