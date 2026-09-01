@@ -23,6 +23,7 @@ import '../../features/student/test_series_screen.dart';
 import '../../features/tests/mock_tests_screen.dart';
 import '../../features/tests/test_screen.dart';
 import '../../features/tests/test_result_screen.dart';
+import '../../features/tests/my_tests_history_screen.dart';
 import '../../features/practice/practice_screen.dart';
 import '../../features/practice/custom_practice_wizard.dart';
 import '../../features/admin/admin_dashboard_screen.dart';
@@ -103,8 +104,9 @@ final GoRouter appRouter = GoRouter(
         userProfile: _getEffectiveProfile(),
         activeExam: 'NEET',
         onOpenPractice: () => context.go('/practice'),
-        onOpenCustomTest: () => context.go('/mock-tests'),
-        onOpenMockTests: () => context.go('/mock-tests'),
+        onOpenCustomTest: () => context.go('/my-tests'),
+        onOpenMockTests: () => context.go('/my-tests'),
+        onOpenMyTests: () => context.go('/my-tests'),
         onOpenPyqs: () => context.go('/pyq'),
         onOpenMistakes: () => context.go('/mistakes'),
         onLogout: () => context.go('/login'),
@@ -116,11 +118,36 @@ final GoRouter appRouter = GoRouter(
         userProfile: _getEffectiveProfile(),
         activeExam: 'NEET',
         onOpenPractice: () => context.go('/practice'),
-        onOpenCustomTest: () => context.go('/mock-tests'),
-        onOpenMockTests: () => context.go('/mock-tests'),
+        onOpenCustomTest: () => context.go('/my-tests'),
+        onOpenMockTests: () => context.go('/my-tests'),
+        onOpenMyTests: () => context.go('/my-tests'),
         onOpenPyqs: () => context.go('/pyq'),
         onOpenMistakes: () => context.go('/mistakes'),
         onLogout: () => context.go('/login'),
+      ),
+    ),
+    GoRoute(
+      path: '/my-tests',
+      builder: (context, state) => MyTestsHistoryScreen(
+        userProfile: _getEffectiveProfile(),
+        onBack: () => context.go('/dashboard'),
+        onNavigateTab: (idx) {},
+      ),
+    ),
+    GoRoute(
+      path: '/tests',
+      builder: (context, state) => MyTestsHistoryScreen(
+        userProfile: _getEffectiveProfile(),
+        onBack: () => context.go('/dashboard'),
+        onNavigateTab: (idx) {},
+      ),
+    ),
+    GoRoute(
+      path: '/history',
+      builder: (context, state) => MyTestsHistoryScreen(
+        userProfile: _getEffectiveProfile(),
+        onBack: () => context.go('/dashboard'),
+        onNavigateTab: (idx) {},
       ),
     ),
     GoRoute(
@@ -169,8 +196,9 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/mock-tests',
-      builder: (context, state) => TestSeriesScreen(
-        onBackToDashboard: () => context.go('/dashboard'),
+      builder: (context, state) => MyTestsHistoryScreen(
+        userProfile: _getEffectiveProfile(),
+        onBack: () => context.go('/dashboard'),
         onNavigateTab: (idx) {},
       ),
     ),
