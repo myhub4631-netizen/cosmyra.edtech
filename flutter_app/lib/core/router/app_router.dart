@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/supabase_service.dart';
@@ -45,6 +46,10 @@ int _activeTestTimerMinutes = 30;
 TestAttemptModel? _lastTestAttempt;
 Map<int, String>? _lastTestUserAnswers;
 List<QuestionModel>? _lastTestQuestions;
+String? _activePracticeSessionId;
+bool _isNewPracticeSession = false;
+String? _activeTestSessionId;
+bool _isNewTestSession = false;
 
 UserProfileModel _getEffectiveProfile() {
   if (SupabaseService.activeUserSession != null) {
@@ -236,6 +241,9 @@ final GoRouter appRouter = GoRouter(
         onStartPractice: (questions, timerMins) {
           _activeTestQuestions = questions;
           _activeTestTimerMinutes = timerMins;
+          final newSessionId = 'session_${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(999999)}';
+          _activePracticeSessionId = newSessionId;
+          _isNewPracticeSession = true;
           context.go('/practice/session');
         },
       ),
@@ -249,7 +257,9 @@ final GoRouter appRouter = GoRouter(
         onStartPractice: (questions, timerMins) {
           _activeTestQuestions = questions;
           _activeTestTimerMinutes = timerMins;
-          final String attemptId = 'attempt_${DateTime.now().millisecondsSinceEpoch}';
+          final String attemptId = 'attempt_${DateTime.now().microsecondsSinceEpoch}';
+          _activeTestSessionId = attemptId;
+          _isNewTestSession = true;
           context.go('/custom-test/attempt/$attemptId');
         },
       ),
@@ -257,9 +267,13 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/custom-test/attempt/:attemptId',
       builder: (context, state) {
-        final attemptId = state.pathParameters['attemptId'] ?? 'attempt_1';
+        final attemptId = state.pathParameters['attemptId'] ?? _activeTestSessionId ?? 'attempt_${DateTime.now().microsecondsSinceEpoch}';
         final questions = _activeTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        final bool isNew = _isNewTestSession;
+        _isNewTestSession = false;
         return CustomTestScreen(
+          sessionId: attemptId,
+          isNewSession: isNew,
           questions: questions,
           durationMinutes: _activeTestTimerMinutes > 0 ? _activeTestTimerMinutes : 30,
           onTestSubmitted: (attempt, answers) {
@@ -317,6 +331,9 @@ final GoRouter appRouter = GoRouter(
         onStartPractice: (questions, timerMins) {
           _activeTestQuestions = questions;
           _activeTestTimerMinutes = timerMins;
+          final newSessionId = 'session_${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(999999)}';
+          _activePracticeSessionId = newSessionId;
+          _isNewPracticeSession = true;
           context.go('/practice/session');
         },
       ),
@@ -325,7 +342,12 @@ final GoRouter appRouter = GoRouter(
       path: '/practice/:subject',
       builder: (context, state) {
         final questions = _activeTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        final String currentSessionId = _activePracticeSessionId ?? 'session_${DateTime.now().microsecondsSinceEpoch}';
+        final bool isNew = _isNewPracticeSession;
+        _isNewPracticeSession = false;
         return PracticeScreen(
+          sessionId: currentSessionId,
+          isNewSession: isNew,
           questions: questions,
           timerMinutes: _activeTestTimerMinutes,
           onFinish: () => context.go('/dashboard'),
@@ -342,7 +364,11 @@ final GoRouter appRouter = GoRouter(
         onStartPYQSession: (questions, timerMins, isTestMode) {
           _activeTestQuestions = questions;
           _activeTestTimerMinutes = timerMins;
-          final attemptId = 'pyq_${DateTime.now().millisecondsSinceEpoch}';
+          final attemptId = 'pyq_${DateTime.now().microsecondsSinceEpoch}';
+          _activePracticeSessionId = attemptId;
+          _isNewPracticeSession = true;
+          _activeTestSessionId = attemptId;
+          _isNewTestSession = true;
           if (isTestMode) {
             context.go('/pyq/test');
           } else {
@@ -356,7 +382,12 @@ final GoRouter appRouter = GoRouter(
       path: '/pyq/practice',
       builder: (context, state) {
         final questions = _activeTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        final String currentSessionId = _activePracticeSessionId ?? 'pyq_${DateTime.now().microsecondsSinceEpoch}';
+        final bool isNew = _isNewPracticeSession;
+        _isNewPracticeSession = false;
         return PracticeScreen(
+          sessionId: currentSessionId,
+          isNewSession: isNew,
           questions: questions,
           timerMinutes: 0,
           onFinish: () => context.go('/pyq'),
@@ -367,8 +398,12 @@ final GoRouter appRouter = GoRouter(
       path: '/pyq/test',
       builder: (context, state) {
         final questions = _activeTestQuestions ?? SupabaseService.getSampleQuestions(20);
-        final attemptId = 'pyq_${DateTime.now().millisecondsSinceEpoch}';
+        final attemptId = _activeTestSessionId ?? 'pyq_${DateTime.now().microsecondsSinceEpoch}';
+        final bool isNew = _isNewTestSession;
+        _isNewTestSession = false;
         return CustomTestScreen(
+          sessionId: attemptId,
+          isNewSession: isNew,
           questions: questions,
           durationMinutes: _activeTestTimerMinutes > 0 ? _activeTestTimerMinutes : 30,
           onTestSubmitted: (attempt, answers) {
