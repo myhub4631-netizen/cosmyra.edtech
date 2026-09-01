@@ -3,36 +3,170 @@ import 'package:flutter/services.dart';
 import '../../models/models.dart';
 
 /// Helper utility for extracting clean, user-facing rendered question content
-/// suitable for pasting directly into ChatGPT, Word, Google Docs, etc.
+/// suitable for pasting directly into ChatGPT, Word, Google Docs, WhatsApp, Notes, etc.
 class QuestionCopyHelper {
-  /// Cleans HTML tags, internal editor JSON/markup, and normalizes line breaks.
+  /// Cleans HTML tags, parses tables into clean aligned plain text without borders/pipes,
+  /// normalizes line breaks and decodes HTML entities.
   static String cleanTextContent(String raw) {
     if (raw.trim().isEmpty) return '';
     String text = raw;
 
-    // Replace HTML break tags with newlines
+    // 1. Convert HTML <table>...</table> blocks into clean aligned plain text
+    final tableRegex = RegExp(r'<table[^>]*>(.*?)</table>', dotAll: true, caseSensitive: false);
+    text = text.replaceAllMapped(tableRegex, (match) {
+      final tableContent = match.group(1) ?? '';
+      return _parseHtmlTableToPlainText(tableContent);
+    });
+
+    // 2. Convert Markdown / ASCII Pipe tables (| Col 1 | Col 2 |) into clean aligned text
+    text = _parsePipeTableToPlainText(text);
+
+    // 3. Convert HTML paragraph and break tags into clean newlines
     text = text.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
-    text = text.replaceAll(RegExp(r'</p\s*>', caseSensitive: false), '\n');
+    text = text.replaceAll(RegExp(r'</p\s*>', caseSensitive: false), '\n\n');
     text = text.replaceAll(RegExp(r'</div>', caseSensitive: false), '\n');
     text = text.replaceAll(RegExp(r'</li>', caseSensitive: false), '\n');
 
-    // Strip remaining HTML tags
+    // 4. Strip any remaining HTML tags
     text = text.replaceAll(RegExp(r'<[^>]*>'), '');
 
-    // Replace HTML entities
+    // 5. Decode HTML entities & Greek/Math symbols
     text = text.replaceAll('&nbsp;', ' ');
     text = text.replaceAll('&amp;', '&');
     text = text.replaceAll('&lt;', '<');
     text = text.replaceAll('&gt;', '>');
     text = text.replaceAll('&quot;', '"');
+    text = text.replaceAll('&#39;', "'");
+    text = text.replaceAll('&nu;', 'ν');
+    text = text.replaceAll('&lambda;', 'λ');
+    text = text.replaceAll('&pi;', 'π');
+    text = text.replaceAll('&theta;', 'θ');
+    text = text.replaceAll('&alpha;', 'α');
+    text = text.replaceAll('&beta;', 'β');
+    text = text.replaceAll('&infin;', '∞');
 
-    // Normalize multiple consecutive blank lines (more than 2 -> 2)
+    // 6. Normalize line breaks and remove extra trailing blank lines
+    text = text.replaceAll(RegExp(r'\r\n|\r'), '\n');
     text = text.replaceAll(RegExp(r'\n{3,}'), '\n\n');
 
     return text.trim();
   }
 
-  /// Formats a question into clean, user-facing text with options A, B, C, D.
+  /// Parses HTML table rows and cells into aligned column text without borders
+  static String _parseHtmlTableToPlainText(String tableHtml) {
+    final trRegex = RegExp(r'<tr[^>]*>(.*?)</tr>', dotAll: true, caseSensitive: false);
+    final trMatches = trRegex.allMatches(tableHtml);
+    if (trMatches.isEmpty) return tableHtml;
+
+    List<List<String>> tableRows = [];
+    for (final tr in trMatches) {
+      final rowHtml = tr.group(1) ?? '';
+      final cellRegex = RegExp(r'<(?:td|th)[^>]*>(.*?)</(?:td|th)>', dotAll: true, caseSensitive: false);
+      final cellMatches = cellRegex.allMatches(rowHtml);
+      List<String> rowCells = [];
+      for (final cell in cellMatches) {
+        String content = cell.group(1) ?? '';
+        content = content.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+        rowCells.add(content);
+      }
+      if (rowCells.isNotEmpty) {
+        tableRows.add(rowCells);
+      }
+    }
+
+    return _formatTableRowsToAlignedColumns(tableRows);
+  }
+
+  /// Parses Markdown / ASCII Pipe tables into clean aligned plain text
+  static String _parsePipeTableToPlainText(String fullText) {
+    final lines = fullText.split('\n');
+    List<String> resultLines = [];
+    List<List<String>> currentTableBuffer = [];
+
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i].trim();
+
+      // Check if line is part of a pipe table (contains '|' and has multiple sections)
+      if (line.startsWith('|') || (line.contains('|') && line.split('|').length >= 3)) {
+        // Skip table separator line like "|---|---|" or "| ------ | ------ |"
+        if (RegExp(r'^\|?[\s\-:|]+\|?$').hasMatch(line)) {
+          continue;
+        }
+
+        final rawCells = line.split('|');
+        List<String> cells = [];
+        for (var c in rawCells) {
+          final trimmed = c.trim();
+          cells.add(trimmed);
+        }
+
+        // Clean out empty leading/trailing cells caused by outer pipes
+        if (cells.isNotEmpty && cells.first.isEmpty) cells.removeAt(0);
+        if (cells.isNotEmpty && cells.last.isEmpty) cells.removeLast();
+
+        if (cells.isNotEmpty) {
+          currentTableBuffer.add(cells);
+          continue;
+        }
+      }
+
+      // Flush table buffer if we exit table section
+      if (currentTableBuffer.isNotEmpty) {
+        resultLines.add(_formatTableRowsToAlignedColumns(currentTableBuffer));
+        currentTableBuffer.clear();
+      }
+
+      resultLines.add(lines[i]);
+    }
+
+    if (currentTableBuffer.isNotEmpty) {
+      resultLines.add(_formatTableRowsToAlignedColumns(currentTableBuffer));
+      currentTableBuffer.clear();
+    }
+
+    return resultLines.join('\n');
+  }
+
+  /// Formats a 2D list of cells into aligned column plain text without pipes/borders
+  static String _formatTableRowsToAlignedColumns(List<List<String>> rows) {
+    if (rows.isEmpty) return '';
+
+    int maxCols = 0;
+    for (final r in rows) {
+      if (r.length > maxCols) maxCols = r.length;
+    }
+
+    List<int> colWidths = List.filled(maxCols, 0);
+    for (final r in rows) {
+      for (int c = 0; c < r.length; c++) {
+        final cellLen = r[c].length;
+        if (cellLen > colWidths[c]) {
+          colWidths[c] = cellLen;
+        }
+      }
+    }
+
+    final StringBuffer sb = StringBuffer();
+    sb.writeln(); // Blank space before table
+    for (final r in rows) {
+      final List<String> formattedCells = [];
+      for (int c = 0; c < r.length; c++) {
+        final cellText = r[c];
+        if (c < r.length - 1) {
+          // Align column 1 with spacing (minimum padding of 4 spaces)
+          final targetWidth = (colWidths[c] < 30) ? 32 : (colWidths[c] + 4);
+          formattedCells.add(cellText.padRight(targetWidth));
+        } else {
+          formattedCells.add(cellText);
+        }
+      }
+      sb.writeln(formattedCells.join(''));
+    }
+    sb.writeln(); // Blank space after table
+    return sb.toString();
+  }
+
+  /// Formats a question into clean, user-facing plain text with options A, B, C, D.
   static String formatForClipboard({
     required String questionText,
     required List<dynamic> options,
@@ -63,7 +197,12 @@ class QuestionCopyHelper {
           optText = opt.toString();
         }
 
-        final cleanOpt = cleanTextContent(optText);
+        String cleanOpt = cleanTextContent(optText);
+
+        // Strip redundant double prefix like "A. " if option text already contains option letter
+        final prefixRegex = RegExp('^\\(?$letter[\\.\\)]\\s*', caseSensitive: false);
+        cleanOpt = cleanOpt.replaceFirst(prefixRegex, '');
+
         sb.writeln('Option $letter: $cleanOpt');
       }
     }
