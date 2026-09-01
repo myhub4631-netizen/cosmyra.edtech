@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/latex_view.dart';
 import 'exam_config_engine.dart';
+import '../leaderboard/leaderboard_screen.dart';
 
 class TestResultScreen extends StatefulWidget {
   final TestAttemptModel attempt;
@@ -524,8 +525,12 @@ class _TestResultScreenState extends State<TestResultScreen> {
           const SizedBox(width: 10),
           ElevatedButton(
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Leaderboard functionality updated!'), duration: Duration(seconds: 2)),
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (ctx) => LeaderboardScreen(
+                    initialExam: _prediction.examName,
+                  ),
+                ),
               );
             },
             style: ElevatedButton.styleFrom(
