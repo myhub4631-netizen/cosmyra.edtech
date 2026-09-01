@@ -752,89 +752,187 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Icon Container
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: item.iconBgColor,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(item.icon, color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: 14),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < 520;
 
-              // Main Info Column
-              Expanded(
-                child: Column(
+              String nextNameDisplay = item.nextTestName;
+              if (nextNameDisplay.contains('-') || nextNameDisplay.length > 20) {
+                nextNameDisplay = 'Paper 01';
+              }
+
+              if (isMobile) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      item.title,
-                      style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      item.subtitle,
-                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w400, color: const Color(0xFF64748B)),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Meta Pills Row (Tests, Duration, Difficulty)
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildMetaPill(Icons.description_outlined, '${item.testCount} Tests'),
-                        const SizedBox(width: 10),
-                        _buildMetaPill(Icons.access_time_rounded, '${item.durationMinutes} min'),
-                        const SizedBox(width: 10),
-                        _buildMetaPill(Icons.bar_chart_rounded, item.difficulty),
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: item.iconBgColor,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(item.icon, color: Colors.white, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.title,
+                                style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                item.subtitle,
+                                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w400, color: const Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isInProgress ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            item.status,
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isInProgress ? const Color(0xFF047857) : const Color(0xFF1D4ED8),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildMetaPill(Icons.description_outlined, '${item.testCount} Tests'),
+                              const SizedBox(width: 8),
+                              _buildMetaPill(Icons.access_time_rounded, '${item.durationMinutes} min'),
+                              const SizedBox(width: 8),
+                              _buildMetaPill(Icons.bar_chart_rounded, item.difficulty),
+                            ],
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Text(
+                              isInProgress ? 'Resume' : 'Start Test',
+                              style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF2563EB)),
+                          ],
+                        ),
                       ],
                     ),
                   ],
-                ),
-              ),
+                );
+              }
 
-              const SizedBox(width: 12),
-
-              // Right Status Pill & Start Next Test Info
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisAlignment: MainAxisAlignment.center,
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: isInProgress ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF),
+                      color: item.iconBgColor,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      item.status,
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: isInProgress ? const Color(0xFF047857) : const Color(0xFF1D4ED8),
-                      ),
+                    child: Icon(item.icon, color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: 14),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.subtitle,
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w400, color: const Color(0xFF64748B)),
+                        ),
+                        const SizedBox(height: 8),
+
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildMetaPill(Icons.description_outlined, '${item.testCount} Tests'),
+                              const SizedBox(width: 10),
+                              _buildMetaPill(Icons.access_time_rounded, '${item.durationMinutes} min'),
+                              const SizedBox(width: 10),
+                              _buildMetaPill(Icons.bar_chart_rounded, item.difficulty),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    isInProgress ? 'Next Test' : 'Start Test',
-                    style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w500, color: const Color(0xFF94A3B8)),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    item.nextTestName,
-                    style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 8),
 
-              const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF94A3B8)),
-            ],
+                  const SizedBox(width: 12),
+
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 120),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isInProgress ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            item.status,
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isInProgress ? const Color(0xFF047857) : const Color(0xFF1D4ED8),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          isInProgress ? 'Next Test' : 'Start Test',
+                          style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w500, color: const Color(0xFF94A3B8)),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          nextNameDisplay,
+                          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF94A3B8)),
+                ],
+              );
+            },
           ),
         ),
       ),
