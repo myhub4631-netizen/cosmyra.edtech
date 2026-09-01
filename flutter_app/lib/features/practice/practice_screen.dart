@@ -324,6 +324,21 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_submittedAttempt != null) {
+      return TestResultScreen(
+        attempt: _submittedAttempt!,
+        questions: widget.questions,
+        userAnswers: _selectedAnswers,
+        onBackToDashboard: widget.onFinish,
+        onRetryTest: () {
+          setState(() {
+            _submittedAttempt = null;
+            _clearPracticeSession();
+          });
+        },
+      );
+    }
+
     if (widget.questions.isEmpty) {
       return const Center(child: Text('No practice questions available.'));
     }
