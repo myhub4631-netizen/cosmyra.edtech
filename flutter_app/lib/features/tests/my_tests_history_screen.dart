@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/app_sidebar.dart';
@@ -97,7 +99,7 @@ class _MyTestsHistoryScreenState extends State<MyTestsHistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _loadMockHistoryData();
+    _loadRealHistoryData();
   }
 
   @override
@@ -106,128 +108,199 @@ class _MyTestsHistoryScreenState extends State<MyTestsHistoryScreen> {
     super.dispose();
   }
 
-  void _loadMockHistoryData() {
+  Future<void> _loadRealHistoryData() async {
     setState(() => _isLoading = true);
 
-    Future.delayed(const Duration(milliseconds: 150), () {
-      final List<TestHistoryItem> items = [
-        // 1. Custom Test (Completed)
-        TestHistoryItem(
-          id: 'item_1',
-          title: 'NEET Physics + Chemistry Test',
-          category: TestCategoryFilter.customTest,
-          badgeLabel: 'My Creation',
-          isOfficial: false,
-          questionsCount: 60,
-          maxMarks: 240,
-          subjectsInfo: 'Physics, Chemistry',
-          createdDate: DateTime.now().subtract(const Duration(days: 2)),
-          status: TestStatusFilter.completed,
-          score: 156,
-          totalScoreMax: 240,
-          accuracy: 81.0,
-          timeTaken: '01:32:18',
-          attemptsCount: 2,
-        ),
+    final List<TestHistoryItem> items = [];
 
-        // 2. Custom Practice (Attempted)
-        TestHistoryItem(
-          id: 'item_2',
-          title: 'Electrostatics',
-          category: TestCategoryFilter.customPractice,
-          badgeLabel: 'My Creation',
-          isOfficial: false,
-          questionsCount: 25,
-          maxMarks: 100,
-          subjectsInfo: 'Physics',
-          createdDate: DateTime.now().subtract(const Duration(days: 3)),
-          status: TestStatusFilter.attempted,
-          score: 18,
-          totalScoreMax: 25,
-          accuracy: 72.0,
-          bestScore: 20,
-          attemptsCount: 3,
-        ),
+    try {
+      final prefs = await SharedPreferences.getInstance();
 
-        // 3. NEET PYQ (Completed)
-        TestHistoryItem(
-          id: 'item_3',
-          title: 'NEET PYQ 2024',
-          category: TestCategoryFilter.neetPyq,
-          badgeLabel: 'Official',
-          isOfficial: true,
-          questionsCount: 50,
-          maxMarks: 200,
-          subjectsInfo: 'Physics • Current Electricity',
-          createdDate: DateTime.now().subtract(const Duration(days: 4)),
-          status: TestStatusFilter.completed,
-          score: 168,
-          totalScoreMax: 200,
-          accuracy: 84.0,
-          percentile: 98.76,
-          attemptsCount: 1,
-        ),
+      // 1. Load submitted test attempts from local storage 'cosmyra_test_attempts_history'
+      final localAttemptsStr = prefs.getString('cosmyra_test_attempts_history');
+      if (localAttemptsStr != null && localAttemptsStr.isNotEmpty) {
+        final List<dynamic> localList = jsonDecode(localAttemptsStr);
+        for (var item in localList) {
+          final String id = item['id']?.toString() ?? '';
+          if (id.isNotEmpty) {
+            final String title = item['testTitle'] ?? 'Custom Practice Session';
+            final double score = (item['totalScore'] as num?)?.toDouble() ?? 0.0;
+            final double maxMarks = (item['maxMarks'] as num?)?.toDouble() ?? 200.0;
+            final double accuracy = (item['accuracy'] as num?)?.toDouble() ?? 0.0;
+            final int timeSpent = (item['timeSpentSeconds'] as num?)?.toInt() ?? 0;
 
-        // 4. NTA Questions (Saved)
-        TestHistoryItem(
-          id: 'item_4',
-          title: 'NTA Questions (2023-24)',
-          category: TestCategoryFilter.ntaQuestions,
-          badgeLabel: 'Official',
-          isOfficial: true,
-          questionsCount: 40,
-          maxMarks: 160,
-          subjectsInfo: 'Biology • Human Physiology',
-          createdDate: DateTime.now().subtract(const Duration(days: 5)),
-          savedDate: DateTime.now().subtract(const Duration(days: 5)),
-          status: TestStatusFilter.saved,
-          attemptsCount: 0,
-        ),
+            TestCategoryFilter cat = TestCategoryFilter.customPractice;
+            if (title.toUpperCase().contains('PYQ')) {
+              cat = TestCategoryFilter.neetPyq;
+            } else if (title.toUpperCase().contains('NTA')) {
+              cat = TestCategoryFilter.ntaQuestions;
+            } else if (title.toUpperCase().contains('SERIES') || title.toUpperCase().contains('MOCK')) {
+              cat = TestCategoryFilter.testSeries;
+            } else if (title.toUpperCase().contains('TEST')) {
+              cat = TestCategoryFilter.customTest;
+            }
 
-        // 5. Test Series (Completed)
-        TestHistoryItem(
-          id: 'item_5',
-          title: 'NEET Full Syllabus Test Series',
-          category: TestCategoryFilter.testSeries,
-          badgeLabel: 'Official',
-          isOfficial: true,
-          questionsCount: 200,
-          maxMarks: 720,
-          subjectsInfo: 'Test 05 • 200 Questions • 720 Marks',
-          createdDate: DateTime.now().subtract(const Duration(days: 1)),
-          status: TestStatusFilter.completed,
-          score: 612,
-          totalScoreMax: 720,
-          accuracy: 85.0,
-          percentile: 97.48,
-          rank: 12845,
-          attemptsCount: 1,
-        ),
+            final hours = timeSpent ~/ 3600;
+            final mins = (timeSpent % 3600) ~/ 60;
+            final secs = timeSpent % 60;
+            final timeStr = '${hours.toString().padLeft(2, '0')}:${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
 
-        // 6. Custom Test (In Progress)
-        TestHistoryItem(
-          id: 'item_6',
-          title: 'NEET Full Length Test - 02',
-          category: TestCategoryFilter.customTest,
-          badgeLabel: 'My Creation',
-          isOfficial: false,
-          questionsCount: 180,
-          maxMarks: 720,
-          subjectsInfo: 'All Subjects',
-          createdDate: DateTime.now().subtract(const Duration(days: 6)),
-          status: TestStatusFilter.inProgress,
-          completedQuestions: 108,
-          attemptsCount: 1,
-        ),
-      ];
-
-      if (mounted) {
-        setState(() {
-          _allHistoryItems = items;
-          _isLoading = false;
-        });
+            items.add(TestHistoryItem(
+              id: id,
+              title: title,
+              category: cat,
+              badgeLabel: (cat == TestCategoryFilter.neetPyq || cat == TestCategoryFilter.ntaQuestions || cat == TestCategoryFilter.testSeries) ? 'Official' : 'My Creation',
+              isOfficial: (cat == TestCategoryFilter.neetPyq || cat == TestCategoryFilter.ntaQuestions || cat == TestCategoryFilter.testSeries),
+              questionsCount: (maxMarks / 4.0).round(),
+              maxMarks: maxMarks.toInt(),
+              subjectsInfo: 'Submitted Attempt',
+              createdDate: DateTime.tryParse(item['submittedAt'] ?? '') ?? DateTime.now(),
+              status: TestStatusFilter.completed,
+              score: score.toInt(),
+              totalScoreMax: maxMarks.toInt(),
+              accuracy: accuracy,
+              timeTaken: timeStr,
+              attemptsCount: 1,
+            ));
+          }
+        }
       }
-    });
+
+      // 2. Load attempts from Supabase DB 'test_attempts' table
+      try {
+        final List<dynamic> dbRows = await SupabaseService.client
+            .from('test_attempts')
+            .select('*')
+            .order('submitted_at', ascending: false)
+            .limit(50);
+
+        for (var row in dbRows) {
+          final String id = row['id']?.toString() ?? '';
+          if (id.isNotEmpty && !items.any((i) => i.id == id)) {
+            final String title = row['test_title'] ?? row['title'] ?? 'Custom Test Attempt';
+            final double score = (row['total_score'] as num?)?.toDouble() ?? 0.0;
+            final double maxMarks = (row['max_score'] as num?)?.toDouble() ?? 720.0;
+            final double accuracy = (row['accuracy_percentage'] as num?)?.toDouble() ?? 0.0;
+            final int timeSpent = (row['time_spent_seconds'] as num?)?.toInt() ?? 0;
+            final String statusStr = (row['status'] ?? 'completed').toString().toLowerCase();
+
+            TestCategoryFilter cat = TestCategoryFilter.customTest;
+            if (title.toUpperCase().contains('PYQ')) {
+              cat = TestCategoryFilter.neetPyq;
+            } else if (title.toUpperCase().contains('NTA')) {
+              cat = TestCategoryFilter.ntaQuestions;
+            } else if (title.toUpperCase().contains('SERIES') || title.toUpperCase().contains('MOCK')) {
+              cat = TestCategoryFilter.testSeries;
+            } else if (title.toUpperCase().contains('PRACTICE')) {
+              cat = TestCategoryFilter.customPractice;
+            }
+
+            final hours = timeSpent ~/ 3600;
+            final mins = (timeSpent % 3600) ~/ 60;
+            final secs = timeSpent % 60;
+            final timeStr = '${hours.toString().padLeft(2, '0')}:${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+
+            items.add(TestHistoryItem(
+              id: id,
+              title: title,
+              category: cat,
+              badgeLabel: (cat == TestCategoryFilter.neetPyq || cat == TestCategoryFilter.ntaQuestions || cat == TestCategoryFilter.testSeries) ? 'Official' : 'My Creation',
+              isOfficial: (cat == TestCategoryFilter.neetPyq || cat == TestCategoryFilter.ntaQuestions || cat == TestCategoryFilter.testSeries),
+              questionsCount: (maxMarks / 4.0).round(),
+              maxMarks: maxMarks.toInt(),
+              subjectsInfo: 'All Subjects',
+              createdDate: DateTime.tryParse(row['submitted_at'] ?? row['started_at'] ?? '') ?? DateTime.now(),
+              status: statusStr == 'submitted' || statusStr == 'completed' ? TestStatusFilter.completed : TestStatusFilter.attempted,
+              score: score.toInt(),
+              totalScoreMax: maxMarks.toInt(),
+              accuracy: accuracy,
+              timeTaken: timeStr,
+              attemptsCount: 1,
+            ));
+          }
+        }
+      } catch (e) {
+        debugPrint('Notice loading Supabase test_attempts: $e');
+      }
+
+      // 3. Load saved custom papers from SharedPreferences key 'cosmyra_saved_papers'
+      final savedPapersStr = prefs.getString('cosmyra_saved_papers');
+      if (savedPapersStr != null && savedPapersStr.isNotEmpty) {
+        final List<dynamic> savedList = jsonDecode(savedPapersStr);
+        for (var item in savedList) {
+          final String id = item['id']?.toString() ?? '';
+          if (id.isNotEmpty && !items.any((i) => i.id == id)) {
+            final String title = item['title'] ?? item['name'] ?? 'Custom Saved Paper';
+            final int qCount = (item['question_count'] ?? item['questionsCount'] ?? 30) as int;
+            final int maxM = qCount * 4;
+
+            items.add(TestHistoryItem(
+              id: id,
+              title: title,
+              category: TestCategoryFilter.customTest,
+              badgeLabel: 'My Creation',
+              isOfficial: false,
+              questionsCount: qCount,
+              maxMarks: maxM,
+              subjectsInfo: item['subject'] ?? 'Custom Test',
+              createdDate: DateTime.tryParse(item['created_at'] ?? '') ?? DateTime.now(),
+              savedDate: DateTime.tryParse(item['created_at'] ?? '') ?? DateTime.now(),
+              status: TestStatusFilter.saved,
+              attemptsCount: 0,
+            ));
+          }
+        }
+      }
+
+      // 4. Load PYQ practice history from SharedPreferences key 'cosmyra_pyq_practice_history'
+      final pyqHistoryStr = prefs.getString('cosmyra_pyq_practice_history');
+      if (pyqHistoryStr != null && pyqHistoryStr.isNotEmpty) {
+        final List<dynamic> pyqList = jsonDecode(pyqHistoryStr);
+        for (var item in pyqList) {
+          final String id = item['id']?.toString() ?? 'pyq_${DateTime.now().millisecondsSinceEpoch}';
+          if (!items.any((i) => i.id == id)) {
+            final String title = item['title'] ?? 'PYQ Practice';
+            final int qCount = (item['questionCount'] ?? 20) as int;
+            final double accuracy = (item['accuracy'] as num?)?.toDouble() ?? 0.0;
+            final int timeSpent = (item['timeSpentSeconds'] as num?)?.toInt() ?? 0;
+
+            final hours = timeSpent ~/ 3600;
+            final mins = (timeSpent % 3600) ~/ 60;
+            final secs = timeSpent % 60;
+            final timeStr = '${hours.toString().padLeft(2, '0')}:${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+
+            items.add(TestHistoryItem(
+              id: id,
+              title: title,
+              category: TestCategoryFilter.neetPyq,
+              badgeLabel: 'Official',
+              isOfficial: true,
+              questionsCount: qCount,
+              maxMarks: qCount * 4,
+              subjectsInfo: item['exam'] ?? 'NEET PYQ',
+              createdDate: DateTime.tryParse(item['date'] ?? '') ?? DateTime.now(),
+              status: TestStatusFilter.completed,
+              accuracy: accuracy,
+              timeTaken: timeStr,
+              attemptsCount: 1,
+            ));
+          }
+        }
+      }
+
+      // Sort newest createdDate first
+      items.sort((a, b) => b.createdDate.compareTo(a.createdDate));
+
+    } catch (e) {
+      debugPrint('Error loading real history data: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _allHistoryItems = items;
+        _isLoading = false;
+      });
+    }
   }
 
   List<TestHistoryItem> get _filteredItems {
