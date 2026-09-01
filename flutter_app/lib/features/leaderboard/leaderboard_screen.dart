@@ -18,7 +18,8 @@ class LeaderboardStudent {
   final double percentile;
   final double accuracy;
   final int questionsAttempted;
-  final int correctQuestions; // For Points: +10 pts each
+  final int correctQuestions; // For Points: +10 pts each. For Marks: +4 marks each
+  final int wrongQuestions; // For Marks: -1 mark each
   final int points; // correctQuestions * 10
   final int rankChange; // +112, -5, etc.
   final bool isCrownWinner;
@@ -39,6 +40,7 @@ class LeaderboardStudent {
     required this.accuracy,
     required this.questionsAttempted,
     required this.correctQuestions,
+    this.wrongQuestions = 0,
     int? points,
     required this.rankChange,
     this.isCrownWinner = false,
@@ -73,7 +75,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   LeaderboardTimeframe _selectedTimeframe = LeaderboardTimeframe.thisWeek;
   LeaderboardScope _selectedScope = LeaderboardScope.allIndia;
   LeaderboardMainTab _selectedTab = LeaderboardMainTab.overall;
-  LeaderboardSystemMode _selectedSystemMode = LeaderboardSystemMode.marksAndRanks; // Default or Points
+  LeaderboardSystemMode _selectedSystemMode = LeaderboardSystemMode.marksAndRanks; // Default toggle
   String _selectedCategory = 'NEET FULL Syllabus';
 
   bool _isLoading = false;
@@ -102,79 +104,178 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     setState(() => _isLoading = true);
 
     Future.delayed(const Duration(milliseconds: 200), () {
-      int maxScore = _selectedExam == LeaderboardExam.neet ? 720 : (_selectedExam == LeaderboardExam.jeeAdvanced ? 360 : 300);
+      int maxScore = _categoryMaxMarks;
+      int totalQs = _categoryTotalQuestions;
       
       List<LeaderboardStudent> mockList = [];
       if (_selectedExam == LeaderboardExam.neet) {
-        mockList = [
-          LeaderboardStudent(
-            rank: 1, name: 'Aarav Sharma', coaching: 'Vibrant Academy', avatarUrl: 'https://i.pravatar.cc/150?img=11',
-            score: 715, maxScore: 720, percentile: 99.99, accuracy: 99.2, questionsAttempted: 180, correctQuestions: 179,
-            rankChange: 0, isCrownWinner: true, crownType: 'gold', recentSessionType: 'Custom Test', categoryScope: _selectedCategory, meetsMinCriteria: true,
-          ),
-          LeaderboardStudent(
-            rank: 2, name: 'Rohit Verma', coaching: 'Resonance Kota', avatarUrl: 'https://i.pravatar.cc/150?img=12',
-            score: 710, maxScore: 720, percentile: 99.97, accuracy: 98.6, questionsAttempted: 180, correctQuestions: 178,
-            rankChange: 2, isCrownWinner: true, crownType: 'silver', recentSessionType: 'NEET PYQ', categoryScope: _selectedCategory, meetsMinCriteria: true,
-          ),
-          LeaderboardStudent(
-            rank: 3, name: 'Isha Singh', coaching: 'Allen Career Institute', avatarUrl: 'https://i.pravatar.cc/150?img=25',
-            score: 705, maxScore: 720, percentile: 99.95, accuracy: 98.0, questionsAttempted: 178, correctQuestions: 176,
-            rankChange: -1, isCrownWinner: true, crownType: 'bronze', recentSessionType: 'Test Series', categoryScope: _selectedCategory, meetsMinCriteria: true,
-          ),
-          LeaderboardStudent(
-            rank: 4, name: 'Vedant Gupta', coaching: 'Aakash Institute', avatarUrl: 'https://i.pravatar.cc/150?img=33',
-            score: 700, maxScore: 720, percentile: 99.92, accuracy: 97.4, questionsAttempted: 176, correctQuestions: 175,
-            rankChange: 4, recentSessionType: 'Custom Practice', categoryScope: _selectedCategory, meetsMinCriteria: true,
-          ),
-          LeaderboardStudent(
-            rank: 5, name: 'Ananya Reddy', coaching: 'Narayana Academy', avatarUrl: 'https://i.pravatar.cc/150?img=47',
-            score: 695, maxScore: 720, percentile: 99.90, accuracy: 96.8, questionsAttempted: 175, correctQuestions: 174,
-            rankChange: 1, recentSessionType: 'NTA Questions', categoryScope: _selectedCategory, meetsMinCriteria: true,
-          ),
-        ];
-        _currentUserData = LeaderboardStudent(
-          rank: 142,
-          name: widget.userProfile?.fullName ?? 'You',
-          coaching: 'Cosmyra Student',
-          avatarUrl: widget.userProfile?.avatarUrl ?? 'https://i.pravatar.cc/150?img=60',
-          score: 612,
-          maxScore: 720,
-          percentile: 98.89,
-          accuracy: 85.0,
-          questionsAttempted: 162,
-          correctQuestions: 153,
-          rankChange: 112,
-          isCurrentUser: true,
-          recentSessionType: 'Custom Practice',
-          categoryScope: _selectedCategory,
-          meetsMinCriteria: true,
-        );
+        if (_selectedCategory.contains('Biology')) {
+          // Biology Full syllabus (90 Qs, 360 Marks)
+          mockList = [
+            LeaderboardStudent(
+              rank: 1, name: 'Aarav Sharma', coaching: 'Vibrant Academy', avatarUrl: 'https://i.pravatar.cc/150?img=11',
+              score: 355, maxScore: 360, percentile: 99.99, accuracy: 98.8, questionsAttempted: 90, correctQuestions: 89, wrongQuestions: 1,
+              rankChange: 0, isCrownWinner: true, crownType: 'gold', recentSessionType: 'Custom Test', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+            LeaderboardStudent(
+              rank: 2, name: 'Rohit Verma', coaching: 'Resonance Kota', avatarUrl: 'https://i.pravatar.cc/150?img=12',
+              score: 350, maxScore: 360, percentile: 99.97, accuracy: 97.7, questionsAttempted: 90, correctQuestions: 88, wrongQuestions: 2,
+              rankChange: 2, isCrownWinner: true, crownType: 'silver', recentSessionType: 'NEET PYQ', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+            LeaderboardStudent(
+              rank: 3, name: 'Isha Singh', coaching: 'Allen Career Institute', avatarUrl: 'https://i.pravatar.cc/150?img=25',
+              score: 345, maxScore: 360, percentile: 99.95, accuracy: 96.6, questionsAttempted: 90, correctQuestions: 87, wrongQuestions: 3,
+              rankChange: -1, isCrownWinner: true, crownType: 'bronze', recentSessionType: 'Test Series', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+            LeaderboardStudent(
+              rank: 4, name: 'Vedant Gupta', coaching: 'Aakash Institute', avatarUrl: 'https://i.pravatar.cc/150?img=33',
+              score: 340, maxScore: 360, percentile: 99.92, accuracy: 95.5, questionsAttempted: 90, correctQuestions: 86, wrongQuestions: 4,
+              rankChange: 4, recentSessionType: 'Custom Practice', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+            LeaderboardStudent(
+              rank: 5, name: 'Ananya Reddy', coaching: 'Narayana Academy', avatarUrl: 'https://i.pravatar.cc/150?img=47',
+              score: 335, maxScore: 360, percentile: 99.90, accuracy: 94.4, questionsAttempted: 90, correctQuestions: 85, wrongQuestions: 5,
+              rankChange: 1, recentSessionType: 'NTA Questions', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+          ];
+          _currentUserData = LeaderboardStudent(
+            rank: 142,
+            name: widget.userProfile?.fullName ?? 'You',
+            coaching: 'Cosmyra Student',
+            avatarUrl: widget.userProfile?.avatarUrl ?? 'https://i.pravatar.cc/150?img=60',
+            score: 305,
+            maxScore: 360,
+            percentile: 98.89,
+            accuracy: 85.5,
+            questionsAttempted: 80,
+            correctQuestions: 77,
+            wrongQuestions: 3,
+            rankChange: 112,
+            isCurrentUser: true,
+            recentSessionType: 'Custom Practice',
+            categoryScope: _selectedCategory,
+            meetsMinCriteria: true,
+          );
+        } else if (_selectedCategory.contains('Chemistry') || _selectedCategory.contains('Physics')) {
+          // Physics / Chemistry Full Syllabus (45 Qs, 180 Marks)
+          mockList = [
+            LeaderboardStudent(
+              rank: 1, name: 'Aarav Sharma', coaching: 'Vibrant Academy', avatarUrl: 'https://i.pravatar.cc/150?img=11',
+              score: 175, maxScore: 180, percentile: 99.99, accuracy: 97.7, questionsAttempted: 45, correctQuestions: 44, wrongQuestions: 1,
+              rankChange: 0, isCrownWinner: true, crownType: 'gold', recentSessionType: 'Custom Test', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+            LeaderboardStudent(
+              rank: 2, name: 'Rohit Verma', coaching: 'Resonance Kota', avatarUrl: 'https://i.pravatar.cc/150?img=12',
+              score: 170, maxScore: 180, percentile: 99.97, accuracy: 95.5, questionsAttempted: 45, correctQuestions: 43, wrongQuestions: 2,
+              rankChange: 2, isCrownWinner: true, crownType: 'silver', recentSessionType: 'NEET PYQ', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+            LeaderboardStudent(
+              rank: 3, name: 'Isha Singh', coaching: 'Allen Career Institute', avatarUrl: 'https://i.pravatar.cc/150?img=25',
+              score: 166, maxScore: 180, percentile: 99.95, accuracy: 93.3, questionsAttempted: 44, correctQuestions: 42, wrongQuestions: 2,
+              rankChange: -1, isCrownWinner: true, crownType: 'bronze', recentSessionType: 'Test Series', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+            LeaderboardStudent(
+              rank: 4, name: 'Vedant Gupta', coaching: 'Aakash Institute', avatarUrl: 'https://i.pravatar.cc/150?img=33',
+              score: 161, maxScore: 180, percentile: 99.92, accuracy: 91.1, questionsAttempted: 44, correctQuestions: 41, wrongQuestions: 3,
+              rankChange: 4, recentSessionType: 'Custom Practice', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+            LeaderboardStudent(
+              rank: 5, name: 'Ananya Reddy', coaching: 'Narayana Academy', avatarUrl: 'https://i.pravatar.cc/150?img=47',
+              score: 157, maxScore: 180, percentile: 99.90, accuracy: 88.8, questionsAttempted: 43, correctQuestions: 40, wrongQuestions: 3,
+              rankChange: 1, recentSessionType: 'NTA Questions', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+          ];
+          _currentUserData = LeaderboardStudent(
+            rank: 142,
+            name: widget.userProfile?.fullName ?? 'You',
+            coaching: 'Cosmyra Student',
+            avatarUrl: widget.userProfile?.avatarUrl ?? 'https://i.pravatar.cc/150?img=60',
+            score: 150,
+            maxScore: 180,
+            percentile: 98.89,
+            accuracy: 84.4,
+            questionsAttempted: 40,
+            correctQuestions: 38,
+            wrongQuestions: 2,
+            rankChange: 112,
+            isCurrentUser: true,
+            recentSessionType: 'Custom Practice',
+            categoryScope: _selectedCategory,
+            meetsMinCriteria: true,
+          );
+        } else {
+          // NEET FULL Syllabus (180 Qs, 720 Marks)
+          mockList = [
+            LeaderboardStudent(
+              rank: 1, name: 'Aarav Sharma', coaching: 'Vibrant Academy', avatarUrl: 'https://i.pravatar.cc/150?img=11',
+              score: 715, maxScore: 720, percentile: 99.99, accuracy: 99.4, questionsAttempted: 180, correctQuestions: 179, wrongQuestions: 1,
+              rankChange: 0, isCrownWinner: true, crownType: 'gold', recentSessionType: 'Custom Test', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+            LeaderboardStudent(
+              rank: 2, name: 'Rohit Verma', coaching: 'Resonance Kota', avatarUrl: 'https://i.pravatar.cc/150?img=12',
+              score: 710, maxScore: 720, percentile: 99.97, accuracy: 98.8, questionsAttempted: 180, correctQuestions: 178, wrongQuestions: 2,
+              rankChange: 2, isCrownWinner: true, crownType: 'silver', recentSessionType: 'NEET PYQ', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+            LeaderboardStudent(
+              rank: 3, name: 'Isha Singh', coaching: 'Allen Career Institute', avatarUrl: 'https://i.pravatar.cc/150?img=25',
+              score: 705, maxScore: 720, percentile: 99.95, accuracy: 98.3, questionsAttempted: 180, correctQuestions: 177, wrongQuestions: 3,
+              rankChange: -1, isCrownWinner: true, crownType: 'bronze', recentSessionType: 'Test Series', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+            LeaderboardStudent(
+              rank: 4, name: 'Vedant Gupta', coaching: 'Aakash Institute', avatarUrl: 'https://i.pravatar.cc/150?img=33',
+              score: 700, maxScore: 720, percentile: 99.92, accuracy: 97.7, questionsAttempted: 180, correctQuestions: 176, wrongQuestions: 4,
+              rankChange: 4, recentSessionType: 'Custom Practice', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+            LeaderboardStudent(
+              rank: 5, name: 'Ananya Reddy', coaching: 'Narayana Academy', avatarUrl: 'https://i.pravatar.cc/150?img=47',
+              score: 695, maxScore: 720, percentile: 99.90, accuracy: 97.2, questionsAttempted: 180, correctQuestions: 175, wrongQuestions: 5,
+              rankChange: 1, recentSessionType: 'NTA Questions', categoryScope: _selectedCategory, meetsMinCriteria: true,
+            ),
+          ];
+          _currentUserData = LeaderboardStudent(
+            rank: 142,
+            name: widget.userProfile?.fullName ?? 'You',
+            coaching: 'Cosmyra Student',
+            avatarUrl: widget.userProfile?.avatarUrl ?? 'https://i.pravatar.cc/150?img=60',
+            score: 612,
+            maxScore: 720,
+            percentile: 98.89,
+            accuracy: 85.5,
+            questionsAttempted: 158,
+            correctQuestions: 154,
+            wrongQuestions: 4,
+            rankChange: 112,
+            isCurrentUser: true,
+            recentSessionType: 'Custom Practice',
+            categoryScope: _selectedCategory,
+            meetsMinCriteria: true,
+          );
+        }
       } else if (_selectedExam == LeaderboardExam.jeeAdvanced) {
         mockList = [
           LeaderboardStudent(
             rank: 1, name: 'Aarav Sharma', coaching: 'Vibrant Academy', avatarUrl: 'https://i.pravatar.cc/150?img=11',
-            score: 325, maxScore: 360, percentile: 99.99, accuracy: 94.2, questionsAttempted: 90, correctQuestions: 82,
+            score: (maxScore * 0.90).round(), maxScore: maxScore, percentile: 99.99, accuracy: 94.2, questionsAttempted: totalQs, correctQuestions: (totalQs * 0.91).round(), wrongQuestions: 2,
             rankChange: 0, isCrownWinner: true, crownType: 'gold', recentSessionType: 'Test Series', categoryScope: _selectedCategory, meetsMinCriteria: true,
           ),
           LeaderboardStudent(
             rank: 2, name: 'Rohit Verma', coaching: 'Resonance Kota', avatarUrl: 'https://i.pravatar.cc/150?img=12',
-            score: 318, maxScore: 360, percentile: 99.97, accuracy: 92.6, questionsAttempted: 88, correctQuestions: 80,
+            score: (maxScore * 0.88).round(), maxScore: maxScore, percentile: 99.97, accuracy: 92.6, questionsAttempted: totalQs, correctQuestions: (totalQs * 0.89).round(), wrongQuestions: 3,
             rankChange: 1, isCrownWinner: true, crownType: 'silver', recentSessionType: 'Custom Test', categoryScope: _selectedCategory, meetsMinCriteria: true,
           ),
           LeaderboardStudent(
             rank: 3, name: 'Isha Singh', coaching: 'Allen Career Institute', avatarUrl: 'https://i.pravatar.cc/150?img=25',
-            score: 310, maxScore: 360, percentile: 99.95, accuracy: 91.0, questionsAttempted: 86, correctQuestions: 78,
+            score: (maxScore * 0.86).round(), maxScore: maxScore, percentile: 99.95, accuracy: 91.0, questionsAttempted: totalQs, correctQuestions: (totalQs * 0.87).round(), wrongQuestions: 3,
             rankChange: -1, isCrownWinner: true, crownType: 'bronze', recentSessionType: 'NTA Questions', categoryScope: _selectedCategory, meetsMinCriteria: true,
           ),
           LeaderboardStudent(
             rank: 4, name: 'Vedant Gupta', coaching: 'Aakash Institute', avatarUrl: 'https://i.pravatar.cc/150?img=33',
-            score: 302, maxScore: 360, percentile: 99.92, accuracy: 89.4, questionsAttempted: 84, correctQuestions: 76,
+            score: (maxScore * 0.83).round(), maxScore: maxScore, percentile: 99.92, accuracy: 89.4, questionsAttempted: totalQs, correctQuestions: (totalQs * 0.85).round(), wrongQuestions: 4,
             rankChange: 2, recentSessionType: 'Custom Practice', categoryScope: _selectedCategory, meetsMinCriteria: true,
           ),
           LeaderboardStudent(
             rank: 5, name: 'Ananya Reddy', coaching: 'Narayana Academy', avatarUrl: 'https://i.pravatar.cc/150?img=47',
-            score: 295, maxScore: 360, percentile: 99.90, accuracy: 88.8, questionsAttempted: 82, correctQuestions: 74,
+            score: (maxScore * 0.81).round(), maxScore: maxScore, percentile: 99.90, accuracy: 88.8, questionsAttempted: totalQs, correctQuestions: (totalQs * 0.83).round(), wrongQuestions: 4,
             rankChange: 3, recentSessionType: 'JEE PYQ', categoryScope: _selectedCategory, meetsMinCriteria: true,
           ),
         ];
@@ -183,12 +284,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           name: widget.userProfile?.fullName ?? 'You',
           coaching: 'Cosmyra Student',
           avatarUrl: widget.userProfile?.avatarUrl ?? 'https://i.pravatar.cc/150?img=60',
-          score: 215,
-          maxScore: 360,
+          score: (maxScore * 0.60).round(),
+          maxScore: maxScore,
           percentile: 98.89,
           accuracy: 78.5,
-          questionsAttempted: 74,
-          correctQuestions: 54,
+          questionsAttempted: (totalQs * 0.80).round(),
+          correctQuestions: (totalQs * 0.65).round(),
+          wrongQuestions: 4,
           rankChange: 112,
           isCurrentUser: true,
           recentSessionType: 'Custom Practice',
@@ -196,30 +298,31 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           meetsMinCriteria: true,
         );
       } else {
+        // JEE Main
         mockList = [
           LeaderboardStudent(
             rank: 1, name: 'Aarav Sharma', coaching: 'Vibrant Academy', avatarUrl: 'https://i.pravatar.cc/150?img=11',
-            score: 285, maxScore: 300, percentile: 99.99, accuracy: 95.0, questionsAttempted: 75, correctQuestions: 72,
+            score: (maxScore * 0.95).round(), maxScore: maxScore, percentile: 99.99, accuracy: 95.0, questionsAttempted: totalQs, correctQuestions: (totalQs * 0.96).round(), wrongQuestions: 2,
             rankChange: 0, isCrownWinner: true, crownType: 'gold', recentSessionType: 'Custom Test', categoryScope: _selectedCategory, meetsMinCriteria: true,
           ),
           LeaderboardStudent(
             rank: 2, name: 'Rohit Verma', coaching: 'Resonance Kota', avatarUrl: 'https://i.pravatar.cc/150?img=12',
-            score: 282, maxScore: 300, percentile: 99.97, accuracy: 94.0, questionsAttempted: 75, correctQuestions: 71,
+            score: (maxScore * 0.94).round(), maxScore: maxScore, percentile: 99.97, accuracy: 94.0, questionsAttempted: totalQs, correctQuestions: (totalQs * 0.94).round(), wrongQuestions: 2,
             rankChange: 2, isCrownWinner: true, crownType: 'silver', recentSessionType: 'JEE PYQ', categoryScope: _selectedCategory, meetsMinCriteria: true,
           ),
           LeaderboardStudent(
             rank: 3, name: 'Isha Singh', coaching: 'Allen Career Institute', avatarUrl: 'https://i.pravatar.cc/150?img=25',
-            score: 278, maxScore: 300, percentile: 99.95, accuracy: 92.6, questionsAttempted: 74, correctQuestions: 70,
+            score: (maxScore * 0.92).round(), maxScore: maxScore, percentile: 99.95, accuracy: 92.6, questionsAttempted: totalQs, correctQuestions: (totalQs * 0.93).round(), wrongQuestions: 3,
             rankChange: -1, isCrownWinner: true, crownType: 'bronze', recentSessionType: 'Test Series', categoryScope: _selectedCategory, meetsMinCriteria: true,
           ),
           LeaderboardStudent(
             rank: 4, name: 'Vedant Gupta', coaching: 'Aakash Institute', avatarUrl: 'https://i.pravatar.cc/150?img=33',
-            score: 276, maxScore: 300, percentile: 99.92, accuracy: 92.0, questionsAttempted: 74, correctQuestions: 69,
+            score: (maxScore * 0.91).round(), maxScore: maxScore, percentile: 99.92, accuracy: 92.0, questionsAttempted: totalQs, correctQuestions: (totalQs * 0.92).round(), wrongQuestions: 3,
             rankChange: 3, recentSessionType: 'NTA Questions', categoryScope: _selectedCategory, meetsMinCriteria: true,
           ),
           LeaderboardStudent(
             rank: 5, name: 'Ananya Reddy', coaching: 'Narayana Academy', avatarUrl: 'https://i.pravatar.cc/150?img=47',
-            score: 274, maxScore: 300, percentile: 99.90, accuracy: 91.3, questionsAttempted: 73, correctQuestions: 68,
+            score: (maxScore * 0.89).round(), maxScore: maxScore, percentile: 99.90, accuracy: 91.3, questionsAttempted: totalQs, correctQuestions: (totalQs * 0.90).round(), wrongQuestions: 4,
             rankChange: 1, recentSessionType: 'Custom Practice', categoryScope: _selectedCategory, meetsMinCriteria: true,
           ),
         ];
@@ -228,12 +331,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           name: widget.userProfile?.fullName ?? 'You',
           coaching: 'Cosmyra Student',
           avatarUrl: widget.userProfile?.avatarUrl ?? 'https://i.pravatar.cc/150?img=60',
-          score: 208,
-          maxScore: 300,
+          score: (maxScore * 0.69).round(),
+          maxScore: maxScore,
           percentile: 98.89,
           accuracy: 78.0,
-          questionsAttempted: 68,
-          correctQuestions: 52,
+          questionsAttempted: (totalQs * 0.85).round(),
+          correctQuestions: (totalQs * 0.72).round(),
+          wrongQuestions: 4,
           rankChange: 112,
           isCurrentUser: true,
           recentSessionType: 'Custom Practice',
@@ -264,26 +368,40 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   }
 
   String get _examTitle {
-    switch (_selectedExam) {
-      case LeaderboardExam.neet:
-        return 'NEET Full Length Test - 01';
-      case LeaderboardExam.jeeAdvanced:
-        return 'JEE Advanced Mock Test - 03';
-      case LeaderboardExam.jeeMain:
-      default:
-        return 'JEE Main Full Test - 05';
+    if (_selectedExam == LeaderboardExam.neet) {
+      return '$_selectedCategory - Mock Exam';
+    } else if (_selectedExam == LeaderboardExam.jeeAdvanced) {
+      return '$_selectedCategory - Advanced Series';
+    } else {
+      return '$_selectedCategory - Mains Series';
     }
   }
 
-  int get _examMaxMarks {
-    switch (_selectedExam) {
-      case LeaderboardExam.neet:
-        return 720;
-      case LeaderboardExam.jeeAdvanced:
-        return 360;
-      case LeaderboardExam.jeeMain:
-      default:
-        return 300;
+  int get _categoryMaxMarks {
+    if (_selectedExam == LeaderboardExam.neet) {
+      if (_selectedCategory.contains('Biology')) return 360;
+      if (_selectedCategory.contains('Chemistry') || _selectedCategory.contains('Physics')) return 180;
+      return 720; // NEET FULL Syllabus
+    } else if (_selectedExam == LeaderboardExam.jeeAdvanced) {
+      if (_selectedCategory.contains('Physics') || _selectedCategory.contains('Chemistry') || _selectedCategory.contains('Mathematics')) return 120;
+      return 360;
+    } else {
+      if (_selectedCategory.contains('Physics') || _selectedCategory.contains('Chemistry') || _selectedCategory.contains('Mathematics')) return 100;
+      return 300;
+    }
+  }
+
+  int get _categoryTotalQuestions {
+    if (_selectedExam == LeaderboardExam.neet) {
+      if (_selectedCategory.contains('Biology')) return 90;
+      if (_selectedCategory.contains('Chemistry') || _selectedCategory.contains('Physics')) return 45;
+      return 180; // NEET FULL Syllabus
+    } else if (_selectedExam == LeaderboardExam.jeeAdvanced) {
+      if (_selectedCategory.contains('Physics') || _selectedCategory.contains('Chemistry') || _selectedCategory.contains('Mathematics')) return 18;
+      return 54;
+    } else {
+      if (_selectedCategory.contains('Physics') || _selectedCategory.contains('Chemistry') || _selectedCategory.contains('Mathematics')) return 25;
+      return 75;
     }
   }
 
@@ -531,7 +649,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     examSegment,
-                    systemModeSegment, // Positioned right where user marked in RED!
+                    systemModeSegment,
                     timeframeSegment,
                   ],
                 ),
@@ -684,7 +802,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Points System: +10 points for every correct option. 0 points for wrong or unattempted questions.',
+                'Points System: Earn +10 points for every correct option. 0 points for wrong or unattempted questions.',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF15803D)),
               ),
             ),
@@ -699,22 +817,35 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: const Color(0xFFBFDBFE)),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.verified_user_outlined, color: Color(0xFF2563EB), size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: RichText(
-                text: TextSpan(
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF1E40AF)),
-                  children: [
-                    const TextSpan(text: 'Marks & Ranks Minimum Criteria: ', style: TextStyle(fontWeight: FontWeight.w800)),
-                    TextSpan(
-                      text: 'Must have attempted recent sessions in $_selectedCategory across Custom Practice, Custom Test, NEET PYQ, NTA Questions, or Test Series.',
+            Row(
+              children: [
+                const Icon(Icons.verified_user_outlined, color: Color(0xFF2563EB), size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF1E40AF)),
+                      children: [
+                        const TextSpan(text: 'Marks & Ranks Marking Scheme: ', style: TextStyle(fontWeight: FontWeight.w800)),
+                        const TextSpan(
+                          text: '+4 marks for correct option, -1 mark for wrong option (0 for unattempted).\n',
+                        ),
+                        const TextSpan(text: 'Rank Priority: ', style: TextStyle(fontWeight: FontWeight.w800)),
+                        const TextSpan(
+                          text: '1st Priority = Percentage (%) • 2nd Priority = Total Marks.\n',
+                        ),
+                        const TextSpan(text: 'Minimum Eligibility Criteria: ', style: TextStyle(fontWeight: FontWeight.w800)),
+                        TextSpan(
+                          text: 'Must have attempted $_selectedCategory ($_categoryTotalQuestions Questions • $_categoryMaxMarks Marks) across Custom Practice, Custom Test, NEET PYQ, NTA Questions, or Test Series.',
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
         ),
@@ -770,9 +901,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                           runSpacing: 4,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Text('30 Questions', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            Text('$_categoryTotalQuestions Questions', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                             const Text('•', style: TextStyle(color: Color(0xFF94A3B8))),
-                            Text('$_examMaxMarks Marks', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            Text('$_categoryMaxMarks Marks', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                             const Text('•', style: TextStyle(color: Color(0xFF94A3B8))),
                             const Text('01 May 2025', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                           ],
@@ -908,7 +1039,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       style: TextStyle(fontSize: isMobile ? 18 : 22, fontWeight: FontWeight.w900, color: const Color(0xFF4F46E5)),
                     ),
                     TextSpan(
-                      text: '/ $_examMaxMarks',
+                      text: '/ $_categoryMaxMarks',
                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                     ),
                   ],
@@ -939,7 +1070,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Percentage / Acc',
+                'Percentage %',
                 style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 2),
@@ -1065,7 +1196,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           ),
         );
 
-        // CATEGORY DROPDOWN: NEET FULL Syllabus, Biology Full syllabus, Chemistry Full Syllabus, Physics Full Syllabus
+        // CATEGORY DROPDOWN: NEET FULL Syllabus (180 Qs, 720 Marks), Biology Full syllabus (90 Qs, 360 Marks), Chemistry Full Syllabus (45 Qs, 180 Marks), Physics Full Syllabus (45 Qs, 180 Marks)
         final filterDropdown = Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1166,7 +1297,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     }
 
     final isPointsMode = _selectedSystemMode == LeaderboardSystemMode.points;
-    final double tableWidth = isPointsMode ? 560 : 640;
+    final double tableWidth = isPointsMode ? 560 : 660;
 
     return Container(
       decoration: BoxDecoration(
@@ -1202,8 +1333,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         const SizedBox(width: 100, child: Text('Correct Qs (+10)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)), textAlign: TextAlign.right)),
                         const SizedBox(width: 90, child: Text('Total Points', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)), textAlign: TextAlign.right)),
                       ] else ...[
-                        const SizedBox(width: 90, child: Text('Percentage %', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)), textAlign: TextAlign.right)),
-                        const SizedBox(width: 85, child: Text('Marks', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)), textAlign: TextAlign.right)),
+                        const SizedBox(width: 95, child: Text('Percentage %', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)), textAlign: TextAlign.right)),
+                        const SizedBox(width: 95, child: Text('Marks (+4/-1)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)), textAlign: TextAlign.right)),
                         const SizedBox(width: 80, child: Text('Percentile', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)), textAlign: TextAlign.right)),
                       ],
                       const SizedBox(width: 32),
@@ -1313,21 +1444,21 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                           ),
                         ] else ...[
                           SizedBox(
-                            width: 90,
+                            width: 95,
                             child: Text(
                               '${_currentUserData!.percentage.toStringAsFixed(1)}%',
                               textAlign: TextAlign.right,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF4F46E5)),
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF4F46E5)),
                             ),
                           ),
                           SizedBox(
-                            width: 85,
+                            width: 95,
                             child: RichText(
                               textAlign: TextAlign.right,
                               text: TextSpan(
                                 children: [
                                   TextSpan(text: '${_currentUserData!.score} ', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF4F46E5))),
-                                  TextSpan(text: '/ $_examMaxMarks', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                                  TextSpan(text: '/ $_categoryMaxMarks', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
                                 ],
                               ),
                             ),
@@ -1435,21 +1566,21 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             ),
           ] else ...[
             SizedBox(
-              width: 90,
+              width: 95,
               child: Text(
                 '${s.percentage.toStringAsFixed(1)}%',
                 textAlign: TextAlign.right,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF4F46E5)),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF4F46E5)),
               ),
             ),
             SizedBox(
-              width: 85,
+              width: 95,
               child: RichText(
                 textAlign: TextAlign.right,
                 text: TextSpan(
                   children: [
                     TextSpan(text: '${s.score} ', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF4F46E5))),
-                    TextSpan(text: '/ $_examMaxMarks', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                    TextSpan(text: '/ $_categoryMaxMarks', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
                   ],
                 ),
               ),
@@ -1599,7 +1730,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 iconBg: const Color(0xFFE0F2FE),
                 iconColor: const Color(0xFF0284C7),
                 title: _selectedSystemMode == LeaderboardSystemMode.points ? 'Average Points' : 'Average Score',
-                val: _selectedSystemMode == LeaderboardSystemMode.points ? '1,240 pts' : '${(_examMaxMarks * 0.52).round()} / $_examMaxMarks',
+                val: _selectedSystemMode == LeaderboardSystemMode.points ? '1,240 pts' : '${(_categoryMaxMarks * 0.52).round()} / $_categoryMaxMarks',
                 sub: 'Average performance',
               ),
               const SizedBox(height: 10),
@@ -1608,7 +1739,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 iconBg: const Color(0xFFDCFCE7),
                 iconColor: const Color(0xFF15803D),
                 title: _selectedSystemMode == LeaderboardSystemMode.points ? 'Top Points' : 'Top Score',
-                val: _selectedSystemMode == LeaderboardSystemMode.points ? '1,800 pts' : '${(_examMaxMarks * 0.95).round()} / $_examMaxMarks',
+                val: _selectedSystemMode == LeaderboardSystemMode.points ? '1,800 pts' : '${(_categoryMaxMarks * 0.95).round()} / $_categoryMaxMarks',
                 sub: 'By Aarav Sharma',
               ),
             ] else ...[
@@ -1631,7 +1762,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       iconBg: const Color(0xFFE0F2FE),
                       iconColor: const Color(0xFF0284C7),
                       title: _selectedSystemMode == LeaderboardSystemMode.points ? 'Average Points' : 'Average Score',
-                      val: _selectedSystemMode == LeaderboardSystemMode.points ? '1,240 pts' : '${(_examMaxMarks * 0.52).round()} / $_examMaxMarks',
+                      val: _selectedSystemMode == LeaderboardSystemMode.points ? '1,240 pts' : '${(_categoryMaxMarks * 0.52).round()} / $_categoryMaxMarks',
                       sub: 'Average performance',
                     ),
                   ),
@@ -1642,7 +1773,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       iconBg: const Color(0xFFDCFCE7),
                       iconColor: const Color(0xFF15803D),
                       title: _selectedSystemMode == LeaderboardSystemMode.points ? 'Top Points' : 'Top Score',
-                      val: _selectedSystemMode == LeaderboardSystemMode.points ? '1,800 pts' : '${(_examMaxMarks * 0.95).round()} / $_examMaxMarks',
+                      val: _selectedSystemMode == LeaderboardSystemMode.points ? '1,800 pts' : '${(_categoryMaxMarks * 0.95).round()} / $_categoryMaxMarks',
                       sub: 'By Aarav Sharma',
                     ),
                   ),
