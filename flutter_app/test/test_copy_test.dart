@@ -47,4 +47,13 @@ Choose the correct answer from the options given below:
     print("================================");
     expect(cleaned, equals('(3mL³)/(8π)'));
   });
+
+  test('Test inverted fraction artifact 8π3mL3 conversion', () {
+    final rawInverted = '8π3mL3';
+    final cleaned = QuestionCopyHelper.cleanTextContent(rawInverted);
+    print("=== INVERTED ARTIFACT CONVERTED ===");
+    print(cleaned);
+    print("===================================");
+    expect(cleaned, equals('(3mL³)/(8π)'));
+  });
 }

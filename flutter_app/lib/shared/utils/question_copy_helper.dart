@@ -48,11 +48,61 @@ class QuestionCopyHelper {
     // 6. Convert LaTeX math expressions (\frac{3mL^3}{8\pi} -> (3mL³)/(8π))
     text = convertLatexToPlainText(text);
 
-    // 7. Normalize line breaks and remove extra trailing blank lines
+    // 7. Fix inverted fraction artifacts (8π3mL3 -> (3mL³)/(8π))
+    text = fixInvertedFractionArtifacts(text);
+
+    // 8. Normalize line breaks and remove extra trailing blank lines
     text = text.replaceAll(RegExp(r'\r\n|\r'), '\n');
     text = text.replaceAll(RegExp(r'\n{3,}'), '\n\n');
 
     return text.trim();
+  }
+
+  /// Fixes inverted denominator-first copy/extraction artifacts like "8π3mL3" or "8\pi3mL3" -> "(3mL³)/(8π)"
+  static String fixInvertedFractionArtifacts(String raw) {
+    if (raw.trim().isEmpty) return raw;
+    String str = raw.trim();
+
+    // Pattern 1: "8π3mL3" or "8π^2 3mL^3" or "8\pi 3mL3" -> "(3mL³)/(8π)"
+    final invertedRegex = RegExp(r'^(\d+\\?(?:pi|π|alpha|beta|gamma|theta|omega|degree|°)?[\^0-9²³]*)\s*(\d+[a-zA-Z]+[\^0-9²³0-9]*)$');
+    final match = invertedRegex.firstMatch(str);
+    if (match != null) {
+      String denom = match.group(1)!;
+      String num = match.group(2)!;
+
+      // Clean denominator and numerator
+      denom = convertLatexToPlainText(denom);
+      num = convertLatexToPlainText(num);
+
+      // Convert trailing digits like "3mL3" -> "3mL³"
+      final superDigits = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
+      num = num.replaceAllMapped(RegExp(r'([a-zA-Z])([0-9])$'), (m) {
+        return '${m.group(1)}${superDigits[m.group(2)] ?? m.group(2)}';
+      });
+      denom = denom.replaceAllMapped(RegExp(r'([a-zA-Z])([0-9])$'), (m) {
+        return '${m.group(1)}${superDigits[m.group(2)] ?? m.group(2)}';
+      });
+
+      return '($num)/($denom)';
+    }
+
+    // Pattern 2: Multiline numeric fraction artifact "120\n1\ns"
+    final multilineRegex = RegExp(r'^(\d+)\s*[\r\n]+\s*(\d+)\s*[\r\n]+\s*([a-zA-Z°%]+)$');
+    final m2 = multilineRegex.firstMatch(str);
+    if (m2 != null) {
+      final p1 = m2.group(1)!;
+      final p2 = m2.group(2)!;
+      final u = m2.group(3)!;
+      final n1 = int.tryParse(p1) ?? 0;
+      final n2 = int.tryParse(p2) ?? 0;
+      if (n1 < n2) {
+        return '($p1/$p2) $u';
+      } else {
+        return '($p2/$p1) $u';
+      }
+    }
+
+    return str;
   }
 
   /// Converts LaTeX math expressions into clean readable plain text

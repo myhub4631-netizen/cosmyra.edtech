@@ -28,21 +28,8 @@ class LaTeXView extends StatelessWidget {
       str = QuestionCopyHelper.cleanTextContent(str);
     }
 
-    // Fix multiline fraction copy artifact: "120\n1\ns" or "120 \n 1 \n s" -> "\frac{1}{120}\text{ s}"
-    final multilineRegex = RegExp(r'^(\d+)\s*[\r\n]+\s*(\d+)\s*[\r\n]+\s*([a-zA-Z°%]+)$');
-    final m = multilineRegex.firstMatch(str);
-    if (m != null) {
-      final p1 = m.group(1)!;
-      final p2 = m.group(2)!;
-      final u = m.group(3)!;
-      final n1 = int.tryParse(p1) ?? 0;
-      final n2 = int.tryParse(p2) ?? 0;
-      if (n1 < n2) {
-        return r'\frac{' + p1 + r'}{' + p2 + r'}\text{ ' + u + r'}';
-      } else {
-        return r'\frac{' + p2 + r'}{' + p1 + r'}\text{ ' + u + r'}';
-      }
-    }
+    // Fix inverted denominator-first fraction artifacts like "8π3mL3" -> "(3mL³)/(8π)"
+    str = QuestionCopyHelper.fixInvertedFractionArtifacts(str);
 
     return str;
   }
