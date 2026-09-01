@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/app_sidebar.dart';
@@ -100,11 +102,15 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   children: [
                     // 1. Mobile Top Header
                     _buildMobileHeader(displayName),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
 
-                    // 2. Offer Banner
-                    _buildMobileBannerCarousel(),
-                    const SizedBox(height: 8),
+                    // 2. Offer Banner Carousel
+                    DashboardBannerCarousel(
+                      onOpenMockTests: widget.onOpenMockTests,
+                      onOpenCustomPractice: widget.onOpenPractice,
+                      onOpenLeaderboard: widget.onOpenLeaderboard,
+                    ),
+                    const SizedBox(height: 12),
 
                     // 3. Quick Stats Cards (4 Horizontal Rectangles)
                     _buildMobileKpiGrid(),
@@ -169,6 +175,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                           children: [
                             // Welcome Banner Header Row
                             _buildWelcomeHeader(displayName),
+                            const SizedBox(height: 20),
+
+                            // Offer Banner Carousel Section
+                            DashboardBannerCarousel(
+                              onOpenMockTests: widget.onOpenMockTests,
+                              onOpenCustomPractice: widget.onOpenPractice,
+                              onOpenLeaderboard: widget.onOpenLeaderboard,
+                            ),
                             const SizedBox(height: 24),
 
                             // Top 4 KPI Metrics Grid Row
@@ -2176,4 +2190,302 @@ class SmoothLineChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class DashboardBannerCarousel extends StatefulWidget {
+  final VoidCallback? onOpenMockTests;
+  final VoidCallback? onOpenCustomPractice;
+  final VoidCallback? onOpenLeaderboard;
+
+  const DashboardBannerCarousel({
+    super.key,
+    this.onOpenMockTests,
+    this.onOpenCustomPractice,
+    this.onOpenLeaderboard,
+  });
+
+  @override
+  State<DashboardBannerCarousel> createState() => _DashboardBannerCarouselState();
+}
+
+class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+  Timer? _timer;
+
+  final List<Map<String, dynamic>> _slides = [
+    {
+      'badge': '🔥 HOT • NTA PATTERN',
+      'title': 'NEET 2026 Full Length Test Series',
+      'desc': 'Simulate real exam conditions with 720-marks tests, rank prediction & instant solution analytics.',
+      'btnText': 'Attempt Test Series',
+      'gradient': const [Color(0xFF1E1B4B), Color(0xFF4338CA)],
+      'emoji': '🚀',
+      'action': 'mock_tests',
+    },
+    {
+      'badge': '🎯 AI CUSTOM PRACTICE',
+      'title': 'Build Custom Practice Sets & Tests',
+      'desc': 'Select chapters, topic difficulty & duration to target weak areas with real PYQ questions.',
+      'btnText': 'Create Custom Test',
+      'gradient': const [Color(0xFF064E3B), Color(0xFF059669)],
+      'emoji': '⚡',
+      'action': 'custom_practice',
+    },
+    {
+      'badge': '🏆 LIVE RANKINGS',
+      'title': 'All India Student Leaderboard',
+      'desc': 'Earn points for correct answers, improve your percentile rank & compete with top aspirants.',
+      'btnText': 'View Leaderboard',
+      'gradient': const [Color(0xFF4C1D95), Color(0xFF7C3AED)],
+      'emoji': '👑',
+      'action': 'leaderboard',
+    },
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _startAutoSlide();
+  }
+
+  void _startAutoSlide() {
+    _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (_pageController.hasClients) {
+        final nextPage = (_currentPage + 1) % _slides.length;
+        _pageController.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _handleAction(String action) {
+    if (action == 'mock_tests') {
+      if (widget.onOpenMockTests != null) {
+        widget.onOpenMockTests!();
+      } else {
+        context.go('/mock-tests');
+      }
+    } else if (action == 'custom_practice') {
+      if (widget.onOpenCustomPractice != null) {
+        widget.onOpenCustomPractice!();
+      } else {
+        context.go('/custom-practice');
+      }
+    } else if (action == 'leaderboard') {
+      if (widget.onOpenLeaderboard != null) {
+        widget.onOpenLeaderboard!();
+      } else {
+        context.go('/leaderboard');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 700;
+
+    return Container(
+      height: isMobile ? 150 : 175,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: PageView.builder(
+              controller: _pageController,
+              onPageChanged: (index) {
+                setState(() => _currentPage = index);
+              },
+              itemCount: _slides.length,
+              itemBuilder: (context, index) {
+                final slide = _slides[index];
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: slide['gradient'] as List<Color>,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 16 : 28,
+                    vertical: isMobile ? 14 : 20,
+                  ),
+                  child: Stack(
+                    children: [
+                      // Decorative background circles
+                      Positioned(
+                        right: -20,
+                        top: -30,
+                        child: Container(
+                          width: 140,
+                          height: 140,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withValues(alpha: 0.06),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 80,
+                        bottom: -40,
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withValues(alpha: 0.04),
+                          ),
+                        ),
+                      ),
+
+                      // Content Row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Text(
+                                    slide['badge'] as String,
+                                    style: GoogleFonts.inter(
+                                      fontSize: isMobile ? 9.5 : 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                      letterSpacing: 0.4,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: isMobile ? 6 : 8),
+
+                                Text(
+                                  slide['title'] as String,
+                                  style: GoogleFonts.inter(
+                                    fontSize: isMobile ? 14.5 : 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: -0.3,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                SizedBox(height: isMobile ? 3 : 4),
+
+                                Text(
+                                  slide['desc'] as String,
+                                  style: GoogleFonts.inter(
+                                    fontSize: isMobile ? 10.5 : 12,
+                                    fontWeight: FontWeight.w400,
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    height: 1.3,
+                                  ),
+                                  maxLines: isMobile ? 2 : 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                SizedBox(height: isMobile ? 10 : 14),
+
+                                ElevatedButton(
+                                  onPressed: () => _handleAction(slide['action'] as String),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: const Color(0xFF0F172A),
+                                    elevation: 0,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: isMobile ? 12 : 18,
+                                      vertical: isMobile ? 7 : 10,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        slide['btnText'] as String,
+                                        style: GoogleFonts.inter(
+                                          fontSize: isMobile ? 11 : 12.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: const Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF0F172A)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (!isMobile) ...[
+                            const SizedBox(width: 20),
+                            Text(
+                              slide['emoji'] as String,
+                              style: const TextStyle(fontSize: 48),
+                            ),
+                            const SizedBox(width: 10),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Dots Indicator
+          Positioned(
+            bottom: 12,
+            right: 20,
+            child: Row(
+              children: List.generate(
+                _slides.length,
+                (idx) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.only(left: 4),
+                  width: _currentPage == idx ? 18 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _currentPage == idx ? Colors.white : Colors.white.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
