@@ -95,6 +95,55 @@ export const AdminBulkUploadStep2: React.FC = () => {
 
           if (match) {
             savedCount++;
+            let resolvedIdx = -1;
+            if (typeof match.correctOptionIndex === 'number' && match.correctOptionIndex >= 0) {
+              resolvedIdx = match.correctOptionIndex;
+            } else if (typeof match.correct_option_index === 'number' && match.correct_option_index >= 0) {
+              resolvedIdx = match.correct_option_index;
+            } else if (Array.isArray(match.options)) {
+              for (let optI = 0; optI < match.options.length; optI++) {
+                const optItem = match.options[optI];
+                if (typeof optItem === 'object' && optItem !== null && (optItem.is_correct || optItem.isCorrect)) {
+                  resolvedIdx = optI;
+                  break;
+                }
+              }
+            }
+            if (resolvedIdx === -1) {
+              const caStr = String(match.correctAnswer || match.correct_answer || match.correctText || '').trim();
+              if (caStr) {
+                const uStr = caStr.toUpperCase();
+                if (uStr.startsWith('OPTION ')) {
+                  const sub = uStr.substring(7).trim();
+                  if (sub.length === 1 && /[A-D]/.test(sub)) {
+                    resolvedIdx = sub.charCodeAt(0) - 65;
+                  } else {
+                    const num = parseInt(sub, 10);
+                    if (!isNaN(num) && num >= 1) resolvedIdx = num - 1;
+                  }
+                }
+                if (resolvedIdx === -1) {
+                  const cleanLetter = uStr.replace(/[\(\)\.]/g, '').trim();
+                  if (cleanLetter.length === 1 && /[A-D]/.test(cleanLetter)) {
+                    resolvedIdx = cleanLetter.charCodeAt(0) - 65;
+                  } else if (cleanLetter.length === 1 && /[1-4]/.test(cleanLetter)) {
+                    resolvedIdx = parseInt(cleanLetter, 10) - 1;
+                  }
+                }
+                if (resolvedIdx === -1 && Array.isArray(match.options)) {
+                  const normCa = caStr.replace(/\s+/g, '').toLowerCase();
+                  for (let optI = 0; optI < match.options.length; optI++) {
+                    const optVal = typeof match.options[optI] === 'object' ? match.options[optI]?.option_text : match.options[optI];
+                    const normOpt = String(optVal || '').replace(/\s+/g, '').toLowerCase();
+                    if (normOpt && normCa && normOpt === normCa) {
+                      resolvedIdx = optI;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+
             return {
               id: qNum,
               questionId: match.id,
@@ -102,7 +151,7 @@ export const AdminBulkUploadStep2: React.FC = () => {
               questionImage: match.questionImage || match.question_image || '',
               options: match.options || ['', '', '', ''],
               optionImages: match.optionImages || match.option_images || [null, null, null, null],
-              correctOptionIndex: match.options ? match.options.indexOf(match.correctAnswer || match.correct_answer) : 0,
+              correctOptionIndex: resolvedIdx,
               explanation: match.explanation || '',
               difficulty: match.difficulty || 'Medium',
               positiveMarks: (match.marks || 4).toString(),
@@ -199,9 +248,12 @@ export const AdminBulkUploadStep2: React.FC = () => {
 
       batchToSave.forEach((q) => {
         const qId = `q_${pId}_${q.id}`;
-        let correctAnsText = 'Option A';
+        let correctAnsText = '';
         if (q.correctOptionIndex >= 0 && q.correctOptionIndex < q.options.length) {
-          correctAnsText = q.options[q.correctOptionIndex] || `Option ${String.fromCharCode(65 + q.correctOptionIndex)}`;
+          const optStr = typeof q.options[q.correctOptionIndex] === 'string' ? q.options[q.correctOptionIndex] : '';
+          correctAnsText = (optStr && optStr.trim().length > 0)
+            ? optStr
+            : `Option ${String.fromCharCode(65 + q.correctOptionIndex)}`;
         }
 
         const payload = {
@@ -218,6 +270,8 @@ export const AdminBulkUploadStep2: React.FC = () => {
           option_images: q.optionImages || [null, null, null, null],
           correctAnswer: correctAnsText,
           correct_answer: correctAnsText,
+          correctOptionIndex: q.correctOptionIndex,
+          correct_option_index: q.correctOptionIndex,
           explanation: q.explanation,
           difficulty: q.difficulty || 'Medium',
           marks: parseFloat(q.positiveMarks) || 4,

@@ -342,6 +342,7 @@ class QuestionModel {
   });
 
   static int resolveCorrectOptionIndex(Map<String, dynamic> map, List<String> opts) {
+    // 1. Direct numeric index in map
     dynamic rawIdx = map['correct_option_index'] ?? map['correctOptionIndex'];
     if (rawIdx is num && rawIdx >= 0 && rawIdx < opts.length) {
       return rawIdx.toInt();
@@ -353,6 +354,16 @@ class QuestionModel {
       }
     }
 
+    // 2. Check options array for is_correct or isCorrect flag
+    var rawOptions = map['options'] as List? ?? map['question_options'] as List? ?? [];
+    for (int i = 0; i < rawOptions.length; i++) {
+      final opt = rawOptions[i];
+      if (opt is Map && (opt['is_correct'] == true || opt['isCorrect'] == true)) {
+        if (i < opts.length) return i;
+      }
+    }
+
+    // 3. Parse correct_answer / correctAnswer / correctText string
     final String caStr = (map['correct_answer'] ?? map['correctAnswer'] ?? map['correctText'] ?? '').toString().trim();
     if (caStr.isNotEmpty) {
       final uStr = caStr.toUpperCase();
@@ -392,16 +403,33 @@ class QuestionModel {
       }
     }
 
-    return 0;
+    return -1;
   }
 
   factory QuestionModel.fromJson(Map<String, dynamic> json) {
+    var rawOptions = json['options'] as List? ?? json['question_options'] as List? ?? [];
     int targetCorrectIdx = -1;
+
+    // 1. Check explicit correct option index
     if (json['correct_option_index'] != null) {
       targetCorrectIdx = (json['correct_option_index'] as num).toInt();
     } else if (json['correctOptionIndex'] != null) {
       targetCorrectIdx = (json['correctOptionIndex'] as num).toInt();
-    } else {
+    }
+
+    // 2. Check if rawOptions contains an option with is_correct / isCorrect = true
+    if (targetCorrectIdx == -1) {
+      for (int i = 0; i < rawOptions.length; i++) {
+        final opt = rawOptions[i];
+        if (opt is Map && (opt['is_correct'] == true || opt['isCorrect'] == true)) {
+          targetCorrectIdx = i;
+          break;
+        }
+      }
+    }
+
+    // 3. Parse correct_answer / correctAnswer / correctText string
+    if (targetCorrectIdx == -1) {
       final String corrStr = (json['correct_answer'] ?? json['correctAnswer'] ?? json['correctText'] ?? '').toString().trim();
       final String uCorr = corrStr.toUpperCase();
       if (uCorr.startsWith('OPTION ')) {
@@ -419,9 +447,8 @@ class QuestionModel {
       }
 
       if (targetCorrectIdx == -1 && corrStr.isNotEmpty) {
-        var rawOptsTmp = json['options'] as List? ?? json['question_options'] as List? ?? [];
-        for (int i = 0; i < rawOptsTmp.length; i++) {
-          final rawOpt = rawOptsTmp[i];
+        for (int i = 0; i < rawOptions.length; i++) {
+          final rawOpt = rawOptions[i];
           final String optText = (rawOpt is Map ? (rawOpt['option_text'] ?? rawOpt['optionText'] ?? '') : rawOpt.toString()).trim();
           if (optText.isNotEmpty && (optText.toLowerCase() == corrStr.toLowerCase() || optText.replaceAll(RegExp(r'\s+'), '').toLowerCase() == corrStr.replaceAll(RegExp(r'\s+'), '').toLowerCase())) {
             targetCorrectIdx = i;
@@ -433,17 +460,15 @@ class QuestionModel {
 
     debugPrint('[QuestionModel.fromJson] QID: ${json['id']} | TargetCorrectIdx: $targetCorrectIdx (Option ${targetCorrectIdx != -1 ? String.fromCharCode(65 + targetCorrectIdx) : "None"})');
 
-    var rawOptions = json['options'] as List? ?? json['question_options'] as List? ?? [];
     List<QuestionOptionModel> parsedOptions = [];
 
     for (int i = 0; i < rawOptions.length; i++) {
       final rawOpt = rawOptions[i];
       if (rawOpt is Map) {
         final mapOpt = Map<String, dynamic>.from(rawOpt);
-        bool isOptCorrect = mapOpt['is_correct'] == true || mapOpt['isCorrect'] == true;
-        if (targetCorrectIdx != -1) {
-          isOptCorrect = (i == targetCorrectIdx);
-        }
+        bool isOptCorrect = (targetCorrectIdx != -1)
+            ? (i == targetCorrectIdx)
+            : (mapOpt['is_correct'] == true || mapOpt['isCorrect'] == true);
         parsedOptions.add(QuestionOptionModel.fromJson({
           ...mapOpt,
           'option_index': mapOpt['option_index'] ?? mapOpt['optionIndex'] ?? i,

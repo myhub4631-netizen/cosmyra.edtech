@@ -53,6 +53,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   // Active Practice Engine State
   List<QuestionModel>? _activePracticeQuestions;
   int _activePracticeTimerMinutes = 0;
+  String? _activePracticeSessionId;
+  bool _isNewPracticeSession = false;
 
   // Active Test Engine State
   List<QuestionModel>? _activeTestQuestions;
@@ -158,6 +160,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               Navigator.of(ctx).pop();
             }
             setState(() {
+              _activePracticeSessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
+              _isNewPracticeSession = true;
               _activePracticeQuestions = questions;
               _activePracticeTimerMinutes = timerMins;
             });
@@ -175,6 +179,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       });
     } else {
       setState(() {
+        _activePracticeSessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
+        _isNewPracticeSession = true;
         _activePracticeQuestions = questions;
         _activePracticeTimerMinutes = 0;
       });
@@ -242,9 +248,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       return PracticeScreen(
         questions: _activePracticeQuestions!,
         timerMinutes: _activePracticeTimerMinutes,
+        sessionId: _activePracticeSessionId ?? 'practice_${_activePracticeQuestions.hashCode}',
+        isNewSession: _isNewPracticeSession,
         onFinish: () {
           setState(() {
             _activePracticeQuestions = null;
+            _activePracticeSessionId = null;
+            _isNewPracticeSession = false;
           });
         },
       );
@@ -365,6 +375,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           },
           onStartPractice: (questions, timerMins) {
             setState(() {
+              _activePracticeSessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
+              _isNewPracticeSession = true;
               _activePracticeQuestions = questions;
               _activePracticeTimerMinutes = timerMins;
             });

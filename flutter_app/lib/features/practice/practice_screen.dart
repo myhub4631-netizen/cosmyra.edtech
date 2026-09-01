@@ -9,12 +9,16 @@ import '../../core/services/supabase_service.dart';
 class PracticeScreen extends StatefulWidget {
   final List<QuestionModel> questions;
   final int timerMinutes;
+  final String? sessionId;
+  final bool isNewSession;
   final VoidCallback onFinish;
 
   const PracticeScreen({
     Key? key,
     required this.questions,
     this.timerMinutes = 0,
+    this.sessionId,
+    this.isNewSession = false,
     required this.onFinish,
   }) : super(key: key);
 
@@ -23,6 +27,7 @@ class PracticeScreen extends StatefulWidget {
 }
 
 class _PracticeScreenState extends State<PracticeScreen> {
+  late final String _activeSessionId;
   int _currentIndex = 0;
   final Map<int, String> _selectedAnswers = {};
   final Map<int, bool> _hasAnswered = {};
@@ -36,18 +41,47 @@ class _PracticeScreenState extends State<PracticeScreen> {
   @override
   void initState() {
     super.initState();
+    _activeSessionId = widget.sessionId ?? 'session_${DateTime.now().millisecondsSinceEpoch}_${widget.questions.map((q) => q.id).join('_').hashCode}';
     if (widget.timerMinutes > 0) {
       _secondsRemaining = widget.timerMinutes * 60;
       _startTimer();
     }
-    _loadPracticeSession();
+    if (widget.isNewSession) {
+      _clearPracticeSession();
+    } else {
+      _loadPracticeSession();
+    }
+  }
+
+  Future<void> _clearPracticeSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final sessionKey = 'cosmyra_practice_session_$_activeSessionId';
+      await prefs.remove(sessionKey);
+      if (mounted) {
+        setState(() {
+          _currentIndex = 0;
+          _selectedAnswers.clear();
+          _hasAnswered.clear();
+          _markedForReview.clear();
+          _isCorrectMap.clear();
+          _isPartialMap.clear();
+          if (widget.timerMinutes > 0) {
+            _secondsRemaining = widget.timerMinutes * 60;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Notice clearing practice session: $e');
+    }
   }
 
   Future<void> _savePracticeSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final sessionKey = 'cosmyra_practice_session_${widget.questions.map((q) => q.id).join('_').hashCode}';
+      final sessionKey = 'cosmyra_practice_session_$_activeSessionId';
       final Map<String, dynamic> data = {
+        'sessionId': _activeSessionId,
         'currentIndex': _currentIndex,
         'selectedAnswers': _selectedAnswers.map((k, v) => MapEntry(k.toString(), v)),
         'hasAnswered': _hasAnswered.map((k, v) => MapEntry(k.toString(), v)),
@@ -65,7 +99,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   Future<void> _loadPracticeSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final sessionKey = 'cosmyra_practice_session_${widget.questions.map((q) => q.id).join('_').hashCode}';
+      final sessionKey = 'cosmyra_practice_session_$_activeSessionId';
       final str = prefs.getString(sessionKey);
       if (str != null && str.isNotEmpty) {
         final Map<String, dynamic> data = jsonDecode(str);

@@ -1818,7 +1818,16 @@ class SupabaseService {
       }
     }
 
-    // 2. Parse correct_answer / correctAnswer string
+    // 2. Check options array for is_correct or isCorrect flag
+    var rawOptions = map['options'] as List? ?? map['question_options'] as List? ?? [];
+    for (int i = 0; i < rawOptions.length; i++) {
+      final opt = rawOptions[i];
+      if (opt is Map && (opt['is_correct'] == true || opt['isCorrect'] == true)) {
+        if (i < opts.length) return i;
+      }
+    }
+
+    // 3. Parse correct_answer / correctAnswer string
     final String caStr = (map['correct_answer'] ?? map['correctAnswer'] ?? map['correctText'] ?? '').toString().trim();
     if (caStr.isNotEmpty) {
       final uStr = caStr.toUpperCase();
@@ -1862,7 +1871,7 @@ class SupabaseService {
       }
     }
 
-    return 0; // Fallback to 0 if no metadata exists
+    return -1;
   }
 
   static List<QuestionModel> _liveQuestionsCache = [];
@@ -2369,6 +2378,17 @@ class SupabaseService {
         cIdx = cIdxRaw.toInt();
       } else if (cIdxRaw != null) {
         cIdx = int.tryParse(cIdxRaw.toString()) ?? -1;
+      }
+
+      if (cIdx < 0 && qMap['options'] is List) {
+        final rawOptsList = qMap['options'] as List;
+        for (int i = 0; i < rawOptsList.length; i++) {
+          final opt = rawOptsList[i];
+          if (opt is Map && (opt['is_correct'] == true || opt['isCorrect'] == true)) {
+            cIdx = i;
+            break;
+          }
+        }
       }
 
       if (cIdx < 0 || cIdx >= (optionsList.isNotEmpty ? optionsList.length : 4)) {

@@ -106,6 +106,8 @@ export const NewPracticeWizard: React.FC<NewPracticeWizardProps> = ({
     } else {
       if (onStartSession) {
         onStartSession({
+          sessionId: `session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          isNewSession: true,
           subjects: selectedSubjects,
           exam: selectedExam,
           mode: selectedMode,

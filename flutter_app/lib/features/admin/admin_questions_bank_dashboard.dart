@@ -699,25 +699,13 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
 
     int initCorrIdx = -1;
     if (isEdit && initialData != null) {
-      if (initialData['correct_option_index'] != null) {
-        initCorrIdx = (initialData['correct_option_index'] as num).toInt();
-      } else if (initialData['correctOptionIndex'] != null) {
-        initCorrIdx = (initialData['correctOptionIndex'] as num).toInt();
-      } else {
-        final String caStr = (initialData['correct_answer'] ?? initialData['correctAnswer'] ?? initialData['correctText'] ?? '').toString().trim();
-        final String uCa = caStr.toUpperCase();
-        if (uCa.startsWith('OPTION ')) {
-          final sub = uCa.substring(7).trim();
-          if (sub.length == 1 && RegExp(r'[A-D]').hasMatch(sub)) {
-            initCorrIdx = sub.codeUnitAt(0) - 65;
-          } else {
-            int n = int.tryParse(sub) ?? -1;
-            if (n != -1) initCorrIdx = (n - 1).clamp(0, 3);
-          }
-        } else if (uCa.length == 1 && RegExp(r'[A-D]').hasMatch(uCa)) {
-          initCorrIdx = uCa.codeUnitAt(0) - 65;
-        }
-      }
+      final List<String> optStrs = [
+        opt1Ctrl.text,
+        opt2Ctrl.text,
+        opt3Ctrl.text,
+        opt4Ctrl.text,
+      ];
+      initCorrIdx = QuestionModel.resolveCorrectOptionIndex(initialData, optStrs);
     }
 
     int selCorrectIdx = (initCorrIdx >= 0 && initCorrIdx < 4) ? initCorrIdx : 0;
