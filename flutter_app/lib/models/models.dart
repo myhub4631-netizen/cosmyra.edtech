@@ -305,56 +305,66 @@ class QuestionModel {
     'test_series': 'Test Series',
   };
 
-  /// Returns full human-readable question source (e.g., "NEET 2026 Phase 1", "NTA Abhyas Test 14", "JEE Main 2024 Shift 1")
+  static bool _isTechnicalId(String? s) {
+    if (s == null) return true;
+    final str = s.trim();
+    if (str.isEmpty) return true;
+    if (RegExp(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}').hasMatch(str)) return true;
+    if (str.contains('11111111-1111') || str.contains('00000000-0000')) return true;
+    final lower = str.toLowerCase();
+    if (lower.startsWith('tmpl-') || lower.startsWith('att-') || lower.startsWith('session_') || lower.startsWith('opt_') || lower.startsWith('q_')) return true;
+    if (lower == 'practice question' || lower == 'pyq' || lower == 'nta' || lower == 'custom_practice' || lower == 'custom_test') return true;
+    return false;
+  }
+
+  /// Returns clean human-readable question source (e.g., "NEET 2026 Phase 1", "NTA Abhyas Test 14", "JEE Main 2024 Shift 1")
   String get displaySource {
     final String sName = (sourceName ?? '').trim();
-    if (sName.isNotEmpty && sName.toLowerCase() != 'practice question' && sName.toLowerCase() != 'pyq' && sName.toLowerCase() != 'nta') {
+    if (sName.isNotEmpty && !_isTechnicalId(sName)) {
       return sName;
     }
 
     final String paperStr = (paper ?? '').trim();
-    if (paperStr.isNotEmpty && paperStr.toLowerCase() != 'practice question' && paperStr.toLowerCase() != 'pyq' && paperStr.toLowerCase() != 'nta') {
+    if (paperStr.isNotEmpty && !_isTechnicalId(paperStr)) {
       return paperStr;
     }
 
     final List<String> parts = [];
-    final String eId = examId.trim().toUpperCase();
+    String eId = examId.trim();
+    if (_isTechnicalId(eId)) {
+      eId = '';
+    }
+
     final String uSource = source.trim().toUpperCase();
 
     if (eId.isNotEmpty) {
-      parts.add(eId);
-    } else if (uSource == 'PYQ' || uSource.contains('NEET') || uSource.contains('JEE')) {
+      parts.add(eId.toUpperCase());
+    } else if (uSource == 'PYQ' || uSource.contains('NEET') || uSource.contains('JEE') || uSource == 'PRACTICE' || uSource == 'CUSTOM_TEST' || uSource == 'CUSTOM_PRACTICE') {
       if (uSource.contains('JEE')) {
-        parts.add('JEE MAIN');
+        parts.add('JEE Main');
       } else {
         parts.add('NEET');
       }
     } else if (uSource == 'NTA' || uSource == 'NTA_QUESTIONS') {
-      parts.add('NTA ABHYAS');
+      parts.add('NTA Abhyas');
+    } else {
+      parts.add('NEET');
     }
 
-    if (year != null && year! > 0) {
-      parts.add('$year');
-    }
+    final int y = (year != null && year! > 0) ? year! : 2026;
+    parts.add('$y');
 
-    if (session != null && session!.trim().isNotEmpty) {
+    if (session != null && session!.trim().isNotEmpty && !_isTechnicalId(session)) {
       parts.add(session!.trim());
+    } else {
+      parts.add('Phase 1');
     }
 
-    if (shift != null && shift!.trim().isNotEmpty) {
+    if (shift != null && shift!.trim().isNotEmpty && !_isTechnicalId(shift)) {
       parts.add(shift!.trim());
     }
 
-    if (parts.isNotEmpty) {
-      return parts.join(' ');
-    }
-
-    if (sName.isNotEmpty) return sName;
-    if (paperStr.isNotEmpty) return paperStr;
-    if (uSource == 'PYQ') return 'NEET / JEE PYQ';
-    if (uSource == 'NTA') return 'NTA ABHYAS';
-
-    return source.toUpperCase();
+    return parts.join(' ');
   }
 
   QuestionModel({
