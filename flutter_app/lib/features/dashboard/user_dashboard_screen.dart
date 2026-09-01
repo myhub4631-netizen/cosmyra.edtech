@@ -12,6 +12,7 @@ class UserDashboardScreen extends StatefulWidget {
   final VoidCallback onOpenMockTests;
   final VoidCallback onOpenPyqs;
   final VoidCallback onOpenMistakes;
+  final VoidCallback? onOpenLeaderboard;
   final VoidCallback? onLogout;
 
   const UserDashboardScreen({
@@ -23,6 +24,7 @@ class UserDashboardScreen extends StatefulWidget {
     required this.onOpenMockTests,
     required this.onOpenPyqs,
     required this.onOpenMistakes,
+    this.onOpenLeaderboard,
     this.onLogout,
   });
 
@@ -820,8 +822,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               setState(() => _mobileBottomNavIndex = idx);
               if (idx == 1) widget.onOpenPractice();
               if (idx == 2) widget.onOpenMockTests();
-              if (idx == 3) widget.onOpenPyqs();
-              if (idx == 4) {}
+              if (idx == 3) {
+                if (widget.onOpenLeaderboard != null) {
+                  widget.onOpenLeaderboard!();
+                } else {
+                  context.go('/leaderboard');
+                }
+              }
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1167,6 +1174,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                       if (item['label'] == 'PYQ' || item['label'] == 'PYQ Practice') context.go('/pyq');
                       if (item['label'] == 'NTA Questions' || item['label'] == 'NTA Practice') context.go('/nta-practice');
                       if (item['label'] == 'Bookmarks' || item['label'] == 'My Mistakes') widget.onOpenMistakes();
+                      if (item['label'] == 'Leaderboard') {
+                        if (widget.onOpenLeaderboard != null) {
+                          widget.onOpenLeaderboard!();
+                        } else {
+                          context.go('/leaderboard');
+                        }
+                      }
                     },
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
@@ -1862,7 +1876,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 children: [
                   const Text('Leaderboard (Daily)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                   GestureDetector(
-                    onTap: () {},
+                    onTap: () {
+                      if (widget.onOpenLeaderboard != null) {
+                        widget.onOpenLeaderboard!();
+                      } else {
+                        context.go('/leaderboard');
+                      }
+                    },
                     child: const Row(
                       children: [
                         Text('View All', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2563EB))),
