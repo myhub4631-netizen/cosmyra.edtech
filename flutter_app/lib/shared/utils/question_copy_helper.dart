@@ -45,11 +45,150 @@ class QuestionCopyHelper {
     text = text.replaceAll('&beta;', 'β');
     text = text.replaceAll('&infin;', '∞');
 
-    // 6. Normalize line breaks and remove extra trailing blank lines
+    // 6. Convert LaTeX math expressions (\frac{3mL^3}{8\pi} -> (3mL³)/(8π))
+    text = convertLatexToPlainText(text);
+
+    // 7. Normalize line breaks and remove extra trailing blank lines
     text = text.replaceAll(RegExp(r'\r\n|\r'), '\n');
     text = text.replaceAll(RegExp(r'\n{3,}'), '\n\n');
 
     return text.trim();
+  }
+
+  /// Converts LaTeX math expressions into clean readable plain text
+  static String convertLatexToPlainText(String raw) {
+    if (raw.trim().isEmpty) return raw;
+    String text = raw;
+
+    // 1. Convert LaTeX fractions \frac{num}{denom} or \dfrac{num}{denom} -> (num)/(denom)
+    text = _convertLatexFractions(text);
+
+    // 2. Convert LaTeX square roots \sqrt{x} -> √(x)
+    text = text.replaceAllMapped(RegExp(r'\\sqrt\s*\{([^\}]+)\}'), (m) => '√(${m.group(1)})');
+    text = text.replaceAll(r'\sqrt', '√');
+
+    // 3. Convert Greek letters
+    final greekMap = {
+      r'\alpha': 'α', r'\beta': 'β', r'\gamma': 'γ', r'\delta': 'δ',
+      r'\epsilon': 'ε', r'\varepsilon': 'ε', r'\zeta': 'ζ', r'\eta': 'η',
+      r'\theta': 'θ', r'\iota': 'ι', r'\kappa': 'κ', r'\lambda': 'λ',
+      r'\mu': 'μ', r'\nu': 'ν', r'\xi': 'ξ', r'\pi': 'π', r'\rho': 'ρ',
+      r'\sigma': 'σ', r'\tau': 'τ', r'\upsilon': 'υ', r'\phi': 'ϕ',
+      r'\chi': 'χ', r'\psi': 'ψ', r'\omega': 'ω',
+      r'\Gamma': 'Γ', r'\Delta': 'Δ', r'\Theta': 'Θ', r'\Lambda': 'Λ',
+      r'\Xi': 'Ξ', r'\Pi': 'Π', r'\Sigma': 'Σ', r'\Upsilon': 'Υ',
+      r'\Phi': 'Φ', r'\Psi': 'Ψ', r'\Omega': 'Ω',
+    };
+    greekMap.forEach((key, value) {
+      text = text.replaceAll(key, value);
+    });
+
+    // 4. Convert Math operators & symbols
+    final mathSymbols = {
+      r'\infty': '∞', r'\pm': '±', r'\mp': '∓', r'\times': '×', r'\div': '÷',
+      r'\cdot': '·', r'\le': '≤', r'\leq': '≤', r'\ge': '≥', r'\geq': '≥',
+      r'\neq': '≠', r'\approx': '≈', r'\propto': '∝', r'\partial': '∂',
+      r'\int': '∫', r'\sum': '∑', r'\prod': '∏', r'\degree': '°',
+      r'\vec': '', r'\overrightarrow': '', r'\hat': '', r'\bar': '',
+      r'\text': '', r'\mathrm': '', r'\mathbf': '', r'\mathit': '',
+    };
+    mathSymbols.forEach((key, value) {
+      text = text.replaceAll(key, value);
+    });
+
+    // 5. Convert Superscripts & Subscripts (e.g. L^3 -> L³, x_1 -> x₁)
+    text = _convertSuperscriptsAndSubscripts(text);
+
+    // 6. Clean braces and dollar sign enclosers
+    text = text.replaceAll(RegExp(r'\$|\$\$|\\\(|\\\)|\\\[|\\\]'), '');
+    text = text.replaceAll(RegExp(r'[\{\}]'), '');
+
+    // 7. Clean extra spaces
+    text = text.replaceAll(RegExp(r'[ \t]+'), ' ');
+
+    return text.trim();
+  }
+
+  static String _convertLatexFractions(String text) {
+    String result = text;
+    final fracPattern = RegExp(r'\\d?frac\s*\{');
+    
+    int maxIterations = 20;
+    while (fracPattern.hasMatch(result) && maxIterations > 0) {
+      maxIterations--;
+      final match = fracPattern.firstMatch(result);
+      if (match == null) break;
+      final startIdx = match.start;
+
+      int numStart = match.end - 1; // pointing at '{'
+      int numEnd = _findMatchingBrace(result, numStart);
+      if (numEnd == -1) break;
+      String numText = result.substring(numStart + 1, numEnd).trim();
+
+      int denomStart = result.indexOf('{', numEnd + 1);
+      if (denomStart == -1 || result.substring(numEnd + 1, denomStart).trim().isNotEmpty) {
+        break;
+      }
+      int denomEnd = _findMatchingBrace(result, denomStart);
+      if (denomEnd == -1) break;
+      String denomText = result.substring(denomStart + 1, denomEnd).trim();
+
+      numText = _convertLatexFractions(numText);
+      denomText = _convertLatexFractions(denomText);
+
+      String formattedFrac;
+      if (numText.length <= 4 && !numText.contains(' ') && !numText.contains('+') && !numText.contains('-')) {
+        formattedFrac = '$numText/$denomText';
+      } else {
+        formattedFrac = '($numText)/($denomText)';
+      }
+
+      result = result.substring(0, startIdx) + formattedFrac + result.substring(denomEnd + 1);
+    }
+
+    return result;
+  }
+
+  static int _findMatchingBrace(String text, int openPos) {
+    int depth = 0;
+    for (int i = openPos; i < text.length; i++) {
+      if (text[i] == '{') {
+        depth++;
+      } else if (text[i] == '}') {
+        depth--;
+        if (depth == 0) return i;
+      }
+    }
+    return -1;
+  }
+
+  static String _convertSuperscriptsAndSubscripts(String text) {
+    final superMap = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','+':'⁺','-':'⁻','=':'⁼','(':'⁽',')':'⁾','n':'ⁿ','i':'ⁱ'};
+    final subMap   = {'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','+':'₊','-':'₋','=':'₌','(':'₍',')':'₎','a':'ₐ','e':'ₑ','o':'ₒ','x':'ₓ'};
+
+    String res = text;
+
+    res = res.replaceAllMapped(RegExp(r'\^\{([^\}]+)\}'), (match) {
+      final inner = match.group(1) ?? '';
+      final converted = inner.split('').map((ch) => superMap[ch] ?? ch).join('');
+      return converted;
+    });
+    res = res.replaceAllMapped(RegExp(r'\^([0-9a-zA-Z])'), (match) {
+      final ch = match.group(1) ?? '';
+      return superMap[ch] ?? '^$ch';
+    });
+
+    res = res.replaceAllMapped(RegExp(r'_\{([^\}]+)\}'), (match) {
+      final inner = match.group(1) ?? '';
+      final converted = inner.split('').map((ch) => subMap[ch] ?? ch).join('');
+      return converted;
+    });
+    res = res.replaceAllMapped(RegExp(r'_([0-9a-zA-Z])'), (match) {
+      final ch = match.group(1) ?? '';
+      return subMap[ch] ?? '_$ch';
+    });
+
+    return res;
   }
 
   /// Parses HTML table rows and cells into aligned column text without borders

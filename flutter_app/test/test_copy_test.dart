@@ -38,4 +38,13 @@ Choose the correct answer from the options given below:
     expect(result.contains('Option A:'), isFalse);
     expect(result.contains('(1) A-IV, B-III, C-II, D-I'), isTrue);
   });
+
+  test('Test LaTeX fraction conversion (3mL^3 / 8\\pi)', () {
+    final rawLatex = r'\frac{3mL^3}{8\pi}';
+    final cleaned = QuestionCopyHelper.cleanTextContent(rawLatex);
+    print("=== LATEX FRACTION CONVERTED ===");
+    print(cleaned);
+    print("================================");
+    expect(cleaned, equals('(3mL³)/(8π)'));
+  });
 }
