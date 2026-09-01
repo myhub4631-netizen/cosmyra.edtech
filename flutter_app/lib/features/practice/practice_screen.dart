@@ -7,6 +7,7 @@ import '../../shared/widgets/latex_view.dart';
 import '../../shared/widgets/smart_image.dart';
 import '../../shared/utils/question_copy_helper.dart';
 import '../../core/services/supabase_service.dart';
+import '../tests/test_result_screen.dart';
 
 class PracticeScreen extends StatefulWidget {
   final List<QuestionModel> questions;
@@ -235,33 +236,61 @@ class _PracticeScreenState extends State<PracticeScreen> {
     );
   }
 
+  TestAttemptModel? _submittedAttempt;
+
   void _finishPracticeSession() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Practice Session Complete 🎉'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Total Questions: ${widget.questions.length}'),
-            Text('Attempted: ${_selectedAnswers.length}'),
-            Text('Correct: ${_isCorrectMap.values.where((v) => v).length}'),
-            Text('Incorrect: ${_isCorrectMap.values.where((v) => !v).length}'),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              widget.onFinish();
-            },
-            child: const Text('Return to Dashboard'),
-          ),
-        ],
-      ),
+    _timer?.cancel();
+
+    int correct = 0;
+    int incorrect = 0;
+    _isCorrectMap.forEach((idx, isCorr) {
+      if (isCorr) {
+        correct++;
+      } else {
+        incorrect++;
+      }
+    });
+
+    final attempted = _selectedAnswers.length;
+    final unattempted = widget.questions.length - attempted;
+    final double score = (correct * 4.0) - (incorrect * 1.0);
+    final double maxScore = widget.questions.length * 4.0;
+    final double accuracy = attempted > 0 ? (correct / attempted * 100) : 0.0;
+    final int timeSpent = widget.timerMinutes > 0 ? ((widget.timerMinutes * 60) - _secondsRemaining) : 180;
+
+    final attempt = TestAttemptModel(
+      id: 'att-${DateTime.now().millisecondsSinceEpoch}',
+      userId: 'usr-current',
+      testTemplateId: 'tmpl-practice',
+      testTitle: 'Custom Practice Session',
+      startedAt: DateTime.now().subtract(Duration(seconds: timeSpent > 0 ? timeSpent : 1)),
+      expiresAt: DateTime.now(),
+      submittedAt: DateTime.now(),
+      status: 'submitted',
+      totalScore: score,
+      maxMarks: maxScore,
+      totalQuestions: widget.questions.length,
+      attemptedCount: attempted,
+      correctCount: correct,
+      incorrectCount: incorrect,
+      unattemptedCount: unattempted,
+      accuracy: double.parse(accuracy.toStringAsFixed(1)),
+      timeSpentSeconds: timeSpent > 0 ? timeSpent : 1,
     );
+
+    // Save attempt to Supabase
+    SupabaseService.submitTestAttempt(
+      userId: 'usr-current',
+      attempt: attempt,
+      questions: widget.questions,
+      userAnswers: _selectedAnswers,
+    );
+
+    if (mounted) {
+      setState(() {
+        _submittedAttempt = attempt;
+      });
+    }
   }
 
   void _showReportDialog(String questionId) {

@@ -5,6 +5,7 @@ import '../../shared/widgets/latex_view.dart';
 import '../../shared/widgets/smart_image.dart';
 import '../../shared/utils/question_copy_helper.dart';
 import '../../core/services/supabase_service.dart';
+import 'test_result_screen.dart';
 
 class CustomTestScreen extends StatefulWidget {
   final List<QuestionModel> questions;
@@ -31,6 +32,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
   int _currentIndex = 0;
   final Map<int, String> _userAnswers = {};
   final Set<int> _markedForReview = {};
+  TestAttemptModel? _submittedAttempt;
 
   late DateTime _startedAt;
   late DateTime _expiresAt;
@@ -337,12 +339,37 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
     );
 
     if (mounted) {
+      setState(() {
+        _submittedAttempt = attempt;
+        _isSubmitting = false;
+      });
       widget.onTestSubmitted(attempt, _userAnswers);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_submittedAttempt != null) {
+      return TestResultScreen(
+        attempt: _submittedAttempt!,
+        questions: widget.questions,
+        userAnswers: _userAnswers,
+        onBackToDashboard: () {
+          widget.onTestSubmitted(_submittedAttempt!, _userAnswers);
+        },
+        onRetryTest: () {
+          setState(() {
+            _submittedAttempt = null;
+            _currentIndex = 0;
+            _userAnswers.clear();
+            _isSubmitting = false;
+            _secondsRemaining = widget.durationMinutes * 60;
+            _startTimer();
+          });
+        },
+      );
+    }
+
     if (widget.questions.isEmpty) {
       return const Center(child: Text('No test questions loaded.'));
     }

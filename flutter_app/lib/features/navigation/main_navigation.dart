@@ -278,21 +278,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     // 3. If showing Test Results Screen
     if (_lastTestAttemptResult != null && _lastTestUserAnswers != null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Examination Score Report')),
-        body: TestResultScreen(
-          attempt: _lastTestAttemptResult!,
-          questions: _lastTestQuestions ?? SupabaseService.getSampleQuestions(),
-          userAnswers: _lastTestUserAnswers!,
-          onBackToDashboard: () {
-            setState(() {
-              _lastTestAttemptResult = null;
-              _lastTestUserAnswers = null;
-              _lastTestQuestions = null;
-              _selectedIndex = 0;
-            });
-          },
-        ),
+      return TestResultScreen(
+        attempt: _lastTestAttemptResult!,
+        questions: _lastTestQuestions ?? SupabaseService.getSampleQuestions(),
+        userAnswers: _lastTestUserAnswers!,
+        onBackToDashboard: () {
+          setState(() {
+            _lastTestAttemptResult = null;
+            _lastTestUserAnswers = null;
+            _lastTestQuestions = null;
+            _selectedIndex = 0;
+          });
+        },
       );
     }
 
