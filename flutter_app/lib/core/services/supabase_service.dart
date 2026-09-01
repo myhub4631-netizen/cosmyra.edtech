@@ -1954,22 +1954,29 @@ class SupabaseService {
 
   static List<String> parseOptionsFromQuestionMap(Map<String, dynamic> map) {
     List<String> resultList = [];
-    if (map['options'] is List) {
-      final list = (map['options'] as List).map((e) => e?.toString() ?? '').toList();
-      if (list.any((s) => s.trim().isNotEmpty)) resultList = list;
-    } else if (map['optionsList'] is List) {
-      final list = (map['optionsList'] as List).map((e) => e?.toString() ?? '').toList();
-      if (list.any((s) => s.trim().isNotEmpty)) resultList = list;
-    } else if (map['options_list'] is List) {
-      final list = (map['options_list'] as List).map((e) => e?.toString() ?? '').toList();
-      if (list.any((s) => s.trim().isNotEmpty)) resultList = list;
-    } else if (map['options'] is String && (map['options'] as String).trim().isNotEmpty) {
-      final str = (map['options'] as String).trim();
+    var rawList = map['options'] ?? map['question_options'] ?? map['optionsList'] ?? map['options_list'];
+
+    if (rawList is List) {
+      resultList = rawList.map((e) {
+        if (e is Map) {
+          return (e['option_text'] ?? e['optionText'] ?? e['text'] ?? e['value'] ?? e.toString()).toString();
+        }
+        return e?.toString() ?? '';
+      }).toList();
+      if (!resultList.any((s) => s.trim().isNotEmpty)) {
+        resultList = [];
+      }
+    } else if (rawList is String && rawList.trim().isNotEmpty) {
+      final str = rawList.trim();
       if (str.startsWith('[') && str.endsWith(']')) {
         try {
           final List<dynamic> decoded = jsonDecode(str);
-          final list = decoded.map((e) => e?.toString() ?? '').toList();
-          if (list.any((s) => s.trim().isNotEmpty)) resultList = list;
+          resultList = decoded.map((e) {
+            if (e is Map) {
+              return (e['option_text'] ?? e['optionText'] ?? e['text'] ?? e['value'] ?? e.toString()).toString();
+            }
+            return e?.toString() ?? '';
+          }).toList();
         } catch (_) {}
       }
     }
@@ -2068,7 +2075,9 @@ class SupabaseService {
           ? List<String?>.from(map['optionImages'])
           : (map['option_images'] is List ? List<String?>.from(map['option_images']) : <String?>[]);
 
-      int? childTruthCorrIdx;
+      int? groundTruthCorrIdx;
+
+      // Step 1: Check childOptsMap (question_options table)
       if (qId.isNotEmpty && childOptsMap.containsKey(qId)) {
         final childRows = childOptsMap[qId]!;
         if (optsRaw.isEmpty) {
@@ -2077,17 +2086,68 @@ class SupabaseService {
         }
         for (var r in childRows) {
           if (r['is_correct'] == true || r['isCorrect'] == true) {
-            childTruthCorrIdx = (r['option_index'] as num?)?.toInt();
+            groundTruthCorrIdx = (r['option_index'] as num?)?.toInt();
             break;
           }
         }
       }
 
-      if (childTruthCorrIdx != null && childTruthCorrIdx >= 0) {
-        map['correct_option_index'] = childTruthCorrIdx;
-        map['correctOptionIndex'] = childTruthCorrIdx;
-        map['correct_answer'] = 'Option ${String.fromCharCode(65 + childTruthCorrIdx)}';
-        map['correctAnswer'] = 'Option ${String.fromCharCode(65 + childTruthCorrIdx)}';
+      // Step 2: Check map['options'] or map['question_options'] array for option maps with is_correct == true
+      if (groundTruthCorrIdx == null) {
+        var rawOptsList = map['options'] ?? map['question_options'];
+        if (rawOptsList is List) {
+          for (int i = 0; i < rawOptsList.length; i++) {
+            final opt = rawOptsList[i];
+            if (opt is Map && (opt['is_correct'] == true || opt['isCorrect'] == true)) {
+              groundTruthCorrIdx = i;
+              break;
+            }
+          }
+        }
+      }
+
+      // Step 3: Check explicit correct_option_index or correctOptionIndex
+      if (groundTruthCorrIdx == null) {
+        dynamic rawIdx = map['correct_option_index'] ?? map['correctOptionIndex'];
+        if (rawIdx is num && rawIdx >= 0) {
+          groundTruthCorrIdx = rawIdx.toInt();
+        } else if (rawIdx != null) {
+          int? parsed = int.tryParse(rawIdx.toString().trim());
+          if (parsed != null && parsed >= 0) {
+            groundTruthCorrIdx = parsed;
+          }
+        }
+      }
+
+      // Step 4: Parse correct_answer / correctAnswer string ('Option D', 'D', '4')
+      if (groundTruthCorrIdx == null) {
+        final String caStr = (map['correct_answer'] ?? map['correctAnswer'] ?? map['correctText'] ?? '').toString().trim();
+        if (caStr.isNotEmpty) {
+          final uStr = caStr.toUpperCase();
+          if (uStr.startsWith('OPTION ') || uStr.startsWith('OPT ') || uStr.startsWith('OPT.')) {
+            String sub = uStr.replaceAll(RegExp(r'^OPT(ION)?\.?\s*'), '').trim();
+            if (sub.length == 1 && RegExp(r'[A-D]').hasMatch(sub)) {
+              groundTruthCorrIdx = sub.codeUnitAt(0) - 65;
+            } else {
+              int? n = int.tryParse(sub);
+              if (n != null && n >= 1) groundTruthCorrIdx = n - 1;
+            }
+          } else {
+            final cleanLetter = uStr.replaceAll(RegExp(r'[\(\)\.]'), '').trim();
+            if (cleanLetter.length == 1 && RegExp(r'[A-D]').hasMatch(cleanLetter)) {
+              groundTruthCorrIdx = cleanLetter.codeUnitAt(0) - 65;
+            } else if (cleanLetter.length == 1 && RegExp(r'[1-4]').hasMatch(cleanLetter)) {
+              groundTruthCorrIdx = int.parse(cleanLetter) - 1;
+            }
+          }
+        }
+      }
+
+      if (groundTruthCorrIdx != null && groundTruthCorrIdx >= 0) {
+        map['correct_option_index'] = groundTruthCorrIdx;
+        map['correctOptionIndex'] = groundTruthCorrIdx;
+        map['correct_answer'] = 'Option ${String.fromCharCode(65 + groundTruthCorrIdx)}';
+        map['correctAnswer'] = 'Option ${String.fromCharCode(65 + groundTruthCorrIdx)}';
       }
 
       if (optsRaw.isEmpty) {
@@ -2099,8 +2159,8 @@ class SupabaseService {
         final text = e.value;
         final img = idx < optImgsRaw.length ? optImgsRaw[idx] : null;
         final optKey = 'opt_${map['id']}_$idx';
-        final isCorr = (childTruthCorrIdx != null)
-            ? (idx == childTruthCorrIdx)
+        final isCorr = (groundTruthCorrIdx != null && groundTruthCorrIdx >= 0)
+            ? (idx == groundTruthCorrIdx)
             : checkOptionIsCorrect(
                 optionIndex: idx,
                 optionText: text,
