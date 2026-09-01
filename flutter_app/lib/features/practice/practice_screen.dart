@@ -488,12 +488,13 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       final String selectedLetter = selectedOptIndex != -1 ? String.fromCharCode(65 + selectedOptIndex) : 'Selected';
 
                       final correctOptIndex = question.options.indexWhere((o) => o.isCorrect);
-                      final int validCorrectIndex = correctOptIndex != -1 ? correctOptIndex : 0;
-                      final String correctLetter = String.fromCharCode(65 + validCorrectIndex);
+                      final String correctLetter = correctOptIndex != -1 ? String.fromCharCode(65 + correctOptIndex) : '';
 
                       final String feedbackTitle = isCorrect
                           ? '✅ Correct Answer! Option $correctLetter is correct.'
-                          : '❌ Option $selectedLetter is wrong. Correct answer is Option $correctLetter.';
+                          : (correctOptIndex != -1
+                              ? '❌ Option $selectedLetter is wrong. Correct answer is Option $correctLetter.'
+                              : '❌ Option $selectedLetter is wrong.');
 
                       return Container(
                         padding: const EdgeInsets.all(20),

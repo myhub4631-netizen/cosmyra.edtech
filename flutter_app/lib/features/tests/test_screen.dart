@@ -7,12 +7,16 @@ import '../../core/services/supabase_service.dart';
 class CustomTestScreen extends StatefulWidget {
   final List<QuestionModel> questions;
   final int durationMinutes;
+  final String? sessionId;
+  final bool isNewSession;
   final Function(TestAttemptModel attempt, Map<int, String> answers) onTestSubmitted;
 
   const CustomTestScreen({
     super.key,
     required this.questions,
     this.durationMinutes = 60,
+    this.sessionId,
+    this.isNewSession = false,
     required this.onTestSubmitted,
   });
 
@@ -21,6 +25,7 @@ class CustomTestScreen extends StatefulWidget {
 }
 
 class _CustomTestScreenState extends State<CustomTestScreen> {
+  late final String _activeSessionId;
   int _currentIndex = 0;
   final Map<int, String> _userAnswers = {};
   final Set<int> _markedForReview = {};
@@ -34,15 +39,20 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
   @override
   void initState() {
     super.initState();
+    _activeSessionId = widget.sessionId ?? 'test_session_${DateTime.now().millisecondsSinceEpoch}';
     _startedAt = DateTime.now();
     _secondsRemaining = widget.durationMinutes > 0 ? widget.durationMinutes * 60 : 3600;
     _expiresAt = _startedAt.add(Duration(seconds: _secondsRemaining));
-    _restoreActiveSession();
+    if (widget.isNewSession) {
+      SupabaseService.clearActiveTestSession();
+    } else {
+      _restoreActiveSession();
+    }
     _startTimer();
   }
 
   Future<void> _restoreActiveSession() async {
-    final savedSession = await SupabaseService.loadActiveTestSession();
+    final savedSession = await SupabaseService.loadActiveTestSession(targetSessionId: _activeSessionId);
     if (savedSession != null && mounted) {
       final savedAnswersRaw = savedSession['userAnswers'] as Map<String, dynamic>?;
       final savedReviewRaw = savedSession['markedForReview'] as List<dynamic>?;
@@ -69,6 +79,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
 
   void _persistCurrentSession() {
     SupabaseService.saveActiveTestSession(
+      sessionId: _activeSessionId,
       questions: widget.questions,
       userAnswers: _userAnswers,
       markedForReview: _markedForReview,

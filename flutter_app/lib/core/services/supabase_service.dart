@@ -2068,10 +2068,26 @@ class SupabaseService {
           ? List<String?>.from(map['optionImages'])
           : (map['option_images'] is List ? List<String?>.from(map['option_images']) : <String?>[]);
 
-      if (optsRaw.isEmpty && qId.isNotEmpty && childOptsMap.containsKey(qId)) {
+      int? childTruthCorrIdx;
+      if (qId.isNotEmpty && childOptsMap.containsKey(qId)) {
         final childRows = childOptsMap[qId]!;
-        optsRaw = childRows.map((r) => r['option_text']?.toString() ?? '').toList();
-        optImgsRaw = childRows.map((r) => r['option_image']?.toString()).toList();
+        if (optsRaw.isEmpty) {
+          optsRaw = childRows.map((r) => r['option_text']?.toString() ?? '').toList();
+          optImgsRaw = childRows.map((r) => r['option_image']?.toString()).toList();
+        }
+        for (var r in childRows) {
+          if (r['is_correct'] == true || r['isCorrect'] == true) {
+            childTruthCorrIdx = (r['option_index'] as num?)?.toInt();
+            break;
+          }
+        }
+      }
+
+      if (childTruthCorrIdx != null && childTruthCorrIdx >= 0) {
+        map['correct_option_index'] = childTruthCorrIdx;
+        map['correctOptionIndex'] = childTruthCorrIdx;
+        map['correct_answer'] = 'Option ${String.fromCharCode(65 + childTruthCorrIdx)}';
+        map['correctAnswer'] = 'Option ${String.fromCharCode(65 + childTruthCorrIdx)}';
       }
 
       if (optsRaw.isEmpty) {
@@ -2083,13 +2099,15 @@ class SupabaseService {
         final text = e.value;
         final img = idx < optImgsRaw.length ? optImgsRaw[idx] : null;
         final optKey = 'opt_${map['id']}_$idx';
-        final isCorr = checkOptionIsCorrect(
-          optionIndex: idx,
-          optionText: text,
-          optionKey: optKey,
-          correctAnswerRaw: map['correctAnswer'] ?? map['correct_answer'],
-          correctOptionIndexRaw: map['correctOptionIndex'] ?? map['correct_option_index'],
-        );
+        final isCorr = (childTruthCorrIdx != null)
+            ? (idx == childTruthCorrIdx)
+            : checkOptionIsCorrect(
+                optionIndex: idx,
+                optionText: text,
+                optionKey: optKey,
+                correctAnswerRaw: map['correctAnswer'] ?? map['correct_answer'],
+                correctOptionIndexRaw: map['correctOptionIndex'] ?? map['correct_option_index'],
+              );
         return QuestionOptionModel(
           id: optKey,
           questionId: map['id']?.toString() ?? '',
@@ -3382,6 +3400,7 @@ class SupabaseService {
 
   // ================= ACTIVE SESSION PERSISTENCE FOR REFRESH / RECONNECT =================
   static Future<void> saveActiveTestSession({
+    required String sessionId,
     required List<QuestionModel> questions,
     required Map<int, String> userAnswers,
     required Set<int> markedForReview,
@@ -3392,6 +3411,7 @@ class SupabaseService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final sessionMap = {
+        'sessionId': sessionId,
         'startedAt': startedAt.toIso8601String(),
         'durationMinutes': durationMinutes,
         'secondsRemaining': secondsRemaining,
@@ -3424,12 +3444,19 @@ class SupabaseService {
     }
   }
 
-  static Future<Map<String, dynamic>?> loadActiveTestSession() async {
+  static Future<Map<String, dynamic>?> loadActiveTestSession({String? targetSessionId, bool isExplicitResume = false}) async {
+    if (!isExplicitResume && targetSessionId == null) {
+      return null;
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       final str = prefs.getString('cosmyra_active_test_session');
       if (str != null && str.isNotEmpty) {
-        return jsonDecode(str) as Map<String, dynamic>;
+        final data = jsonDecode(str) as Map<String, dynamic>;
+        if (targetSessionId != null && data['sessionId'] != null && data['sessionId'] != targetSessionId) {
+          return null;
+        }
+        return data;
       }
     } catch (e) {
       debugPrint('Error loading active test session: $e');
