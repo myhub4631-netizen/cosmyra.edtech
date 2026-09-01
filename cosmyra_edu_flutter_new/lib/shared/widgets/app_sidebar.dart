@@ -1,0 +1,343 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../core/services/supabase_service.dart';
+import '../../features/auth/login_screen.dart';
+
+class AppSidebar extends StatefulWidget {
+  final int selectedIndex;
+  final Function(int)? onItemSelected;
+  final VoidCallback? onOpenPractice;
+  final VoidCallback? onOpenCustomPractice;
+  final VoidCallback? onOpenCustomTest;
+  final VoidCallback? onOpenPyqs;
+  final VoidCallback? onOpenMistakes;
+  final VoidCallback? onOpenMyTests;
+  final VoidCallback? onOpenMockTests;
+  final VoidCallback? onOpenLeaderboard;
+  final VoidCallback? onLogout;
+
+  const AppSidebar({
+    super.key,
+    this.selectedIndex = 0,
+    this.onItemSelected,
+    this.onOpenPractice,
+    this.onOpenCustomPractice,
+    this.onOpenCustomTest,
+    this.onOpenPyqs,
+    this.onOpenMistakes,
+    this.onOpenMyTests,
+    this.onOpenMockTests,
+    this.onOpenLeaderboard,
+    this.onLogout,
+  });
+
+  @override
+  State<AppSidebar> createState() => _AppSidebarState();
+}
+
+class _AppSidebarState extends State<AppSidebar> {
+  late int _activeIdx;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeIdx = widget.selectedIndex;
+  }
+
+  @override
+  void didUpdateWidget(covariant AppSidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedIndex != widget.selectedIndex) {
+      setState(() => _activeIdx = widget.selectedIndex);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final navItems = [
+      {'icon': Icons.track_changes_rounded, 'label': 'Practice', 'route': '/practice'},
+      {'icon': Icons.edit_note_rounded, 'label': 'Custom Practice', 'route': '/custom-practice'},
+      {'icon': Icons.assignment_outlined, 'label': 'Custom Test', 'route': '/custom-test'},
+      {'icon': Icons.menu_book_rounded, 'label': 'PYQ', 'route': '/pyq'},
+      {'icon': Icons.verified_user_outlined, 'label': 'NTA Questions', 'route': '/nta-practice'},
+      {'icon': Icons.bookmark_border_rounded, 'label': 'Bookmarks', 'route': '/mistakes'},
+      {'icon': Icons.cancel_outlined, 'label': 'My Mistakes', 'route': '/mistakes'},
+      {'icon': Icons.assignment_turned_in_rounded, 'label': 'My All Tests', 'route': '/my-tests'},
+      {'icon': Icons.calendar_today_rounded, 'label': 'Test Series', 'route': '/mock-tests'},
+      {'icon': Icons.bar_chart_rounded, 'label': 'Analytics', 'route': '/analytics'},
+      {'icon': Icons.emoji_events_outlined, 'label': 'Leaderboard', 'route': '/leaderboard'},
+      {'icon': Icons.event_note_rounded, 'label': 'Study Plan', 'route': '/my-tests'},
+      {'icon': Icons.person_outline_rounded, 'label': 'Profile', 'route': '/profile'},
+      {'icon': Icons.settings_outlined, 'label': 'Settings', 'route': '/profile'},
+      {'icon': Icons.help_outline_rounded, 'label': 'Help & Support', 'route': '/help'},
+      {'icon': Icons.logout_rounded, 'label': 'Logout', 'route': '/login'},
+    ];
+
+    return Container(
+      width: 260,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(right: BorderSide(color: Color(0xFFF1F5F9))),
+      ),
+      child: Column(
+        children: [
+          // 1. Header with Logo & Version
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2563EB),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.school_rounded, color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Cosmyra Edu',
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'v1.1.1',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF2563EB),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // 2. Navigation Items List
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              itemCount: navItems.length,
+              itemBuilder: (context, index) {
+                final item = navItems[index];
+                final String label = item['label'] as String;
+                final IconData icon = item['icon'] as IconData;
+                final String route = item['route'] as String;
+                final bool isSelected = _activeIdx == index;
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: InkWell(
+                    onTap: () async {
+                      setState(() => _activeIdx = index);
+                      if (widget.onItemSelected != null) {
+                        widget.onItemSelected!(index);
+                      }
+
+                      // Close drawer if open
+                      if (Scaffold.of(context).isDrawerOpen) {
+                        Navigator.of(context).pop();
+                      }
+
+                      if (label == 'Logout') {
+                        await SupabaseService.logoutUserSession();
+                        if (widget.onLogout != null) widget.onLogout!();
+                        if (context.mounted) {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (context) => const LoginScreen()),
+                            (route) => false,
+                          );
+                        }
+                        return;
+                      }
+
+                      if (label == 'My All Tests') {
+                        if (widget.onOpenMyTests != null) {
+                          widget.onOpenMyTests!();
+                        } else {
+                          context.go('/my-tests');
+                        }
+                        return;
+                      }
+
+                      if (label == 'Practice') {
+                        if (widget.onOpenPractice != null) {
+                          widget.onOpenPractice!();
+                        } else {
+                          context.go('/custom-practice');
+                        }
+                        return;
+                      }
+
+                      if (label == 'Custom Practice') {
+                        if (widget.onOpenCustomPractice != null) {
+                          widget.onOpenCustomPractice!();
+                        } else {
+                          context.go('/custom-practice');
+                        }
+                        return;
+                      }
+
+                      if (label == 'Custom Test') {
+                        if (widget.onOpenCustomTest != null) {
+                          widget.onOpenCustomTest!();
+                        } else {
+                          context.go('/my-tests');
+                        }
+                        return;
+                      }
+
+                      if (label == 'PYQ' || label == 'NTA Questions') {
+                        if (widget.onOpenPyqs != null) {
+                          widget.onOpenPyqs!();
+                        } else {
+                          context.go('/pyq');
+                        }
+                        return;
+                      }
+
+                      if (label == 'Bookmarks' || label == 'My Mistakes') {
+                        if (widget.onOpenMistakes != null) {
+                          widget.onOpenMistakes!();
+                        } else {
+                          context.go('/mistakes');
+                        }
+                        return;
+                      }
+
+                      if (label == 'Test Series') {
+                        if (widget.onOpenMockTests != null) {
+                          widget.onOpenMockTests!();
+                        } else {
+                          context.go('/mock-tests');
+                        }
+                        return;
+                      }
+
+                      if (label == 'Leaderboard') {
+                        if (widget.onOpenLeaderboard != null) {
+                          widget.onOpenLeaderboard!();
+                        } else {
+                          context.go('/leaderboard');
+                        }
+                        return;
+                      }
+
+                      // Default navigation fallback
+                      context.go(route);
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFFEEF2FF) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            icon,
+                            size: 19,
+                            color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              label,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFF334155),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // 3. Go Premium Card
+          Padding(
+            padding: const EdgeInsets.all(14.0),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text('👑', style: TextStyle(fontSize: 15)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Go Premium',
+                        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Unlock unlimited tests, detailed analytics, and exclusive features.',
+                    style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B), height: 1.3),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 34,
+                    child: ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4F46E5),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('Upgrade Now', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.arrow_forward_rounded, size: 13, color: Colors.white),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

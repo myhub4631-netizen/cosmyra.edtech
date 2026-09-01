@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "672019832931",
+    "project_id": "cosmyra-edu",
+    "storage_bucket": "cosmyra-edu.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:672019832931:android:f306b7e0c88a9c9aaf9856",
+        "android_client_info": {
+          "package_name": "com.cosmyra.neetjee"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAP1bSXD1ho4dLeamygyeTbLCO3FLxoxfs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
