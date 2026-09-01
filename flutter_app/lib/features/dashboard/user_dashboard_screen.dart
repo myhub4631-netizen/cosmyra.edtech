@@ -13,6 +13,7 @@ class UserDashboardScreen extends StatefulWidget {
   final VoidCallback onOpenPyqs;
   final VoidCallback onOpenMistakes;
   final VoidCallback? onOpenLeaderboard;
+  final VoidCallback? onOpenMyTests;
   final VoidCallback? onLogout;
 
   const UserDashboardScreen({
@@ -25,6 +26,7 @@ class UserDashboardScreen extends StatefulWidget {
     required this.onOpenPyqs,
     required this.onOpenMistakes,
     this.onOpenLeaderboard,
+    this.onOpenMyTests,
     this.onLogout,
   });
 

@@ -28,6 +28,7 @@ import '../admin/admin_bulk_upload_step2_screen.dart';
 import '../admin/admin_questions_bank_dashboard.dart';
 import '../dashboard/user_dashboard_screen.dart';
 import '../admin/admin_dashboard_sections_screen.dart';
+import '../tests/my_tests_history_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final int? initialIndex;
@@ -80,6 +81,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final isPricingRoute = uriPath.contains('pricing') || uriFragment.contains('pricing');
     final isAdminRoute = uriPath.contains('admin') || uriFragment.contains('admin');
     final isDashboardRoute = uriPath.contains('dashboard') || uriFragment.contains('dashboard');
+    final isMyTestsRoute = uriPath.contains('my-tests') || uriPath.contains('history') || uriFragment.contains('my-tests') || uriFragment.contains('history');
 
     if (widget.initialIndex != null) {
       _selectedIndex = widget.initialIndex!;
@@ -103,6 +105,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       _selectedIndex = 9;
     } else if (isAdminRoute) {
       _selectedIndex = 8;
+    } else if (isMyTestsRoute) {
+      _selectedIndex = 20;
     } else if (isDashboardRoute) {
       _selectedIndex = 0;
     } else {
@@ -435,6 +439,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         return AdminUserManagementScreen(userProfile: _currentUser);
       case 14:
         return AdminDashboardSectionsScreen(userProfile: _currentUser);
+      case 20:
+        return MyTestsHistoryScreen(
+          userProfile: _currentUser,
+          onBack: () => setState(() => _selectedIndex = 0),
+          onNavigateTab: (idx) => setState(() => _selectedIndex = idx),
+          onOpenCustomPractice: _openCustomPracticeWizard,
+          onOpenCustomTest: _openCustomTestWizard,
+          onOpenPyqs: () => setState(() => _selectedIndex = 3),
+        );
       default:
         return UserDashboardScreen(
           userProfile: _currentUser,
@@ -445,6 +458,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           onOpenPyqs: () => setState(() => _selectedIndex = 3),
           onOpenMistakes: () => setState(() => _selectedIndex = 4),
           onOpenLeaderboard: () => setState(() => _selectedIndex = 6),
+          onOpenMyTests: () => setState(() => _selectedIndex = 20),
           onLogout: () {
             setState(() {
               _isLoggedIn = false;
