@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/latex_view.dart';
 import '../../shared/widgets/smart_image.dart';
+import '../../shared/widgets/question_feedback_view.dart';
+import '../../shared/services/audio_feedback_service.dart';
 import '../../shared/utils/question_copy_helper.dart';
 import '../../core/services/supabase_service.dart';
 import '../tests/test_result_screen.dart';
@@ -37,6 +39,9 @@ class _PracticeScreenState extends State<PracticeScreen> {
   final Set<int> _markedForReview = {};
   final Map<int, bool> _isCorrectMap = {};
   final Map<int, bool> _isPartialMap = {};
+
+  int _currentStreak = 0;
+  bool _isAudioMuted = !AudioFeedbackService.isAudioEnabled;
 
   Timer? _timer;
   int _secondsRemaining = 0;
@@ -216,6 +221,11 @@ class _PracticeScreenState extends State<PracticeScreen> {
       _hasAnswered[_currentIndex] = true;
       _isCorrectMap[_currentIndex] = isCorrect;
       _isPartialMap[_currentIndex] = isPartial;
+      if (isCorrect) {
+        _currentStreak++;
+      } else {
+        _currentStreak = 0;
+      }
     });
 
     _savePracticeSession();
@@ -375,255 +385,52 @@ class _PracticeScreenState extends State<PracticeScreen> {
           // Main Question View
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Metadata Tags Header
-                  Row(
-                    children: [
-                      Chip(
-                        label: Text(question.difficulty.toUpperCase()),
-                        backgroundColor: question.difficulty == 'easy'
-                            ? Colors.green.withOpacity(0.15)
-                            : (question.difficulty == 'hard' ? Colors.red.withOpacity(0.15) : Colors.orange.withOpacity(0.15)),
-                        side: BorderSide.none,
-                      ),
-                      const SizedBox(width: 8),
-                      Chip(label: Text(question.source.toUpperCase())),
-                      if (question.year != null) ...[
-                        const SizedBox(width: 8),
-                        Chip(label: Text('${question.year}')),
-                      ],
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.copy_rounded, color: Color(0xFF64748B)),
-                        tooltip: 'Copy Question',
-                        onPressed: () => QuestionCopyHelper.copyModelToClipboard(
-                          context,
-                          question,
-                          questionIndex: _currentIndex + 1,
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          _markedForReview.contains(_currentIndex) ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                          color: _markedForReview.contains(_currentIndex) ? Colors.amber : null,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            if (_markedForReview.contains(_currentIndex)) {
-                              _markedForReview.remove(_currentIndex);
-                            } else {
-                              _markedForReview.add(_currentIndex);
-                            }
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Question Text Card
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          LaTeXView(
-                            text: question.questionText,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 17, height: 1.4),
-                          ),
-                          if (question.questionImage != null) ...[
-                            const SizedBox(height: 12),
-                            SmartImage(
-                              key: ValueKey('q_img_${question.id}_${question.questionImage}'),
-                              url: question.questionImage,
-                              height: 180,
-                              fit: BoxFit.contain,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Options List
-                  if (question.qType == 'numerical')
-                    _buildNumericalInput(question)
-                  else
-                    ...question.options.map((opt) {
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 820),
+                  child: QuestionFeedbackView(
+                    question: question,
+                    questionIndex: _currentIndex,
+                    totalQuestions: widget.questions.length,
+                    selectedAnswer: _selectedAnswers[_currentIndex],
+                    isAnswered: isAnswered,
+                    isCorrect: isCorrect,
+                    currentStreak: _currentStreak,
+                    currentScore: (_isCorrectMap.values.where((v) => v).length * 4.0) - (_isCorrectMap.values.where((v) => !v).length * 1.0),
+                    onOptionSelected: (idx) {
+                      final opt = question.options[idx];
                       final String optKey = (opt.id != null && opt.id.isNotEmpty) ? opt.id : 'opt_${question.id}_${opt.optionIndex}';
-                      final String optLetter = String.fromCharCode(65 + opt.optionIndex);
-                      final optionText = opt.optionText;
-                      final isSelected = _isOptSelected(_selectedAnswers[_currentIndex], optKey, optLetter, optionText);
-                      final isThisCorrect = opt.isCorrect;
-
-                      Color optionBorderColor = Theme.of(context).dividerColor.withOpacity(0.2);
-                      Color optionBgColor = Theme.of(context).cardColor;
-
-                      if (isAnswered) {
-                        if (isThisCorrect) {
-                          optionBorderColor = Colors.green;
-                          optionBgColor = Colors.green.withOpacity(0.08);
-                        } else if (isSelected && !isThisCorrect) {
-                          optionBorderColor = Colors.red;
-                          optionBgColor = Colors.red.withOpacity(0.08);
-                        }
+                      _selectOption(idx, optKey, opt.optionText);
+                    },
+                    onNextQuestion: () {
+                      if (_currentIndex < widget.questions.length - 1) {
+                        setState(() => _currentIndex++);
+                      } else {
+                        _finishPracticeSession();
                       }
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12.0),
-                        child: InkWell(
-                          key: ValueKey('opt_practice_${question.id}_${opt.optionIndex}'),
-                          onTap: () => _selectOption(opt.optionIndex, optKey, optionText),
-                          borderRadius: BorderRadius.circular(14),
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: optionBgColor,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: optionBorderColor, width: isAnswered && (isThisCorrect || isSelected) ? 2 : 1),
-                            ),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 16,
-                                  backgroundColor: isAnswered && isThisCorrect
-                                      ? Colors.green
-                                      : (isAnswered && isSelected && !isThisCorrect
-                                          ? Colors.red
-                                          : Theme.of(context).primaryColor.withOpacity(0.1)),
-                                  child: Text(
-                                    optLetter,
-                                    style: TextStyle(
-                                      color: isAnswered && (isThisCorrect || (isSelected && !isThisCorrect))
-                                          ? Colors.white
-                                          : Theme.of(context).primaryColor,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      if (optionText.isNotEmpty) LaTeXView(text: optionText),
-                                      if (opt.optionImage != null && opt.optionImage!.isNotEmpty) ...[
-                                        if (optionText.isNotEmpty) const SizedBox(height: 6),
-                                        SmartImage(
-                                          key: ValueKey('opt_img_${question.id}_${opt.optionIndex}_${opt.optionImage}'),
-                                          url: opt.optionImage,
-                                          height: 120,
-                                          fit: BoxFit.contain,
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                if (isAnswered && isThisCorrect)
-                                  const Icon(Icons.check_circle_rounded, color: Colors.green)
-                                else if (isAnswered && isSelected && !isThisCorrect)
-                                  const Icon(Icons.cancel_rounded, color: Colors.red),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-
-                  // Immediate Feedback Box
-                  if (isAnswered) ...[
-                    const SizedBox(height: 20),
-                    Builder(builder: (context) {
-                      final selectedOptIndex = question.options.indexWhere((opt) {
-                        final String optKey = (opt.id != null && opt.id.isNotEmpty) ? opt.id : 'opt_${question.id}_${opt.optionIndex}';
-                        final String optLetter = String.fromCharCode(65 + opt.optionIndex);
-                        return _isOptSelected(_selectedAnswers[_currentIndex], optKey, optLetter, opt.optionText);
+                    },
+                    isLastQuestion: _currentIndex == widget.questions.length - 1,
+                    isAudioMuted: _isAudioMuted,
+                    onToggleAudio: () {
+                      AudioFeedbackService.toggleAudio();
+                      setState(() {
+                        _isAudioMuted = !AudioFeedbackService.isAudioEnabled;
                       });
-                      final String selectedLetter = selectedOptIndex != -1 ? String.fromCharCode(65 + selectedOptIndex) : 'Selected';
-
-                      final correctOptIndex = question.options.indexWhere((o) => o.isCorrect);
-                      final String correctLetter = correctOptIndex != -1 ? String.fromCharCode(65 + correctOptIndex) : '';
-
-                      final String feedbackTitle = isCorrect
-                          ? '✅ Correct Answer! Option $correctLetter is correct.'
-                          : (correctOptIndex != -1
-                              ? '❌ Option $selectedLetter is wrong. Correct answer is Option $correctLetter.'
-                              : '❌ Option $selectedLetter is wrong.');
-
-                      return Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: isCorrect ? Colors.green.withOpacity(0.08) : Colors.red.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: isCorrect ? Colors.green : Colors.red),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(isCorrect ? Icons.check_circle : Icons.error, color: isCorrect ? Colors.green : Colors.red),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    feedbackTitle,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: isCorrect ? Colors.green.shade800 : Colors.red.shade800,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (question.explanation != null && question.explanation!.trim().isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              const Text('Explanation:', style: TextStyle(fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              LaTeXView(text: question.explanation!),
-                            ],
-                            if (question.solution != null && question.solution!.trim().isNotEmpty) ...[
-                              const SizedBox(height: 10),
-                              const Text('Step-by-Step Solution:', style: TextStyle(fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              LaTeXView(text: question.solution!),
-                            ],
-                          ],
-                        ),
-                      );
-                    }),
-                  ],
-
-                  const SizedBox(height: 32),
-
-                  // Bottom Controls (Previous, Clear, Next, Finish)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _currentIndex > 0 ? () => setState(() => _currentIndex--) : null,
-                        icon: const Icon(Icons.arrow_back),
-                        label: const Text('Previous'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          if (_currentIndex < widget.questions.length - 1) {
-                            setState(() => _currentIndex++);
-                          } else {
-                            _finishPracticeSession();
-                          }
-                        },
-                        child: Text(_currentIndex == widget.questions.length - 1 ? 'Finish Practice' : 'Next Question'),
-                      ),
-                    ],
+                    },
+                    isBookmarked: _markedForReview.contains(_currentIndex),
+                    onBookmarkToggle: () {
+                      setState(() {
+                        if (_markedForReview.contains(_currentIndex)) {
+                          _markedForReview.remove(_currentIndex);
+                        } else {
+                          _markedForReview.add(_currentIndex);
+                        }
+                      });
+                    },
+                    onReportQuestion: () => _showReportDialog(question.id),
                   ),
-                ],
+                ),
               ),
             ),
           ),
