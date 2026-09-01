@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:cosmyra_edu_flutter/shared/utils/question_copy_helper.dart';
 
 void main() {
-  test('Test QuestionCopyHelper clean formatting for Q7 match table', () {
+  test('Test QuestionCopyHelper clean formatting matching exact user screenshot', () {
     final sampleQ7 = '''
 Match List I with List II:
 
@@ -26,6 +26,7 @@ Choose the correct answer from the options given below:
     final result = QuestionCopyHelper.formatForClipboard(
       questionText: sampleQ7,
       options: options,
+      questionIndex: 7,
     );
 
     print("=== RESULT OUTPUT ===");
@@ -33,6 +34,8 @@ Choose the correct answer from the options given below:
     print("=====================");
 
     expect(result.contains('|'), isFalse);
-    expect(result.contains('Option A: (1) A-IV, B-III, C-II, D-I'), isTrue);
+    expect(result.contains('Options:'), isFalse);
+    expect(result.contains('Option A:'), isFalse);
+    expect(result.contains('(1) A-IV, B-III, C-II, D-I'), isTrue);
   });
 }

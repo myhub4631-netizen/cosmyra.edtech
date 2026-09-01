@@ -166,7 +166,7 @@ class QuestionCopyHelper {
     return sb.toString();
   }
 
-  /// Formats a question into clean, user-facing plain text with options A, B, C, D.
+  /// Formats a question into clean, user-facing plain text matching exact prompt specification.
   static String formatForClipboard({
     required String questionText,
     required List<dynamic> options,
@@ -177,16 +177,15 @@ class QuestionCopyHelper {
 
     final String cleanQText = cleanTextContent(questionText);
     if (questionIndex != null && questionIndex > 0) {
-      sb.writeln('Q$questionIndex. $cleanQText');
+      sb.writeln('$questionIndex.');
+      sb.writeln(cleanQText);
     } else {
       sb.writeln(cleanQText);
     }
-    sb.writeln();
 
     if (options.isNotEmpty) {
-      sb.writeln('Options:');
+      sb.writeln();
       for (int i = 0; i < options.length; i++) {
-        final letter = String.fromCharCode(65 + i); // 'A', 'B', 'C', 'D'
         final opt = options[i];
         String optText = '';
         if (opt is QuestionOptionModel) {
@@ -199,11 +198,14 @@ class QuestionCopyHelper {
 
         String cleanOpt = cleanTextContent(optText);
 
-        // Strip redundant double prefix like "A. " if option text already contains option letter
-        final prefixRegex = RegExp('^\\(?$letter[\\.\\)]\\s*', caseSensitive: false);
-        cleanOpt = cleanOpt.replaceFirst(prefixRegex, '');
-
-        sb.writeln('Option $letter: $cleanOpt');
+        // If option text already has numbering/prefix like "(1)", "(A)", "1.", "A.", print as is
+        final hasPrefix = RegExp(r'^\(?(\d+|[A-D])[\.\)]\s*', caseSensitive: false).hasMatch(cleanOpt);
+        if (hasPrefix) {
+          sb.writeln(cleanOpt);
+        } else {
+          final letter = String.fromCharCode(65 + i);
+          sb.writeln('($letter) $cleanOpt');
+        }
       }
     }
 
