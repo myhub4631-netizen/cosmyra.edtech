@@ -455,7 +455,12 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                           ),
                           if (question.questionImage != null) ...[
                             const SizedBox(height: 12),
-                            SmartImage(url: question.questionImage, height: 180, fit: BoxFit.contain),
+                            SmartImage(
+                              key: ValueKey('q_img_${question.id}_${question.questionImage}'),
+                              url: question.questionImage,
+                              height: 180,
+                              fit: BoxFit.contain,
+                            ),
                           ],
                         ],
                       ),
@@ -512,6 +517,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                                        if (opt.optionImage != null && opt.optionImage!.isNotEmpty) ...[
                                          if (opt.optionText.isNotEmpty) const SizedBox(height: 6),
                                          SmartImage(
+                                           key: ValueKey('opt_img_${question.id}_${opt.optionIndex}_${opt.optionImage}'),
                                            url: opt.optionImage,
                                            height: 120,
                                            fit: BoxFit.contain,

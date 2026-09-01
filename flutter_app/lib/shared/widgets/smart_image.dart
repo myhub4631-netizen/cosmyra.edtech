@@ -26,6 +26,8 @@ class SmartImage extends StatelessWidget {
 
     if (cleanUrl.isEmpty) return defaultFallback;
 
+    final widgetKey = ValueKey(cleanUrl);
+
     // Check if SVG format
     final bool isSvg = cleanUrl.toLowerCase().contains('.svg') || cleanUrl.startsWith('data:image/svg+xml');
 
@@ -37,19 +39,17 @@ class SmartImage extends StatelessWidget {
             final Uint8List bytes = base64Decode(base64Content);
             return SvgPicture.memory(
               bytes,
+              key: widgetKey,
               height: height,
               width: width,
               fit: fit,
-              placeholderBuilder: (_) => SizedBox(
-                height: height,
-                width: width,
-                child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-              ),
+              placeholderBuilder: (_) => SizedBox(height: height, width: width),
             );
           } else if (cleanUrl.contains(',')) {
             final xmlStr = Uri.decodeComponent(cleanUrl.split(',').last);
             return SvgPicture.string(
               xmlStr,
+              key: widgetKey,
               height: height,
               width: width,
               fit: fit,
@@ -60,17 +60,14 @@ class SmartImage extends StatelessWidget {
         }
       }
 
-      // Network SVG
+      // Network SVG with gapless placeholder to prevent flickering on parent rebuilds
       return SvgPicture.network(
         cleanUrl,
+        key: widgetKey,
         height: height,
         width: width,
         fit: fit,
-        placeholderBuilder: (_) => SizedBox(
-          height: height,
-          width: width,
-          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-        ),
+        placeholderBuilder: (_) => SizedBox(height: height, width: width),
       );
     }
 
@@ -81,9 +78,11 @@ class SmartImage extends StatelessWidget {
         final Uint8List bytes = base64Decode(base64Content);
         return Image.memory(
           bytes,
+          key: widgetKey,
           height: height,
           width: width,
           fit: fit,
+          gaplessPlayback: true,
           errorBuilder: (_, __, ___) => defaultFallback,
         );
       } catch (e) {
@@ -91,12 +90,14 @@ class SmartImage extends StatelessWidget {
       }
     }
 
-    // Standard Network Raster Image
+    // Standard Network Raster Image with gaplessPlayback to prevent flickering on parent rebuilds
     return Image.network(
       cleanUrl,
+      key: widgetKey,
       height: height,
       width: width,
       fit: fit,
+      gaplessPlayback: true,
       errorBuilder: (_, __, ___) => defaultFallback,
     );
   }
