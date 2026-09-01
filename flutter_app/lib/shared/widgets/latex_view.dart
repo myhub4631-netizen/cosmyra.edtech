@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
+import '../utils/question_copy_helper.dart';
 
 /// Renders math expressions mixed with normal text seamlessly.
 /// Supports inline and display math delimited by:
@@ -21,6 +22,11 @@ class LaTeXView extends StatelessWidget {
   static String normalizeText(String raw) {
     if (raw.trim().isEmpty) return raw;
     String str = raw.trim();
+
+    // Convert raw Markdown/ASCII pipe tables (| List I | List II |) & HTML tables into clean text
+    if (str.contains('|') || str.contains('<table') || str.contains('<br') || str.contains('</p>')) {
+      str = QuestionCopyHelper.cleanTextContent(str);
+    }
 
     // Fix multiline fraction copy artifact: "120\n1\ns" or "120 \n 1 \n s" -> "\frac{1}{120}\text{ s}"
     final multilineRegex = RegExp(r'^(\d+)\s*[\r\n]+\s*(\d+)\s*[\r\n]+\s*([a-zA-Z°%]+)$');
