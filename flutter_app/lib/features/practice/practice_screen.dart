@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/latex_view.dart';
+import '../../shared/utils/question_copy_helper.dart';
 import '../../core/services/supabase_service.dart';
 
 class PracticeScreen extends StatefulWidget {
@@ -350,6 +351,15 @@ class _PracticeScreenState extends State<PracticeScreen> {
                         Chip(label: Text('${question.year}')),
                       ],
                       const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.copy_rounded, color: Color(0xFF64748B)),
+                        tooltip: 'Copy Question',
+                        onPressed: () => QuestionCopyHelper.copyModelToClipboard(
+                          context,
+                          question,
+                          questionIndex: _currentIndex + 1,
+                        ),
+                      ),
                       IconButton(
                         icon: Icon(
                           _markedForReview.contains(_currentIndex) ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,

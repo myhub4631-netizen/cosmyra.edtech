@@ -10,6 +10,7 @@ import '../../shared/widgets/latex_view.dart';
 import 'admin_question_builder_screen.dart';
 import 'admin_pdf_import_screen.dart';
 import 'admin_bulk_upload_step1_screen.dart';
+import '../../shared/utils/question_copy_helper.dart';
 
 class AdminQuestionsBankDashboard extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -367,6 +368,12 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
   }
 
   void _showQuestionPreviewModal(Map<String, dynamic> question) {
+    final optsRaw = question['options'] is List ? (question['options'] as List) : [];
+    final String cleanSubj = (question['subjectName'] ?? question['subject'] ?? 'Subject').toString();
+    final String cleanChap = (question['chapterName'] ?? question['chapter'] ?? 'Chapter').toString();
+    final String headerSubj = (cleanSubj.contains('-') && cleanSubj.length > 20) ? 'Physics' : cleanSubj;
+    final String headerChap = (cleanChap.contains('-') && cleanChap.length > 20) ? 'General' : cleanChap;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -379,15 +386,15 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                 color: const Color(0xFFEEF2FF),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Text(
-                question['id'] ?? '',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
+              child: const Text(
+                'Question Preview',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                '${question['subject']} • ${question['chapter']}',
+                '$headerSubj • $headerChap',
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -403,16 +410,29 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                 const Text('Question Text:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
                 const SizedBox(height: 6),
                 LaTeXView(
-                  text: question['questionText'] ?? '',
+                  text: (question['questionText'] ?? question['question_text'] ?? '').toString(),
                   style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A), fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 16),
 
-                if (question['options'] != null && (question['options'] as List).isNotEmpty) ...[
+                if (optsRaw.isNotEmpty) ...[
                   const Text('Options:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
                   const SizedBox(height: 6),
-                  ...(question['options'] as List).map((opt) {
-                    final isCorrect = opt.toString() == question['correctAnswer'];
+                  ...optsRaw.asMap().entries.map((entry) {
+                    final idx = entry.key;
+                    final opt = entry.value;
+                    final optLetter = String.fromCharCode(65 + idx);
+                    String optText = '';
+                    bool isCorrect = false;
+
+                    if (opt is Map) {
+                      optText = (opt['option_text'] ?? opt['optionText'] ?? opt['text'] ?? '').toString();
+                      isCorrect = opt['is_correct'] == true || opt['isCorrect'] == true;
+                    } else {
+                      optText = opt.toString();
+                      isCorrect = (idx == QuestionModel.resolveCorrectOptionIndex(question, optsRaw.map((e) => e.toString()).toList()));
+                    }
+
                     return Container(
                       margin: const EdgeInsets.only(bottom: 6),
                       padding: const EdgeInsets.all(10),
@@ -423,15 +443,22 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                       ),
                       child: Row(
                         children: [
-                          Icon(
-                            isCorrect ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                            size: 16,
-                            color: isCorrect ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
+                          CircleAvatar(
+                            radius: 12,
+                            backgroundColor: isCorrect ? const Color(0xFF16A34A) : const Color(0xFFE2E8F0),
                             child: Text(
-                              opt.toString(),
+                              optLetter,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isCorrect ? Colors.white : const Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: LaTeXView(
+                              text: optText,
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: isCorrect ? FontWeight.bold : FontWeight.normal,
@@ -439,6 +466,8 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                               ),
                             ),
                           ),
+                          if (isCorrect)
+                            const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF16A34A)),
                         ],
                       ),
                     );
@@ -449,7 +478,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                 const Text('Explanation / Solution:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
                 const SizedBox(height: 4),
                 Text(
-                  question['explanation'] ?? 'No explanation provided.',
+                  (question['explanation'] ?? '').toString().isNotEmpty ? question['explanation'].toString() : 'No explanation provided.',
                   style: const TextStyle(fontSize: 13, color: Color(0xFF334155)),
                 ),
                 const SizedBox(height: 16),
@@ -460,7 +489,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                     const SizedBox(width: 8),
                     _buildPreviewChip('Type', question['type'] ?? 'MCQ'),
                     const SizedBox(width: 8),
-                    _buildPreviewChip('Marks', '+${question['marks']} / -${question['negativeMarks'] ?? 1.0}'),
+                    _buildPreviewChip('Marks', '+${question['marks'] ?? 4.0} / -${question['negativeMarks'] ?? 1.0}'),
                     const SizedBox(width: 8),
                     _buildPreviewChip('Used In', '${question['usedIn'] ?? 0} Tests'),
                   ],
@@ -470,9 +499,20 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
           ),
         ),
         actions: [
+          ElevatedButton.icon(
+            icon: const Icon(Icons.copy_rounded, size: 16),
+            label: const Text('Copy Question'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4F46E5),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => QuestionCopyHelper.copyMapToClipboard(context, question),
+          ),
+          const SizedBox(width: 8),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close', style: TextStyle(color: Color(0xFF4F46E5), fontWeight: FontWeight.bold)),
+            child: const Text('Close', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
           ),
         ],
       ),

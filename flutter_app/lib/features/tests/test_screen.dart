@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/latex_view.dart';
+import '../../shared/utils/question_copy_helper.dart';
 import '../../core/services/supabase_service.dart';
 
 class CustomTestScreen extends StatefulWidget {
@@ -409,6 +410,16 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                       ),
                       Row(
                         children: [
+                          IconButton(
+                            icon: const Icon(Icons.copy_rounded, color: Color(0xFF64748B)),
+                            tooltip: 'Copy Question',
+                            onPressed: () => QuestionCopyHelper.copyModelToClipboard(
+                              context,
+                              question,
+                              questionIndex: _currentIndex + 1,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
                           OutlinedButton.icon(
                             onPressed: _toggleMarkForReview,
                             icon: Icon(
