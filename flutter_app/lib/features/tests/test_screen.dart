@@ -431,10 +431,24 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Chip(
-                        label: Text('Marking: +${question.marks.toInt()} / -${question.negativeMarks.toInt()}'),
-                        backgroundColor: const Color(0xFFF1F5F9),
-                        side: BorderSide.none,
+                      Row(
+                        children: [
+                          Chip(
+                            label: Text('Marking: +${question.marks.toInt()} / -${question.negativeMarks.toInt()}'),
+                            backgroundColor: const Color(0xFFF1F5F9),
+                            side: BorderSide.none,
+                          ),
+                          const SizedBox(width: 8),
+                          Chip(
+                            avatar: const Icon(Icons.school_rounded, size: 14, color: Color(0xFF1D4ED8)),
+                            label: Text(
+                              question.displaySource,
+                              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
+                            ),
+                            backgroundColor: const Color(0xFFEFF6FF),
+                            side: const BorderSide(color: Color(0xFFBFDBFE)),
+                          ),
+                        ],
                       ),
                       Row(
                         children: [

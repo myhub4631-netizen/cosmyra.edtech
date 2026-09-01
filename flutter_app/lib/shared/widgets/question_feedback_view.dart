@@ -436,14 +436,22 @@ class _QuestionFeedbackViewState extends State<QuestionFeedbackView> with Single
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
+                      color: const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
                     ),
-                    child: Text(
-                      question.source.toUpperCase(),
-                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF475569)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.school_rounded, size: 12, color: Color(0xFF1D4ED8)),
+                        const SizedBox(width: 4),
+                        Text(
+                          question.displaySource,
+                          style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: const Color(0xFF1D4ED8)),
+                        ),
+                      ],
                     ),
                   ),
                 ],

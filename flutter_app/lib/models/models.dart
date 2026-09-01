@@ -305,6 +305,58 @@ class QuestionModel {
     'test_series': 'Test Series',
   };
 
+  /// Returns full human-readable question source (e.g., "NEET 2026 Phase 1", "NTA Abhyas Test 14", "JEE Main 2024 Shift 1")
+  String get displaySource {
+    final String sName = (sourceName ?? '').trim();
+    if (sName.isNotEmpty && sName.toLowerCase() != 'practice question' && sName.toLowerCase() != 'pyq' && sName.toLowerCase() != 'nta') {
+      return sName;
+    }
+
+    final String paperStr = (paper ?? '').trim();
+    if (paperStr.isNotEmpty && paperStr.toLowerCase() != 'practice question' && paperStr.toLowerCase() != 'pyq' && paperStr.toLowerCase() != 'nta') {
+      return paperStr;
+    }
+
+    final List<String> parts = [];
+    final String eId = examId.trim().toUpperCase();
+    final String uSource = source.trim().toUpperCase();
+
+    if (eId.isNotEmpty) {
+      parts.add(eId);
+    } else if (uSource == 'PYQ' || uSource.contains('NEET') || uSource.contains('JEE')) {
+      if (uSource.contains('JEE')) {
+        parts.add('JEE MAIN');
+      } else {
+        parts.add('NEET');
+      }
+    } else if (uSource == 'NTA' || uSource == 'NTA_QUESTIONS') {
+      parts.add('NTA ABHYAS');
+    }
+
+    if (year != null && year! > 0) {
+      parts.add('$year');
+    }
+
+    if (session != null && session!.trim().isNotEmpty) {
+      parts.add(session!.trim());
+    }
+
+    if (shift != null && shift!.trim().isNotEmpty) {
+      parts.add(shift!.trim());
+    }
+
+    if (parts.isNotEmpty) {
+      return parts.join(' ');
+    }
+
+    if (sName.isNotEmpty) return sName;
+    if (paperStr.isNotEmpty) return paperStr;
+    if (uSource == 'PYQ') return 'NEET / JEE PYQ';
+    if (uSource == 'NTA') return 'NTA ABHYAS';
+
+    return source.toUpperCase();
+  }
+
   QuestionModel({
     required this.id,
     required this.examId,
@@ -528,14 +580,16 @@ class QuestionModel {
       questionImage: json['question_image'] ?? json['questionImage'],
       qType: json['q_type'] ?? json['question_type'] ?? json['qType'] ?? 'single_correct',
       difficulty: json['difficulty'] ?? 'medium',
-      source: json['source'] ?? 'practice',
-      sourceName: json['source_name'],
+      source: json['source'] ?? json['sourceType'] ?? json['source_type'] ?? 'practice',
+      sourceName: json['source_name'] ?? json['sourceName'] ?? json['paper_name'] ?? json['paperName'] ?? json['test_title'] ?? json['testTitle'] ?? json['paper'],
       marks: (json['marks'] as num?)?.toDouble() ?? 4.0,
       negativeMarks: (json['negative_marks'] as num?)?.toDouble() ?? 1.0,
-      year: json['year'] as int?,
-      session: json['session']?.toString(),
-      shift: json['shift']?.toString(),
-      paper: json['paper']?.toString(),
+      year: (json['year'] ?? json['exam_year'] ?? json['examYear']) is int
+          ? (json['year'] ?? json['exam_year'] ?? json['examYear']) as int
+          : int.tryParse((json['year'] ?? json['exam_year'] ?? json['examYear'] ?? '').toString()),
+      session: (json['session'] ?? json['exam_session'] ?? json['examSession'])?.toString(),
+      shift: (json['shift'] ?? json['exam_shift'] ?? json['examShift'])?.toString(),
+      paper: (json['paper'] ?? json['paper_name'] ?? json['paperName'])?.toString(),
       questionNumber: (json['question_number'] ?? json['questionNumber']) as int?,
       numericalAnswer: json['numerical_answer']?.toString(),
       numericalTolerance: (json['numerical_tolerance'] as num?)?.toDouble(),
