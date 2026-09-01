@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cosmyra_edu_flutter/shared/utils/question_copy_helper.dart';
+import 'package:cosmyra_edu_flutter/core/services/supabase_service.dart';
 
 void main() {
   test('Test QuestionCopyHelper clean formatting matching exact user screenshot', () {
@@ -55,5 +56,23 @@ Choose the correct answer from the options given below:
     print(cleaned);
     print("===================================");
     expect(cleaned, equals('(3mL³)/(8π)'));
+  });
+
+  test('Test processEnumerateInQuestionMap for Q29 enumerate options extraction', () {
+    final map = {
+      'questionText': r'\textbf{29.} A thin wire of length L and linear mass density m is bent into a circular ring... \begin{enumerate} \item $\dfrac{3mL^3}{8\pi}$ \item $\dfrac{3mL^2}{8\pi^2}$ \item $\dfrac{3mL^3}{8\pi^2}$ \item $\dfrac{3mL^2}{8\pi}$ \end{enumerate}',
+      'options': ['1', '2', '3', '4'],
+    };
+
+    final processed = SupabaseService.processEnumerateInQuestionMap(map);
+    print("=== PROCESSED ENUMERATE QUESTION ===");
+    print("QText: ${processed['questionText']}");
+    print("Options: ${processed['options']}");
+    print("====================================");
+
+    final List opts = processed['options'] as List;
+    expect(opts.length, equals(4));
+    expect(opts[0], contains(r'\dfrac{3mL^3}{8\pi}'));
+    expect(opts[1], contains(r'\dfrac{3mL^2}{8\pi^2}'));
   });
 }

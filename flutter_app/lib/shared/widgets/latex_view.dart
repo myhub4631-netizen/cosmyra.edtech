@@ -28,10 +28,24 @@ class LaTeXView extends StatelessWidget {
       str = QuestionCopyHelper.cleanTextContent(str);
     }
 
+    // Strip leading question number prefixes like \textbf{29.} or \textbf{29}
+    str = str.replaceAll(RegExp(r'^\\textbf\{\s*(?:Q\.?\s*)?\d+[\.\)]?\s*\}', caseSensitive: false), '').trim();
+
+    // Clean TeX bold/italic macros
+    str = str.replaceAllMapped(RegExp(r'\\textbf\{([^\}]+)\}'), (m) => m.group(1) ?? '');
+    str = str.replaceAllMapped(RegExp(r'\\textit\{([^\}]+)\}'), (m) => m.group(1) ?? '');
+
+    // Strip enumerate block if present in rendered text
+    if (str.contains(r'\begin{enumerate}') || str.contains(r'\begin{itemize}')) {
+      str = str.replaceAll(RegExp(r'\\begin\{(?:enumerate|itemize)\}'), '');
+      str = str.replaceAll(RegExp(r'\\end\{(?:enumerate|itemize)\}'), '');
+    }
+    str = str.replaceAll(RegExp(r'\\item\s*'), '\n');
+
     // Fix inverted denominator-first fraction artifacts like "8π3mL3" -> "(3mL³)/(8π)"
     str = QuestionCopyHelper.fixInvertedFractionArtifacts(str);
 
-    return str;
+    return str.trim();
   }
 
   @override
@@ -46,6 +60,7 @@ class LaTeXView extends StatelessWidget {
     String processed = cleanText;
     if (!processed.contains('\$') && !processed.contains(r'\(') && !processed.contains(r'\[')) {
       if (processed.contains(r'\frac') ||
+          processed.contains(r'\dfrac') ||
           processed.contains(r'\sqrt') ||
           processed.contains(r'\alpha') ||
           processed.contains(r'\beta') ||
@@ -87,7 +102,11 @@ class LaTeXView extends StatelessWidget {
       mathExpr = mathExpr.trim();
 
       if (mathExpr.isNotEmpty) {
-        final sanitizedExpr = mathExpr.replaceAll(r'\,', r'\text{ }');
+        final sanitizedExpr = mathExpr
+            .replaceAll(r'\,', r'\text{ }')
+            .replaceAll(RegExp(r'\\item\s*'), '')
+            .replaceAll(RegExp(r'\\begin\{[^\}]+\}'), '')
+            .replaceAll(RegExp(r'\\end\{[^\}]+\}'), '');
 
         spans.add(WidgetSpan(
           alignment: PlaceholderAlignment.baseline,

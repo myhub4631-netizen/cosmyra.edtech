@@ -2010,6 +2010,55 @@ class SupabaseService {
     return resultList.map((opt) => LaTeXView.normalizeText(opt)).toList();
   }
 
+  /// Extracts items from \begin{enumerate}...\end{enumerate} or \begin{itemize}...\end{itemize}
+  /// in question text if current options are dummy placeholders like ["1", "2", "3", "4"].
+  static Map<String, dynamic> processEnumerateInQuestionMap(Map<String, dynamic> map) {
+    String qText = (map['question_text'] ?? map['questionText'] ?? map['text'] ?? '').toString();
+    List<String> currentOpts = parseOptionsFromQuestionMap(map);
+
+    bool isPlaceholderOpts = currentOpts.isEmpty ||
+        (currentOpts.length <= 4 && currentOpts.every((opt) {
+          final clean = opt.trim().replaceAll(RegExp(r'[\(\)\.\s]'), '').toLowerCase();
+          return RegExp(r'^(?:[1-4]|[a-d]|option[1-4]|option[a-d])$').hasMatch(clean);
+        }));
+
+    if (qText.contains(r'\begin{enumerate}') || qText.contains(r'\begin{itemize}') || qText.contains(r'\item')) {
+      final itemRegex = RegExp(r'\\item\s*(.+?)(?=\\item|\\end\{(?:enumerate|itemize)\}|$)', dotAll: true);
+      final matches = itemRegex.allMatches(qText);
+
+      if (matches.isNotEmpty && (isPlaceholderOpts || currentOpts.isEmpty)) {
+        List<String> extractedOpts = [];
+        for (var m in matches) {
+          String optContent = (m.group(1) ?? '').trim();
+          if (optContent.contains(r'\dfrac') || optContent.contains(r'\frac')) {
+            if (!optContent.contains('\$')) {
+              optContent = '\$$optContent\$';
+            }
+          }
+          if (optContent.isNotEmpty) {
+            extractedOpts.add(optContent);
+          }
+        }
+
+        if (extractedOpts.length >= 2) {
+          String cleanedQText = qText.replaceAll(RegExp(r'\\begin\{(?:enumerate|itemize)\}.*?\\end\{(?:enumerate|itemize)\}', dotAll: true), '').trim();
+          if (cleanedQText.isEmpty) {
+            cleanedQText = qText.split(r'\begin{')[0].trim();
+          }
+
+          cleanedQText = cleanedQText.replaceAll(RegExp(r'^\\textbf\{\s*(?:Q\.?\s*)?\d+[\.\)]?\s*\}', caseSensitive: false), '').trim();
+
+          map['question_text'] = cleanedQText;
+          map['questionText'] = cleanedQText;
+          map['options'] = extractedOpts;
+          map['question_options'] = extractedOpts;
+        }
+      }
+    }
+
+    return map;
+  }
+
   static Future<List<QuestionModel>> fetchQuestions({
     String? examId,
     String? subjectId,
@@ -2062,6 +2111,7 @@ class SupabaseService {
 
     final List<QuestionModel> models = [];
     for (var map in allMaps) {
+      map = processEnumerateInQuestionMap(map);
       final statusStr = (map['status'] ?? map['question_status'] ?? '').toString().trim().toLowerCase();
       if (statusStr == 'inactive' || statusStr == 'draft' || statusStr == 'disabled') {
         continue;
@@ -4082,6 +4132,7 @@ class SupabaseService {
       if (res != null && (res as List).isNotEmpty) {
         final dbQuestions = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         for (var dbQ in dbQuestions) {
+          dbQ = processEnumerateInQuestionMap(dbQ);
           final pId = dbQ['paper_id']?.toString() ?? dbQ['paperId']?.toString() ?? dbQ['test_series_id']?.toString() ?? '';
           final bool isPaperMatch = pId == paperId ||
               pId == paperUuid ||
