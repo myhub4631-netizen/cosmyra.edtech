@@ -286,6 +286,47 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     }
   }
 
+  void _showCustomQuestionCountDialog() {
+    final controller = TextEditingController(text: _questionCount > 0 ? '$_questionCount' : '');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Custom Question Count', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: 'Number of Questions',
+            hintText: 'Enter question count (e.g. 40)',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final cnt = int.tryParse(controller.text.trim());
+              if (cnt != null && cnt > 0) {
+                setState(() => _questionCount = cnt);
+              }
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4F46E5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Save', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -786,16 +827,29 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<int>(
-                        value: _questionCount,
+                        value: [10, 20, 30, 45, 90].contains(_questionCount) ? _questionCount : -1,
                         isExpanded: true,
-                        items: [10, 20, 30, 50, 100].map((c) {
-                          return DropdownMenuItem<int>(
-                            value: c,
-                            child: Text('$c Questions', style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B))),
-                          );
-                        }).toList(),
+                        items: [
+                          ...[10, 20, 30, 45, 90].map((c) {
+                            return DropdownMenuItem<int>(
+                              value: c,
+                              child: Text('$c Questions', style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B))),
+                            );
+                          }),
+                          DropdownMenuItem<int>(
+                            value: -1,
+                            child: Text(
+                              [10, 20, 30, 45, 90].contains(_questionCount) ? 'Custom' : 'Custom ($_questionCount)',
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
+                            ),
+                          ),
+                        ],
                         onChanged: (val) {
-                          if (val != null) setState(() => _questionCount = val);
+                          if (val == -1) {
+                            _showCustomQuestionCountDialog();
+                          } else if (val != null) {
+                            setState(() => _questionCount = val);
+                          }
                         },
                       ),
                     ),

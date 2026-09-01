@@ -2019,8 +2019,8 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
         ),
         const SizedBox(height: 12),
         _buildSegmentedSelector<int>(
-          options: [10, 20, 30, 50, 100, -1], // -1 represents 'Custom'
-          selectedValue: [10, 20, 30, 50, 100].contains(_questionCount) ? _questionCount : -1,
+          options: [10, 20, 30, 45, 90, -1], // -1 represents 'Custom'
+          selectedValue: [10, 20, 30, 45, 90].contains(_questionCount) ? _questionCount : -1,
           labelBuilder: (val) => val == -1 ? 'Custom' : '$val',
           onSelected: (val) {
             if (val == -1) {
