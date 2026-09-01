@@ -823,7 +823,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             onTap: () {
               setState(() => _mobileBottomNavIndex = idx);
               if (idx == 1) widget.onOpenPractice();
-              if (idx == 2) widget.onOpenMockTests();
+              if (idx == 2) {
+                if (widget.onOpenMyTests != null) {
+                  widget.onOpenMyTests!();
+                } else {
+                  widget.onOpenMockTests();
+                }
+              }
               if (idx == 3) {
                 if (widget.onOpenLeaderboard != null) {
                   widget.onOpenLeaderboard!();
