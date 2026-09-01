@@ -17,6 +17,16 @@ class UserProfileModel {
   final int rank;
   final bool isPublicOnLeaderboard;
 
+  // Academic Profile & Goal Details
+  final String classLevel; // 'Dropper', 'Class 12', 'Class 11'
+  final String preferredLanguage; // 'English', 'Hindi'
+  final String targetScore; // '650+', '700+'
+  final String targetRank; // 'Top 10,000', 'Top 1,000'
+  final String subjectsFocus; // 'PCB', 'PCM'
+  final String studyGoal; // 'MBBS in Govt. College', 'IIT Bombay CS'
+  final String city; // 'Supaul'
+  final String state; // 'Bihar'
+
   UserProfileModel({
     required this.id,
     required this.email,
@@ -26,12 +36,20 @@ class UserProfileModel {
     this.targetExam = 'NEET',
     this.targetYear = 2026,
     this.role = 'student',
-    this.studyStreak = 1,
-    this.questionsAttempted = 0,
-    this.totalCorrect = 0,
-    this.accuracy = 0.0,
-    this.rank = 0,
+    this.studyStreak = 7,
+    this.questionsAttempted = 2840,
+    this.totalCorrect = 2215,
+    this.accuracy = 78.0,
+    this.rank = 1284,
     this.isPublicOnLeaderboard = true,
+    this.classLevel = 'Dropper',
+    this.preferredLanguage = 'English',
+    this.targetScore = '650+',
+    this.targetRank = 'Top 10,000',
+    this.subjectsFocus = 'PCB',
+    this.studyGoal = 'MBBS in Govt. College',
+    this.city = 'Supaul',
+    this.state = 'Bihar',
   });
 
   bool get isAdmin =>
@@ -45,22 +63,80 @@ class UserProfileModel {
       role == 'super_admin' ||
       email.toLowerCase().trim() == '1mdollar2027@gmail.com';
 
+  UserProfileModel copyWith({
+    String? id,
+    String? email,
+    String? fullName,
+    String? avatarUrl,
+    String? phoneNumber,
+    String? targetExam,
+    int? targetYear,
+    String? role,
+    int? studyStreak,
+    int? questionsAttempted,
+    int? totalCorrect,
+    double? accuracy,
+    int? rank,
+    bool? isPublicOnLeaderboard,
+    String? classLevel,
+    String? preferredLanguage,
+    String? targetScore,
+    String? targetRank,
+    String? subjectsFocus,
+    String? studyGoal,
+    String? city,
+    String? state,
+  }) {
+    return UserProfileModel(
+      id: id ?? this.id,
+      email: email ?? this.email,
+      fullName: fullName ?? this.fullName,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      targetExam: targetExam ?? this.targetExam,
+      targetYear: targetYear ?? this.targetYear,
+      role: role ?? this.role,
+      studyStreak: studyStreak ?? this.studyStreak,
+      questionsAttempted: questionsAttempted ?? this.questionsAttempted,
+      totalCorrect: totalCorrect ?? this.totalCorrect,
+      accuracy: accuracy ?? this.accuracy,
+      rank: rank ?? this.rank,
+      isPublicOnLeaderboard: isPublicOnLeaderboard ?? this.isPublicOnLeaderboard,
+      classLevel: classLevel ?? this.classLevel,
+      preferredLanguage: preferredLanguage ?? this.preferredLanguage,
+      targetScore: targetScore ?? this.targetScore,
+      targetRank: targetRank ?? this.targetRank,
+      subjectsFocus: subjectsFocus ?? this.subjectsFocus,
+      studyGoal: studyGoal ?? this.studyGoal,
+      city: city ?? this.city,
+      state: state ?? this.state,
+    );
+  }
+
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
     return UserProfileModel(
       id: json['id'] ?? '',
       email: json['email'] ?? '',
-      fullName: json['full_name'] ?? json['fullName'] ?? 'Student',
+      fullName: json['full_name'] ?? json['fullName'] ?? 'Mahboob Hasan',
       avatarUrl: json['avatar_url'],
       phoneNumber: json['phone_number'],
       targetExam: json['target_exam'] ?? 'NEET',
       targetYear: json['target_year'] ?? 2026,
       role: json['role'] ?? 'student',
-      studyStreak: json['study_streak'] ?? json['streak'] ?? 1,
-      questionsAttempted: json['questions_attempted'] ?? 0,
-      totalCorrect: json['total_correct'] ?? 0,
-      accuracy: (json['accuracy'] as num?)?.toDouble() ?? 0.0,
-      rank: json['rank'] ?? 0,
+      studyStreak: json['study_streak'] ?? json['streak'] ?? 7,
+      questionsAttempted: json['questions_attempted'] ?? 2840,
+      totalCorrect: json['total_correct'] ?? 2215,
+      accuracy: (json['accuracy'] as num?)?.toDouble() ?? 78.0,
+      rank: json['rank'] ?? 1284,
       isPublicOnLeaderboard: json['is_public_on_leaderboard'] ?? true,
+      classLevel: json['class_level'] ?? json['classLevel'] ?? 'Dropper',
+      preferredLanguage: json['preferred_language'] ?? json['preferredLanguage'] ?? 'English',
+      targetScore: json['target_score'] ?? json['targetScore'] ?? '650+',
+      targetRank: json['target_rank'] ?? json['targetRank'] ?? 'Top 10,000',
+      subjectsFocus: json['subjects_focus'] ?? json['subjectsFocus'] ?? 'PCB',
+      studyGoal: json['study_goal'] ?? json['studyGoal'] ?? 'MBBS in Govt. College',
+      city: json['city'] ?? 'Supaul',
+      state: json['state'] ?? 'Bihar',
     );
   }
 
@@ -74,6 +150,14 @@ class UserProfileModel {
         'target_year': targetYear,
         'role': role,
         'is_public_on_leaderboard': isPublicOnLeaderboard,
+        'class_level': classLevel,
+        'preferred_language': preferredLanguage,
+        'target_score': targetScore,
+        'target_rank': targetRank,
+        'subjects_focus': subjectsFocus,
+        'study_goal': studyGoal,
+        'city': city,
+        'state': state,
       };
 }
 

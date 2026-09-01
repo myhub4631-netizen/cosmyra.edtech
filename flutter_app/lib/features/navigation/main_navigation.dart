@@ -424,6 +424,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           activeExam: _activeExam,
           onExamChanged: (newExam) => setState(() => _activeExam = newExam),
           onSignOut: () => _openAuthModal(),
+          onNavigateTab: (index) => setState(() => _selectedIndex = index),
+          onOpenCustomPractice: () => setState(() => _selectedIndex = 2),
+          onOpenCustomTest: () => setState(() => _selectedIndex = 1),
+          onOpenPyqs: () => setState(() => _selectedIndex = 3),
         );
       case 8:
         return AdminDashboardScreen(userProfile: _currentUser);
