@@ -3874,11 +3874,28 @@ class SupabaseService {
     final cleanName = filename.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
     final String path = 'questions/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
 
+    final lower = filename.toLowerCase();
+    String contentType = 'image/jpeg';
+    String mimeType = 'jpeg';
+    if (lower.endsWith('.png')) {
+      contentType = 'image/png';
+      mimeType = 'png';
+    } else if (lower.endsWith('.webp')) {
+      contentType = 'image/webp';
+      mimeType = 'webp';
+    } else if (lower.endsWith('.svg')) {
+      contentType = 'image/svg+xml';
+      mimeType = 'svg+xml';
+    } else if (lower.endsWith('.gif')) {
+      contentType = 'image/gif';
+      mimeType = 'gif';
+    }
+
     try {
       await client.storage.from('question-images').uploadBinary(
         path,
         bytes,
-        fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+        fileOptions: FileOptions(cacheControl: '3600', upsert: true, contentType: contentType),
       );
       final String publicUrl = client.storage.from('question-images').getPublicUrl(path);
       if (publicUrl.isNotEmpty) return publicUrl;
@@ -3888,11 +3905,6 @@ class SupabaseService {
 
     try {
       final base64Str = base64Encode(bytes);
-      String mimeType = 'jpeg';
-      final lower = filename.toLowerCase();
-      if (lower.endsWith('.png')) mimeType = 'png';
-      else if (lower.endsWith('.webp')) mimeType = 'webp';
-      else if (lower.endsWith('.gif')) mimeType = 'gif';
       return 'data:image/$mimeType;base64,$base64Str';
     } catch (e) {
       debugPrint('Error encoding image bytes: $e');

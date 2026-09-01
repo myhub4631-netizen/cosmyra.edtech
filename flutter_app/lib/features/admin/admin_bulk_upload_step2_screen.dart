@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:file_picker/file_picker.dart';
 
 import '../../core/services/supabase_service.dart';
+import '../../shared/widgets/smart_image.dart';
 import 'admin_bulk_upload_step1_screen.dart';
 
 class AdminBulkUploadStep2Screen extends StatefulWidget {
@@ -515,7 +516,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       setState(() => q.isUploadingQuestionImage = true);
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'svg'],
         withData: true,
       );
       if (result != null && result.files.single.bytes != null) {
@@ -543,7 +544,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       setState(() => q.isUploadingOptionImage[optIdx] = true);
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'svg'],
         withData: true,
       );
       if (result != null && result.files.single.bytes != null) {
@@ -1487,12 +1488,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(6),
-                          child: Image.network(
-                            q.questionImage!,
+                          child: SmartImage(
+                            url: q.questionImage,
                             height: 70,
                             width: 100,
                             fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded, color: Colors.grey),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1703,12 +1703,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(4),
-                            child: Image.network(
-                              optImg,
+                            child: SmartImage(
+                              url: optImg,
                               height: 45,
                               width: 60,
                               fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded, color: Colors.grey, size: 20),
                             ),
                           ),
                           const SizedBox(width: 8),

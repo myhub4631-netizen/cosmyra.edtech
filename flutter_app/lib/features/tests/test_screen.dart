@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/latex_view.dart';
+import '../../shared/widgets/smart_image.dart';
 import '../../shared/utils/question_copy_helper.dart';
 import '../../core/services/supabase_service.dart';
 
@@ -454,7 +455,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                           ),
                           if (question.questionImage != null) ...[
                             const SizedBox(height: 12),
-                            Image.network(question.questionImage!, height: 180, fit: BoxFit.contain),
+                            SmartImage(url: question.questionImage, height: 180, fit: BoxFit.contain),
                           ],
                         ],
                       ),
@@ -510,11 +511,10 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                                        if (opt.optionText.isNotEmpty) LaTeXView(text: opt.optionText),
                                        if (opt.optionImage != null && opt.optionImage!.isNotEmpty) ...[
                                          if (opt.optionText.isNotEmpty) const SizedBox(height: 6),
-                                         Image.network(
-                                           opt.optionImage!,
+                                         SmartImage(
+                                           url: opt.optionImage,
                                            height: 120,
                                            fit: BoxFit.contain,
-                                           errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                                          ),
                                        ],
                                      ],

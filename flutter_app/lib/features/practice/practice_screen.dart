@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/latex_view.dart';
+import '../../shared/widgets/smart_image.dart';
 import '../../shared/utils/question_copy_helper.dart';
 import '../../core/services/supabase_service.dart';
 
@@ -392,7 +393,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                           ),
                           if (question.questionImage != null) ...[
                             const SizedBox(height: 12),
-                            Image.network(question.questionImage!, height: 180, fit: BoxFit.contain),
+                            SmartImage(url: question.questionImage, height: 180, fit: BoxFit.contain),
                           ],
                         ],
                       ),
@@ -465,11 +466,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
                                       if (optionText.isNotEmpty) LaTeXView(text: optionText),
                                       if (opt.optionImage != null && opt.optionImage!.isNotEmpty) ...[
                                         if (optionText.isNotEmpty) const SizedBox(height: 6),
-                                        Image.network(
-                                          opt.optionImage!,
+                                        SmartImage(
+                                          url: opt.optionImage,
                                           height: 120,
                                           fit: BoxFit.contain,
-                                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                                         ),
                                       ],
                                     ],
