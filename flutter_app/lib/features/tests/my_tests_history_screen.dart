@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../shared/widgets/app_sidebar.dart';
 
 enum TestCategoryFilter { all, customTest, customPractice, neetPyq, ntaQuestions, testSeries }
 enum TestStatusFilter { all, completed, attempted, saved, inProgress }
@@ -263,6 +264,15 @@ class _MyTestsHistoryScreenState extends State<MyTestsHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      drawer: Drawer(
+        child: AppSidebar(
+          selectedIndex: 7,
+          onOpenPractice: widget.onOpenCustomPractice,
+          onOpenCustomPractice: widget.onOpenCustomPractice,
+          onOpenCustomTest: widget.onOpenCustomTest,
+          onOpenPyqs: widget.onOpenPyqs,
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
@@ -336,6 +346,22 @@ class _MyTestsHistoryScreenState extends State<MyTestsHistoryScreen> {
       children: [
         Row(
           children: [
+            Builder(
+              builder: (ctx) => InkWell(
+                onTap: () => Scaffold.of(ctx).openDrawer(),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.all(6.0),
+                  margin: const EdgeInsets.only(right: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: const Icon(Icons.menu_rounded, size: 20, color: Color(0xFF0F172A)),
+                ),
+              ),
+            ),
             InkWell(
               onTap: widget.onBack ?? () => Navigator.of(context).maybePop(),
               borderRadius: BorderRadius.circular(10),
