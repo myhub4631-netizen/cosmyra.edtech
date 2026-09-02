@@ -93,10 +93,10 @@ class _AppSidebarState extends State<AppSidebar> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2563EB),
+                    color: const Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.school_rounded, color: Colors.white, size: 22),
+                  child: const Icon(Icons.school_rounded, color: Color(0xFF0D7A53), size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -104,9 +104,9 @@ class _AppSidebarState extends State<AppSidebar> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Cosmyra Edu',
+                        'Cosmyra Neet Jee',
                         style: GoogleFonts.inter(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: const Color(0xFF0F172A),
                         ),
@@ -115,15 +115,15 @@ class _AppSidebarState extends State<AppSidebar> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
+                          color: const Color(0xFFE8F5E9),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          'v1.1.1',
+                          'ExamPrep',
                           style: GoogleFonts.inter(
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
-                            color: const Color(0xFF2563EB),
+                            color: const Color(0xFF0D7A53),
                           ),
                         ),
                       ),

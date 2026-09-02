@@ -25,7 +25,7 @@ class CosmyraApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Cosmyra Edu Flutter v1.1.1',
+      title: 'Cosmyra Neet Jee',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

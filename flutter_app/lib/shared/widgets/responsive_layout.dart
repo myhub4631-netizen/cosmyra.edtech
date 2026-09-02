@@ -60,11 +60,11 @@ class _ResponsiveLayoutShellState extends State<ResponsiveLayoutShell> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Cosmyra Edu',
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                              'Cosmyra Neet Jee',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              'NEET & JEE Prep',
+                              'ExamPrep • NEET & JEE',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
                             ),
                           ],
