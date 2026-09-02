@@ -403,8 +403,8 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     final isEnabled = _sections.firstWhere((s) => s.sectionKey == 'banner_slider', orElse: () => DashboardSectionModel(id: '', sectionKey: 'banner_slider', title: 'Banner Slider', subtitle: '', sortOrder: 1, isEnabled: true, isVisible: true)).isEnabled;
 
     return _buildContainerCard(
-      title: 'Banner Slider',
-      subtitle: 'Manage promotional banners that appear at the top of the dashboard',
+      title: 'Banner Slider Management',
+      subtitle: 'Create, edit, delete, toggle status and reorder banners live in Supabase',
       number: '1',
       isEnabled: isEnabled,
       onToggleEnable: (val) => _setSectionEnabled('banner_slider', val),
@@ -432,12 +432,176 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
         ),
       ],
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _banners.map((b) => _buildBannerCardItem(b)).toList(),
+          if (_banners.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.view_carousel_outlined, size: 48, color: Color(0xFF94A3B8)),
+                  const SizedBox(height: 12),
+                  const Text('No Promotional Banners Found', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                  const SizedBox(height: 4),
+                  const Text('Create custom promotional banners to highlight courses, mock tests, or announcements.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => _openBannerModal(),
+                    icon: const Icon(Icons.add, size: 16, color: Colors.white),
+                    label: const Text('Create First Banner', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4F46E5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            // Banner Preview Cards
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _banners.map((b) => _buildBannerCardItem(b)).toList(),
+              ),
             ),
+            const SizedBox(height: 24),
+            // Manage Banners Data Table
+            const Text('All Active Banners', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  // Table Header
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.only(topLeft: Radius.circular(12), topRight: Radius.circular(12)),
+                    ),
+                    child: const Row(
+                      children: [
+                        SizedBox(width: 40, child: Text('#', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+                        Expanded(flex: 3, child: Text('Banner Title & Details', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+                        Expanded(flex: 2, child: Text('Audience', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+                        Expanded(flex: 2, child: Text('CTA Button', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+                        SizedBox(width: 90, child: Text('Status', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+                        SizedBox(width: 120, child: Text('Actions', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                  // Rows
+                  ..._banners.asMap().entries.map((entry) {
+                    final idx = entry.key;
+                    final b = entry.value;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 40,
+                            child: Text('${idx + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(b.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                if (b.subtitle.isNotEmpty)
+                                  Text(b.subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEEF2FF),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(b.targetAudience, style: const TextStyle(fontSize: 11, color: Color(0xFF4F46E5), fontWeight: FontWeight.w600)),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Text('${b.ctaText} → ${b.ctaDestination}', style: const TextStyle(fontSize: 11, color: Color(0xFF475569))),
+                          ),
+                          SizedBox(
+                            width: 90,
+                            child: Switch(
+                              value: b.isActive,
+                              activeColor: const Color(0xFF10B981),
+                              onChanged: (val) async {
+                                final updated = b.copyWith(isActive: val);
+                                await DashboardCmsService.saveBanner(updated);
+                                _showMessage('Banner status updated!');
+                                await _loadCmsData();
+                              },
+                            ),
+                          ),
+                          SizedBox(
+                            width: 120,
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit, size: 18, color: Color(0xFF3B82F6)),
+                                  tooltip: 'Edit Banner',
+                                  onPressed: () => _openBannerModal(banner: b),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete, size: 18, color: Color(0xFFEF4444)),
+                                  tooltip: 'Delete Banner',
+                                  onPressed: () => _confirmDeleteBanner(b),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteBanner(DashboardBannerModel b) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Banner'),
+        content: Text('Are you sure you want to delete "${b.title}"? This will permanently remove it from Supabase.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _deleteBanner(b.id);
+              _showMessage('Banner deleted successfully.');
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -482,7 +646,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
                 icon: const Icon(Icons.more_vert, color: Colors.white, size: 18),
                 onSelected: (val) {
                   if (val == 'edit') _openBannerModal(banner: b);
-                  if (val == 'delete') _deleteBanner(b.id);
+                  if (val == 'delete') _confirmDeleteBanner(b);
                 },
                 itemBuilder: (context) => [
                   const PopupMenuItem(value: 'edit', child: Text('Edit')),
