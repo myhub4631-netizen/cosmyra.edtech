@@ -301,7 +301,10 @@ class SupabaseService {
 
   static Future<bool> signInWithGoogle() async {
     try {
-      final redirectUrl = kIsWeb ? Uri.base.origin : 'io.supabase.cosmyra://login-callback';
+      final base = kIsWeb
+          ? (Uri.base.origin.contains('localhost') ? 'https://neet-jee.in' : Uri.base.origin)
+          : 'io.supabase.cosmyra://login-callback';
+      final redirectUrl = '$base/dashboard';
       return await client.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: redirectUrl,
@@ -350,6 +353,40 @@ class SupabaseService {
           final profile = _ensureSuperAdminRole(UserProfileModel.fromJson(res));
           await setActiveUserSession(profile);
           return profile;
+        } else {
+          // Newly logged in OAuth user (e.g. Google Sign-In)
+          final meta = user.userMetadata ?? {};
+          final googleName = (meta['full_name'] ?? meta['name'] ?? meta['user_name'] ?? user.email?.split('@').first ?? 'Aspirant').toString();
+          final googleAvatar = (meta['avatar_url'] ?? meta['picture'] ?? '').toString();
+          final userEmail = user.email ?? '';
+
+          final newProfile = UserProfileModel(
+            id: user.id,
+            email: userEmail,
+            fullName: googleName,
+            avatarUrl: googleAvatar.isNotEmpty ? googleAvatar : null,
+            targetExam: 'NEET',
+            targetYear: 2026,
+            role: 'student',
+          );
+
+          try {
+            await client.from('profiles').upsert({
+              'id': user.id,
+              'email': userEmail,
+              'full_name': googleName,
+              'avatar_url': googleAvatar.isNotEmpty ? googleAvatar : null,
+              'target_exam': 'NEET',
+              'target_year': 2026,
+              'role': 'student',
+            });
+          } catch (pe) {
+            debugPrint('Error upserting Google OAuth profile to Supabase: $pe');
+          }
+
+          final ensured = _ensureSuperAdminRole(newProfile);
+          await setActiveUserSession(ensured);
+          return ensured;
         }
       }
 

@@ -732,10 +732,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Signing up with Google...')),
-                      );
+                    onPressed: () async {
+                      try {
+                        await SupabaseService.signInWithGoogle();
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Google Sign In: $e')),
+                          );
+                        }
+                      }
                     },
                     icon: _buildGoogleGIcon(),
                     label: const Text('Sign up with Google', style: TextStyle(color: Color(0xFF334155), fontSize: 12, fontWeight: FontWeight.bold)),

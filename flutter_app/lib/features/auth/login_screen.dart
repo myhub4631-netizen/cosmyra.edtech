@@ -331,6 +331,36 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                       ),
                     ),
+
+                    const SizedBox(height: 20),
+                    Row(
+                      children: const [
+                        Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: Text('OR', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w600)),
+                        ),
+                        Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Google Sign In button
+                    _buildSocialButton(
+                      label: 'Continue with Google',
+                      iconWidget: _buildGoogleLogo(),
+                      onTap: () async {
+                        try {
+                          await SupabaseService.signInWithGoogle();
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Google Sign In: $e')),
+                            );
+                          }
+                        }
+                      },
+                    ),
                   ],
                 ),
               ),
