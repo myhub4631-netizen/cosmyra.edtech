@@ -5,6 +5,7 @@ import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/dashboard_cms_service.dart';
 import '../auth/login_screen.dart';
+import 'admin_banner_manager_screen.dart';
 
 class AdminDashboardSectionsScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -139,7 +140,12 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
                               _buildSubHeaderTabs(),
                               const SizedBox(height: 24),
 
-                              if (_activeTab == 'Dashboard Sections')
+                              if (_activeTab == 'Banners' || _activeSidebar == 'Banners')
+                                SizedBox(
+                                  height: 850,
+                                  child: AdminBannerManagerScreen(userProfile: widget.userProfile),
+                                )
+                              else if (_activeTab == 'Dashboard Sections')
                                 _buildDashboardSectionsTab(isDesktop)
                               else if (_activeTab == 'Layout & Visibility')
                                 _buildLayoutVisibilityTab()
@@ -305,7 +311,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
   // SUB HEADER TABS
   // ========================================================
   Widget _buildSubHeaderTabs() {
-    final tabs = ['Dashboard Sections', 'Layout & Visibility', 'Settings', 'Preview Dashboard', 'Audit Logs'];
+    final tabs = ['Banners', 'Dashboard Sections', 'Layout & Visibility', 'Settings', 'Preview Dashboard', 'Audit Logs'];
     return Container(
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
@@ -1733,7 +1739,10 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     return InkWell(
       onTap: () {
         if (title == 'Banners') {
-          context.go('/admin/banners');
+          setState(() {
+            _activeSidebar = 'Banners';
+            _activeTab = 'Banners';
+          });
         } else {
           setState(() => _activeSidebar = title);
         }
