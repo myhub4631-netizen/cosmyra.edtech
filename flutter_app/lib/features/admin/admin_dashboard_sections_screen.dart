@@ -1166,6 +1166,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
   // MODALS & CRUD DIALOGS
   // ========================================================
   void _openBannerModal({DashboardBannerModel? banner}) {
+    debugPrint('[ADMIN CMS] ${banner == null ? "ADD BANNER CLICKED" : "EDIT BANNER CLICKED"}');
     final titleCtrl = TextEditingController(text: banner?.title ?? '');
     final subCtrl = TextEditingController(text: banner?.subtitle ?? '');
     final ctaCtrl = TextEditingController(text: banner?.ctaText ?? 'Subscribe Now');
@@ -1222,11 +1223,13 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
   }
 
   Future<void> _deleteBanner(String id) async {
+    debugPrint('[ADMIN CMS] DELETE BANNER CLICKED: $id');
     await DashboardCmsService.deleteBanner(id);
     _loadCmsData();
   }
 
   void _openManageBannerOrderModal() {
+    debugPrint('[ADMIN CMS] MANAGE BANNER ORDER CLICKED');
     List<DashboardBannerModel> list = [..._banners];
     showDialog(
       context: context,
@@ -1310,6 +1313,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
   }
 
   void _openQuickStatModal({DashboardQuickStatModel? stat}) {
+    debugPrint('[ADMIN CMS] ${stat == null ? "ADD STAT CLICKED" : "EDIT STAT CLICKED"}');
     final titleCtrl = TextEditingController(text: stat?.title ?? '');
     final sourceCtrl = TextEditingController(text: stat?.dataSource ?? 'user_stats.questions_attempted');
     final changeCtrl = TextEditingController(text: stat?.changeText ?? '↑ 10%');
@@ -1352,11 +1356,13 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
   }
 
   Future<void> _deleteQuickStat(String id) async {
+    debugPrint('[ADMIN CMS] DELETE STAT CLICKED: $id');
     await DashboardCmsService.deleteQuickStat(id);
     _loadCmsData();
   }
 
   void _openQuickActionModal({DashboardQuickActionModel? action}) {
+    debugPrint('[ADMIN CMS] ${action == null ? "ADD ACTION CLICKED" : "EDIT ACTION CLICKED"}');
     final titleCtrl = TextEditingController(text: action?.title ?? '');
     final descCtrl = TextEditingController(text: action?.description ?? '');
     final destCtrl = TextEditingController(text: action?.destination ?? '/practice');
@@ -1399,6 +1405,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
   }
 
   Future<void> _deleteQuickAction(String id) async {
+    debugPrint('[ADMIN CMS] DELETE ACTION CLICKED: $id');
     await DashboardCmsService.deleteQuickAction(id);
     _loadCmsData();
   }
