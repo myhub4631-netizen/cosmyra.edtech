@@ -621,6 +621,14 @@ final GoRouter appRouter = GoRouter(
       ),
     ),
     GoRoute(
+      path: '/admin/sections',
+      redirect: (context, state) => '/admin/dashboard',
+    ),
+    GoRoute(
+      path: '/admin/banners',
+      redirect: (context, state) => '/admin/dashboard',
+    ),
+    GoRoute(
       path: '/admin/users',
       builder: (context, state) => AdminUserManagementScreen(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
