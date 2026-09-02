@@ -1127,6 +1127,33 @@ class DashboardBannerModel {
   }
 
   factory DashboardBannerModel.fromJson(Map<String, dynamic> json) {
+    bool showText = true;
+    bool showBtn = true;
+    double opacity = 0.0;
+
+    // Check if visual config is encoded in icon_name (e.g. cfg:text=0;btn=0;op=0.0)
+    final iconField = json['icon_name']?.toString() ?? 'school';
+    if (iconField.startsWith('cfg:')) {
+      final parts = iconField.substring(4).split(';');
+      for (final p in parts) {
+        if (p.startsWith('text=')) showText = p.substring(5) == '1';
+        if (p.startsWith('btn=')) showBtn = p.substring(4) == '1';
+        if (p.startsWith('op=')) opacity = double.tryParse(p.substring(3)) ?? 0.0;
+      }
+    } else {
+      if (json.containsKey('show_text_overlay')) {
+        showText = json['show_text_overlay'] == true;
+      } else if (json['image_url'] != null && json['image_url'].toString().isNotEmpty && (json['title'] == null || json['title'].toString().isEmpty)) {
+        showText = false;
+      }
+      if (json.containsKey('show_button')) {
+        showBtn = json['show_button'] == true;
+      }
+      if (json['overlay_opacity'] is num) {
+        opacity = (json['overlay_opacity'] as num).toDouble();
+      }
+    }
+
     return DashboardBannerModel(
       id: json['id']?.toString() ?? '',
       title: json['title'] ?? '',
@@ -1137,16 +1164,16 @@ class DashboardBannerModel {
       bgColor: json['bg_color'] ?? '#5B21B6',
       btnColor: json['btn_color'] ?? '#FACC15',
       btnTextColor: json['btn_text_color'] ?? '#1E1B4B',
-      iconName: json['icon_name'] ?? 'school',
+      iconName: iconField,
       isActive: json['is_active'] ?? true,
       sortOrder: json['sort_order'] ?? 0,
       startAt: json['start_at'] != null ? DateTime.tryParse(json['start_at'].toString()) : null,
       endAt: json['end_at'] != null ? DateTime.tryParse(json['end_at'].toString()) : null,
       targetAudience: json['target_audience'] ?? 'All Students',
       priority: json['priority'] ?? 1,
-      showTextOverlay: json['show_text_overlay'] ?? (json['image_url'] != null && json['image_url'].toString().isNotEmpty && (json['title'] == null || json['title'].toString().isEmpty) ? false : (json['show_text_overlay'] ?? true)),
-      showButton: json['show_button'] ?? true,
-      overlayOpacity: (json['overlay_opacity'] is num) ? (json['overlay_opacity'] as num).toDouble() : 0.0,
+      showTextOverlay: showText,
+      showButton: showBtn,
+      overlayOpacity: opacity,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -1157,6 +1184,9 @@ class DashboardBannerModel {
   }
 
   Map<String, dynamic> toJson() {
+    // Encapsulate extra display preferences into icon_name column which exists in Supabase
+    final encodedConfig = 'cfg:text=${showTextOverlay ? 1 : 0};btn=${showButton ? 1 : 0};op=${overlayOpacity.toStringAsFixed(2)}';
+
     return {
       'id': id,
       'title': title,
@@ -1167,16 +1197,13 @@ class DashboardBannerModel {
       'bg_color': bgColor,
       'btn_color': btnColor,
       'btn_text_color': btnTextColor,
-      'icon_name': iconName,
+      'icon_name': encodedConfig,
       'is_active': isActive,
       'sort_order': sortOrder,
       'start_at': startAt?.toIso8601String(),
       'end_at': endAt?.toIso8601String(),
       'target_audience': targetAudience,
       'priority': priority,
-      'show_text_overlay': showTextOverlay,
-      'show_button': showButton,
-      'overlay_opacity': overlayOpacity,
       'updated_at': DateTime.now().toIso8601String(),
     };
   }

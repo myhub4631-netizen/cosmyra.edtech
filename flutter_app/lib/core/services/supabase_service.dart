@@ -4498,22 +4498,7 @@ class SupabaseService {
       return saved;
     } catch (e) {
       debugPrint('Error saving banner to Supabase: $e');
-      // Save locally if offline
-      final prefs = await SharedPreferences.getInstance();
-      final current = await fetchBanners();
-      final fallbackId = banner.id.isEmpty ? 'local_${DateTime.now().millisecondsSinceEpoch}' : banner.id;
-      final localBanner = banner.copyWith(id: fallbackId);
-      final index = current.indexWhere((b) => b.id == localBanner.id);
-      if (index >= 0) {
-        current[index] = localBanner;
-      } else {
-        current.add(localBanner);
-      }
-      await prefs.setString(
-        'cosmyra_cached_dashboard_banners',
-        jsonEncode(current.map((b) => b.toJson()).toList()),
-      );
-      return localBanner;
+      rethrow;
     }
   }
 
