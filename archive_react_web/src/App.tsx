@@ -51,7 +51,6 @@ import { AdminPaperPrediction } from './pages/admin/AdminPaperPrediction';
 import { AdminQuestionsBank } from './pages/admin/AdminQuestionsBank';
 import { AdminBulkUploadStep1 } from './pages/admin/AdminBulkUploadStep1';
 import { AdminBulkUploadStep2 } from './pages/admin/AdminBulkUploadStep2';
-import { AdminDashboardSections } from './pages/admin/AdminDashboardSections';
 
 function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -239,8 +238,6 @@ export function App() {
           <Route path="/admin/taxonomy" element={<TaxonomyManagerView />} />
           <Route path="/admin/moderation" element={<QuestionModerationView />} />
           <Route path="/admin/bulk-import" element={<QuestionModerationView />} />
-          <Route path="/admin/sections" element={<AdminDashboardSections />} />
-          <Route path="/admin/dashboard-sections" element={<AdminDashboardSections />} />
           <Route path="/admin/teachers" element={<AdminDashboardWrapper />} />
           <Route path="/admin/students" element={<AdminDashboardWrapper />} />
           <Route path="/admin/audit-logs" element={<AdminDashboardWrapper />} />

@@ -86,20 +86,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
             )}
 
             <button
-              onClick={() => navigate('/admin/sections')}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                isNavActive('/admin/sections')
-                  ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Layers className="w-4 h-4 text-blue-400" />
-                {!isCollapsed && <span>Dashboard Sections</span>}
-              </div>
-            </button>
-
-            <button
               onClick={() => navigate('/admin/moderation')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
                 isNavActive('/admin/moderation')

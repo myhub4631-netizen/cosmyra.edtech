@@ -27,7 +27,6 @@ import '../admin/admin_bulk_upload_step1_screen.dart';
 import '../admin/admin_bulk_upload_step2_screen.dart';
 import '../admin/admin_questions_bank_dashboard.dart';
 import '../dashboard/user_dashboard_screen.dart';
-import '../admin/admin_dashboard_sections_screen.dart';
 import '../tests/my_tests_history_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -327,7 +326,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       return AdminUserManagementScreen(userProfile: _currentUser);
     }
     if (_selectedIndex == 14) {
-      return AdminDashboardSectionsScreen(userProfile: _currentUser);
+      return AdminDashboardScreen(userProfile: _currentUser);
     }
     if (_selectedIndex == 16) {
       return const AdminChaptersTopicsScreen();
@@ -442,7 +441,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       case 13:
         return AdminUserManagementScreen(userProfile: _currentUser);
       case 14:
-        return AdminDashboardSectionsScreen(userProfile: _currentUser);
+        return AdminDashboardScreen(userProfile: _currentUser);
       case 20:
         return MyTestsHistoryScreen(
           userProfile: _currentUser,

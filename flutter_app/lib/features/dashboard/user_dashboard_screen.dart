@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
-import '../../core/services/dashboard_cms_service.dart';
 import '../../shared/widgets/app_sidebar.dart';
 import '../auth/login_screen.dart';
 
@@ -47,47 +46,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   int _mobileBottomNavIndex = 0;
 
   late UserProfileModel _currentUserProfile;
-  List<DashboardSectionModel> _cmsSections = [];
-  List<DashboardBannerModel> _cmsBanners = [];
-  List<DashboardQuickStatModel> _cmsQuickStats = [];
-  List<DashboardQuickActionModel> _cmsQuickActions = [];
-
   @override
   void initState() {
     super.initState();
     _currentUserProfile = widget.userProfile;
     _loadCurrentUser();
-    _loadCmsData();
   }
 
-  Future<void> _loadCmsData() async {
-    try {
-      final secs = await DashboardCmsService.fetchSections();
-      final bans = await DashboardCmsService.fetchBanners();
-      final stats = await DashboardCmsService.fetchQuickStats();
-      final acts = await DashboardCmsService.fetchQuickActions();
-
-      if (mounted) {
-        setState(() {
-          _cmsSections = secs;
-          _cmsBanners = bans.where((b) => b.isActive).toList();
-          _cmsQuickStats = stats.where((s) => s.isEnabled).toList();
-          _cmsQuickActions = acts.where((a) => a.isEnabled).toList();
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading CMS data in user dashboard: $e');
-    }
-  }
-
-  bool _isSectionVisible(String key) {
-    if (_cmsSections.isEmpty) return true;
-    final sec = _cmsSections.firstWhere(
-      (s) => s.sectionKey == key,
-      orElse: () => DashboardSectionModel(id: '', sectionKey: key, title: '', subtitle: '', sortOrder: 99, isEnabled: true, isVisible: true),
-    );
-    return sec.isEnabled && sec.isVisible;
-  }
+  bool _isSectionVisible(String key) => true;
 
   Future<void> _loadCurrentUser() async {
     final currentUser = await SupabaseService.getCurrentUser();
@@ -2256,33 +2222,12 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   Timer? _timer;
-  List<DashboardBannerModel> _banners = [];
-  bool _loading = true;
+  final List _banners = [];
+  final bool _loading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadBanners();
-  }
-
-  Future<void> _loadBanners() async {
-    try {
-      final list = await DashboardCmsService.fetchBanners();
-      if (mounted) {
-        final screenWidth = MediaQuery.of(context).size.width;
-        final isMobile = screenWidth < 700;
-        final platformFilter = isMobile ? 'app' : 'website';
-        final activeList = list.where((b) => b.isActive && (b.targetPlatform == 'all' || b.targetPlatform == platformFilter)).toList();
-
-        setState(() {
-          _banners = activeList;
-          _loading = false;
-        });
-        _startAutoSlide();
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
   }
 
   void _startAutoSlide() {

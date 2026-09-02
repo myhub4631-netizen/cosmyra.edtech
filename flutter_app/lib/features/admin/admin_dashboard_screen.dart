@@ -386,7 +386,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 ),
                 const SizedBox(height: 6),
 
-                _buildSidebarTile('Dashboard Sections', Icons.dashboard_customize_outlined, false, onTap: () => context.go('/admin/sections')),
                 _buildSidebarTile('Paper Predictions', Icons.note_alt_outlined, false, onTap: () => context.go('/admin/predictions')),
                 _buildSidebarTile('Question & Paper Bank', Icons.quiz_outlined, false, onTap: () => context.go('/admin/questions')),
                 _buildSidebarTile('Upload Questions (Step 1)', Icons.cloud_upload_outlined, false, onTap: () => context.go('/admin/questions/upload')),
@@ -720,18 +719,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 side: const BorderSide(color: Color(0xFFE0E7FF)),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              ),
-            ),
-            const SizedBox(width: 12),
-            ElevatedButton.icon(
-              onPressed: () => Navigator.pushNamed(context, '/admin/sections'),
-              icon: const Icon(Icons.dashboard_customize_rounded, size: 16, color: Colors.white),
-              label: const Text('Dashboard Layout', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4F46E5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                elevation: 0,
               ),
             ),
           ],
@@ -1310,7 +1297,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               await Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
               _loadAdminData();
             }),
-            _buildQuickActionCard('Dashboard Layout', 'Manage banners, stats & sections', Icons.dashboard_customize_rounded, const Color(0xFF4F46E5), () => Navigator.pushNamed(context, '/admin/sections')),
             _buildQuickActionCard('Add New Question', 'Create single question', Icons.add_circle_outline_rounded, const Color(0xFF6366F1), () async {
               await Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionBuilderScreen(userProfile: widget.userProfile)));
               _loadAdminData();
