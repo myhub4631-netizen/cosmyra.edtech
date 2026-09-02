@@ -2214,4 +2214,3 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
     return const SizedBox.shrink();
   }
 }
-}
