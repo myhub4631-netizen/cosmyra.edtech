@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,22 @@ import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
+
+ImageProvider? _getBannerImageProvider(String? url) {
+  if (url == null || url.isEmpty) return null;
+  if (url.startsWith('data:image')) {
+    try {
+      final comma = url.indexOf(',');
+      if (comma != -1) {
+        final b64 = url.substring(comma + 1);
+        return MemoryImage(base64Decode(b64));
+      }
+    } catch (_) {}
+  } else if (url.startsWith('http')) {
+    return NetworkImage(url);
+  }
+  return null;
+}
 
 class AdminBannerManagerScreen extends StatefulWidget {
   final UserProfileModel? userProfile;
@@ -111,25 +128,33 @@ class _AdminBannerManagerScreenState extends State<AdminBannerManagerScreen> {
     _showMessage('Banner order updated');
   }
 
-  void _openBannerDialog({DashboardBannerModel? banner}) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _BannerEditorDialog(
-        banner: banner,
-        onSaved: (saved) {
-          setState(() {
-            final idx = _banners.indexWhere((b) => b.id == saved.id);
-            if (idx >= 0) {
-              _banners[idx] = saved;
-            } else {
-              _banners.insert(0, saved);
-            }
-          });
-          _showMessage(banner == null ? 'Banner created successfully!' : 'Banner updated successfully!');
-        },
-      ),
-    );
+  bool _isOpeningDialog = false;
+
+  Future<void> _openBannerDialog({DashboardBannerModel? banner}) async {
+    if (_isOpeningDialog) return;
+    _isOpeningDialog = true;
+    try {
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => _BannerEditorDialog(
+          banner: banner,
+          onSaved: (saved) {
+            setState(() {
+              final idx = _banners.indexWhere((b) => b.id == saved.id);
+              if (idx >= 0) {
+                _banners[idx] = saved;
+              } else {
+                _banners.insert(0, saved);
+              }
+            });
+            _showMessage(banner == null ? 'Banner created successfully!' : 'Banner updated successfully!');
+          },
+        ),
+      );
+    } finally {
+      _isOpeningDialog = false;
+    }
   }
 
   @override
@@ -259,9 +284,9 @@ class _AdminBannerManagerScreenState extends State<AdminBannerManagerScreen> {
             decoration: BoxDecoration(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               color: _parseColor(banner.bgColor, const Color(0xFF5B21B6)),
-              image: hasImage
+              image: _getBannerImageProvider(banner.imageUrl) != null
                   ? DecorationImage(
-                      image: NetworkImage(banner.imageUrl!),
+                      image: _getBannerImageProvider(banner.imageUrl)!,
                       fit: BoxFit.cover,
                       colorFilter: banner.overlayOpacity > 0
                           ? ColorFilter.mode(Colors.black.withValues(alpha: banner.overlayOpacity), BlendMode.darken)
@@ -411,15 +436,49 @@ class _AdminBannerManagerScreenState extends State<AdminBannerManagerScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF4F46E5)),
-                  tooltip: 'Edit Banner',
-                  onPressed: () => _openBannerDialog(banner: banner),
+                Tooltip(
+                  message: 'Edit Banner',
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => _openBannerDialog(banner: banner),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEEF2FF),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.edit_outlined, size: 16, color: Color(0xFF4F46E5)),
+                            SizedBox(width: 4),
+                            Text('Edit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF4F46E5))),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
-                  tooltip: 'Delete Banner',
-                  onPressed: () => _deleteBanner(banner),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Delete Banner',
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => _deleteBanner(banner),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -747,11 +806,11 @@ class _BannerEditorDialogState extends State<_BannerEditorDialog> {
                         ),
                         child: Row(
                           children: [
-                            if (_imageUrl != null && _imageUrl!.isNotEmpty) ...[
+                            if (_getBannerImageProvider(_imageUrl) != null) ...[
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  _imageUrl!,
+                                child: Image(
+                                  image: _getBannerImageProvider(_imageUrl)!,
                                   width: 80,
                                   height: 50,
                                   fit: BoxFit.cover,
