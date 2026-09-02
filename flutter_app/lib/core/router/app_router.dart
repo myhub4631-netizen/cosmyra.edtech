@@ -29,6 +29,7 @@ import '../../features/practice/custom_practice_wizard.dart';
 import '../../features/admin/admin_dashboard_screen.dart';
 import '../../features/admin/admin_user_management_screen.dart';
 import '../../features/admin/admin_dashboard_sections_screen.dart';
+import '../../features/admin/admin_banner_manager_screen.dart';
 import '../../features/admin/admin_chapters_topics_screen.dart';
 import '../../features/admin/admin_questions_bank_dashboard.dart';
 import '../../features/admin/admin_bulk_upload_step1_screen.dart';
@@ -636,6 +637,12 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/admin/sections',
       builder: (context, state) => AdminDashboardSectionsScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/banners',
+      builder: (context, state) => AdminBannerManagerScreen(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
       ),
     ),

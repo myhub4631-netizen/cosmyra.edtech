@@ -1114,6 +1114,7 @@ class DashboardBannerModel {
   final bool isActive;
   final int sortOrder;
   final String targetAudience;
+  final String targetPlatform; // 'all', 'website', 'app'
   final int priority;
 
   DashboardBannerModel({
@@ -1130,6 +1131,7 @@ class DashboardBannerModel {
     this.isActive = true,
     this.sortOrder = 0,
     this.targetAudience = 'All Students',
+    this.targetPlatform = 'all',
     this.priority = 1,
   });
 
@@ -1147,6 +1149,7 @@ class DashboardBannerModel {
     bool? isActive,
     int? sortOrder,
     String? targetAudience,
+    String? targetPlatform,
     int? priority,
   }) {
     return DashboardBannerModel(
@@ -1163,6 +1166,7 @@ class DashboardBannerModel {
       isActive: isActive ?? this.isActive,
       sortOrder: sortOrder ?? this.sortOrder,
       targetAudience: targetAudience ?? this.targetAudience,
+      targetPlatform: targetPlatform ?? this.targetPlatform,
       priority: priority ?? this.priority,
     );
   }
@@ -1182,6 +1186,7 @@ class DashboardBannerModel {
       isActive: json['is_active'] ?? json['isActive'] ?? true,
       sortOrder: json['sort_order'] ?? json['sortOrder'] ?? 0,
       targetAudience: json['target_audience'] ?? json['targetAudience'] ?? 'All Students',
+      targetPlatform: json['target_platform'] ?? json['targetPlatform'] ?? 'all',
       priority: json['priority'] ?? 1,
     );
   }
@@ -1200,6 +1205,7 @@ class DashboardBannerModel {
         'is_active': isActive,
         'sort_order': sortOrder,
         'target_audience': targetAudience,
+        'target_platform': targetPlatform,
         'priority': priority,
       };
 }

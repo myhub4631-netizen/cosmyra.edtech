@@ -150,6 +150,7 @@ class DashboardCmsService {
       'is_active': banner.isActive,
       'sort_order': banner.sortOrder,
       'target_audience': banner.targetAudience.isNotEmpty ? banner.targetAudience : 'All Students',
+      'target_platform': banner.targetPlatform.isNotEmpty ? banner.targetPlatform : 'all',
       'priority': banner.priority,
       'updated_at': DateTime.now().toIso8601String(),
     };

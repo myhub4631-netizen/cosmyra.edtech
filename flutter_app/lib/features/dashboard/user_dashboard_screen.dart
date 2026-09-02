@@ -2268,8 +2268,12 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
   Future<void> _loadBanners() async {
     try {
       final list = await DashboardCmsService.fetchBanners();
-      final activeList = list.where((b) => b.isActive).toList();
       if (mounted) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isMobile = screenWidth < 700;
+        final platformFilter = isMobile ? 'app' : 'website';
+        final activeList = list.where((b) => b.isActive && (b.targetPlatform == 'all' || b.targetPlatform == platformFilter)).toList();
+
         setState(() {
           _banners = activeList;
           _loading = false;
@@ -2347,34 +2351,7 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
     final isMobile = screenWidth < 700;
 
     if (_loading || _banners.isEmpty) {
-      return Container(
-        height: isMobile ? 150 : 175,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF5B21B6), Color(0xFF7C3AED)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Cosmyra Edu Platform',
-              style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Unlock unlimited test series & practice sessions.',
-              style: GoogleFonts.inter(fontSize: 12, color: Colors.white70),
-            ),
-          ],
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     return Container(

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/dashboard_cms_service.dart';
@@ -1717,7 +1718,13 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
 
   Widget _buildSidebarItem(IconData icon, String title, {bool isSelected = false}) {
     return InkWell(
-      onTap: () => setState(() => _activeSidebar = title),
+      onTap: () {
+        if (title == 'Banners') {
+          context.go('/admin/banners');
+        } else {
+          setState(() => _activeSidebar = title);
+        }
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
