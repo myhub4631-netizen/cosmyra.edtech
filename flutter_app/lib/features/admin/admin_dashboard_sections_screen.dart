@@ -1169,55 +1169,87 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     debugPrint('[ADMIN CMS] ${banner == null ? "ADD BANNER CLICKED" : "EDIT BANNER CLICKED"}');
     final titleCtrl = TextEditingController(text: banner?.title ?? '');
     final subCtrl = TextEditingController(text: banner?.subtitle ?? '');
+    final imgCtrl = TextEditingController(text: banner?.imageUrl ?? '');
     final ctaCtrl = TextEditingController(text: banner?.ctaText ?? 'Subscribe Now');
     final destCtrl = TextEditingController(text: banner?.ctaDestination ?? '/practice');
+    final bgCtrl = TextEditingController(text: banner?.bgColor ?? '#5B21B6');
+    final btnCtrl = TextEditingController(text: banner?.btnColor ?? '#FACC15');
     String audience = banner?.targetAudience ?? 'All Students';
+    bool isSaving = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(banner == null ? 'Add Banner' : 'Edit Banner'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Banner Title')),
-              TextField(controller: subCtrl, decoration: const InputDecoration(labelText: 'Subtitle')),
-              TextField(controller: ctaCtrl, decoration: const InputDecoration(labelText: 'CTA Button Text')),
-              TextField(controller: destCtrl, decoration: const InputDecoration(labelText: 'CTA Destination Route')),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: audience,
-                items: ['All Students', 'NEET', 'JEE Main', 'JEE Advanced', 'New Users', 'Premium Users']
-                    .map((a) => DropdownMenuItem(value: a, child: Text(a)))
-                    .toList(),
-                onChanged: (val) => audience = val ?? 'All Students',
-                decoration: const InputDecoration(labelText: 'Target Audience'),
-              ),
-            ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => AlertDialog(
+          title: Text(banner == null ? 'Add Banner' : 'Edit Banner'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Banner Title *')),
+                TextField(controller: subCtrl, decoration: const InputDecoration(labelText: 'Subtitle')),
+                TextField(controller: imgCtrl, decoration: const InputDecoration(labelText: 'Image URL (e.g. https://...)')),
+                TextField(controller: ctaCtrl, decoration: const InputDecoration(labelText: 'CTA Button Text')),
+                TextField(controller: destCtrl, decoration: const InputDecoration(labelText: 'CTA Destination Route')),
+                TextField(controller: bgCtrl, decoration: const InputDecoration(labelText: 'Background Color (e.g. #5B21B6)')),
+                TextField(controller: btnCtrl, decoration: const InputDecoration(labelText: 'Button Color (e.g. #FACC15)')),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: audience,
+                  items: ['All Students', 'NEET', 'JEE Main', 'JEE Advanced', 'New Users', 'Premium Users']
+                      .map((a) => DropdownMenuItem(value: a, child: Text(a)))
+                      .toList(),
+                  onChanged: (val) => audience = val ?? 'All Students',
+                  decoration: const InputDecoration(labelText: 'Target Audience'),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isSaving ? null : () async {
+                if (titleCtrl.text.trim().isEmpty) {
+                  _showMessage('Please enter a banner title.');
+                  return;
+                }
+                setModalState(() => isSaving = true);
+                try {
+                  final newB = DashboardBannerModel(
+                    id: banner?.id ?? '',
+                    title: titleCtrl.text.trim(),
+                    subtitle: subCtrl.text.trim(),
+                    ctaText: ctaCtrl.text.trim(),
+                    ctaDestination: destCtrl.text.trim(),
+                    imageUrl: imgCtrl.text.trim().isNotEmpty ? imgCtrl.text.trim() : null,
+                    bgColor: bgCtrl.text.trim().isNotEmpty ? bgCtrl.text.trim() : '#5B21B6',
+                    btnColor: btnCtrl.text.trim().isNotEmpty ? btnCtrl.text.trim() : '#FACC15',
+                    isActive: true,
+                    sortOrder: banner?.sortOrder ?? (_banners.length + 1),
+                    targetAudience: audience,
+                  );
+                  final saved = await DashboardCmsService.saveBanner(newB);
+                  debugPrint('[ADMIN CMS] Banner Saved Successfully: ${saved.id}');
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    _showMessage('Banner saved successfully!');
+                    await _loadCmsData();
+                  }
+                } catch (e) {
+                  debugPrint('[ADMIN CMS] Error saving banner: $e');
+                  setModalState(() => isSaving = false);
+                  _showMessage('Error saving banner: $e');
+                }
+              },
+              child: isSaving
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Save Banner'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final newB = DashboardBannerModel(
-                id: banner?.id ?? '',
-                title: titleCtrl.text,
-                subtitle: subCtrl.text,
-                ctaText: ctaCtrl.text,
-                ctaDestination: destCtrl.text,
-                isActive: true,
-                sortOrder: banner?.sortOrder ?? (_banners.length + 1),
-                targetAudience: audience,
-              );
-              await DashboardCmsService.saveBanner(newB);
-              Navigator.pop(ctx);
-              _loadCmsData();
-            },
-            child: const Text('Save Banner'),
-          ),
-        ],
       ),
     );
   }
@@ -1317,48 +1349,72 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     final titleCtrl = TextEditingController(text: stat?.title ?? '');
     final sourceCtrl = TextEditingController(text: stat?.dataSource ?? 'user_stats.questions_attempted');
     final changeCtrl = TextEditingController(text: stat?.changeText ?? '↑ 10%');
+    bool isSaving = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(stat == null ? 'Add Quick Stat' : 'Edit Quick Stat'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Stat Title')),
-            TextField(controller: sourceCtrl, decoration: const InputDecoration(labelText: 'Data Source Field')),
-            TextField(controller: changeCtrl, decoration: const InputDecoration(labelText: 'Change Label')),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => AlertDialog(
+          title: Text(stat == null ? 'Add Quick Stat' : 'Edit Quick Stat'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Stat Title *')),
+              TextField(controller: sourceCtrl, decoration: const InputDecoration(labelText: 'Data Source Field')),
+              TextField(controller: changeCtrl, decoration: const InputDecoration(labelText: 'Change Label')),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: isSaving ? null : () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: isSaving ? null : () async {
+                if (titleCtrl.text.trim().isEmpty) {
+                  _showMessage('Please enter a stat title.');
+                  return;
+                }
+                setModalState(() => isSaving = true);
+                try {
+                  final newS = DashboardQuickStatModel(
+                    id: stat?.id ?? '',
+                    statKey: stat?.statKey ?? titleCtrl.text.toLowerCase().replaceAll(' ', '_'),
+                    title: titleCtrl.text.trim(),
+                    iconName: 'bar_chart',
+                    dataSource: sourceCtrl.text.trim(),
+                    changeText: changeCtrl.text.trim(),
+                    sortOrder: stat?.sortOrder ?? (_quickStats.length + 1),
+                    isEnabled: true,
+                  );
+                  await DashboardCmsService.saveQuickStat(newS);
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    _showMessage('Stat saved successfully!');
+                    await _loadCmsData();
+                  }
+                } catch (e) {
+                  debugPrint('[ADMIN CMS] Error saving stat: $e');
+                  setModalState(() => isSaving = false);
+                  _showMessage('Error saving stat: $e');
+                }
+              },
+              child: isSaving
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Save Stat'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final newS = DashboardQuickStatModel(
-                id: stat?.id ?? '',
-                statKey: stat?.statKey ?? titleCtrl.text.toLowerCase().replaceAll(' ', '_'),
-                title: titleCtrl.text,
-                iconName: 'bar_chart',
-                dataSource: sourceCtrl.text,
-                changeText: changeCtrl.text,
-                sortOrder: stat?.sortOrder ?? (_quickStats.length + 1),
-                isEnabled: true,
-              );
-              await DashboardCmsService.saveQuickStat(newS);
-              Navigator.pop(ctx);
-              _loadCmsData();
-            },
-            child: const Text('Save Stat'),
-          ),
-        ],
       ),
     );
   }
 
   Future<void> _deleteQuickStat(String id) async {
     debugPrint('[ADMIN CMS] DELETE STAT CLICKED: $id');
-    await DashboardCmsService.deleteQuickStat(id);
-    _loadCmsData();
+    try {
+      await DashboardCmsService.deleteQuickStat(id);
+      _showMessage('Stat deleted.');
+      _loadCmsData();
+    } catch (e) {
+      _showMessage('Error deleting stat: $e');
+    }
   }
 
   void _openQuickActionModal({DashboardQuickActionModel? action}) {
@@ -1366,40 +1422,59 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     final titleCtrl = TextEditingController(text: action?.title ?? '');
     final descCtrl = TextEditingController(text: action?.description ?? '');
     final destCtrl = TextEditingController(text: action?.destination ?? '/practice');
+    bool isSaving = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(action == null ? 'Add Quick Action' : 'Edit Quick Action'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Action Title')),
-            TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description')),
-            TextField(controller: destCtrl, decoration: const InputDecoration(labelText: 'Destination Route')),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => AlertDialog(
+          title: Text(action == null ? 'Add Quick Action' : 'Edit Quick Action'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Action Title *')),
+              TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description')),
+              TextField(controller: destCtrl, decoration: const InputDecoration(labelText: 'Destination Route')),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: isSaving ? null : () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: isSaving ? null : () async {
+                if (titleCtrl.text.trim().isEmpty) {
+                  _showMessage('Please enter an action title.');
+                  return;
+                }
+                setModalState(() => isSaving = true);
+                try {
+                  final newA = DashboardQuickActionModel(
+                    id: action?.id ?? '',
+                    actionKey: action?.actionKey ?? titleCtrl.text.toLowerCase().replaceAll(' ', '_'),
+                    title: titleCtrl.text.trim(),
+                    description: descCtrl.text.trim(),
+                    iconName: 'assignment',
+                    destination: destCtrl.text.trim(),
+                    isEnabled: true,
+                    sortOrder: action?.sortOrder ?? (_quickActions.length + 1),
+                  );
+                  await DashboardCmsService.saveQuickAction(newA);
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    _showMessage('Quick Action saved successfully!');
+                    await _loadCmsData();
+                  }
+                } catch (e) {
+                  debugPrint('[ADMIN CMS] Error saving action: $e');
+                  setModalState(() => isSaving = false);
+                  _showMessage('Error saving action: $e');
+                }
+              },
+              child: isSaving
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Save Action'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final newA = DashboardQuickActionModel(
-                id: action?.id ?? '',
-                actionKey: action?.actionKey ?? titleCtrl.text.toLowerCase().replaceAll(' ', '_'),
-                title: titleCtrl.text,
-                description: descCtrl.text,
-                iconName: 'assignment',
-                destination: destCtrl.text,
-                isEnabled: true,
-                sortOrder: action?.sortOrder ?? (_quickActions.length + 1),
-              );
-              await DashboardCmsService.saveQuickAction(newA);
-              Navigator.pop(ctx);
-              _loadCmsData();
-            },
-            child: const Text('Save Action'),
-          ),
-        ],
       ),
     );
   }
