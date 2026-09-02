@@ -4426,6 +4426,178 @@ class SupabaseService {
       );
     }).toList();
   }
+
+  // =========================================================================
+  // DYNAMIC BANNER MANAGEMENT SYSTEM
+  // =========================================================================
+
+  /// Fetch all banners from Supabase with SharedPreferences fallback
+  static Future<List<DashboardBannerModel>> fetchBanners({bool onlyActive = false}) async {
+    try {
+      var query = client.from('dashboard_banners').select();
+      if (onlyActive) {
+        query = query.eq('is_active', true);
+      }
+      final res = await query.order('sort_order', ascending: true).order('created_at', ascending: false);
+      final List<dynamic> rows = res as List<dynamic>;
+
+      final banners = rows.map((r) => DashboardBannerModel.fromJson(r as Map<String, dynamic>)).toList();
+
+      // Cache locally
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'cosmyra_cached_dashboard_banners',
+        jsonEncode(banners.map((b) => b.toJson()).toList()),
+      );
+
+      return banners;
+    } catch (e) {
+      debugPrint('Error fetching banners from Supabase: $e');
+      // Fallback to local cache
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final raw = prefs.getString('cosmyra_cached_dashboard_banners');
+        if (raw != null && raw.isNotEmpty) {
+          final List<dynamic> decoded = jsonDecode(raw) as List<dynamic>;
+          var list = decoded.map((b) => DashboardBannerModel.fromJson(b as Map<String, dynamic>)).toList();
+          if (onlyActive) {
+            list = list.where((b) => b.isActive).toList();
+          }
+          return list;
+        }
+      } catch (_) {}
+      return [];
+    }
+  }
+
+  /// Create or update a banner in Supabase and local cache
+  static Future<DashboardBannerModel?> saveBanner(DashboardBannerModel banner) async {
+    final payload = banner.toJson();
+    if (banner.id.isEmpty) {
+      payload.remove('id');
+    }
+
+    try {
+      final res = await client.from('dashboard_banners').upsert(payload).select().single();
+      final saved = DashboardBannerModel.fromJson(res as Map<String, dynamic>);
+
+      // Update cache
+      final current = await fetchBanners();
+      final index = current.indexWhere((b) => b.id == saved.id);
+      if (index >= 0) {
+        current[index] = saved;
+      } else {
+        current.add(saved);
+      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'cosmyra_cached_dashboard_banners',
+        jsonEncode(current.map((b) => b.toJson()).toList()),
+      );
+
+      return saved;
+    } catch (e) {
+      debugPrint('Error saving banner to Supabase: $e');
+      // Save locally if offline
+      final prefs = await SharedPreferences.getInstance();
+      final current = await fetchBanners();
+      final fallbackId = banner.id.isEmpty ? 'local_${DateTime.now().millisecondsSinceEpoch}' : banner.id;
+      final localBanner = banner.copyWith(id: fallbackId);
+      final index = current.indexWhere((b) => b.id == localBanner.id);
+      if (index >= 0) {
+        current[index] = localBanner;
+      } else {
+        current.add(localBanner);
+      }
+      await prefs.setString(
+        'cosmyra_cached_dashboard_banners',
+        jsonEncode(current.map((b) => b.toJson()).toList()),
+      );
+      return localBanner;
+    }
+  }
+
+  /// Delete a banner from Supabase and local cache
+  static Future<bool> deleteBanner(String bannerId) async {
+    try {
+      await client.from('dashboard_banners').delete().eq('id', bannerId);
+
+      // Update cache
+      final prefs = await SharedPreferences.getInstance();
+      final current = await fetchBanners();
+      current.removeWhere((b) => b.id == bannerId);
+      await prefs.setString(
+        'cosmyra_cached_dashboard_banners',
+        jsonEncode(current.map((b) => b.toJson()).toList()),
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting banner from Supabase: $e');
+      return false;
+    }
+  }
+
+  /// Reorder banners batch
+  static Future<void> reorderBanners(List<DashboardBannerModel> banners) async {
+    for (int i = 0; i < banners.length; i++) {
+      final banner = banners[i];
+      try {
+        await client.from('dashboard_banners').update({'sort_order': i}).eq('id', banner.id);
+      } catch (e) {
+        debugPrint('Error updating banner sort order: $e');
+      }
+    }
+    // Update local cache
+    try {
+      final updated = banners.asMap().entries.map((e) => e.value.copyWith(sortOrder: e.key)).toList();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        'cosmyra_cached_dashboard_banners',
+        jsonEncode(updated.map((b) => b.toJson()).toList()),
+      );
+    } catch (_) {}
+  }
+
+  /// Upload banner image with public storage upload or Data URL fallback
+  static Future<String?> uploadBannerImage(Uint8List bytes, String filename) async {
+    final cleanName = filename.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    final String path = 'banners/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
+
+    final lower = filename.toLowerCase();
+    String contentType = 'image/jpeg';
+    String mimeType = 'jpeg';
+    if (lower.endsWith('.png')) {
+      contentType = 'image/png';
+      mimeType = 'png';
+    } else if (lower.endsWith('.webp')) {
+      contentType = 'image/webp';
+      mimeType = 'webp';
+    } else if (lower.endsWith('.svg')) {
+      contentType = 'image/svg+xml';
+      mimeType = 'svg+xml';
+    }
+
+    try {
+      await client.storage.from('banners').uploadBinary(
+        path,
+        bytes,
+        fileOptions: FileOptions(cacheControl: '3600', upsert: true, contentType: contentType),
+      );
+      final String publicUrl = client.storage.from('banners').getPublicUrl(path);
+      if (publicUrl.isNotEmpty) return publicUrl;
+    } catch (e) {
+      debugPrint('Notice: upload to Supabase banners bucket fallback: $e');
+    }
+
+    // High quality Data URL fallback (renders seamlessly everywhere)
+    try {
+      final base64Str = base64Encode(bytes);
+      return 'data:image/$mimeType;base64,$base64Str';
+    } catch (e) {
+      debugPrint('Error encoding banner image: $e');
+      return null;
+    }
+  }
 }
 
 

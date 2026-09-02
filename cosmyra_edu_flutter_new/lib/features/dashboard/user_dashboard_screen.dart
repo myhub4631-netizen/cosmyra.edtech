@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -46,13 +47,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   int _mobileBottomNavIndex = 0;
 
   late UserProfileModel _currentUserProfile;
-
   @override
   void initState() {
     super.initState();
     _currentUserProfile = widget.userProfile;
     _loadCurrentUser();
   }
+
+  bool _isSectionVisible(String key) => true;
 
   Future<void> _loadCurrentUser() async {
     final currentUser = await SupabaseService.getCurrentUser();
@@ -105,32 +107,32 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     const SizedBox(height: 10),
 
                     // 2. Offer Banner Carousel
-                    DashboardBannerCarousel(
-                      onOpenMockTests: widget.onOpenMockTests,
-                      onOpenCustomPractice: widget.onOpenPractice,
-                      onOpenLeaderboard: widget.onOpenLeaderboard,
-                    ),
-                    const SizedBox(height: 12),
+                    if (_isSectionVisible('banner_slider')) ...[
+                      DashboardBannerCarousel(
+                        onOpenMockTests: widget.onOpenMockTests,
+                        onOpenCustomPractice: widget.onOpenPractice,
+                        onOpenLeaderboard: widget.onOpenLeaderboard,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
 
-                    // 3. Quick Stats Cards (4 Horizontal Rectangles)
-                    _buildMobileKpiGrid(),
-                    const SizedBox(height: 8),
+                    // 3. Quick Stats Cards
+                    if (_isSectionVisible('quick_stats')) ...[
+                      _buildMobileKpiGrid(),
+                      const SizedBox(height: 8),
+                    ],
 
                     // 4. Continue Where You Left Off Card
-                    _buildMobileContinueCard(),
-                    const SizedBox(height: 8),
+                    if (_isSectionVisible('continue_section')) ...[
+                      _buildMobileContinueCard(),
+                      const SizedBox(height: 8),
+                    ],
 
                     // 5. Quick Actions Row
-                    _buildMobileQuickActions(),
-                    const SizedBox(height: 12),
-
-                    // 6. Performance Overview (Mini Trend Charts)
-                    _buildMobilePerformanceOverview(),
-                    const SizedBox(height: 12),
-
-                    // 7. Subject Strength Card
-                    _buildMobileSubjectStrength(),
-                    const SizedBox(height: 60), // Padding for bottom navbar
+                    if (_isSectionVisible('quick_actions')) ...[
+                      _buildMobileQuickActions(),
+                      const SizedBox(height: 12),
+                    ],
                   ],
                 ),
               ),
@@ -139,13 +141,12 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           );
         }
 
-        // DESKTOP LAYOUT
+        // DESKTOP / TABLET LAYOUT (Split Navigation + Main Scrollable Container)
         return Scaffold(
-          backgroundColor: const Color(0xFFFAFAFA),
+          backgroundColor: const Color(0xFFF8FAFC),
           body: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. LEFT SIDEBAR NAVIGATION
+              // Left Permanent Navigation Sidebar Component
               AppSidebar(
                 selectedIndex: _activeSidebarIndex,
                 onItemSelected: (idx) => setState(() => _activeSidebarIndex = idx),
@@ -159,7 +160,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 onLogout: widget.onLogout,
               ),
 
-              // 2. MAIN CONTENT AREA
+              // Right Main Content Column
               Expanded(
                 child: Column(
                   children: [
@@ -178,27 +179,37 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                             const SizedBox(height: 20),
 
                             // Offer Banner Carousel Section
-                            DashboardBannerCarousel(
-                              onOpenMockTests: widget.onOpenMockTests,
-                              onOpenCustomPractice: widget.onOpenPractice,
-                              onOpenLeaderboard: widget.onOpenLeaderboard,
-                            ),
-                            const SizedBox(height: 24),
+                            if (_isSectionVisible('banner_slider')) ...[
+                              DashboardBannerCarousel(
+                                onOpenMockTests: widget.onOpenMockTests,
+                                onOpenCustomPractice: widget.onOpenPractice,
+                                onOpenLeaderboard: widget.onOpenLeaderboard,
+                              ),
+                              const SizedBox(height: 24),
+                            ],
 
                             // Top 4 KPI Metrics Grid Row
-                            _buildKpiMetricsGrid(),
-                            const SizedBox(height: 28),
+                            if (_isSectionVisible('quick_stats')) ...[
+                              _buildKpiMetricsGrid(),
+                              const SizedBox(height: 28),
+                            ],
 
                             // Middle Section Row: Continue Where You Left Off + Today's Progress
-                            _buildMiddleSectionRow(),
-                            const SizedBox(height: 28),
+                            if (_isSectionVisible('continue_section')) ...[
+                              _buildMiddleSectionRow(),
+                              const SizedBox(height: 28),
+                            ],
 
                             // Quick Start Section Header + 5 Cards Grid Row
-                            _buildQuickStartSection(),
-                            const SizedBox(height: 28),
+                            if (_isSectionVisible('quick_actions')) ...[
+                              _buildQuickStartSection(),
+                              const SizedBox(height: 28),
+                            ],
 
                             // Bottom Section Row: Performance Overview Line Chart + Leaderboard
-                            _buildBottomSectionRow(displayName),
+                            if (_isSectionVisible('performance_overview') || _isSectionVisible('leaderboard_preview')) ...[
+                              _buildBottomSectionRow(displayName),
+                            ],
                           ],
                         ),
                       ),
@@ -2209,8 +2220,312 @@ class DashboardBannerCarousel extends StatefulWidget {
 }
 
 class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+  Timer? _timer;
+  List<DashboardBannerModel> _banners = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchActiveBanners();
+  }
+
+  Future<void> _fetchActiveBanners() async {
+    try {
+      final all = await SupabaseService.fetchBanners(onlyActive: true);
+      final activeAndScheduled = all.where((b) => b.isScheduledActive).toList();
+      if (mounted) {
+        setState(() {
+          _banners = activeAndScheduled;
+          _loading = false;
+        });
+        if (_banners.length > 1) {
+          _startAutoSlide();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  void _startAutoSlide() {
+    _timer?.cancel();
+    if (_banners.isEmpty) return;
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (_pageController.hasClients && _banners.isNotEmpty) {
+        final nextPage = (_currentPage + 1) % _banners.length;
+        _pageController.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  Color _parseHexColor(String hexString, Color fallback) {
+    try {
+      final buffer = StringBuffer();
+      if (hexString.length == 6 || hexString.length == 7) {
+        buffer.write('ff');
+        buffer.write(hexString.replaceFirst('#', ''));
+        return Color(int.parse(buffer.toString(), radix: 16));
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
+  void _handleDestination(String dest) {
+    if (dest == '/mock-tests' || dest == '/test-series') {
+      if (widget.onOpenMockTests != null) {
+        widget.onOpenMockTests!();
+      } else {
+        context.go('/mock-tests');
+      }
+    } else if (dest == '/custom-practice' || dest == '/practice') {
+      if (widget.onOpenCustomPractice != null) {
+        widget.onOpenCustomPractice!();
+      } else {
+        context.go('/practice');
+      }
+    } else if (dest == '/leaderboard') {
+      if (widget.onOpenLeaderboard != null) {
+        widget.onOpenLeaderboard!();
+      } else {
+        context.go('/leaderboard');
+      }
+    } else {
+      try {
+        context.go(dest);
+      } catch (_) {}
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return const SizedBox.shrink();
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 700;
+
+    if (_loading || _banners.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      height: isMobile ? 150 : 175,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: PageView.builder(
+              controller: _pageController,
+              onPageChanged: (index) {
+                setState(() => _currentPage = index);
+              },
+              itemCount: _banners.length,
+              itemBuilder: (context, index) {
+                final banner = _banners[index];
+                final bgColor = _parseHexColor(banner.bgColor, const Color(0xFF5B21B6));
+                final btnBg = _parseHexColor(banner.btnColor, const Color(0xFFFACC15));
+                final btnTxt = _parseHexColor(banner.btnTextColor, const Color(0xFF1E1B4B));
+
+                final hasImage = banner.imageUrl != null && banner.imageUrl!.isNotEmpty;
+                ImageProvider? imageProvider;
+                if (hasImage) {
+                  if (banner.imageUrl!.startsWith('data:image')) {
+                    try {
+                      final comma = banner.imageUrl!.indexOf(',');
+                      if (comma != -1) {
+                        final b64 = banner.imageUrl!.substring(comma + 1);
+                        imageProvider = MemoryImage(base64Decode(b64));
+                      }
+                    } catch (_) {}
+                  } else if (banner.imageUrl!.startsWith('http')) {
+                    imageProvider = NetworkImage(banner.imageUrl!);
+                  }
+                }
+
+                return GestureDetector(
+                  onTap: () => _handleDestination(banner.ctaDestination),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      gradient: imageProvider != null
+                          ? null
+                          : LinearGradient(
+                              colors: [bgColor, bgColor.withValues(alpha: 0.85)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                      image: imageProvider != null
+                          ? DecorationImage(
+                              image: imageProvider,
+                              fit: BoxFit.cover,
+                              colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.5), BlendMode.darken),
+                            )
+                          : null,
+                    ),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 16 : 28,
+                    vertical: isMobile ? 14 : 20,
+                  ),
+                  child: Stack(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Text(
+                                    'FEATURED • ${banner.targetAudience}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: isMobile ? 9.5 : 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                      letterSpacing: 0.4,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: isMobile ? 6 : 8),
+
+                                Text(
+                                  banner.title.replaceAll('\n', ' '),
+                                  style: GoogleFonts.inter(
+                                    fontSize: isMobile ? 14.5 : 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: -0.3,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                SizedBox(height: isMobile ? 3 : 4),
+
+                                Text(
+                                  banner.subtitle.replaceAll('\n', ' '),
+                                  style: GoogleFonts.inter(
+                                    fontSize: isMobile ? 10.5 : 12,
+                                    fontWeight: FontWeight.w400,
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    height: 1.3,
+                                  ),
+                                  maxLines: isMobile ? 2 : 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                SizedBox(height: isMobile ? 10 : 14),
+
+                                ElevatedButton(
+                                  onPressed: () => _handleDestination(banner.ctaDestination),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: btnBg,
+                                    foregroundColor: btnTxt,
+                                    elevation: 0,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: isMobile ? 12 : 18,
+                                      vertical: isMobile ? 7 : 10,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        banner.ctaText,
+                                        style: GoogleFonts.inter(
+                                          fontSize: isMobile ? 11 : 12.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.arrow_forward_rounded, size: 14),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          if (!isMobile) ...[
+                            const SizedBox(width: 20),
+                            Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.auto_awesome_rounded,
+                                color: Colors.white,
+                                size: 30,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+            ),
+          ),
+
+          // Carousel Dot Indicators
+          if (_banners.length > 1)
+            Positioned(
+              bottom: 10,
+              right: 18,
+              child: Row(
+                children: List.generate(
+                  _banners.length,
+                  (index) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    margin: const EdgeInsets.only(left: 4),
+                    height: 6,
+                    width: _currentPage == index ? 16 : 6,
+                    decoration: BoxDecoration(
+                      color: _currentPage == index ? Colors.white : Colors.white.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

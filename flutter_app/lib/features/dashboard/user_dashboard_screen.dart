@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -2222,12 +2223,33 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   Timer? _timer;
-  final List _banners = [];
-  final bool _loading = false;
+  List<DashboardBannerModel> _banners = [];
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    _fetchActiveBanners();
+  }
+
+  Future<void> _fetchActiveBanners() async {
+    try {
+      final all = await SupabaseService.fetchBanners(onlyActive: true);
+      final activeAndScheduled = all.where((b) => b.isScheduledActive).toList();
+      if (mounted) {
+        setState(() {
+          _banners = activeAndScheduled;
+          _loading = false;
+        });
+        if (_banners.length > 1) {
+          _startAutoSlide();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   void _startAutoSlide() {
@@ -2328,26 +2350,42 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
                 final btnBg = _parseHexColor(banner.btnColor, const Color(0xFFFACC15));
                 final btnTxt = _parseHexColor(banner.btnTextColor, const Color(0xFF1E1B4B));
 
-                final hasImage = banner.imageUrl != null && banner.imageUrl!.isNotEmpty && banner.imageUrl!.startsWith('http');
+                final hasImage = banner.imageUrl != null && banner.imageUrl!.isNotEmpty;
+                ImageProvider? imageProvider;
+                if (hasImage) {
+                  if (banner.imageUrl!.startsWith('data:image')) {
+                    try {
+                      final comma = banner.imageUrl!.indexOf(',');
+                      if (comma != -1) {
+                        final b64 = banner.imageUrl!.substring(comma + 1);
+                        imageProvider = MemoryImage(base64Decode(b64));
+                      }
+                    } catch (_) {}
+                  } else if (banner.imageUrl!.startsWith('http')) {
+                    imageProvider = NetworkImage(banner.imageUrl!);
+                  }
+                }
 
-                return Container(
-                  decoration: BoxDecoration(
-                    color: bgColor,
-                    gradient: hasImage
-                        ? null
-                        : LinearGradient(
-                            colors: [bgColor, bgColor.withValues(alpha: 0.85)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                    image: hasImage
-                        ? DecorationImage(
-                            image: NetworkImage(banner.imageUrl!),
-                            fit: BoxFit.cover,
-                            colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.5), BlendMode.darken),
-                          )
-                        : null,
-                  ),
+                return GestureDetector(
+                  onTap: () => _handleDestination(banner.ctaDestination),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      gradient: imageProvider != null
+                          ? null
+                          : LinearGradient(
+                              colors: [bgColor, bgColor.withValues(alpha: 0.85)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                      image: imageProvider != null
+                          ? DecorationImage(
+                              image: imageProvider,
+                              fit: BoxFit.cover,
+                              colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.5), BlendMode.darken),
+                            )
+                          : null,
+                    ),
                   padding: EdgeInsets.symmetric(
                     horizontal: isMobile ? 16 : 28,
                     vertical: isMobile ? 14 : 20,
@@ -2459,8 +2497,9 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
                       ),
                     ],
                   ),
-                );
-              },
+                ),
+              );
+            },
             ),
           ),
 

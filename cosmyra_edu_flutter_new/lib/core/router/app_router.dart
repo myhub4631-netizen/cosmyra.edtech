@@ -38,6 +38,7 @@ import '../../features/admin/admin_leaderboard_screen.dart';
 import '../../features/admin/admin_predictions_screen.dart';
 import '../../features/admin/admin_question_builder_screen.dart';
 import '../../features/admin/admin_pdf_import_screen.dart';
+import '../../features/admin/admin_banner_manager_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -617,6 +618,16 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/admin/dashboard',
       builder: (context, state) => AdminDashboardScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/sections',
+      redirect: (context, state) => '/admin/dashboard',
+    ),
+    GoRoute(
+      path: '/admin/banners',
+      builder: (context, state) => AdminBannerManagerScreen(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
       ),
     ),

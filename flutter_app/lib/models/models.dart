@@ -1068,3 +1068,144 @@ class AuditLogModel {
     );
   }
 }
+
+/// Dynamic Dashboard Banner Model
+class DashboardBannerModel {
+  final String id;
+  final String title;
+  final String subtitle;
+  final String ctaText;
+  final String ctaDestination;
+  final String? imageUrl;
+  final String bgColor;
+  final String btnColor;
+  final String btnTextColor;
+  final String iconName;
+  final bool isActive;
+  final int sortOrder;
+  final DateTime? startAt;
+  final DateTime? endAt;
+  final String targetAudience;
+  final int priority;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  DashboardBannerModel({
+    required this.id,
+    required this.title,
+    this.subtitle = '',
+    this.ctaText = 'Explore Now',
+    this.ctaDestination = '/practice',
+    this.imageUrl,
+    this.bgColor = '#5B21B6',
+    this.btnColor = '#FACC15',
+    this.btnTextColor = '#1E1B4B',
+    this.iconName = 'school',
+    this.isActive = true,
+    this.sortOrder = 0,
+    this.startAt,
+    this.endAt,
+    this.targetAudience = 'All Students',
+    this.priority = 1,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  })  : createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
+
+  bool get isScheduledActive {
+    if (!isActive) return false;
+    final now = DateTime.now();
+    if (startAt != null && now.isBefore(startAt!)) return false;
+    if (endAt != null && now.isAfter(endAt!)) return false;
+    return true;
+  }
+
+  factory DashboardBannerModel.fromJson(Map<String, dynamic> json) {
+    return DashboardBannerModel(
+      id: json['id']?.toString() ?? '',
+      title: json['title'] ?? '',
+      subtitle: json['subtitle'] ?? '',
+      ctaText: json['cta_text'] ?? 'Explore Now',
+      ctaDestination: json['cta_destination'] ?? '/practice',
+      imageUrl: json['image_url'],
+      bgColor: json['bg_color'] ?? '#5B21B6',
+      btnColor: json['btn_color'] ?? '#FACC15',
+      btnTextColor: json['btn_text_color'] ?? '#1E1B4B',
+      iconName: json['icon_name'] ?? 'school',
+      isActive: json['is_active'] ?? true,
+      sortOrder: json['sort_order'] ?? 0,
+      startAt: json['start_at'] != null ? DateTime.tryParse(json['start_at'].toString()) : null,
+      endAt: json['end_at'] != null ? DateTime.tryParse(json['end_at'].toString()) : null,
+      targetAudience: json['target_audience'] ?? 'All Students',
+      priority: json['priority'] ?? 1,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.tryParse(json['updated_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'subtitle': subtitle,
+      'cta_text': ctaText,
+      'cta_destination': ctaDestination,
+      'image_url': imageUrl,
+      'bg_color': bgColor,
+      'btn_color': btnColor,
+      'btn_text_color': btnTextColor,
+      'icon_name': iconName,
+      'is_active': isActive,
+      'sort_order': sortOrder,
+      'start_at': startAt?.toIso8601String(),
+      'end_at': endAt?.toIso8601String(),
+      'target_audience': targetAudience,
+      'priority': priority,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+  }
+
+  DashboardBannerModel copyWith({
+    String? id,
+    String? title,
+    String? subtitle,
+    String? ctaText,
+    String? ctaDestination,
+    String? imageUrl,
+    String? bgColor,
+    String? btnColor,
+    String? btnTextColor,
+    String? iconName,
+    bool? isActive,
+    int? sortOrder,
+    DateTime? startAt,
+    DateTime? endAt,
+    String? targetAudience,
+    int? priority,
+  }) {
+    return DashboardBannerModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      subtitle: subtitle ?? this.subtitle,
+      ctaText: ctaText ?? this.ctaText,
+      ctaDestination: ctaDestination ?? this.ctaDestination,
+      imageUrl: imageUrl ?? this.imageUrl,
+      bgColor: bgColor ?? this.bgColor,
+      btnColor: btnColor ?? this.btnColor,
+      btnTextColor: btnTextColor ?? this.btnTextColor,
+      iconName: iconName ?? this.iconName,
+      isActive: isActive ?? this.isActive,
+      sortOrder: sortOrder ?? this.sortOrder,
+      startAt: startAt ?? this.startAt,
+      endAt: endAt ?? this.endAt,
+      targetAudience: targetAudience ?? this.targetAudience,
+      priority: priority ?? this.priority,
+      createdAt: createdAt,
+      updatedAt: DateTime.now(),
+    );
+  }
+}
