@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Cosmyra NEET JEE / ExamPrep</title>
+  <meta name="description" content="Privacy Policy for Cosmyra NEET JEE and ExamPrep educational platform. Learn how we collect, use, and protect your information.">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #0D7A53;
+      --primary-dark: #0A5E40;
+      --primary-light: #E8F5E9;
+      --slate-900: #0F172A;
+      --slate-800: #1E293B;
+      --slate-700: #334155;
+      --slate-600: #475569;
+      --slate-500: #64748B;
+      --slate-200: #E2E8F0;
+      --slate-100: #F1F5F9;
+      --slate-50: #F8FAFC;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--slate-50);
+      color: var(--slate-700);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+    header {
+      background: #ffffff;
+      border-bottom: 1px solid var(--slate-200);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(8px);
+      background-color: rgba(255, 255, 255, 0.95);
+    }
+    .nav-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--primary-light);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+    }
+    .brand-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--slate-900);
+      line-height: 1.2;
+    }
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--slate-500);
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px;
+      background: var(--slate-100);
+      border: 1px solid var(--slate-200);
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--slate-700);
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    .back-btn:hover {
+      background: var(--primary-light);
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+    .hero {
+      background: linear-gradient(180deg, #ffffff 0%, var(--slate-50) 100%);
+      border-bottom: 1px solid var(--slate-200);
+      padding: 56px 24px 44px;
+      text-align: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--primary-light);
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    h1 {
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--slate-900);
+      margin-bottom: 12px;
+      letter-spacing: -0.5px;
+    }
+    .meta {
+      font-size: 14px;
+      color: var(--slate-500);
+      font-weight: 500;
+    }
+    .container {
+      max-width: 900px;
+      margin: 40px auto 80px;
+      padding: 0 24px;
+    }
+    .policy-card {
+      background: #ffffff;
+      border-radius: 16px;
+      border: 1px solid var(--slate-200);
+      padding: 48px;
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+    }
+    .lead-paragraph {
+      font-size: 16px;
+      color: var(--slate-700);
+      margin-bottom: 24px;
+      line-height: 1.8;
+    }
+    .highlight-box {
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      border-left: 4px solid var(--primary);
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin: 28px 0;
+    }
+    .highlight-box h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--primary-dark);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .highlight-box p {
+      font-size: 14px;
+      color: #166534;
+      line-height: 1.6;
+      margin: 0;
+    }
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--slate-900);
+      margin-top: 36px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--slate-100);
+      letter-spacing: -0.3px;
+    }
+    h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--slate-800);
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+    p {
+      margin-bottom: 16px;
+      font-size: 15px;
+      color: var(--slate-600);
+    }
+    ul {
+      margin: 12px 0 24px 24px;
+    }
+    li {
+      margin-bottom: 8px;
+      font-size: 15px;
+      color: var(--slate-600);
+    }
+    li strong {
+      color: var(--slate-900);
+    }
+    .contact-card {
+      background: var(--slate-50);
+      border: 1px solid var(--slate-200);
+      border-radius: 12px;
+      padding: 24px;
+      margin-top: 24px;
+    }
+    .contact-item {
+      display: flex;
+      margin-bottom: 10px;
+      font-size: 14.5px;
+    }
+    .contact-item:last-child {
+      margin-bottom: 0;
+    }
+    .contact-label {
+      width: 140px;
+      font-weight: 700;
+      color: var(--slate-800);
+    }
+    .contact-val {
+      color: var(--slate-600);
+    }
+    .contact-val a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .contact-val a:hover {
+      text-decoration: underline;
+    }
+    footer {
+      background: #ffffff;
+      border-top: 1px solid var(--slate-200);
+      padding: 32px 24px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--slate-500);
+    }
+    @media (max-width: 640px) {
+      .policy-card {
+        padding: 24px 18px;
+      }
+      h1 {
+        font-size: 26px;
+      }
+      h2 {
+        font-size: 18px;
+      }
+      .hero {
+        padding: 36px 16px 28px;
+      }
+      .contact-item {
+        flex-direction: column;
+      }
+      .contact-label {
+        margin-bottom: 2px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="nav-container">
+      <a href="/" class="brand">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3L1 9L12 15L21 10.09V17H23V9M5 13.18V17.18L12 21L19 17.18V13.18L12 17L5 13.18Z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">ExamPrep</div>
+          <div class="brand-subtitle">Cosmyra NEET JEE</div>
+        </div>
+      </a>
+      <a href="/" class="back-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        Back to Home
+      </a>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <div class="hero">
+    <div class="badge">Legal & Security</div>
+    <h1>Privacy Policy</h1>
+    <div class="meta">Effective Date: September 3, 2026 &nbsp;|&nbsp; Last Updated: September 3, 2026</div>
+  </div>
+
+  <!-- Content Container -->
+  <div class="container">
+    <div class="policy-card">
+      <p class="lead-paragraph">
+        <strong>Cosmyra Technologies Pvt. Ltd.</strong> ("Cosmyra", "we", "our", or "us") operates <strong>Cosmyra NEET JEE / ExamPrep</strong>, an educational platform designed to help students prepare for NEET, JEE and other competitive examinations through practice questions, tests, previous-year questions, performance analytics, study tools and related educational services.
+      </p>
+      <p>
+        This Privacy Policy explains how we collect, use, store, protect and disclose information when you use our website, mobile application and related services.
+      </p>
+      <p>
+        By using Cosmyra NEET JEE, you agree to the practices described in this Privacy Policy.
+      </p>
+
+      <!-- Google User Data Highlight for Google Compliance Reviewers -->
+      <div class="highlight-box">
+        <h3>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+          </svg>
+          Google User Data Policy Compliance Summary
+        </h3>
+        <p>
+          Cosmyra adheres to the Google API Services User Data Policy, including the Limited Use requirements. When you choose Sign in with Google, we access only basic profile data (name, email, profile photo) strictly for authentication and account maintenance. We never sell Google user data, nor do we use it for advertising, lending, or profiling.
+        </p>
+      </div>
+
+      <h2>1. Information We Collect</h2>
+      <p>We may collect the following categories of information:</p>
+
+      <h3>A. Account Information</h3>
+      <p>When you create an account, we may collect:</p>
+      <ul>
+        <li>Name</li>
+        <li>Email address</li>
+        <li>Password or authentication credentials</li>
+        <li>Profile picture, if provided</li>
+        <li>Phone number, if provided</li>
+        <li>Date of birth or age, if required for our services</li>
+        <li>Class, examination preference and educational information</li>
+        <li>Other information you voluntarily provide in your profile</li>
+      </ul>
+
+      <h3>B. Information Received Through Google Sign-In</h3>
+      <p>
+        If you choose "Sign in with Google", we use Google's authentication service to authenticate your account.
+      </p>
+      <p>
+        Depending on the permissions granted and the Google authentication configuration, we may receive basic account information such as:
+      </p>
+      <ul>
+        <li>Your name</li>
+        <li>Email address</li>
+        <li>Google profile picture</li>
+        <li>Google account identifier associated with the authentication</li>
+      </ul>
+      <p>We use this information to:</p>
+      <ul>
+        <li>Create or identify your Cosmyra account</li>
+        <li>Authenticate you securely</li>
+        <li>Maintain your user profile</li>
+        <li>Provide access to your account and educational services</li>
+        <li>Associate your learning activity with your account</li>
+      </ul>
+      <p>
+        We do not receive or store your Google Account password.
+      </p>
+      <p>
+        We do not request access to your Gmail messages, Google Drive files, contacts or other Google services unless such access is explicitly requested and separately disclosed.
+      </p>
+      <p>
+        Google states that Sign in with Google can provide an app with basic profile information such as name, email address and profile picture after user permission.
+      </p>
+
+      <h2>2. Educational and Activity Information</h2>
+      <p>When you use our platform, we may collect information about your learning activity, including:</p>
+      <ul>
+        <li>Questions attempted</li>
+        <li>Questions answered correctly or incorrectly</li>
+        <li>Unattempted questions</li>
+        <li>Test and practice results</li>
+        <li>Marks and scores</li>
+        <li>Accuracy</li>
+        <li>Percentile and rank</li>
+        <li>Time spent on questions or tests</li>
+        <li>Practice history</li>
+        <li>Test history</li>
+        <li>PYQ practice history</li>
+        <li>NTA question practice history</li>
+        <li>Custom practice activity</li>
+        <li>Custom test activity</li>
+        <li>Test-series activity</li>
+        <li>Subject and chapter performance</li>
+        <li>Study streaks and progress</li>
+        <li>Saved questions and tests</li>
+        <li>Leaderboard participation</li>
+      </ul>
+      <p>
+        This information is used to provide personalized learning, performance analysis, rankings, statistics and other educational features.
+      </p>
+
+      <h2>3. Device and Technical Information</h2>
+      <p>We may automatically collect limited technical information necessary to operate, secure and improve our services, such as:</p>
+      <ul>
+        <li>Device type</li>
+        <li>Operating system</li>
+        <li>Browser information</li>
+        <li>Application version</li>
+        <li>IP address</li>
+        <li>Approximate location derived from IP address where necessary</li>
+        <li>Log information</li>
+        <li>Error and diagnostic information</li>
+        <li>Authentication and session information</li>
+      </ul>
+      <p>We use this information for security, troubleshooting, analytics and service improvement.</p>
+
+      <h2>4. How We Use Your Information</h2>
+      <p>We may use collected information to:</p>
+      <ul>
+        <li>Create and manage your account.</li>
+        <li>Authenticate users.</li>
+        <li>Provide Google Sign-In and email-based authentication.</li>
+        <li>Provide NEET and JEE educational content.</li>
+        <li>Deliver practice questions, tests, PYQs and test series.</li>
+        <li>Calculate scores, marks, accuracy, percentile and rankings.</li>
+        <li>Maintain your practice and test history.</li>
+        <li>Provide performance analytics and recommendations.</li>
+        <li>Display leaderboards where applicable.</li>
+        <li>Save questions, tests and user preferences.</li>
+        <li>Provide customer support.</li>
+        <li>Detect and prevent fraud, abuse and unauthorized access.</li>
+        <li>Maintain platform security.</li>
+        <li>Diagnose technical problems.</li>
+        <li>Improve our educational products and services.</li>
+        <li>Communicate important service-related information.</li>
+        <li>Comply with applicable laws and legal obligations.</li>
+      </ul>
+
+      <h2>5. How We Use Google User Data</h2>
+      <p>
+        If you use Google Sign-In, Google user information received by Cosmyra is used only for purposes related to providing and operating the requested authentication and account features.
+      </p>
+      <p>Specifically, basic Google profile information may be used to:</p>
+      <ul>
+        <li>Authenticate your identity.</li>
+        <li>Create your Cosmyra account.</li>
+        <li>Sign you into an existing Cosmyra account.</li>
+        <li>Display your name and profile picture within your account where applicable.</li>
+        <li>Associate your Google authentication with your Cosmyra profile.</li>
+        <li>Maintain your account and provide educational services.</li>
+      </ul>
+      <p><strong>We do not sell Google user data.</strong></p>
+      <p><strong>We do not use Google user data for advertising or sell it to advertising networks or data brokers.</strong></p>
+      <p><strong>We do not use Google user data for creditworthiness, lending or similar purposes.</strong></p>
+      <p>We only request Google permissions that are necessary for the functionality we provide.</p>
+      <p>
+        Our handling of Google user data follows the applicable Google API Services User Data Policy and Limited Use requirements. Google requires developers to clearly disclose how Google user data is accessed, used, stored and shared.
+      </p>
+
+      <h2>6. Data Sharing and Disclosure</h2>
+      <p>We do not sell your personal information.</p>
+      <p>We may share limited information with trusted service providers when necessary to operate our platform, such as providers for:</p>
+      <ul>
+        <li>Cloud hosting</li>
+        <li>Database services</li>
+        <li>Authentication</li>
+        <li>Storage</li>
+        <li>Application infrastructure</li>
+        <li>Security</li>
+        <li>Error monitoring</li>
+        <li>Payment processing</li>
+        <li>Customer support</li>
+      </ul>
+      <p>
+        These providers receive only the information reasonably necessary to provide their services and are expected to protect the information appropriately.
+      </p>
+      <p>We may also disclose information when required to:</p>
+      <ul>
+        <li>Comply with applicable law</li>
+        <li>Respond to lawful legal requests</li>
+        <li>Protect the rights, safety or property of Cosmyra, our users or others</li>
+        <li>Detect or prevent fraud, security incidents or abuse</li>
+        <li>Enforce our Terms of Service</li>
+      </ul>
+
+      <h2>7. Leaderboards and Public Information</h2>
+      <p>Cosmyra may provide optional leaderboard and ranking features.</p>
+      <p>Depending on the feature and user's settings, information such as:</p>
+      <ul>
+        <li>Display name</li>
+        <li>Profile picture</li>
+        <li>Score</li>
+        <li>Marks</li>
+        <li>Percentile</li>
+        <li>Rank</li>
+        <li>Academic performance</li>
+      </ul>
+      <p>may be displayed to other users participating in the relevant leaderboard.</p>
+      <p>We do not intentionally display sensitive authentication information such as passwords or authentication tokens.</p>
+
+      <h2>8. Data Storage and Security</h2>
+      <p>
+        We take reasonable technical and organizational measures to protect personal information against unauthorized access, alteration, disclosure, loss or destruction.
+      </p>
+      <p>Account and educational information may be stored using secure cloud infrastructure.</p>
+      <p>
+        Data transmitted between your device and our services may be protected using encryption technologies such as HTTPS/TLS where supported.
+      </p>
+      <p>However, no internet-based system can be guaranteed to be completely secure.</p>
+
+      <h2>9. Data Retention</h2>
+      <p>We retain information for as long as reasonably necessary to:</p>
+      <ul>
+        <li>Provide our services</li>
+        <li>Maintain your account</li>
+        <li>Preserve your educational history</li>
+        <li>Provide analytics and progress features</li>
+        <li>Meet legal and regulatory requirements</li>
+        <li>Resolve disputes</li>
+        <li>Prevent fraud and abuse</li>
+        <li>Enforce our agreements</li>
+      </ul>
+      <p>
+        When information is no longer reasonably required, we may delete or anonymize it in accordance with our data retention practices and applicable law.
+      </p>
+
+      <h2>10. Account and Data Deletion</h2>
+      <p>
+        You may request deletion of your Cosmyra account and associated personal information.
+      </p>
+      <p>
+        To request account or data deletion, contact us using the contact information provided below.
+      </p>
+      <p>
+        Upon receiving a valid deletion request, we will take reasonable steps to delete or anonymize applicable personal information, subject to information that we are required or permitted to retain for legal, security, fraud-prevention or other legitimate purposes.
+      </p>
+      <p>
+        If you used Google Sign-In, deleting your Cosmyra account will remove the Cosmyra account and associated data maintained by us. It does not delete your Google Account.
+      </p>
+
+      <h2>11. Children's Privacy</h2>
+      <p>
+        Cosmyra provides educational services that may be used by students, including students who may be under the age of 18.
+      </p>
+      <p>
+        Where required by applicable law, we expect parents, guardians or authorized adults to assist minors in using our services and providing personal information.
+      </p>
+      <p>We do not knowingly request unnecessary personal information from children.</p>
+      <p>
+        If you believe that a child has provided personal information to us improperly, please contact us so that we can review and take appropriate action.
+      </p>
+
+      <h2>12. Cookies and Similar Technologies</h2>
+      <p>Our website may use cookies, local storage and similar technologies for purposes such as:</p>
+      <ul>
+        <li>Maintaining login sessions</li>
+        <li>Remembering preferences</li>
+        <li>Security</li>
+        <li>Website functionality</li>
+        <li>Performance monitoring</li>
+        <li>Improving the user experience</li>
+      </ul>
+      <p>
+        You may be able to control cookies through your browser settings, although disabling certain cookies may affect functionality.
+      </p>
+
+      <h2>13. Third-Party Services</h2>
+      <p>
+        Our platform may use third-party services for authentication, hosting, databases, analytics, payments, communications, security and other infrastructure.
+      </p>
+      <p>
+        These third-party services may process information according to their own privacy policies and applicable agreements.
+      </p>
+      <p>
+        When you use Sign in with Google, Google's authentication services are subject to Google's applicable terms and privacy policies.
+      </p>
+
+      <h2>14. Changes to This Privacy Policy</h2>
+      <p>We may update this Privacy Policy from time to time to reflect changes in:</p>
+      <ul>
+        <li>Our services</li>
+        <li>Technology</li>
+        <li>Data practices</li>
+        <li>Legal requirements</li>
+        <li>Security practices</li>
+      </ul>
+      <p>
+        When we make material changes, we may provide appropriate notice through our website, application or other reasonable communication methods.
+      </p>
+      <p>The updated policy will include a revised "Effective Date."</p>
+
+      <h2>15. Your Rights</h2>
+      <p>Depending on applicable law, you may have rights relating to your personal information, including the ability to:</p>
+      <ul>
+        <li>Request access to your personal information</li>
+        <li>Request correction of inaccurate information</li>
+        <li>Request deletion of your information</li>
+        <li>Request information about how your data is processed</li>
+        <li>Withdraw certain permissions or consents</li>
+        <li>Request assistance regarding your account or personal information</li>
+      </ul>
+      <p>To exercise applicable rights, contact us using the information below.</p>
+
+      <h2>16. Contact Us</h2>
+      <p>If you have questions about this Privacy Policy, your personal information, Google Sign-In data, or account/data deletion, please contact us:</p>
+
+      <div class="contact-card">
+        <div class="contact-item">
+          <div class="contact-label">Company:</div>
+          <div class="contact-val">Cosmyra Technologies Pvt. Ltd.</div>
+        </div>
+        <div class="contact-item">
+          <div class="contact-label">Product:</div>
+          <div class="contact-val">Cosmyra NEET JEE / ExamPrep</div>
+        </div>
+        <div class="contact-item">
+          <div class="contact-label">Website:</div>
+          <div class="contact-val"><a href="https://neet-jee.in">neet-jee.in</a></div>
+        </div>
+        <div class="contact-item">
+          <div class="contact-label">Email:</div>
+          <div class="contact-val"><a href="mailto:cosmyra.in@gmail.com">cosmyra.in@gmail.com</a></div>
+        </div>
+        <div class="contact-item">
+          <div class="contact-label">Subject:</div>
+          <div class="contact-val">Privacy / Data Deletion Request</div>
+        </div>
+      </div>
+
+      <div class="highlight-box" style="margin-top: 36px;">
+        <h3>Google User Data Disclosure</h3>
+        <p>
+          For clarity, when you choose Google Sign-In, Cosmyra may receive basic Google account information necessary to authenticate and maintain your Cosmyra account, such as your name, email address and profile picture.
+        </p>
+        <p style="margin-top: 8px;">
+          This information is used to provide authentication and account functionality. Cosmyra does not sell Google user data and does not use Google user data for advertising.
+        </p>
+      </div>
+
+      <div style="margin-top: 32px; font-size: 13px; color: var(--slate-500); text-align: right;">
+        Last Updated: September 3, 2026<br>
+        Effective: September 3, 2026
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 Cosmyra Technologies Pvt. Ltd. All rights reserved. | <a href="/privacy-policy" style="color: var(--primary); text-decoration: none;">Privacy Policy</a> | <a href="/" style="color: var(--slate-600); text-decoration: none;">Home</a></p>
+  </footer>
+
+</body>
+</html>

@@ -386,6 +386,28 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
                       ],
                     ),
 
+                    const SizedBox(height: 18),
+
+                    // Privacy Policy link
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('By continuing, you agree to our ', style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8))),
+                        InkWell(
+                          onTap: () => context.go('/privacy-policy'),
+                          child: const Text(
+                            'Privacy Policy',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0D7A53),
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
                     const SizedBox(height: 16),
                   ],
                 ),
@@ -434,6 +456,14 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
           ListTile(leading: const Icon(Icons.emoji_events_outlined), title: const Text('Leaderboard'), onTap: () => Navigator.pop(context)),
           ListTile(leading: const Icon(Icons.monetization_on_outlined), title: const Text('Pricing'), onTap: () => Navigator.pop(context)),
           ListTile(leading: const Icon(Icons.info_outline), title: const Text('About Us'), onTap: () => Navigator.pop(context)),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined, color: Color(0xFF0D7A53)),
+            title: const Text('Privacy Policy', style: TextStyle(color: Color(0xFF0D7A53), fontWeight: FontWeight.w600)),
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/privacy-policy');
+            },
+          ),
           const Divider(),
           Padding(
             padding: const EdgeInsets.all(16.0),

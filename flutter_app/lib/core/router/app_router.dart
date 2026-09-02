@@ -39,6 +39,8 @@ import '../../features/admin/admin_predictions_screen.dart';
 import '../../features/admin/admin_question_builder_screen.dart';
 import '../../features/admin/admin_pdf_import_screen.dart';
 import '../../features/admin/admin_banner_manager_screen.dart';
+import '../../features/legal/privacy_policy_screen.dart';
+import '../../features/admin/admin_privacy_policy_manager_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -93,6 +95,14 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/signup',
       builder: (context, state) => const SignUpScreen(),
+    ),
+    GoRoute(
+      path: '/privacy-policy',
+      builder: (context, state) => const PrivacyPolicyScreen(),
+    ),
+    GoRoute(
+      path: '/privacy',
+      builder: (context, state) => const PrivacyPolicyScreen(),
     ),
 
     // =========================================================================
@@ -769,6 +779,18 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/admin/settings',
       builder: (context, state) => AdminPricingScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/privacy-policy',
+      builder: (context, state) => AdminPrivacyPolicyManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/cms/privacy',
+      builder: (context, state) => AdminPrivacyPolicyManagerScreen(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
       ),
     ),

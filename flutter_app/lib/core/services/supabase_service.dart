@@ -4597,6 +4597,51 @@ class SupabaseService {
       return null;
     }
   }
+
+  // =========================================================================
+  // PRIVACY POLICY & CMS SETTINGS
+  // =========================================================================
+
+  /// Fetch Privacy Policy from Supabase app_settings or local storage
+  static Future<String> fetchPrivacyPolicy() async {
+    try {
+      final res = await client.from('app_settings').select('value').eq('key', 'privacy_policy').maybeSingle();
+      if (res != null && res['value'] != null && (res['value'] as String).isNotEmpty) {
+        final content = res['value'] as String;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cosmyra_cached_privacy_policy', content);
+        return content;
+      }
+    } catch (e) {
+      debugPrint('Error fetching privacy policy from Supabase: $e');
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString('cosmyra_cached_privacy_policy');
+      if (cached != null && cached.isNotEmpty) return cached;
+    } catch (_) {}
+
+    return '';
+  }
+
+  /// Save Privacy Policy in Supabase and local cache
+  static Future<bool> savePrivacyPolicy(String policyText) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_cached_privacy_policy', policyText);
+
+      await client.from('app_settings').upsert({
+        'key': 'privacy_policy',
+        'value': policyText,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error saving privacy policy to Supabase: $e');
+      return false;
+    }
+  }
 }
 
 
