@@ -255,7 +255,7 @@ class _AdminBannerManagerScreenState extends State<AdminBannerManagerScreen> {
       child: Column(
         children: [
           Container(
-            height: 100,
+            height: 110,
             decoration: BoxDecoration(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               color: _parseColor(banner.bgColor, const Color(0xFF5B21B6)),
@@ -263,63 +263,85 @@ class _AdminBannerManagerScreenState extends State<AdminBannerManagerScreen> {
                   ? DecorationImage(
                       image: NetworkImage(banner.imageUrl!),
                       fit: BoxFit.cover,
-                      colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.4), BlendMode.darken),
+                      colorFilter: banner.overlayOpacity > 0
+                          ? ColorFilter.mode(Colors.black.withValues(alpha: banner.overlayOpacity), BlendMode.darken)
+                          : null,
                     )
                   : null,
             ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
+            child: Stack(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
+                if (banner.showTextOverlay && (banner.title.isNotEmpty || banner.subtitle.isNotEmpty))
+                  Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          banner.targetAudience,
-                          style: GoogleFonts.inter(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (banner.targetAudience.isNotEmpty && banner.targetAudience != 'None')
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.4),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  banner.targetAudience,
+                                  style: GoogleFonts.inter(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            const SizedBox(height: 4),
+                            Text(
+                              banner.title,
+                              style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                shadows: [const Shadow(color: Colors.black54, offset: Offset(0, 1), blurRadius: 4)],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (banner.subtitle.isNotEmpty)
+                              Text(
+                                banner.subtitle,
+                                style: GoogleFonts.inter(
+                                  color: Colors.white.withValues(alpha: 0.95),
+                                  fontSize: 11,
+                                  shadows: [const Shadow(color: Colors.black54, offset: Offset(0, 1), blurRadius: 4)],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        banner.title,
-                        style: GoogleFonts.inter(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (banner.subtitle.isNotEmpty)
-                        Text(
-                          banner.subtitle,
-                          style: GoogleFonts.inter(color: Colors.white.withValues(alpha: 0.9), fontSize: 11),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
                     ],
                   ),
-                ),
-                ElevatedButton(
-                  onPressed: null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _parseColor(banner.btnColor, const Color(0xFFFACC15)),
-                    disabledBackgroundColor: _parseColor(banner.btnColor, const Color(0xFFFACC15)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: Text(
-                    banner.ctaText,
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: _parseColor(banner.btnTextColor, const Color(0xFF1E1B4B)),
+                if (banner.showButton && banner.ctaText.isNotEmpty)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: ElevatedButton(
+                      onPressed: null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _parseColor(banner.btnColor, const Color(0xFFFACC15)),
+                        disabledBackgroundColor: _parseColor(banner.btnColor, const Color(0xFFFACC15)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Text(
+                        banner.ctaText,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: _parseColor(banner.btnTextColor, const Color(0xFF1E1B4B)),
+                        ),
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -447,6 +469,10 @@ class _BannerEditorDialogState extends State<_BannerEditorDialog> {
   DateTime? _endAt;
   bool _saving = false;
 
+  bool _showTextOverlay = true;
+  bool _showButton = true;
+  double _overlayOpacity = 0.0;
+
   final List<String> _commonDestinations = [
     '/practice',
     '/custom-practice',
@@ -475,6 +501,9 @@ class _BannerEditorDialogState extends State<_BannerEditorDialog> {
       _imageUrl = b.imageUrl;
       _startAt = b.startAt;
       _endAt = b.endAt;
+      _showTextOverlay = b.showTextOverlay;
+      _showButton = b.showButton;
+      _overlayOpacity = b.overlayOpacity;
     }
   }
 
@@ -501,6 +530,8 @@ class _BannerEditorDialogState extends State<_BannerEditorDialog> {
         final url = await SupabaseService.uploadBannerImage(file.bytes!, file.name);
         setState(() {
           _imageUrl = url;
+          // When uploading graphic banner, default overlay opacity to 0 so graphic remains crisp
+          _overlayOpacity = 0.0;
           _saving = false;
         });
       }
@@ -531,6 +562,9 @@ class _BannerEditorDialogState extends State<_BannerEditorDialog> {
       startAt: _startAt,
       endAt: _endAt,
       targetAudience: _targetAudienceCtrl.text.trim(),
+      showTextOverlay: _showTextOverlay,
+      showButton: _showButton,
+      overlayOpacity: _overlayOpacity,
     );
 
     final saved = await SupabaseService.saveBanner(banner);
@@ -585,23 +619,87 @@ class _BannerEditorDialogState extends State<_BannerEditorDialog> {
                       TextFormField(
                         controller: _titleCtrl,
                         decoration: InputDecoration(
-                          labelText: 'Banner Title *',
+                          labelText: 'Banner Title (Optional if Image Provided)',
                           hintText: 'e.g., NEET 2026 Full Length Test Series',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
-                        validator: (v) => v == null || v.trim().isEmpty ? 'Title is required' : null,
                       ),
                       const SizedBox(height: 14),
                       TextFormField(
                         controller: _subtitleCtrl,
                         decoration: InputDecoration(
-                          labelText: 'Subtitle / Description',
+                          labelText: 'Subtitle / Description (Optional)',
                           hintText: 'e.g., Simulate real exam conditions with 720-marks tests',
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                         maxLines: 2,
                       ),
                       const SizedBox(height: 14),
+
+                      // OVERLAY & BUTTON DISPLAY TOGGLES
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Visual Customization & Overlays',
+                              style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: const Color(0xFF1E293B)),
+                            ),
+                            const SizedBox(height: 8),
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Show Text Overlay on Banner', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              subtitle: const Text('Turn OFF if your banner image already contains text graphics', style: TextStyle(fontSize: 11)),
+                              value: _showTextOverlay,
+                              activeColor: const Color(0xFF4F46E5),
+                              onChanged: (v) => setState(() => _showTextOverlay = v),
+                            ),
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Show Action Button on Banner', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              subtitle: const Text('Turn OFF to make the entire banner clickable without displaying a button', style: TextStyle(fontSize: 11)),
+                              value: _showButton,
+                              activeColor: const Color(0xFF4F46E5),
+                              onChanged: (v) => setState(() => _showButton = v),
+                            ),
+                            if (_imageUrl != null && _imageUrl!.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Image Darkening Layer: ${(_overlayOpacity * 100).toInt()}%',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                  if (_overlayOpacity > 0)
+                                    TextButton(
+                                      onPressed: () => setState(() => _overlayOpacity = 0.0),
+                                      child: const Text('Set to 0% (Crisp)', style: TextStyle(fontSize: 11)),
+                                    ),
+                                ],
+                              ),
+                              Slider(
+                                value: _overlayOpacity,
+                                min: 0.0,
+                                max: 0.8,
+                                divisions: 16,
+                                label: '${(_overlayOpacity * 100).toInt()}%',
+                                activeColor: const Color(0xFF4F46E5),
+                                onChanged: (v) => setState(() => _overlayOpacity = v),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
                       Row(
                         children: [
                           Expanded(
@@ -609,7 +707,7 @@ class _BannerEditorDialogState extends State<_BannerEditorDialog> {
                               controller: _ctaTextCtrl,
                               decoration: InputDecoration(
                                 labelText: 'CTA Button Text',
-                                hintText: 'e.g., Attempt Test Series',
+                                hintText: 'e.g., Explore Now',
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                               ),
                             ),
@@ -619,7 +717,7 @@ class _BannerEditorDialogState extends State<_BannerEditorDialog> {
                             child: TextFormField(
                               controller: _ctaDestCtrl,
                               decoration: InputDecoration(
-                                labelText: 'CTA Destination / Route',
+                                labelText: 'Clickable Link / Destination *',
                                 hintText: 'e.g., /mock-tests',
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                               ),

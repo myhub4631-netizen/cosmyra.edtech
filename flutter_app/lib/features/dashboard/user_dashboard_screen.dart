@@ -2332,11 +2332,14 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
           for (int i = 0; i < webBanners.length; i++) ...[
             if (i > 0) const SizedBox(width: 16),
             Expanded(
-              child: _buildBannerItem(
-                banner: webBanners[i],
-                height: 180,
-                isMobile: false,
-                isGridItem: true,
+              child: AspectRatio(
+                aspectRatio: 2.1,
+                child: _buildBannerItem(
+                  banner: webBanners[i],
+                  height: double.infinity,
+                  isMobile: false,
+                  isGridItem: true,
+                ),
               ),
             ),
           ],
@@ -2458,7 +2461,9 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
               ? DecorationImage(
                   image: imageProvider,
                   fit: BoxFit.cover,
-                  colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.45), BlendMode.darken),
+                  colorFilter: banner.overlayOpacity > 0
+                      ? ColorFilter.mode(Colors.black.withValues(alpha: banner.overlayOpacity), BlendMode.darken)
+                      : null,
                 )
               : null,
         ),
@@ -2466,89 +2471,107 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
           horizontal: isMobile ? 16 : 18,
           vertical: isMobile ? 12 : 16,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
           children: [
-            // Target Audience Badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.22),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
-              ),
-              child: Text(
-                banner.targetAudience.isNotEmpty ? banner.targetAudience : 'FEATURED',
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: 0.4,
-                ),
-              ),
-            ),
-            const SizedBox(height: 6),
-
-            // Title
-            Text(
-              banner.title.replaceAll('\n', ' '),
-              style: GoogleFonts.inter(
-                fontSize: isMobile ? 14 : 16,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-                letterSpacing: -0.2,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-
-            // Subtitle
-            if (banner.subtitle.isNotEmpty)
-              Text(
-                banner.subtitle.replaceAll('\n', ' '),
-                style: GoogleFonts.inter(
-                  fontSize: isMobile ? 11 : 12,
-                  fontWeight: FontWeight.w400,
-                  color: Colors.white.withValues(alpha: 0.9),
-                  height: 1.25,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            const Spacer(),
-
-            // CTA Button
-            ElevatedButton(
-              onPressed: () => _handleDestination(banner.ctaDestination),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: btnBg,
-                foregroundColor: btnTxt,
-                elevation: 0,
-                padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 12 : 14,
-                  vertical: isMobile ? 6 : 8,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
+            // Text Content (Optional)
+            if (banner.showTextOverlay && (banner.title.isNotEmpty || banner.subtitle.isNotEmpty))
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    banner.ctaText.isNotEmpty ? banner.ctaText : 'Explore Now',
-                    style: GoogleFonts.inter(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
+                  // Target Audience Badge
+                  if (banner.targetAudience.isNotEmpty && banner.targetAudience != 'None')
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                      ),
+                      child: Text(
+                        banner.targetAudience,
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.arrow_forward_rounded, size: 13),
+                  const SizedBox(height: 6),
+
+                  // Title
+                  if (banner.title.isNotEmpty)
+                    Text(
+                      banner.title.replaceAll('\n', ' '),
+                      style: GoogleFonts.inter(
+                        fontSize: isMobile ? 14 : 16,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.2,
+                        shadows: [
+                          const Shadow(color: Colors.black54, offset: Offset(0, 1), blurRadius: 4),
+                        ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  const SizedBox(height: 4),
+
+                  // Subtitle
+                  if (banner.subtitle.isNotEmpty)
+                    Text(
+                      banner.subtitle.replaceAll('\n', ' '),
+                      style: GoogleFonts.inter(
+                        fontSize: isMobile ? 11 : 12,
+                        fontWeight: FontWeight.w400,
+                        color: Colors.white.withValues(alpha: 0.95),
+                        height: 1.25,
+                        shadows: [
+                          const Shadow(color: Colors.black54, offset: Offset(0, 1), blurRadius: 4),
+                        ],
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                 ],
               ),
-            ),
+
+            // Optional CTA Button at bottom left
+            if (banner.showButton && banner.ctaText.isNotEmpty)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                child: ElevatedButton(
+                  onPressed: () => _handleDestination(banner.ctaDestination),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: btnBg,
+                    foregroundColor: btnTxt,
+                    elevation: 2,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 12 : 14,
+                      vertical: isMobile ? 6 : 8,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        banner.ctaText,
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_forward_rounded, size: 13),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),

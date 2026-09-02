@@ -1087,6 +1087,9 @@ class DashboardBannerModel {
   final DateTime? endAt;
   final String targetAudience;
   final int priority;
+  final bool showTextOverlay;
+  final bool showButton;
+  final double overlayOpacity;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -1107,6 +1110,9 @@ class DashboardBannerModel {
     this.endAt,
     this.targetAudience = 'All Students',
     this.priority = 1,
+    this.showTextOverlay = true,
+    this.showButton = true,
+    this.overlayOpacity = 0.0,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : createdAt = createdAt ?? DateTime.now(),
@@ -1138,6 +1144,9 @@ class DashboardBannerModel {
       endAt: json['end_at'] != null ? DateTime.tryParse(json['end_at'].toString()) : null,
       targetAudience: json['target_audience'] ?? 'All Students',
       priority: json['priority'] ?? 1,
+      showTextOverlay: json['show_text_overlay'] ?? (json['image_url'] != null && json['image_url'].toString().isNotEmpty && (json['title'] == null || json['title'].toString().isEmpty) ? false : (json['show_text_overlay'] ?? true)),
+      showButton: json['show_button'] ?? true,
+      overlayOpacity: (json['overlay_opacity'] is num) ? (json['overlay_opacity'] as num).toDouble() : 0.0,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -1165,6 +1174,9 @@ class DashboardBannerModel {
       'end_at': endAt?.toIso8601String(),
       'target_audience': targetAudience,
       'priority': priority,
+      'show_text_overlay': showTextOverlay,
+      'show_button': showButton,
+      'overlay_opacity': overlayOpacity,
       'updated_at': DateTime.now().toIso8601String(),
     };
   }
@@ -1186,6 +1198,9 @@ class DashboardBannerModel {
     DateTime? endAt,
     String? targetAudience,
     int? priority,
+    bool? showTextOverlay,
+    bool? showButton,
+    double? overlayOpacity,
   }) {
     return DashboardBannerModel(
       id: id ?? this.id,
@@ -1204,6 +1219,9 @@ class DashboardBannerModel {
       endAt: endAt ?? this.endAt,
       targetAudience: targetAudience ?? this.targetAudience,
       priority: priority ?? this.priority,
+      showTextOverlay: showTextOverlay ?? this.showTextOverlay,
+      showButton: showButton ?? this.showButton,
+      overlayOpacity: overlayOpacity ?? this.overlayOpacity,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
     );
