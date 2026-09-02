@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/app_sidebar.dart';
@@ -2286,20 +2287,38 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
     return fallback;
   }
 
-  void _handleDestination(String dest) {
-    if (dest == '/mock-tests' || dest == '/test-series') {
+  Future<void> _handleDestination(String dest) async {
+    final trimmed = dest.trim();
+    if (trimmed.isEmpty) return;
+
+    // Handle external links (e.g. https://cosmyra.in/)
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      try {
+        final uri = Uri.parse(trimmed);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } catch (e) {
+        debugPrint('Error launching URL: $e');
+      }
+    }
+
+    // Handle internal app routes
+    final route = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+    if (route == '/mock-tests' || route == '/test-series') {
       if (widget.onOpenMockTests != null) {
         widget.onOpenMockTests!();
       } else {
         context.go('/mock-tests');
       }
-    } else if (dest == '/custom-practice' || dest == '/practice') {
+    } else if (route == '/custom-practice' || route == '/practice') {
       if (widget.onOpenCustomPractice != null) {
         widget.onOpenCustomPractice!();
       } else {
         context.go('/practice');
       }
-    } else if (dest == '/leaderboard') {
+    } else if (route == '/leaderboard') {
       if (widget.onOpenLeaderboard != null) {
         widget.onOpenLeaderboard!();
       } else {
@@ -2307,7 +2326,7 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
       }
     } else {
       try {
-        context.go(dest);
+        context.go(route);
       } catch (_) {}
     }
   }
