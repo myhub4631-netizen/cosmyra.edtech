@@ -956,33 +956,29 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.school_rounded, color: Colors.white, size: 20),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+              Image.asset(
+                'assets/images/cosmyra_logo.png',
+                height: 34,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Row(
                     children: [
-                      const Text(
-                        'ExamPrep',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.school_rounded, color: Colors.white, size: 20),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'NEET | JEE',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Cosmyra NEET | JEE',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                       ),
                     ],
-                  ),
-                ],
+                  );
+                },
               ),
               const SizedBox(width: 24),
               IconButton(

@@ -40,22 +40,10 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.school_rounded, color: Color(0xFF0D7A53), size: 18),
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              'ExamPrep / Cosmyra',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-            ),
-          ],
+        title: Image.asset(
+          'assets/images/cosmyra_logo.png',
+          height: 32,
+          fit: BoxFit.contain,
         ),
         actions: [
           TextButton.icon(

@@ -131,6 +131,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Center(
+                      child: Image.asset(
+                        'assets/images/cosmyra_logo.png',
+                        height: 42,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
                     // Header Title
                     const Text(
                       'Welcome Back',

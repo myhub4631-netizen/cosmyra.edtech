@@ -82,53 +82,41 @@ class _AppSidebarState extends State<AppSidebar> {
       ),
       child: Column(
         children: [
-          // 1. Header with Logo & Version
+          // 1. Header with Official Logo Image
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
             ),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.school_rounded, color: Color(0xFF0D7A53), size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Cosmyra Neet Jee',
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF0F172A),
+                Image.asset(
+                  'assets/images/cosmyra_logo.png',
+                  height: 38,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.school_rounded, color: Color(0xFF0D7A53), size: 22),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5E9),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'ExamPrep',
+                        const SizedBox(width: 10),
+                        Text(
+                          'Cosmyra Neet Jee',
                           style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF0D7A53),
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF0F172A),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -333,6 +321,20 @@ class _AppSidebarState extends State<AppSidebar> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+
+          // Small Footer Brand Logo
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12, top: 4),
+            child: Opacity(
+              opacity: 0.75,
+              child: Image.asset(
+                'assets/images/cosmyra_logo.png',
+                height: 20,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
               ),
             ),
           ),

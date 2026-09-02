@@ -103,6 +103,10 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
 
                     // 5. BOTTOM NEW HERE CTA BANNER
                     _buildNewHereBanner(isDesktop),
+                    const SizedBox(height: 48),
+
+                    // 6. OFFICIAL FOOTER WITH BRAND LOGO
+                    _buildLandingFooter(context, isDesktop),
                   ],
                 ),
               ),
@@ -132,7 +136,12 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 8),
+                    Image.asset(
+                      'assets/images/cosmyra_logo.png',
+                      height: 38,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(height: 14),
 
                     // Hero Titles
                     RichText(
@@ -444,18 +453,19 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Icons.school_rounded, color: Color(0xFF0D7A53), size: 20),
-                    ),
-                    const SizedBox(width: 10),
-                    const Text('Cosmyra Neet Jee', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                  ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Image.asset(
+                    'assets/images/cosmyra_logo.png',
+                    height: 36,
+                    fit: BoxFit.contain,
+                  ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 const Text('ExamPrep • Practice | Analyze | Succeed', style: TextStyle(color: Color(0xFFA7F3D0), fontSize: 11)),
               ],
             ),
@@ -540,26 +550,33 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
                 ),
               ),
             // Logo
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: const Icon(Icons.school_rounded, color: Color(0xFF0D7A53), size: 18),
-                ),
-                const SizedBox(width: 8),
-                const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            Image.asset(
+              'assets/images/cosmyra_logo.png',
+              height: 38,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return Row(
                   children: [
-                    Text('Cosmyra Neet Jee', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    Text('ExamPrep • Practice | Analyze | Succeed', style: TextStyle(fontSize: 8.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: const Icon(Icons.school_rounded, color: Color(0xFF0D7A53), size: 18),
+                    ),
+                    const SizedBox(width: 8),
+                    const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Cosmyra Neet Jee', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                        Text('ExamPrep • Practice | Analyze | Succeed', style: TextStyle(fontSize: 8.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                      ],
+                    ),
                   ],
-                ),
-              ],
+                );
+              },
             ),
             const SizedBox(width: 24),
 
@@ -1197,6 +1214,56 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
                 Icon(Icons.arrow_forward_rounded, size: 15),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ================= 10. FOOTER WITH LOGO =================
+  Widget _buildLandingFooter(BuildContext context, bool isDesktop) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Image.asset(
+            'assets/images/cosmyra_logo.png',
+            height: 32,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 20,
+            runSpacing: 10,
+            children: [
+              InkWell(
+                onTap: () => context.go('/'),
+                child: const Text('Home', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+              ),
+              InkWell(
+                onTap: () => context.go('/privacy-policy'),
+                child: const Text('Privacy Policy', style: TextStyle(fontSize: 12.5, color: Color(0xFF0D7A53), fontWeight: FontWeight.w600)),
+              ),
+              InkWell(
+                onTap: () => context.go('/terms'),
+                child: const Text('Terms of Service', style: TextStyle(fontSize: 12.5, color: Color(0xFF0D7A53), fontWeight: FontWeight.w600)),
+              ),
+              InkWell(
+                onTap: () => context.go('/contact'),
+                child: const Text('Contact Us', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            '© 2026 Cosmyra Technologies Pvt. Ltd. All rights reserved.',
+            style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
           ),
         ],
       ),
