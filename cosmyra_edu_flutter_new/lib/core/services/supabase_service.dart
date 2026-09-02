@@ -299,6 +299,20 @@ class SupabaseService {
     return newProfile;
   }
 
+  static Future<bool> signInWithGoogle() async {
+    try {
+      final redirectUrl = kIsWeb ? Uri.base.origin : 'io.supabase.cosmyra://login-callback';
+      return await client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: redirectUrl,
+        authScreenLaunchMode: LaunchMode.externalApplication,
+      );
+    } catch (e) {
+      debugPrint('Google OAuth error: $e');
+      rethrow;
+    }
+  }
+
   static UserProfileModel _ensureSuperAdminRole(UserProfileModel profile) {
     if (profile.email.toLowerCase().trim() == '1mdollar2027@gmail.com') {
       return UserProfileModel(

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/services/supabase_service.dart';
 
 class LandingPageScreen extends StatefulWidget {
   final VoidCallback onStartPracticing;
@@ -22,14 +25,33 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
   bool _isMobileMenuOpen = false;
 
   @override
-  Widget build(BuildContext context) {
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        final user = await SupabaseService.getCurrentUser();
+        if (user != null && mounted) {
+          context.go('/dashboard');
+        }
+      } catch (e) {
+        debugPrint('Session check error: $e');
+      }
+    });
+  }
+
+  @override
+    Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 900;
     final isTablet = screenWidth >= 600 && screenWidth < 900;
 
+    if (!isDesktop) {
+      return _buildMobileOnboardingView(context);
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      drawer: !isDesktop ? _buildMobileDrawer(context) : null,
+      drawer: null,
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -39,9 +61,9 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
             // 2. HERO SECTION CANVAS (Responsive Stack/Column on Mobile)
             Container(
               width: double.infinity,
-              padding: EdgeInsets.symmetric(
-                horizontal: isDesktop ? 40 : (isTablet ? 24 : 16),
-                vertical: isDesktop ? 36 : 24,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 40,
+                vertical: 36,
               ),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -53,31 +75,21 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
               child: MaxWidthContainer(
                 child: Column(
                   children: [
-                    // Main Hero Row / Column (Mobile: Vertical Column, Desktop: Horizontal Row)
-                    if (isDesktop)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // Left Headline & Call-To-Action Column
-                          Expanded(flex: 5, child: _buildHeroLeftContent(isDesktop, isTablet)),
-                          const SizedBox(width: 24),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Left Headline & Call-To-Action Column
+                        Expanded(flex: 5, child: _buildHeroLeftContent(isDesktop, isTablet)),
+                        const SizedBox(width: 24),
 
-                          // Center Hero Column: Student Portrait & Floating Badges
-                          Expanded(flex: 4, child: _buildHeroStudentImage(isDesktop)),
-                          const SizedBox(width: 24),
+                        // Center Hero Column: Student Portrait & Floating Badges
+                        Expanded(flex: 4, child: _buildHeroStudentImage(isDesktop)),
+                        const SizedBox(width: 24),
 
-                          // Right Column: Floating Progress & Streak Dashboard Cards
-                          Expanded(flex: 3, child: _buildHeroRightCards()),
-                        ],
-                      )
-                    else ...[
-                      // MOBILE / TABLET STACKED LAYOUT
-                      _buildHeroLeftContent(isDesktop, isTablet),
-                      const SizedBox(height: 32),
-                      _buildHeroStudentImage(isDesktop),
-                      const SizedBox(height: 32),
-                      _buildHeroRightCards(),
-                    ],
+                        // Right Column: Floating Progress & Streak Dashboard Cards
+                        Expanded(flex: 3, child: _buildHeroRightCards()),
+                      ],
+                    ),
 
                     const SizedBox(height: 36),
 
@@ -101,6 +113,290 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
     );
   }
 
+  // ================= DEDICATED MOBILE ONBOARDING VIEW =================
+  Widget _buildMobileOnboardingView(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7FAF8),
+      drawer: _buildMobileDrawer(context),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Mobile Top Header Navbar
+            _buildHeaderNav(context, false),
+
+            // Scrollable Onboarding Content matching exact layout & proportions
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 8),
+
+                    // Hero Titles
+                    RichText(
+                      textAlign: TextAlign.center,
+                      text: const TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'Practice Today\n',
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                              height: 1.15,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          TextSpan(
+                            text: 'Achieve Tomorrow',
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0D7A53),
+                              height: 1.15,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Subtitle
+                    const Text(
+                      'Everything you need to crack NEET & JEE is here.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF475569),
+                        fontWeight: FontWeight.w400,
+                        height: 1.4,
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Student Illustration
+                    Image.asset(
+                      'assets/images/student_study_illustration.png',
+                      height: 210,
+                      fit: BoxFit.contain,
+                      errorBuilder: (ctx, err, stack) => Container(
+                        height: 180,
+                        width: 180,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Center(
+                          child: Icon(Icons.school_rounded, size: 70, color: Color(0xFF0D7A53)),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // 1. Sign in with Google Button
+                    Container(
+                      width: double.infinity,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.02),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () async {
+                            try {
+                              await SupabaseService.signInWithGoogle();
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Google Sign In: $e')),
+                                );
+                              }
+                            }
+                          },
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SvgPicture.string(
+                                '''<svg viewBox="0 0 24 24" width="22" height="22">
+                                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                                </svg>''',
+                              ),
+                              const SizedBox(width: 12),
+                              const Text(
+                                'Sign in with Google',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // 2. Sign in with Email Button
+                    Container(
+                      width: double.infinity,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.02),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: widget.onLogIn,
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.mail_outline_rounded, color: Color(0xFF0D7A53), size: 22),
+                              SizedBox(width: 12),
+                              Text(
+                                'Sign in with Email',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // 3. Create Account Button
+                    Container(
+                      width: double.infinity,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF0D7A53), width: 1.4),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF0D7A53).withOpacity(0.04),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: widget.onSignUp,
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.person_add_outlined, color: Color(0xFF0D7A53), size: 22),
+                              SizedBox(width: 12),
+                              Text(
+                                'Create Account',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0D7A53),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // Social Proof Footer: Trusted by 2M+ students
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Image.asset(
+                          'assets/images/trusted_avatars.png',
+                          height: 28,
+                          fit: BoxFit.contain,
+                          errorBuilder: (ctx, err, stack) => Row(
+                            children: List.generate(
+                              3,
+                              (index) => Container(
+                                margin: const EdgeInsets.only(right: 4),
+                                width: 22,
+                                height: 22,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFFA7F3D0),
+                                ),
+                                child: const Icon(Icons.person, size: 14, color: Color(0xFF0D7A53)),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        RichText(
+                          text: const TextSpan(
+                            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                            children: [
+                              TextSpan(text: 'Trusted by '),
+                              TextSpan(
+                                text: '2M+',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0D7A53),
+                                ),
+                              ),
+                              TextSpan(text: ' students'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ================= MOBILE DRAWER MENU =================
   Widget _buildMobileDrawer(BuildContext context) {
     return Drawer(
@@ -109,7 +405,7 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
         padding: EdgeInsets.zero,
         children: [
           DrawerHeader(
-            decoration: const BoxDecoration(color: Color(0xFF4F46E5)),
+            decoration: const BoxDecoration(color: Color(0xFF0D7A53)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
@@ -119,14 +415,14 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Icons.school_rounded, color: Color(0xFF4F46E5), size: 20),
+                      child: const Icon(Icons.school_rounded, color: Color(0xFF0D7A53), size: 20),
                     ),
                     const SizedBox(width: 10),
                     const Text('ExamPrep', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
                   ],
                 ),
                 const SizedBox(height: 8),
-                const Text('Practice | Analyze | Succeed', style: TextStyle(color: Color(0xFFC7D2FE), fontSize: 11)),
+                const Text('Practice | Analyze | Succeed', style: TextStyle(color: Color(0xFFA7F3D0), fontSize: 11)),
               ],
             ),
           ),
@@ -199,10 +495,10 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
                 Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4F46E5),
+                    color: const Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.circular(9),
                   ),
-                  child: const Icon(Icons.school_rounded, color: Colors.white, size: 18),
+                  child: const Icon(Icons.school_rounded, color: Color(0xFF0D7A53), size: 18),
                 ),
                 const SizedBox(width: 8),
                 const Column(
@@ -279,19 +575,8 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
                     child: const Text('Sign Up', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                   ),
                 ] else ...[
-                  const SizedBox(width: 4),
-                  ElevatedButton(
-                    onPressed: widget.onLogIn,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4F46E5),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      minimumSize: Size.zero,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      elevation: 0,
-                    ),
-                    child: const Text('Log In', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  ),
+                  // Non-logged in mobile view: No Log In button in header
+                  const SizedBox.shrink(),
                 ],
               ],
             ),
