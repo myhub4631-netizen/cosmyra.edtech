@@ -386,13 +386,25 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
                       ],
                     ),
 
-                    const SizedBox(height: 18),
-
-                    // Privacy Policy link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    // Terms and Privacy Policy links
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         const Text('By continuing, you agree to our ', style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8))),
+                        InkWell(
+                          onTap: () => context.go('/terms'),
+                          child: const Text(
+                            'Terms of Service',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0D7A53),
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                        const Text(' & ', style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8))),
                         InkWell(
                           onTap: () => context.go('/privacy-policy'),
                           child: const Text(
@@ -462,6 +474,14 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
             onTap: () {
               Navigator.pop(context);
               context.go('/privacy-policy');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.gavel_rounded, color: Color(0xFF0D7A53)),
+            title: const Text('Terms of Service', style: TextStyle(color: Color(0xFF0D7A53), fontWeight: FontWeight.w600)),
+            onTap: () {
+              Navigator.pop(context);
+              context.go('/terms');
             },
           ),
           const Divider(),

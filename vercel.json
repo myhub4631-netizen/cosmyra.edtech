@@ -29,7 +29,15 @@
       "destination": "/privacy-policy.html"
     },
     {
-      "source": "/((?!privacy-policy|privacy|assets|icons|favicon|manifest|flutter).*)/",
+      "source": "/terms",
+      "destination": "/terms.html"
+    },
+    {
+      "source": "/terms-of-service",
+      "destination": "/terms.html"
+    },
+    {
+      "source": "/((?!privacy-policy|privacy|terms|terms-of-service|assets|icons|favicon|manifest|flutter).*)/",
       "destination": "/index.html"
     },
     {

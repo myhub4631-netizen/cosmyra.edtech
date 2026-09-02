@@ -4642,6 +4642,57 @@ class SupabaseService {
       return false;
     }
   }
+
+  // =========================================================================
+  // TERMS OF SERVICE & GENERIC CMS PAGES (Admin Managed)
+  // =========================================================================
+
+  /// Fetch dynamic CMS page by key with local caching
+  static Future<String> fetchCmsPageContent(String key) async {
+    try {
+      final res = await client.from('app_settings').select('value').eq('key', key).maybeSingle();
+      if (res != null && res['value'] != null && (res['value'] as String).isNotEmpty) {
+        final content = res['value'] as String;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cosmyra_cached_cms_$key', content);
+        return content;
+      }
+    } catch (e) {
+      debugPrint('Error fetching CMS $key from Supabase: $e');
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString('cosmyra_cached_cms_$key');
+      if (cached != null && cached.isNotEmpty) return cached;
+    } catch (_) {}
+
+    return '';
+  }
+
+  /// Save dynamic CMS page by key
+  static Future<bool> saveCmsPageContent(String key, String content) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_cached_cms_$key', content);
+
+      await client.from('app_settings').upsert({
+        'key': key,
+        'value': content,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      return true;
+    } catch (e) {
+      debugPrint('Error saving CMS $key to Supabase: $e');
+      return false;
+    }
+  }
+
+  /// Fetch Terms of Service
+  static Future<String> fetchTermsOfService() => fetchCmsPageContent('terms_of_service');
+
+  /// Save Terms of Service
+  static Future<bool> saveTermsOfService(String termsText) => saveCmsPageContent('terms_of_service', termsText);
 }
 
 
