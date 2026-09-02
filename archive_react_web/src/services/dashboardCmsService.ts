@@ -33,6 +33,17 @@ export const logAuditEvent = async (
 };
 
 // 1. DASHBOARD SECTIONS
+const DEFAULT_SECTIONS: DashboardSection[] = [
+  { id: 'sec_1', section_key: 'banner_slider', title: 'Banner Slider', subtitle: 'Manage promotional banners that appear at the top of the dashboard', sort_order: 1, is_enabled: true, is_visible: true },
+  { id: 'sec_2', section_key: 'quick_stats', title: 'Quick Stats', subtitle: 'Manage the statistics cards shown below the banner', sort_order: 2, is_enabled: true, is_visible: true },
+  { id: 'sec_3', section_key: 'continue_section', title: 'Continue Section', subtitle: 'Show in-progress tests and revision queues', sort_order: 3, is_enabled: true, is_visible: true },
+  { id: 'sec_4', section_key: 'quick_actions', title: 'Quick Actions', subtitle: 'Direct navigation buttons for practice and mock tests', sort_order: 4, is_enabled: true, is_visible: true },
+  { id: 'sec_5', section_key: 'subject_progress', title: 'Subject Progress', subtitle: 'Visual progress breakdown across Physics, Chemistry, Biology & Math', sort_order: 5, is_enabled: true, is_visible: true },
+  { id: 'sec_6', section_key: 'recommendations', title: 'AI Recommendations', subtitle: 'Smart recommendations based on student performance', sort_order: 6, is_enabled: true, is_visible: true },
+  { id: 'sec_7', section_key: 'upcoming_tests', title: 'Upcoming Live Tests', subtitle: 'Scheduled live mock exams and all-India tests', sort_order: 7, is_enabled: true, is_visible: true },
+  { id: 'sec_8', section_key: 'recent_activity', title: 'Recent Activity', subtitle: 'Latest student practice sessions and test logs', sort_order: 8, is_enabled: true, is_visible: true },
+];
+
 export const fetchDashboardSections = async (): Promise<DashboardSection[]> => {
   try {
     const { data, error } = await supabase
@@ -42,12 +53,21 @@ export const fetchDashboardSections = async (): Promise<DashboardSection[]> => {
 
     if (error) {
       console.error('[fetchDashboardSections Error]:', error.message);
-      return [];
+      return DEFAULT_SECTIONS;
     }
-    return (data as DashboardSection[]) || [];
+    if (data && data.length > 0) return data as DashboardSection[];
+
+    // Auto-seed default sections into database if empty
+    for (const sec of DEFAULT_SECTIONS) {
+      await supabase.from('dashboard_sections').upsert(
+        { section_key: sec.section_key, title: sec.title, subtitle: sec.subtitle, sort_order: sec.sort_order, is_enabled: sec.is_enabled, is_visible: sec.is_visible },
+        { onConflict: 'section_key' }
+      );
+    }
+    return DEFAULT_SECTIONS;
   } catch (err: any) {
     console.error('[fetchDashboardSections Exception]:', err.message || err);
-    return [];
+    return DEFAULT_SECTIONS;
   }
 };
 
@@ -55,8 +75,10 @@ export const updateSectionVisibility = async (sectionKey: string, isVisible: boo
   try {
     const { error } = await supabase
       .from('dashboard_sections')
-      .update({ is_visible: isVisible, updated_at: new Date().toISOString() })
-      .eq('section_key', sectionKey);
+      .upsert(
+        { section_key: sectionKey, is_visible: isVisible, updated_at: new Date().toISOString() },
+        { onConflict: 'section_key' }
+      );
 
     if (error) {
       console.error('[updateSectionVisibility Error]:', error.message);
@@ -74,8 +96,10 @@ export const updateSectionEnabled = async (sectionKey: string, isEnabled: boolea
   try {
     const { error } = await supabase
       .from('dashboard_sections')
-      .update({ is_enabled: isEnabled, updated_at: new Date().toISOString() })
-      .eq('section_key', sectionKey);
+      .upsert(
+        { section_key: sectionKey, is_enabled: isEnabled, updated_at: new Date().toISOString() },
+        { onConflict: 'section_key' }
+      );
 
     if (error) {
       console.error('[updateSectionEnabled Error]:', error.message);
@@ -94,8 +118,10 @@ export const updateSectionOrders = async (sections: DashboardSection[]): Promise
     for (let i = 0; i < sections.length; i++) {
       const { error } = await supabase
         .from('dashboard_sections')
-        .update({ sort_order: i + 1, updated_at: new Date().toISOString() })
-        .eq('section_key', sections[i].section_key);
+        .upsert(
+          { section_key: sections[i].section_key, title: sections[i].title, sort_order: i + 1, updated_at: new Date().toISOString() },
+          { onConflict: 'section_key' }
+        );
       if (error) console.error(`[updateSectionOrders Item Error (${sections[i].section_key})]:`, error.message);
     }
     return true;

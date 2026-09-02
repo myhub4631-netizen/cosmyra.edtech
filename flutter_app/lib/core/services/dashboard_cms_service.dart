@@ -15,6 +15,17 @@ class DashboardCmsService {
   // --------------------------------------------------------
   // 1. DASHBOARD SECTIONS
   // --------------------------------------------------------
+  static List<DashboardSectionModel> defaultSections() => [
+        DashboardSectionModel(id: 'sec_1', sectionKey: 'banner_slider', title: 'Banner Slider', subtitle: 'Manage promotional banners that appear at the top of the dashboard', sortOrder: 1, isEnabled: true, isVisible: true),
+        DashboardSectionModel(id: 'sec_2', sectionKey: 'quick_stats', title: 'Quick Stats', subtitle: 'Manage the statistics cards shown below the banner', sortOrder: 2, isEnabled: true, isVisible: true),
+        DashboardSectionModel(id: 'sec_3', sectionKey: 'continue_section', title: 'Continue Section', subtitle: 'Show in-progress tests and revision queues', sortOrder: 3, isEnabled: true, isVisible: true),
+        DashboardSectionModel(id: 'sec_4', sectionKey: 'quick_actions', title: 'Quick Actions', subtitle: 'Direct navigation buttons for practice and mock tests', sortOrder: 4, isEnabled: true, isVisible: true),
+        DashboardSectionModel(id: 'sec_5', sectionKey: 'subject_progress', title: 'Subject Progress', subtitle: 'Visual progress breakdown across Physics, Chemistry, Biology & Math', sortOrder: 5, isEnabled: true, isVisible: true),
+        DashboardSectionModel(id: 'sec_6', sectionKey: 'recommendations', title: 'AI Recommendations', subtitle: 'Smart recommendations based on student performance', sortOrder: 6, isEnabled: true, isVisible: true),
+        DashboardSectionModel(id: 'sec_7', sectionKey: 'upcoming_tests', title: 'Upcoming Live Tests', subtitle: 'Scheduled live mock exams and all-India tests', sortOrder: 7, isEnabled: true, isVisible: true),
+        DashboardSectionModel(id: 'sec_8', sectionKey: 'recent_activity', title: 'Recent Activity', subtitle: 'Latest student practice sessions and test logs', sortOrder: 8, isEnabled: true, isVisible: true),
+      ];
+
   static Future<List<DashboardSectionModel>> fetchSections() async {
     try {
       final data = await _client
@@ -25,18 +36,33 @@ class DashboardCmsService {
       if (data != null && (data as List).isNotEmpty) {
         return (data as List).map((item) => DashboardSectionModel.fromJson(item)).toList();
       }
+
+      // Auto-seed default sections into database if empty
+      final defaults = defaultSections();
+      for (final sec in defaults) {
+        await _client.from('dashboard_sections').upsert({
+          'section_key': sec.sectionKey,
+          'title': sec.title,
+          'subtitle': sec.subtitle,
+          'sort_order': sec.sortOrder,
+          'is_enabled': sec.isEnabled,
+          'is_visible': sec.isVisible,
+        }, onConflict: 'section_key');
+      }
+      return defaults;
     } catch (e) {
       debugPrint('[DashboardCmsService.fetchSections Error]: $e');
     }
-    return [];
+    return defaultSections();
   }
 
   static Future<bool> updateSectionVisibility(String sectionKey, bool isVisible) async {
     try {
-      await _client
-          .from('dashboard_sections')
-          .update({'is_visible': isVisible, 'updated_at': DateTime.now().toIso8601String()})
-          .eq('section_key', sectionKey);
+      await _client.from('dashboard_sections').upsert({
+        'section_key': sectionKey,
+        'is_visible': isVisible,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'section_key');
 
       await logAuditEvent(
         action: 'UPDATE_VISIBILITY',
@@ -53,10 +79,11 @@ class DashboardCmsService {
 
   static Future<bool> updateSectionEnabled(String sectionKey, bool isEnabled) async {
     try {
-      await _client
-          .from('dashboard_sections')
-          .update({'is_enabled': isEnabled, 'updated_at': DateTime.now().toIso8601String()})
-          .eq('section_key', sectionKey);
+      await _client.from('dashboard_sections').upsert({
+        'section_key': sectionKey,
+        'is_enabled': isEnabled,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'section_key');
 
       await logAuditEvent(
         action: 'TOGGLE_ENABLED',
@@ -74,10 +101,12 @@ class DashboardCmsService {
   static Future<bool> updateSectionOrders(List<DashboardSectionModel> sections) async {
     try {
       for (int i = 0; i < sections.length; i++) {
-        await _client
-            .from('dashboard_sections')
-            .update({'sort_order': i + 1, 'updated_at': DateTime.now().toIso8601String()})
-            .eq('section_key', sections[i].sectionKey);
+        await _client.from('dashboard_sections').upsert({
+          'section_key': sections[i].sectionKey,
+          'title': sections[i].title,
+          'sort_order': i + 1,
+          'updated_at': DateTime.now().toIso8601String(),
+        }, onConflict: 'section_key');
       }
       return true;
     } catch (e) {
