@@ -76,26 +76,26 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     }
   }
 
-  Future<void> _toggleSectionVisibility(String sectionKey, bool currentVisibility) async {
-    final success = await DashboardCmsService.updateSectionVisibility(sectionKey, !currentVisibility);
+  Future<void> _setSectionVisibility(String sectionKey, bool isVisible) async {
+    final success = await DashboardCmsService.updateSectionVisibility(sectionKey, isVisible);
     if (success) {
       setState(() {
         final idx = _sections.indexWhere((s) => s.sectionKey == sectionKey);
         if (idx != -1) {
-          _sections[idx] = _sections[idx].copyWith(isVisible: !currentVisibility);
+          _sections[idx] = _sections[idx].copyWith(isVisible: isVisible);
         }
       });
       _showMessage('Section visibility updated.');
     }
   }
 
-  Future<void> _toggleSectionEnabled(String sectionKey, bool currentEnabled) async {
-    final success = await DashboardCmsService.updateSectionEnabled(sectionKey, !currentEnabled);
+  Future<void> _setSectionEnabled(String sectionKey, bool isEnabled) async {
+    final success = await DashboardCmsService.updateSectionEnabled(sectionKey, isEnabled);
     if (success) {
       setState(() {
         final idx = _sections.indexWhere((s) => s.sectionKey == sectionKey);
         if (idx != -1) {
-          _sections[idx] = _sections[idx].copyWith(isEnabled: !currentEnabled);
+          _sections[idx] = _sections[idx].copyWith(isEnabled: isEnabled);
         }
       });
       _showMessage('Section status updated.');
@@ -288,6 +288,18 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     );
   }
 
+  Future<void> _handleSaveChangesAll() async {
+    _showMessage('Saving all layout changes to Supabase...');
+    final successSec = await DashboardCmsService.updateSectionOrders(_sections);
+    final successBan = await DashboardCmsService.updateBannerOrders(_banners);
+    if (successSec || successBan) {
+      _showMessage('All dashboard changes saved successfully!');
+      await _loadCmsData();
+    } else {
+      _showMessage('Error saving layout changes to Supabase.');
+    }
+  }
+
   // ========================================================
   // SUB HEADER TABS
   // ========================================================
@@ -298,31 +310,49 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
         border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
       ),
       child: Row(
-        children: tabs.map((tab) {
-          final isSelected = _activeTab == tab;
-          return InkWell(
-            onTap: () => setState(() => _activeTab = tab),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
-                    width: 2,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: tabs.map((tab) {
+              final isSelected = _activeTab == tab;
+              return InkWell(
+                onTap: () => setState(() => _activeTab = tab),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                  child: Text(
+                    tab,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                    ),
                   ),
                 ),
-              ),
-              child: Text(
-                tab,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
-                ),
+              );
+            }).toList(),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: ElevatedButton.icon(
+              onPressed: _handleSaveChangesAll,
+              icon: const Icon(Icons.save, size: 16, color: Colors.white),
+              label: const Text('Save Changes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               ),
             ),
-          );
-        }).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -377,7 +407,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
       subtitle: 'Manage promotional banners that appear at the top of the dashboard',
       number: '1',
       isEnabled: isEnabled,
-      onToggleEnable: (val) => _toggleSectionEnabled('banner_slider', isEnabled),
+      onToggleEnable: (val) => _setSectionEnabled('banner_slider', val),
       actions: [
         ElevatedButton.icon(
           onPressed: () => _openBannerModal(),
@@ -491,7 +521,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
       subtitle: 'Manage the statistics cards shown below the banner',
       number: '2',
       isEnabled: isEnabled,
-      onToggleEnable: (val) => _toggleSectionEnabled('quick_stats', isEnabled),
+      onToggleEnable: (val) => _setSectionEnabled('quick_stats', val),
       actions: [
         ElevatedButton.icon(
           onPressed: () => _openQuickStatModal(),
@@ -579,7 +609,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
       subtitle: 'Manage quick action buttons for easy navigation',
       number: '3',
       isEnabled: isEnabled,
-      onToggleEnable: (val) => _toggleSectionEnabled('quick_actions', isEnabled),
+      onToggleEnable: (val) => _setSectionEnabled('quick_actions', val),
       actions: [
         ElevatedButton.icon(
           onPressed: () => _openQuickActionModal(),
@@ -680,7 +710,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
                   Switch(
                     value: sec.isVisible,
                     activeColor: const Color(0xFF4F46E5),
-                    onChanged: (val) => _toggleSectionVisibility(sec.sectionKey, sec.isVisible),
+                    onChanged: (val) => _setSectionVisibility(sec.sectionKey, val),
                   ),
                 ],
               ),
@@ -871,7 +901,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
                         Text(sec.isVisible ? 'Visible' : 'Hidden', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: sec.isVisible ? const Color(0xFF16A34A) : const Color(0xFFEF4444))),
                         Switch(
                           value: sec.isVisible,
-                          onChanged: (val) => _toggleSectionVisibility(sec.sectionKey, sec.isVisible),
+                          onChanged: (val) => _setSectionVisibility(sec.sectionKey, val),
                         ),
                       ],
                     ),

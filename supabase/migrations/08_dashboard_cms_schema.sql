@@ -149,15 +149,51 @@ ALTER TABLE public.dashboard_quick_actions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Read policies (Students & Public)
+DROP POLICY IF EXISTS "Public Read Dashboard Sections" ON public.dashboard_sections;
 CREATE POLICY "Public Read Dashboard Sections" ON public.dashboard_sections FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public Read Dashboard Banners" ON public.dashboard_banners;
 CREATE POLICY "Public Read Dashboard Banners" ON public.dashboard_banners FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public Read Dashboard Quick Stats" ON public.dashboard_quick_stats;
 CREATE POLICY "Public Read Dashboard Quick Stats" ON public.dashboard_quick_stats FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public Read Dashboard Quick Actions" ON public.dashboard_quick_actions;
 CREATE POLICY "Public Read Dashboard Quick Actions" ON public.dashboard_quick_actions FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Admin Read Audit Logs" ON public.audit_logs;
 CREATE POLICY "Admin Read Audit Logs" ON public.audit_logs FOR SELECT USING (true);
 
 -- Admin CRUD Policies
-CREATE POLICY "Admin All Dashboard Sections" ON public.dashboard_sections FOR ALL USING (true);
-CREATE POLICY "Admin All Dashboard Banners" ON public.dashboard_banners FOR ALL USING (true);
-CREATE POLICY "Admin All Dashboard Quick Stats" ON public.dashboard_quick_stats FOR ALL USING (true);
-CREATE POLICY "Admin All Dashboard Quick Actions" ON public.dashboard_quick_actions FOR ALL USING (true);
+DROP POLICY IF EXISTS "Admin All Dashboard Sections" ON public.dashboard_sections;
+CREATE POLICY "Admin All Dashboard Sections" ON public.dashboard_sections FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admin All Dashboard Banners" ON public.dashboard_banners;
+CREATE POLICY "Admin All Dashboard Banners" ON public.dashboard_banners FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admin All Dashboard Quick Stats" ON public.dashboard_quick_stats;
+CREATE POLICY "Admin All Dashboard Quick Stats" ON public.dashboard_quick_stats FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admin All Dashboard Quick Actions" ON public.dashboard_quick_actions;
+CREATE POLICY "Admin All Dashboard Quick Actions" ON public.dashboard_quick_actions FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Admin Insert Audit Logs" ON public.audit_logs;
 CREATE POLICY "Admin Insert Audit Logs" ON public.audit_logs FOR INSERT WITH CHECK (true);
+
+-- 5. STORAGE BUCKET FOR DASHBOARD ASSETS
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('dashboard-assets', 'dashboard-assets', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- Storage Policies
+DROP POLICY IF EXISTS "Public Read Dashboard Assets" ON storage.objects;
+CREATE POLICY "Public Read Dashboard Assets" ON storage.objects
+  FOR SELECT USING (bucket_id = 'dashboard-assets');
+
+DROP POLICY IF EXISTS "Admin Upload Dashboard Assets" ON storage.objects;
+CREATE POLICY "Admin Upload Dashboard Assets" ON storage.objects
+  FOR INSERT WITH CHECK (bucket_id = 'dashboard-assets');
+
+DROP POLICY IF EXISTS "Admin Delete Dashboard Assets" ON storage.objects;
+CREATE POLICY "Admin Delete Dashboard Assets" ON storage.objects
+  FOR DELETE USING (bucket_id = 'dashboard-assets');

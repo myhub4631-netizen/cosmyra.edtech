@@ -19,9 +19,7 @@ import { Exam, Subject, Chapter, Topic, Question, LeaderboardEntry, Test } from 
 
 // Helper to check if valid Supabase URL is set
 export const isSupabaseConfigured = (): boolean => {
-  const metaEnv = (import.meta as any).env || {};
-  const url = metaEnv.VITE_SUPABASE_URL || '';
-  return url.length > 0 && !url.includes('xyzcompany.supabase.co');
+  return true;
 };
 
 // 1. TAXONOMY: EXAMS

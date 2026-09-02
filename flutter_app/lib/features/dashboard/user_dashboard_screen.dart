@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/dashboard_cms_service.dart';
 import '../../shared/widgets/app_sidebar.dart';
 import '../auth/login_screen.dart';
 
@@ -46,12 +47,46 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   int _mobileBottomNavIndex = 0;
 
   late UserProfileModel _currentUserProfile;
+  List<DashboardSectionModel> _cmsSections = [];
+  List<DashboardBannerModel> _cmsBanners = [];
+  List<DashboardQuickStatModel> _cmsQuickStats = [];
+  List<DashboardQuickActionModel> _cmsQuickActions = [];
 
   @override
   void initState() {
     super.initState();
     _currentUserProfile = widget.userProfile;
     _loadCurrentUser();
+    _loadCmsData();
+  }
+
+  Future<void> _loadCmsData() async {
+    try {
+      final secs = await DashboardCmsService.fetchSections();
+      final bans = await DashboardCmsService.fetchBanners();
+      final stats = await DashboardCmsService.fetchQuickStats();
+      final acts = await DashboardCmsService.fetchQuickActions();
+
+      if (mounted) {
+        setState(() {
+          _cmsSections = secs;
+          _cmsBanners = bans.where((b) => b.isActive).toList();
+          _cmsQuickStats = stats.where((s) => s.isEnabled).toList();
+          _cmsQuickActions = acts.where((a) => a.isEnabled).toList();
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading CMS data in user dashboard: $e');
+    }
+  }
+
+  bool _isSectionVisible(String key) {
+    if (_cmsSections.isEmpty) return true;
+    final sec = _cmsSections.firstWhere(
+      (s) => s.sectionKey == key,
+      orElse: () => DashboardSectionModel(id: '', sectionKey: key, title: '', subtitle: '', sortOrder: 99, isEnabled: true, isVisible: true),
+    );
+    return sec.isEnabled && sec.isVisible;
   }
 
   Future<void> _loadCurrentUser() async {
@@ -105,32 +140,32 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     const SizedBox(height: 10),
 
                     // 2. Offer Banner Carousel
-                    DashboardBannerCarousel(
-                      onOpenMockTests: widget.onOpenMockTests,
-                      onOpenCustomPractice: widget.onOpenPractice,
-                      onOpenLeaderboard: widget.onOpenLeaderboard,
-                    ),
-                    const SizedBox(height: 12),
+                    if (_isSectionVisible('banner_slider')) ...[
+                      DashboardBannerCarousel(
+                        onOpenMockTests: widget.onOpenMockTests,
+                        onOpenCustomPractice: widget.onOpenPractice,
+                        onOpenLeaderboard: widget.onOpenLeaderboard,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
 
-                    // 3. Quick Stats Cards (4 Horizontal Rectangles)
-                    _buildMobileKpiGrid(),
-                    const SizedBox(height: 8),
+                    // 3. Quick Stats Cards
+                    if (_isSectionVisible('quick_stats')) ...[
+                      _buildMobileKpiGrid(),
+                      const SizedBox(height: 8),
+                    ],
 
                     // 4. Continue Where You Left Off Card
-                    _buildMobileContinueCard(),
-                    const SizedBox(height: 8),
+                    if (_isSectionVisible('continue_section')) ...[
+                      _buildMobileContinueCard(),
+                      const SizedBox(height: 8),
+                    ],
 
                     // 5. Quick Actions Row
-                    _buildMobileQuickActions(),
-                    const SizedBox(height: 12),
-
-                    // 6. Performance Overview (Mini Trend Charts)
-                    _buildMobilePerformanceOverview(),
-                    const SizedBox(height: 12),
-
-                    // 7. Subject Strength Card
-                    _buildMobileSubjectStrength(),
-                    const SizedBox(height: 60), // Padding for bottom navbar
+                    if (_isSectionVisible('quick_actions')) ...[
+                      _buildMobileQuickActions(),
+                      const SizedBox(height: 12),
+                    ],
                   ],
                 ),
               ),
@@ -139,13 +174,12 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           );
         }
 
-        // DESKTOP LAYOUT
+        // DESKTOP / TABLET LAYOUT (Split Navigation + Main Scrollable Container)
         return Scaffold(
-          backgroundColor: const Color(0xFFFAFAFA),
+          backgroundColor: const Color(0xFFF8FAFC),
           body: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. LEFT SIDEBAR NAVIGATION
+              // Left Permanent Navigation Sidebar Component
               AppSidebar(
                 selectedIndex: _activeSidebarIndex,
                 onItemSelected: (idx) => setState(() => _activeSidebarIndex = idx),
@@ -159,7 +193,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 onLogout: widget.onLogout,
               ),
 
-              // 2. MAIN CONTENT AREA
+              // Right Main Content Column
               Expanded(
                 child: Column(
                   children: [
@@ -178,27 +212,37 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                             const SizedBox(height: 20),
 
                             // Offer Banner Carousel Section
-                            DashboardBannerCarousel(
-                              onOpenMockTests: widget.onOpenMockTests,
-                              onOpenCustomPractice: widget.onOpenPractice,
-                              onOpenLeaderboard: widget.onOpenLeaderboard,
-                            ),
-                            const SizedBox(height: 24),
+                            if (_isSectionVisible('banner_slider')) ...[
+                              DashboardBannerCarousel(
+                                onOpenMockTests: widget.onOpenMockTests,
+                                onOpenCustomPractice: widget.onOpenPractice,
+                                onOpenLeaderboard: widget.onOpenLeaderboard,
+                              ),
+                              const SizedBox(height: 24),
+                            ],
 
                             // Top 4 KPI Metrics Grid Row
-                            _buildKpiMetricsGrid(),
-                            const SizedBox(height: 28),
+                            if (_isSectionVisible('quick_stats')) ...[
+                              _buildKpiMetricsGrid(),
+                              const SizedBox(height: 28),
+                            ],
 
                             // Middle Section Row: Continue Where You Left Off + Today's Progress
-                            _buildMiddleSectionRow(),
-                            const SizedBox(height: 28),
+                            if (_isSectionVisible('continue_section')) ...[
+                              _buildMiddleSectionRow(),
+                              const SizedBox(height: 28),
+                            ],
 
                             // Quick Start Section Header + 5 Cards Grid Row
-                            _buildQuickStartSection(),
-                            const SizedBox(height: 28),
+                            if (_isSectionVisible('quick_actions')) ...[
+                              _buildQuickStartSection(),
+                              const SizedBox(height: 28),
+                            ],
 
                             // Bottom Section Row: Performance Overview Line Chart + Leaderboard
-                            _buildBottomSectionRow(displayName),
+                            if (_isSectionVisible('performance_overview') || _isSectionVisible('leaderboard_preview')) ...[
+                              _buildBottomSectionRow(displayName),
+                            ],
                           ],
                         ),
                       ),
@@ -2212,47 +2256,37 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   Timer? _timer;
-
-  final List<Map<String, dynamic>> _slides = [
-    {
-      'badge': '🔥 HOT • NTA PATTERN',
-      'title': 'NEET 2026 Full Length Test Series',
-      'desc': 'Simulate real exam conditions with 720-marks tests, rank prediction & instant solution analytics.',
-      'btnText': 'Attempt Test Series',
-      'gradient': const [Color(0xFF1E1B4B), Color(0xFF4338CA)],
-      'emoji': '🚀',
-      'action': 'mock_tests',
-    },
-    {
-      'badge': '🎯 AI CUSTOM PRACTICE',
-      'title': 'Build Custom Practice Sets & Tests',
-      'desc': 'Select chapters, topic difficulty & duration to target weak areas with real PYQ questions.',
-      'btnText': 'Create Custom Test',
-      'gradient': const [Color(0xFF064E3B), Color(0xFF059669)],
-      'emoji': '⚡',
-      'action': 'custom_practice',
-    },
-    {
-      'badge': '🏆 LIVE RANKINGS',
-      'title': 'All India Student Leaderboard',
-      'desc': 'Earn points for correct answers, improve your percentile rank & compete with top aspirants.',
-      'btnText': 'View Leaderboard',
-      'gradient': const [Color(0xFF4C1D95), Color(0xFF7C3AED)],
-      'emoji': '👑',
-      'action': 'leaderboard',
-    },
-  ];
+  List<DashboardBannerModel> _banners = [];
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _startAutoSlide();
+    _loadBanners();
+  }
+
+  Future<void> _loadBanners() async {
+    try {
+      final list = await DashboardCmsService.fetchBanners();
+      final activeList = list.where((b) => b.isActive).toList();
+      if (mounted) {
+        setState(() {
+          _banners = activeList;
+          _loading = false;
+        });
+        _startAutoSlide();
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   void _startAutoSlide() {
-    _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (_pageController.hasClients) {
-        final nextPage = (_currentPage + 1) % _slides.length;
+    _timer?.cancel();
+    if (_banners.isEmpty) return;
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (_pageController.hasClients && _banners.isNotEmpty) {
+        final nextPage = (_currentPage + 1) % _banners.length;
         _pageController.animateToPage(
           nextPage,
           duration: const Duration(milliseconds: 400),
@@ -2269,25 +2303,41 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
     super.dispose();
   }
 
-  void _handleAction(String action) {
-    if (action == 'mock_tests') {
+  Color _parseHexColor(String hexString, Color fallback) {
+    try {
+      final buffer = StringBuffer();
+      if (hexString.length == 6 || hexString.length == 7) {
+        buffer.write('ff');
+        buffer.write(hexString.replaceFirst('#', ''));
+        return Color(int.parse(buffer.toString(), radix: 16));
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
+  void _handleDestination(String dest) {
+    if (dest == '/mock-tests' || dest == '/test-series') {
       if (widget.onOpenMockTests != null) {
         widget.onOpenMockTests!();
       } else {
         context.go('/mock-tests');
       }
-    } else if (action == 'custom_practice') {
+    } else if (dest == '/custom-practice' || dest == '/practice') {
       if (widget.onOpenCustomPractice != null) {
         widget.onOpenCustomPractice!();
       } else {
-        context.go('/custom-practice');
+        context.go('/practice');
       }
-    } else if (action == 'leaderboard') {
+    } else if (dest == '/leaderboard') {
       if (widget.onOpenLeaderboard != null) {
         widget.onOpenLeaderboard!();
       } else {
         context.go('/leaderboard');
       }
+    } else {
+      try {
+        context.go(dest);
+      } catch (_) {}
     }
   }
 
@@ -2295,6 +2345,37 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 700;
+
+    if (_loading || _banners.isEmpty) {
+      return Container(
+        height: isMobile ? 150 : 175,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF5B21B6), Color(0xFF7C3AED)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Cosmyra Edu Platform',
+              style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Unlock unlimited test series & practice sessions.',
+              style: GoogleFonts.inter(fontSize: 12, color: Colors.white70),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
       height: isMobile ? 150 : 175,
@@ -2318,16 +2399,32 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
               onPageChanged: (index) {
                 setState(() => _currentPage = index);
               },
-              itemCount: _slides.length,
+              itemCount: _banners.length,
               itemBuilder: (context, index) {
-                final slide = _slides[index];
+                final banner = _banners[index];
+                final bgColor = _parseHexColor(banner.bgColor, const Color(0xFF5B21B6));
+                final btnBg = _parseHexColor(banner.btnColor, const Color(0xFFFACC15));
+                final btnTxt = _parseHexColor(banner.btnTextColor, const Color(0xFF1E1B4B));
+
+                final hasImage = banner.imageUrl != null && banner.imageUrl!.isNotEmpty && banner.imageUrl!.startsWith('http');
+
                 return Container(
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: slide['gradient'] as List<Color>,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: bgColor,
+                    gradient: hasImage
+                        ? null
+                        : LinearGradient(
+                            colors: [bgColor, bgColor.withValues(alpha: 0.85)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                    image: hasImage
+                        ? DecorationImage(
+                            image: NetworkImage(banner.imageUrl!),
+                            fit: BoxFit.cover,
+                            colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.5), BlendMode.darken),
+                          )
+                        : null,
                   ),
                   padding: EdgeInsets.symmetric(
                     horizontal: isMobile ? 16 : 28,
@@ -2335,33 +2432,6 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
                   ),
                   child: Stack(
                     children: [
-                      // Decorative background circles
-                      Positioned(
-                        right: -20,
-                        top: -30,
-                        child: Container(
-                          width: 140,
-                          height: 140,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withValues(alpha: 0.06),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 80,
-                        bottom: -40,
-                        child: Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withValues(alpha: 0.04),
-                          ),
-                        ),
-                      ),
-
-                      // Content Row
                       Row(
                         children: [
                           Expanded(
@@ -2377,7 +2447,7 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
                                     border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                                   ),
                                   child: Text(
-                                    slide['badge'] as String,
+                                    'FEATURED • ${banner.targetAudience}',
                                     style: GoogleFonts.inter(
                                       fontSize: isMobile ? 9.5 : 11,
                                       fontWeight: FontWeight.w800,
@@ -2389,7 +2459,7 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
                                 SizedBox(height: isMobile ? 6 : 8),
 
                                 Text(
-                                  slide['title'] as String,
+                                  banner.title.replaceAll('\n', ' '),
                                   style: GoogleFonts.inter(
                                     fontSize: isMobile ? 14.5 : 18,
                                     fontWeight: FontWeight.w800,
@@ -2402,7 +2472,7 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
                                 SizedBox(height: isMobile ? 3 : 4),
 
                                 Text(
-                                  slide['desc'] as String,
+                                  banner.subtitle.replaceAll('\n', ' '),
                                   style: GoogleFonts.inter(
                                     fontSize: isMobile ? 10.5 : 12,
                                     fontWeight: FontWeight.w400,
@@ -2415,10 +2485,10 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
                                 SizedBox(height: isMobile ? 10 : 14),
 
                                 ElevatedButton(
-                                  onPressed: () => _handleAction(slide['action'] as String),
+                                  onPressed: () => _handleDestination(banner.ctaDestination),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: const Color(0xFF0F172A),
+                                    backgroundColor: btnBg,
+                                    foregroundColor: btnTxt,
                                     elevation: 0,
                                     padding: EdgeInsets.symmetric(
                                       horizontal: isMobile ? 12 : 18,
@@ -2432,28 +2502,36 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        slide['btnText'] as String,
+                                        banner.ctaText,
                                         style: GoogleFonts.inter(
                                           fontSize: isMobile ? 11 : 12.5,
                                           fontWeight: FontWeight.w700,
-                                          color: const Color(0xFF0F172A),
                                         ),
                                       ),
-                                      const SizedBox(width: 6),
-                                      const Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF0F172A)),
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.arrow_forward_rounded, size: 14),
                                     ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
+
                           if (!isMobile) ...[
                             const SizedBox(width: 20),
-                            Text(
-                              slide['emoji'] as String,
-                              style: const TextStyle(fontSize: 48),
+                            Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.auto_awesome_rounded,
+                                color: Colors.white,
+                                size: 30,
+                              ),
                             ),
-                            const SizedBox(width: 10),
                           ],
                         ],
                       ),
@@ -2464,26 +2542,27 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
             ),
           ),
 
-          // Dots Indicator
-          Positioned(
-            bottom: 12,
-            right: 20,
-            child: Row(
-              children: List.generate(
-                _slides.length,
-                (idx) => AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  margin: const EdgeInsets.only(left: 4),
-                  width: _currentPage == idx ? 18 : 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: _currentPage == idx ? Colors.white : Colors.white.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(4),
+          // Carousel Dot Indicators
+          if (_banners.length > 1)
+            Positioned(
+              bottom: 10,
+              right: 18,
+              child: Row(
+                children: List.generate(
+                  _banners.length,
+                  (index) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    margin: const EdgeInsets.only(left: 4),
+                    height: 6,
+                    width: _currentPage == index ? 16 : 6,
+                    decoration: BoxDecoration(
+                      color: _currentPage == index ? Colors.white : Colors.white.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
