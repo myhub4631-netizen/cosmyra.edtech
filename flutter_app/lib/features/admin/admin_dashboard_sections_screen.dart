@@ -376,8 +376,6 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
           flex: 3,
           child: Column(
             children: [
-              _buildBannerSliderCard(),
-              const SizedBox(height: 24),
               _buildQuickStatsCard(),
               const SizedBox(height: 24),
               _buildQuickActionsCard(),
@@ -690,7 +688,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     return _buildContainerCard(
       title: 'Quick Stats',
       subtitle: 'Manage the statistics cards shown below the banner',
-      number: '2',
+      number: '1',
       isEnabled: isEnabled,
       onToggleEnable: (val) => _setSectionEnabled('quick_stats', val),
       actions: [
@@ -778,7 +776,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     return _buildContainerCard(
       title: 'Quick Actions',
       subtitle: 'Manage quick action buttons for easy navigation',
-      number: '3',
+      number: '2',
       isEnabled: isEnabled,
       onToggleEnable: (val) => _setSectionEnabled('quick_actions', val),
       actions: [
