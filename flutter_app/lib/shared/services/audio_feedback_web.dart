@@ -1,6 +1,7 @@
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'audio_feedback_stub.dart';
+export 'audio_feedback_stub.dart';
 
 @JS('window')
 external JSObject get _window;

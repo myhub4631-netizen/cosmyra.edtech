@@ -1,8 +1,8 @@
 {
-  "name": "cosmyra-root",
+  "name": "cosmyra-edu-flutter-platform",
   "private": true,
   "scripts": {
-    "build": "cp -r flutter_app/build/web/* public/ || echo 'Build synced'",
-    "dev": "npm run dev --prefix web"
+    "build": "cd flutter_app && flutter build web --release && mkdir -p ../public && cp -r build/web/* ../public/",
+    "start": "cd flutter_app && flutter run -d chrome"
   }
 }

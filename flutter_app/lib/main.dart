@@ -31,6 +31,11 @@ class CosmyraApp extends StatelessWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
       routerConfig: appRouter,
+      builder: (context, child) {
+        return SelectionArea(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
     );
   }
 }

@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/dashboard_cms_service.dart';
 import '../auth/login_screen.dart';
 
 class AdminDashboardSectionsScreen extends StatefulWidget {
@@ -15,6 +17,46 @@ class AdminDashboardSectionsScreen extends StatefulWidget {
 class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScreen> {
   String _activeTab = 'Dashboard Sections';
   String _activeSidebar = 'Dashboard Sections';
+  bool _isLoading = true;
+  bool _isPreviewMobile = false;
+
+  // Supabase CMS Data Arrays
+  List<DashboardSectionModel> _sections = [];
+  List<DashboardBannerModel> _banners = [];
+  List<DashboardQuickStatModel> _quickStats = [];
+  List<DashboardQuickActionModel> _quickActions = [];
+  List<AuditLogModel> _auditLogs = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCmsData();
+  }
+
+  Future<void> _loadCmsData() async {
+    setState(() => _isLoading = true);
+    try {
+      final secs = await DashboardCmsService.fetchSections();
+      final bans = await DashboardCmsService.fetchBanners();
+      final stats = await DashboardCmsService.fetchQuickStats();
+      final acts = await DashboardCmsService.fetchQuickActions();
+      final logs = await DashboardCmsService.fetchAuditLogs();
+
+      if (mounted) {
+        setState(() {
+          _sections = secs;
+          _banners = bans;
+          _quickStats = stats;
+          _quickActions = acts;
+          _auditLogs = logs;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading CMS data: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   Future<void> _handleLogout() async {
     await SupabaseService.logoutUserSession();
@@ -34,250 +76,81 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     }
   }
 
-  // Section Visibility Toggles State
-  final Map<String, bool> _sectionVisibility = {
-    'Banner Slider': true,
-    'Quick Stats': true,
-    'Continue Section': true,
-    'Quick Actions': true,
-    'Performance Overview': true,
-    'Subject Strength': true,
-    'Leaderboard Preview': true,
-    'Recent Tests': true,
-  };
+  Future<void> _toggleSectionVisibility(String sectionKey, bool currentVisibility) async {
+    final success = await DashboardCmsService.updateSectionVisibility(sectionKey, !currentVisibility);
+    if (success) {
+      setState(() {
+        final idx = _sections.indexWhere((s) => s.sectionKey == sectionKey);
+        if (idx != -1) {
+          _sections[idx] = _sections[idx].copyWith(isVisible: !currentVisibility);
+        }
+      });
+      _showMessage('Section visibility updated.');
+    }
+  }
 
-  // Section Enable Toggles
-  bool _bannerSectionEnabled = true;
-  bool _quickStatsSectionEnabled = true;
-  bool _quickActionsSectionEnabled = true;
+  Future<void> _toggleSectionEnabled(String sectionKey, bool currentEnabled) async {
+    final success = await DashboardCmsService.updateSectionEnabled(sectionKey, !currentEnabled);
+    if (success) {
+      setState(() {
+        final idx = _sections.indexWhere((s) => s.sectionKey == sectionKey);
+        if (idx != -1) {
+          _sections[idx] = _sections[idx].copyWith(isEnabled: !currentEnabled);
+        }
+      });
+      _showMessage('Section status updated.');
+    }
+  }
 
-  // Banners State
-  final List<Map<String, dynamic>> _banners = [
-    {
-      'title': 'NEET 2026\nMega Scholarship\nTest Series',
-      'sub': 'Get up to 50% OFF',
-      'btn': 'Subscribe Now',
-      'color': const Color(0xFF5B21B6),
-      'btnColor': const Color(0xFFFACC15),
-      'btnTextColor': const Color(0xFF1E1B4B),
-      'icon': Icons.school_rounded,
-      'status': 'Active',
-    },
-    {
-      'title': 'Unlimited Practice\nUnlimited Tests',
-      'sub': 'One Subscription.\nAll Access.',
-      'btn': 'View Plans',
-      'color': const Color(0xFF047857),
-      'btnColor': const Color(0xFFFACC15),
-      'btnTextColor': const Color(0xFF064E3B),
-      'icon': Icons.assignment_rounded,
-      'status': 'Active',
-    },
-    {
-      'title': 'PYQ Practice\nBoost Your Score',
-      'sub': 'Practice past years\' papers\nchapter-wise & topic-wise.',
-      'btn': 'Start Practicing',
-      'color': const Color(0xFF1E40AF),
-      'btnColor': const Color(0xFFFFFFFF),
-      'btnTextColor': const Color(0xFF1E40AF),
-      'icon': Icons.menu_book_rounded,
-      'status': 'Active',
-    },
-    {
-      'title': 'Refer & Earn\nInvite Friends\nEarn Premium',
-      'sub': 'Earn exciting rewards by\nreferring your friends.',
-      'btn': 'Know More',
-      'color': const Color(0xFFC2410C),
-      'btnColor': const Color(0xFFFFFFFF),
-      'btnTextColor': const Color(0xFF9A3412),
-      'icon': Icons.card_giftcard_rounded,
-      'status': 'Active',
-    },
-  ];
-
-  // Quick Stats Data
-  final List<Map<String, dynamic>> _quickStats = [
-    {
-      'id': '1',
-      'title': 'Questions Attempted',
-      'source': 'user_stats.questions_attempted',
-      'change': '↑ 18%',
-      'icon': Icons.edit_document,
-      'iconColor': const Color(0xFF2563EB),
-      'iconBg': const Color(0xFFEFF6FF),
-      'status': 'Active',
-    },
-    {
-      'id': '2',
-      'title': 'Accuracy',
-      'source': 'user_stats.accuracy',
-      'change': '↑ 6.3%',
-      'icon': Icons.track_changes_rounded,
-      'iconColor': const Color(0xFF16A34A),
-      'iconBg': const Color(0xFFDCFCE7),
-      'status': 'Active',
-    },
-    {
-      'id': '3',
-      'title': 'Tests Completed',
-      'source': 'user_stats.tests_completed',
-      'change': '↑ 4',
-      'icon': Icons.assignment_turned_in_rounded,
-      'iconColor': const Color(0xFF7C3AED),
-      'iconBg': const Color(0xFFF5F3FF),
-      'status': 'Active',
-    },
-    {
-      'id': '4',
-      'title': 'Study Streak',
-      'source': 'user_stats.study_streak',
-      'change': 'Best: 32 Days',
-      'icon': Icons.local_fire_department_rounded,
-      'iconColor': const Color(0xFFEA580C),
-      'iconBg': const Color(0xFFFFF7ED),
-      'status': 'Active',
-    },
-  ];
-
-  // Quick Actions Data
-  final List<Map<String, dynamic>> _quickActions = [
-    {
-      'id': '1',
-      'title': 'Custom Practice',
-      'nav': 'Navigate to /practice/custom',
-      'icon': Icons.track_changes_rounded,
-      'iconColor': const Color(0xFF16A34A),
-      'iconBg': const Color(0xFFDCFCE7),
-      'status': 'Active',
-    },
-    {
-      'id': '2',
-      'title': 'Custom Test',
-      'nav': 'Navigate to /tests/custom',
-      'icon': Icons.assignment_outlined,
-      'iconColor': const Color(0xFF2563EB),
-      'iconBg': const Color(0xFFDBEAFE),
-      'status': 'Active',
-    },
-    {
-      'id': '3',
-      'title': 'PYQ Practice',
-      'nav': 'Navigate to /pyq',
-      'icon': Icons.menu_book_rounded,
-      'iconColor': const Color(0xFF7C3AED),
-      'iconBg': const Color(0xFFDDD6FE),
-      'status': 'Active',
-    },
-    {
-      'id': '4',
-      'title': 'NTA Questions',
-      'nav': 'Navigate to /nta',
-      'icon': Icons.shield_outlined,
-      'iconColor': const Color(0xFFEA580C),
-      'iconBg': const Color(0xFFFFEDD5),
-      'status': 'Active',
-    },
-    {
-      'id': '5',
-      'title': 'Test Series',
-      'nav': 'Navigate to /tests/series',
-      'icon': Icons.calendar_today_outlined,
-      'iconColor': const Color(0xFFDB2777),
-      'iconBg': const Color(0xFFFCE7F3),
-      'status': 'Active',
-    },
-  ];
-
-  void _saveChanges() {
+  void _showMessage(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Dashboard layout management changes saved successfully!'),
-        backgroundColor: Color(0xFF16A34A),
-        duration: Duration(seconds: 2),
-      ),
+      SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
     );
   }
 
+  // ========================================================
+  // BUILD METHOD
+  // ========================================================
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.of(context).size.width >= 900;
+    final isDesktop = MediaQuery.of(context).size.width >= 992;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: Row(
         children: [
-          // 1. Left Sidebar Navigation
-          if (isDesktop) _buildSidebar(),
+          // Sidebar Nav
+          if (isDesktop) _buildSidebar(context),
 
-          // 2. Main Area
+          // Main Screen Area
           Expanded(
             child: Column(
               children: [
-                // Top Header Navbar
-                _buildTopNavbar(),
-
-                // Scrollable Content
+                _buildTopAppBar(context, isDesktop),
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Page Title & Header Actions
-                        _buildTitleHeader(),
-                        const SizedBox(height: 20),
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSubHeaderTabs(),
+                              const SizedBox(height: 24),
 
-                        // Sub Navigation Tabs
-                        _buildSubNavTabs(),
-                        const SizedBox(height: 24),
-
-                        // Main Content & Side Panel Split
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Main Cards (72% flex)
-                            Expanded(
-                              flex: 72,
-                              child: Column(
-                                children: [
-                                  // Section 1: Banner Slider
-                                  _buildBannerSliderSection(),
-                                  const SizedBox(height: 24),
-
-                                  // Section 2: Quick Stats Table
-                                  _buildQuickStatsSection(),
-                                  const SizedBox(height: 24),
-
-                                  // Section 3: Quick Actions Table
-                                  _buildQuickActionsSection(),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 24),
-
-                            // Right Side Panel (28% flex)
-                            Expanded(
-                              flex: 28,
-                              child: Column(
-                                children: [
-                                  // Section Visibility Panel
-                                  _buildSectionVisibilityCard(),
-                                  const SizedBox(height: 20),
-
-                                  // Tips Card
-                                  _buildTipsCard(),
-                                  const SizedBox(height: 20),
-
-                                  // Need Help Card
-                                  _buildNeedHelpCard(),
-                                ],
-                              ),
-                            ),
-                          ],
+                              if (_activeTab == 'Dashboard Sections')
+                                _buildDashboardSectionsTab(isDesktop)
+                              else if (_activeTab == 'Layout & Visibility')
+                                _buildLayoutVisibilityTab()
+                              else if (_activeTab == 'Settings')
+                                _buildSettingsTab()
+                              else if (_activeTab == 'Preview Dashboard')
+                                _buildPreviewDashboardTab()
+                              else if (_activeTab == 'Audit Logs')
+                                _buildAuditLogsTab(),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
-                  ),
                 ),
               ],
             ),
@@ -287,315 +160,164 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     );
   }
 
-  // ================= 1. LEFT SIDEBAR =================
-  Widget _buildSidebar() {
+  // ========================================================
+  // TOP APP BAR
+  // ========================================================
+  Widget _buildTopAppBar(BuildContext context, bool isDesktop) {
     return Container(
-      width: 250,
-      color: const Color(0xFF0F172A),
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          // Logo & Branding
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF4F46E5),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.school_rounded, color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: 12),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'ExamPrep',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    Text(
-                      'Admin Panel',
-                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Menu List
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              children: [
-                _buildSidebarGroupLabel('MAIN'),
-                _buildSidebarTile('Dashboard', Icons.dashboard_outlined),
-                _buildSidebarTile('Users', Icons.people_outline_rounded),
-                _buildSidebarTile('Questions', Icons.quiz_outlined),
-                _buildSidebarTile('Tests', Icons.assignment_outlined),
-                _buildSidebarTile('PYQ & NTA', Icons.menu_book_rounded),
-                _buildSidebarTile('Analytics', Icons.bar_chart_rounded),
-                _buildSidebarTile('Reports', Icons.outlined_flag_rounded),
-
-                const SizedBox(height: 16),
-                _buildSidebarGroupLabel('CONTENT MANAGEMENT'),
-                _buildSidebarTile('Banners', Icons.image_outlined, badge: 'New'),
-                _buildSidebarTile('Quick Stats', Icons.analytics_outlined),
-                _buildSidebarTile('Quick Actions', Icons.touch_app_outlined),
-                _buildSidebarTile('Dashboard Sections', Icons.dashboard_customize_outlined, isActive: true),
-                _buildSidebarTile('Announcements', Icons.campaign_outlined),
-
-                const SizedBox(height: 16),
-                _buildSidebarGroupLabel('SYSTEM'),
-                _buildSidebarTile('Subscriptions', Icons.credit_card_outlined),
-                _buildSidebarTile('Settings', Icons.settings_outlined),
-                _buildSidebarTile('Roles & Permissions', Icons.admin_panel_settings_outlined),
-                _buildSidebarTile('Logs', Icons.list_alt_rounded),
-                _buildSidebarTile('Support Tickets', Icons.help_outline_rounded),
-                _buildSidebarTile('Logout', Icons.logout_rounded, onTap: _handleLogout),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebarGroupLabel(String label) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 12, top: 12, bottom: 6),
-      child: Text(
-        label,
-        style: const TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-      ),
-    );
-  }
-
-  Widget _buildSidebarTile(String title, IconData icon, {bool isActive = false, String? badge, VoidCallback? onTap}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      decoration: BoxDecoration(
-        color: isActive ? const Color(0xFF4338CA) : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: ListTile(
-        dense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-        leading: Icon(icon, color: isActive ? Colors.white : const Color(0xFF94A3B8), size: 18),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: isActive ? Colors.white : const Color(0xFFCBD5E1),
-            fontSize: 13,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-          ),
-        ),
-        trailing: badge != null
-            ? Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(badge, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-              )
-            : null,
-        onTap: onTap ?? () {
-          if (title == 'Dashboard') {
-            Navigator.pushNamed(context, '/admin');
-          } else if (title == 'Users') {
-            Navigator.pushNamed(context, '/admin/users');
-          } else if (title == 'Logout') {
-            _handleLogout();
-          } else {
-            setState(() => _activeSidebar = title);
-          }
-        },
-      ),
-    );
-  }
-
-  // ================= 2. TOP NAVBAR =================
-  Widget _buildTopNavbar() {
-    return Container(
-      height: 64,
+      height: 70,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Search Input
+          if (!isDesktop)
+            IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+
+          // Search Bar
+          Expanded(
+            child: Container(
+              height: 42,
+              constraints: const BoxConstraints(maxWidth: 420),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: const TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search for students, questions, test...',
+                  hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  prefixIcon: Icon(Icons.search, size: 20, color: Color(0xFF94A3B8)),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 11),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 16),
+
+          // Moon / Theme icon
           Container(
-            width: 320,
-            height: 38,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(8),
+              shape: BoxShape.circle,
             ),
-            child: const Row(
-              children: [
-                Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 18),
-                SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search for students, questions, tests...',
-                      hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                      border: InputBorder.none,
-                      isDense: true,
-                    ),
+            child: const Icon(Icons.nightlight_round, size: 18, color: Color(0xFF64748B)),
+          ),
+
+          const SizedBox(width: 12),
+
+          // Notification Badge
+          Stack(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F5F9),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.notifications_none_rounded, size: 18, color: Color(0xFF64748B)),
+              ),
+              Positioned(
+                right: 6,
+                top: 6,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFEF4444),
+                    shape: BoxShape.circle,
                   ),
                 ),
+              ),
+            ],
+          ),
+
+          const SizedBox(width: 16),
+
+          // Admin User Profile Avatar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: const Color(0xFF4F46E5),
+                  child: Text(
+                    widget.userProfile.fullName.isNotEmpty ? widget.userProfile.fullName[0].toUpperCase() : 'A',
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  widget.userProfile.fullName.isNotEmpty ? widget.userProfile.fullName : 'Dr. Sharma (Admin)',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                ),
+                const SizedBox(width: 4),
+                const Text('Admin', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
               ],
             ),
           ),
 
-          // User Profile & Notification Icons
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.nightlight_round, color: Color(0xFF64748B), size: 18),
-                onPressed: () {},
-              ),
-              const SizedBox(width: 8),
+          const SizedBox(width: 12),
 
-              Stack(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications_none_rounded, color: Color(0xFF64748B), size: 20),
-                    onPressed: () {},
-                  ),
-                  Positioned(
-                    right: 6,
-                    top: 6,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFEF4444),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Text('8', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 12),
-
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: const Color(0xFF6366F1),
-                    child: Text(
-                      widget.userProfile.fullName.isNotEmpty ? widget.userProfile.fullName[0].toUpperCase() : 'A',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.userProfile.fullName.isNotEmpty ? widget.userProfile.fullName : 'Admin',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                      ),
-                      Text(widget.userProfile.isSuperAdmin ? 'Super Admin' : 'Admin', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-                    ],
-                  ),
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
-                    onPressed: _handleLogout,
-                    icon: const Icon(Icons.logout_rounded, size: 14, color: Color(0xFFEF4444)),
-                    label: const Text('Logout', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold)),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFFEE2E2)),
-                      backgroundColor: const Color(0xFFFEF2F2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+          // Logout Button
+          OutlinedButton.icon(
+            onPressed: _handleLogout,
+            icon: const Icon(Icons.logout, size: 14, color: Color(0xFFEF4444)),
+            label: const Text('Logout', style: TextStyle(fontSize: 12, color: Color(0xFFEF4444), fontWeight: FontWeight.w600)),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFFFECDD3)),
+              backgroundColor: const Color(0xFFFFF1F2),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
           ),
         ],
       ),
     );
   }
 
-  // ================= 3. TITLE HEADER =================
-  Widget _buildTitleHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Dashboard Layout Management',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.4),
-            ),
-            SizedBox(height: 4),
-            Text(
-              'Customize and manage all sections that appear on the user dashboard.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-            ),
-          ],
-        ),
-
-        ElevatedButton(
-          onPressed: _saveChanges,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF4F46E5),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            elevation: 0,
-          ),
-          child: const Text('Save Changes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-        ),
-      ],
-    );
-  }
-
-  // ================= 4. SUB NAV TABS =================
-  Widget _buildSubNavTabs() {
-    final tabs = ['Dashboard Sections', 'Layout & Visibility', 'Settings', 'Preview Dashboard'];
-
+  // ========================================================
+  // SUB HEADER TABS
+  // ========================================================
+  Widget _buildSubHeaderTabs() {
+    final tabs = ['Dashboard Sections', 'Layout & Visibility', 'Settings', 'Preview Dashboard', 'Audit Logs'];
     return Container(
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
       ),
       child: Row(
-        children: tabs.map((t) {
-          final isSel = t == _activeTab;
-          return GestureDetector(
-            onTap: () => setState(() => _activeTab = t),
+        children: tabs.map((tab) {
+          final isSelected = _activeTab == tab;
+          return InkWell(
+            onTap: () => setState(() => _activeTab = tab),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
                 border: Border(
                   bottom: BorderSide(
-                    color: isSel ? const Color(0xFF4F46E5) : Colors.transparent,
+                    color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
                     width: 2,
                   ),
                 ),
               ),
               child: Text(
-                t,
+                tab,
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
-                  color: isSel ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                  fontSize: 14,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
                 ),
               ),
             ),
@@ -605,513 +327,360 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     );
   }
 
-  // ================= 5. SECTION 1: BANNER SLIDER =================
-  Widget _buildBannerSliderSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  // ========================================================
+  // TAB 1: DASHBOARD SECTIONS (MAIN CMS VIEW)
+  // ========================================================
+  Widget _buildDashboardSectionsTab(bool isDesktop) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Left Column: Configurable Sections
+        Expanded(
+          flex: 3,
+          child: Column(
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4F46E5),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text('1', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                  ),
-                  const SizedBox(width: 12),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Banner Slider', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                      Text('Manage promotional banners that appear at the top of the dashboard', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                    ],
-                  ),
-                ],
-              ),
-
-              Row(
-                children: [
-                  const Text('Enable Section', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
-                  const SizedBox(width: 6),
-                  Switch(
-                    value: _bannerSectionEnabled,
-                    activeColor: const Color(0xFF4F46E5),
-                    onChanged: (v) => setState(() => _bannerSectionEnabled = v),
-                  ),
-                  const SizedBox(width: 12),
-
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4F46E5),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                      elevation: 0,
-                    ),
-                    child: const Text('Add Banner', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                  ),
-                  const SizedBox(width: 8),
-
-                  OutlinedButton(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFCBD5E1)),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                    ),
-                    child: const Text('Manage Order', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
-                  ),
-                ],
-              ),
+              _buildBannerSliderCard(),
+              const SizedBox(height: 24),
+              _buildQuickStatsCard(),
+              const SizedBox(height: 24),
+              _buildQuickActionsCard(),
             ],
           ),
-          const SizedBox(height: 16),
+        ),
 
-          // Horizontal Banners List
+        if (isDesktop) const SizedBox(width: 24),
+
+        // Right Column: Section Visibility & Tips
+        if (isDesktop)
+          SizedBox(
+            width: 320,
+            child: Column(
+              children: [
+                _buildSectionVisibilityCard(),
+                const SizedBox(height: 16),
+                _buildTipsCard(),
+                const SizedBox(height: 16),
+                _buildNeedHelpCard(),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  // BANNER SLIDER CARD
+  Widget _buildBannerSliderCard() {
+    final isEnabled = _sections.firstWhere((s) => s.sectionKey == 'banner_slider', orElse: () => DashboardSectionModel(id: '', sectionKey: 'banner_slider', title: 'Banner Slider', subtitle: '', sortOrder: 1, isEnabled: true, isVisible: true)).isEnabled;
+
+    return _buildContainerCard(
+      title: 'Banner Slider',
+      subtitle: 'Manage promotional banners that appear at the top of the dashboard',
+      number: '1',
+      isEnabled: isEnabled,
+      onToggleEnable: (val) => _toggleSectionEnabled('banner_slider', isEnabled),
+      actions: [
+        ElevatedButton.icon(
+          onPressed: () => _openBannerModal(),
+          icon: const Icon(Icons.add, size: 16, color: Colors.white),
+          label: const Text('Add Banner', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF4F46E5),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          ),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton.icon(
+          onPressed: () => _openManageBannerOrderModal(),
+          icon: const Icon(Icons.swap_vert, size: 16, color: Color(0xFF475569)),
+          label: const Text('Manage Order', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: Color(0xFFCBD5E1)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+        ),
+      ],
+      child: Column(
+        children: [
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: _banners.map((b) {
-                return Container(
-                  width: 220,
-                  height: 140,
-                  margin: const EdgeInsets.only(right: 14),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: b['color'] as Color,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (b['color'] as Color).withOpacity(0.25),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Stack(
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text('Active', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            b['title'] as String,
-                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, height: 1.1),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            b['sub'] as String,
-                            style: const TextStyle(color: Colors.white70, fontSize: 8.5),
-                          ),
-                          const Spacer(),
-
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: b['btnColor'] as Color,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              b['btn'] as String,
-                              style: TextStyle(color: b['btnTextColor'] as Color, fontSize: 8.5, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Icon(Icons.more_vert_rounded, color: Colors.white.withOpacity(0.8), size: 16),
-                      ),
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Icon(b['icon'] as IconData, color: Colors.white.withOpacity(0.2), size: 42),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
+              children: _banners.map((b) => _buildBannerCardItem(b)).toList(),
             ),
           ),
-          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
 
-          // Pagination Dots
+  Widget _buildBannerCardItem(DashboardBannerModel b) {
+    Color bg = const Color(0xFF5B21B6);
+    try {
+      if (b.bgColor.startsWith('#')) {
+        bg = Color(int.parse(b.bgColor.replaceFirst('#', '0xFF')));
+      }
+    } catch (_) {}
+
+    return Container(
+      width: 260,
+      margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(5, (index) {
-              return Container(
-                width: index == 0 ? 8 : 6,
-                height: index == 0 ? 8 : 6,
-                margin: const EdgeInsets.symmetric(horizontal: 3),
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: index == 0 ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
-                  shape: BoxShape.circle,
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              );
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ================= 6. SECTION 2: QUICK STATS =================
-  Widget _buildQuickStatsSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4F46E5),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text('2', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                  ),
-                  const SizedBox(width: 12),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Quick Stats', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                      Text('Manage the statistics cards shown below the banner', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                    ],
-                  ),
-                ],
+                child: Text(
+                  b.isActive ? 'Active' : 'Disabled',
+                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
               ),
-
-              Row(
-                children: [
-                  const Text('Enable Section', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
-                  const SizedBox(width: 6),
-                  Switch(
-                    value: _quickStatsSectionEnabled,
-                    activeColor: const Color(0xFF4F46E5),
-                    onChanged: (v) => setState(() => _quickStatsSectionEnabled = v),
-                  ),
-                  const SizedBox(width: 12),
-
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4F46E5),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                      elevation: 0,
-                    ),
-                    child: const Text('Add Stat', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                  ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: Colors.white, size: 18),
+                onSelected: (val) {
+                  if (val == 'edit') _openBannerModal(banner: b);
+                  if (val == 'delete') _deleteBanner(b.id);
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                  const PopupMenuItem(value: 'delete', child: Text('Delete', style: TextStyle(color: Colors.red))),
                 ],
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Text(b.title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(b.subtitle, style: const TextStyle(color: Colors.white70, fontSize: 11)),
           const SizedBox(height: 16),
-
-          // Table
-          Table(
-            columnWidths: const {
-              0: FixedColumnWidth(40),
-              1: FixedColumnWidth(60),
-              2: FlexColumnWidth(2.5),
-              3: FlexColumnWidth(3),
-              4: FlexColumnWidth(2),
-              5: FixedColumnWidth(80),
-              6: FixedColumnWidth(80),
-            },
-            children: [
-              // Header
-              TableRow(
-                decoration: const BoxDecoration(color: Color(0xFFF8FAFC)),
-                children: [
-                  _buildTableCell('#', isHeader: true),
-                  _buildTableCell('Icon', isHeader: true),
-                  _buildTableCell('Title', isHeader: true),
-                  _buildTableCell('Data Source', isHeader: true),
-                  _buildTableCell('Change (vs last 7 days)', isHeader: true),
-                  _buildTableCell('Status', isHeader: true),
-                  _buildTableCell('Actions', isHeader: true),
-                ],
-              ),
-              ..._quickStats.map((item) {
-                return TableRow(
-                  decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
-                  ),
-                  children: [
-                    _buildTableCell(item['id'] as String),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: item['iconBg'] as Color,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(item['icon'] as IconData, color: item['iconColor'] as Color, size: 14),
-                      ),
-                    ),
-                    _buildTableCell(item['title'] as String, isBold: true),
-                    _buildTableCell(item['source'] as String, color: const Color(0xFF64748B)),
-                    _buildTableCell(item['change'] as String, color: const Color(0xFF16A34A), isBold: true),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          item['status'] as String,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Color(0xFF166534), fontSize: 9, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, color: Color(0xFF6366F1), size: 16),
-                          onPressed: () {},
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16),
-                          onPressed: () {},
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              }).toList(),
-            ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFACC15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              b.ctaText,
+              style: const TextStyle(color: Color(0xFF1E1B4B), fontSize: 11, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
     );
   }
 
-  // ================= 7. SECTION 3: QUICK ACTIONS =================
-  Widget _buildQuickActionsSection() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4F46E5),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text('3', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                  ),
-                  const SizedBox(width: 12),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Quick Actions', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                      Text('Manage quick action buttons for easy navigation', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                    ],
-                  ),
-                ],
-              ),
+  // QUICK STATS CARD
+  Widget _buildQuickStatsCard() {
+    final isEnabled = _sections.firstWhere((s) => s.sectionKey == 'quick_stats', orElse: () => DashboardSectionModel(id: '', sectionKey: 'quick_stats', title: 'Quick Stats', subtitle: '', sortOrder: 2, isEnabled: true, isVisible: true)).isEnabled;
 
-              Row(
-                children: [
-                  const Text('Enable Section', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
-                  const SizedBox(width: 6),
-                  Switch(
-                    value: _quickActionsSectionEnabled,
-                    activeColor: const Color(0xFF4F46E5),
-                    onChanged: (v) => setState(() => _quickActionsSectionEnabled = v),
-                  ),
-                  const SizedBox(width: 12),
-
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4F46E5),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                      elevation: 0,
-                    ),
-                    child: const Text('Add Action', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-                  ),
-                ],
-              ),
-            ],
+    return _buildContainerCard(
+      title: 'Quick Stats',
+      subtitle: 'Manage the statistics cards shown below the banner',
+      number: '2',
+      isEnabled: isEnabled,
+      onToggleEnable: (val) => _toggleSectionEnabled('quick_stats', isEnabled),
+      actions: [
+        ElevatedButton.icon(
+          onPressed: () => _openQuickStatModal(),
+          icon: const Icon(Icons.add, size: 16, color: Colors.white),
+          label: const Text('Add Stat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF4F46E5),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           ),
-          const SizedBox(height: 16),
-
-          // Table
-          Table(
-            columnWidths: const {
-              0: FixedColumnWidth(40),
-              1: FixedColumnWidth(60),
-              2: FlexColumnWidth(2.5),
-              3: FlexColumnWidth(3.5),
-              4: FixedColumnWidth(80),
-              5: FixedColumnWidth(80),
-            },
-            children: [
-              // Header
-              TableRow(
-                decoration: const BoxDecoration(color: Color(0xFFF8FAFC)),
-                children: [
-                  _buildTableCell('#', isHeader: true),
-                  _buildTableCell('Icon', isHeader: true),
-                  _buildTableCell('Title', isHeader: true),
-                  _buildTableCell('Navigation / Type', isHeader: true),
-                  _buildTableCell('Status', isHeader: true),
-                  _buildTableCell('Actions', isHeader: true),
-                ],
-              ),
-              ..._quickActions.map((item) {
-                return TableRow(
-                  decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
-                  ),
-                  children: [
-                    _buildTableCell(item['id'] as String),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: item['iconBg'] as Color,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(item['icon'] as IconData, color: item['iconColor'] as Color, size: 14),
-                      ),
-                    ),
-                    _buildTableCell(item['title'] as String, isBold: true),
-                    _buildTableCell(item['nav'] as String, color: const Color(0xFF64748B)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          item['status'] as String,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Color(0xFF166534), fontSize: 9, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, color: Color(0xFF6366F1), size: 16),
-                          onPressed: () {},
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 16),
-                          onPressed: () {},
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              }).toList(),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTableCell(String text, {bool isHeader = false, bool isBold = false, Color? color}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: isHeader ? 11 : 12,
-          fontWeight: isHeader || isBold ? FontWeight.bold : FontWeight.w500,
-          color: isHeader ? const Color(0xFF475569) : (color ?? const Color(0xFF0F172A)),
         ),
+      ],
+      child: Table(
+        columnWidths: const {
+          0: FixedColumnWidth(40),
+          1: FixedColumnWidth(50),
+          2: FlexColumnWidth(2),
+          3: FlexColumnWidth(3),
+          4: FlexColumnWidth(2),
+          5: FixedColumnWidth(80),
+          6: FixedColumnWidth(80),
+        },
+        children: [
+          const TableRow(
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9)))),
+            children: [
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('#', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Icon', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Title', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Data Source', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Change (vs 7 days)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Status', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Actions', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+            ],
+          ),
+          ..._quickStats.asMap().entries.map((entry) {
+            final idx = entry.key + 1;
+            final s = entry.value;
+            return TableRow(
+              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFF8FAFC)))),
+              children: [
+                Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text('$idx', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(6)),
+                    child: const Icon(Icons.bar_chart, size: 16, color: Color(0xFF2563EB)),
+                  ),
+                ),
+                Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(s.title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)))),
+                Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(s.dataSource, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF64748B)))),
+                Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(s.changeText, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)))),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(12)),
+                    child: Text(s.status, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF15803D))),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      IconButton(icon: const Icon(Icons.edit, size: 16, color: Color(0xFF64748B)), onPressed: () => _openQuickStatModal(stat: s)),
+                      IconButton(icon: const Icon(Icons.delete, size: 16, color: Color(0xFFEF4444)), onPressed: () => _deleteQuickStat(s.id)),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ],
       ),
     );
   }
 
-  // ================= 8. RIGHT SIDE PANEL =================
+  // QUICK ACTIONS CARD
+  Widget _buildQuickActionsCard() {
+    final isEnabled = _sections.firstWhere((s) => s.sectionKey == 'quick_actions', orElse: () => DashboardSectionModel(id: '', sectionKey: 'quick_actions', title: 'Quick Actions', subtitle: '', sortOrder: 4, isEnabled: true, isVisible: true)).isEnabled;
+
+    return _buildContainerCard(
+      title: 'Quick Actions',
+      subtitle: 'Manage quick action buttons for easy navigation',
+      number: '3',
+      isEnabled: isEnabled,
+      onToggleEnable: (val) => _toggleSectionEnabled('quick_actions', isEnabled),
+      actions: [
+        ElevatedButton.icon(
+          onPressed: () => _openQuickActionModal(),
+          icon: const Icon(Icons.add, size: 16, color: Colors.white),
+          label: const Text('Add Action', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF4F46E5),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          ),
+        ),
+      ],
+      child: Table(
+        columnWidths: const {
+          0: FixedColumnWidth(40),
+          1: FixedColumnWidth(50),
+          2: FlexColumnWidth(2),
+          3: FlexColumnWidth(3),
+          4: FixedColumnWidth(80),
+          5: FixedColumnWidth(80),
+        },
+        children: [
+          const TableRow(
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9)))),
+            children: [
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('#', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Icon', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Title', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Navigation / Destination', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Status', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+              Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Actions', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8)))),
+            ],
+          ),
+          ..._quickActions.asMap().entries.map((entry) {
+            final idx = entry.key + 1;
+            final a = entry.value;
+            return TableRow(
+              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFF8FAFC)))),
+              children: [
+                Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text('$idx', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
+                    child: const Icon(Icons.track_changes_rounded, size: 16, color: Color(0xFF16A34A)),
+                  ),
+                ),
+                Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(a.title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)))),
+                Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text('Navigate to ${a.destination}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)))),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(12)),
+                    child: const Text('Active', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF15803D))),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      IconButton(icon: const Icon(Icons.edit, size: 16, color: Color(0xFF64748B)), onPressed: () => _openQuickActionModal(action: a)),
+                      IconButton(icon: const Icon(Icons.delete, size: 16, color: Color(0xFFEF4444)), onPressed: () => _deleteQuickAction(a.id)),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  // RIGHT SIDE PANEL: SECTION VISIBILITY
   Widget _buildSectionVisibilityCard() {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Section Visibility', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-          const SizedBox(height: 2),
+          const Text('Section Visibility', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
           const Text('Show / hide entire sections on the dashboard', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-          const SizedBox(height: 14),
-
-          ..._sectionVisibility.keys.map((k) {
-            final isVal = _sectionVisibility[k] ?? true;
+          const SizedBox(height: 16),
+          ..._sections.map((sec) {
             return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(k, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF334155))),
+                  Text(sec.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF334155))),
                   Switch(
-                    value: isVal,
+                    value: sec.isVisible,
                     activeColor: const Color(0xFF4F46E5),
-                    onChanged: (v) => setState(() => _sectionVisibility[k] = v),
+                    onChanged: (val) => _toggleSectionVisibility(sec.sectionKey, sec.isVisible),
                   ),
                 ],
               ),
@@ -1122,39 +691,38 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     );
   }
 
+  // TIPS CARD
   Widget _buildTipsCard() {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFFFFFBEB),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFFDE68A)),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        children: const [
           Row(
             children: [
-              Text('💡', style: TextStyle(fontSize: 16)),
+              Icon(Icons.lightbulb_outline, size: 16, color: Color(0xFFD97706)),
               SizedBox(width: 6),
               Text('Tips', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF92400E))),
             ],
           ),
-          SizedBox(height: 10),
-
-          Text('• Drag and drop to reorder items in each section.', style: TextStyle(fontSize: 11, color: Color(0xFFB45309), height: 1.4)),
-          SizedBox(height: 4),
-          Text('• Changes reflect in real-time on user dashboard.', style: TextStyle(fontSize: 11, color: Color(0xFFB45309), height: 1.4)),
-          SizedBox(height: 4),
-          Text('• Use Preview to see how changes look for users.', style: TextStyle(fontSize: 11, color: Color(0xFFB45309), height: 1.4)),
+          SizedBox(height: 8),
+          Text('• Drag and drop to reorder items in each section.', style: TextStyle(fontSize: 11, color: Color(0xFFB45309))),
+          Text('• Changes reflect in real-time on user dashboard.', style: TextStyle(fontSize: 11, color: Color(0xFFB45309))),
+          Text('• Use Preview to see how changes look for users.', style: TextStyle(fontSize: 11, color: Color(0xFFB45309))),
         ],
       ),
     );
   }
 
+  // NEED HELP CARD
   Widget _buildNeedHelpCard() {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -1163,22 +731,730 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Need Help?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          const Text('Need Help?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
           const SizedBox(height: 4),
-          const Text('Learn how to customize the dashboard with our guide.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), height: 1.3)),
+          const Text('Learn how to customize the dashboard with our guide.', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
           const SizedBox(height: 12),
-
           OutlinedButton.icon(
             onPressed: () {},
-            icon: const Icon(Icons.open_in_new_rounded, size: 14, color: Color(0xFF4F46E5)),
-            label: const Text('View Documentation', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+            icon: const Icon(Icons.open_in_new, size: 14, color: Color(0xFF4F46E5)),
+            label: const Text('View Documentation', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF4F46E5))),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Color(0xFFC7D2FE)),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // CONTAINER CARD HELPER
+  Widget _buildContainerCard({
+    required String title,
+    required String subtitle,
+    required String number,
+    required bool isEnabled,
+    required Function(bool) onToggleEnable,
+    required List<Widget> actions,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 12,
+                    backgroundColor: const Color(0xFF4F46E5),
+                    child: Text(number, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                      Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  const Text('Enable Section', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF64748B))),
+                  const SizedBox(width: 8),
+                  Switch(
+                    value: isEnabled,
+                    activeColor: const Color(0xFF4F46E5),
+                    onChanged: (val) => onToggleEnable(val),
+                  ),
+                  const SizedBox(width: 12),
+                  ...actions,
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+
+  // ========================================================
+  // TAB 2: LAYOUT & VISIBILITY (REORDER SECTIONS)
+  // ========================================================
+  Widget _buildLayoutVisibilityTab() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Reorder & Section Visibility Management', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+          const Text('Drag items to rearrange how sections appear on the Student Dashboard.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          const SizedBox(height: 20),
+          ReorderableListView(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            onReorder: (oldIdx, newIdx) async {
+              if (newIdx > oldIdx) newIdx -= 1;
+              setState(() {
+                final item = _sections.removeAt(oldIdx);
+                _sections.insert(newIdx, item);
+              });
+              await DashboardCmsService.saveSectionOrders(_sections);
+              _showMessage('Section order saved to Supabase!');
+            },
+            children: _sections.map((sec) {
+              return Container(
+                key: ValueKey(sec.sectionKey),
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.drag_indicator, color: Color(0xFF94A3B8)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(sec.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                          Text(sec.subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        ],
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Text(sec.isVisible ? 'Visible' : 'Hidden', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: sec.isVisible ? const Color(0xFF16A34A) : const Color(0xFFEF4444))),
+                        Switch(
+                          value: sec.isVisible,
+                          onChanged: (val) => _toggleSectionVisibility(sec.sectionKey, sec.isVisible),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ========================================================
+  // TAB 3: SETTINGS
+  // ========================================================
+  Widget _buildSettingsTab() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('CMS Sync & System Settings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+          const Text('Configure Supabase Realtime synchronization and default audience parameters.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          const SizedBox(height: 24),
+
+          ListTile(
+            title: const Text('Supabase Realtime Sync', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: const Text('Propagate CMS changes instantaneously to connected student devices'),
+            trailing: Switch(value: true, onChanged: (val) {}),
+          ),
+          const Divider(),
+          ListTile(
+            title: const Text('Default Target Exam Filter', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: const Text('Default exam filter for new banners and quick actions'),
+            trailing: DropdownButton<String>(
+              value: 'NEET',
+              items: ['All', 'NEET', 'JEE Main', 'JEE Advanced'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              onChanged: (val) {},
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ========================================================
+  // TAB 4: PREVIEW DASHBOARD (INTERACTIVE STUDENT PREVIEW)
+  // ========================================================
+  Widget _buildPreviewDashboardTab() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Preview Header Bar
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF3B82F6),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: const [
+                  Icon(Icons.visibility, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('PREVIEW MODE - Live Student Dashboard Simulation', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                ],
+              ),
+              Row(
+                children: [
+                  ChoiceChip(
+                    label: const Text('Desktop'),
+                    selected: !_isPreviewMobile,
+                    onSelected: (val) => setState(() => _isPreviewMobile = false),
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('Mobile'),
+                    selected: _isPreviewMobile,
+                    onSelected: (val) => setState(() => _isPreviewMobile = true),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // Live Frame Container
+        Center(
+          child: Container(
+            width: _isPreviewMobile ? 380 : double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFCBD5E1), width: 2),
+              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                const Text('Good Morning, Student! 👋', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                const Text('Heres your live dashboard configured by Admin.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                const SizedBox(height: 20),
+
+                // Render Active Sections in Order
+                ..._sections.where((s) => s.isEnabled && s.isVisible).map((sec) {
+                  if (sec.sectionKey == 'banner_slider') return _buildPreviewBanners();
+                  if (sec.sectionKey == 'quick_stats') return _buildPreviewStats();
+                  if (sec.sectionKey == 'quick_actions') return _buildPreviewActions();
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+                      child: Text('📍 Section: ${sec.title}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                    ),
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPreviewBanners() {
+    final active = _banners.where((b) => b.isActive).toList();
+    if (active.isEmpty) return const SizedBox.shrink();
+    final b = active.first;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: const Color(0xFF5B21B6), borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(b.title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(b.subtitle, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          const SizedBox(height: 12),
+          ElevatedButton(onPressed: () {}, child: Text(b.ctaText)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreviewStats() {
+    final active = _quickStats.where((s) => s.isEnabled).toList();
+    if (active.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: active.map((s) {
+          return Expanded(
+            child: Container(
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(10)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(s.title, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                  const SizedBox(height: 4),
+                  const Text('1,248', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildPreviewActions() {
+    final active = _quickActions.where((a) => a.isEnabled).toList();
+    if (active.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: active.map((a) {
+          return Chip(
+            avatar: const Icon(Icons.arrow_forward, size: 14),
+            label: Text(a.title),
+            backgroundColor: const Color(0xFFEFF6FF),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ========================================================
+  // TAB 5: AUDIT LOGS
+  // ========================================================
+  Widget _buildAuditLogsTab() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Admin Audit Log History', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+          const Text('Chronological record of all CMS modifications and section configuration changes.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          const SizedBox(height: 20),
+          Table(
+            columnWidths: const {
+              0: FixedColumnWidth(160),
+              1: FixedColumnWidth(160),
+              2: FixedColumnWidth(140),
+              3: FixedColumnWidth(120),
+              4: FlexColumnWidth(2),
+            },
+            children: [
+              const TableRow(
+                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0)))),
+                children: [
+                  Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Timestamp', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF94A3B8)))),
+                  Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Admin User', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF94A3B8)))),
+                  Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Action', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF94A3B8)))),
+                  Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Entity Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF94A3B8)))),
+                  Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF94A3B8)))),
+                ],
+              ),
+              ..._auditLogs.map((log) {
+                return TableRow(
+                  decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFF8FAFC)))),
+                  children: [
+                    Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text(log.createdAt.toIso8601String().substring(0, 16).replaceFirst('T', ' '), style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)))),
+                    Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text(log.userEmail, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)))),
+                    Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text(log.action, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)))),
+                    Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text(log.entityType, style: const TextStyle(fontSize: 11, color: Color(0xFF334155)))),
+                    Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text(jsonEncode(log.details), style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: Color(0xFF64748B)))),
+                  ],
+                );
+              }).toList(),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ========================================================
+  // MODALS & CRUD DIALOGS
+  // ========================================================
+  void _openBannerModal({DashboardBannerModel? banner}) {
+    final titleCtrl = TextEditingController(text: banner?.title ?? '');
+    final subCtrl = TextEditingController(text: banner?.subtitle ?? '');
+    final ctaCtrl = TextEditingController(text: banner?.ctaText ?? 'Subscribe Now');
+    final destCtrl = TextEditingController(text: banner?.ctaDestination ?? '/practice');
+    String audience = banner?.targetAudience ?? 'All Students';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(banner == null ? 'Add Banner' : 'Edit Banner'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Banner Title')),
+              TextField(controller: subCtrl, decoration: const InputDecoration(labelText: 'Subtitle')),
+              TextField(controller: ctaCtrl, decoration: const InputDecoration(labelText: 'CTA Button Text')),
+              TextField(controller: destCtrl, decoration: const InputDecoration(labelText: 'CTA Destination Route')),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: audience,
+                items: ['All Students', 'NEET', 'JEE Main', 'JEE Advanced', 'New Users', 'Premium Users']
+                    .map((a) => DropdownMenuItem(value: a, child: Text(a)))
+                    .toList(),
+                onChanged: (val) => audience = val ?? 'All Students',
+                decoration: const InputDecoration(labelText: 'Target Audience'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final newB = DashboardBannerModel(
+                id: banner?.id ?? '',
+                title: titleCtrl.text,
+                subtitle: subCtrl.text,
+                ctaText: ctaCtrl.text,
+                ctaDestination: destCtrl.text,
+                isActive: true,
+                sortOrder: banner?.sortOrder ?? (_banners.length + 1),
+                targetAudience: audience,
+              );
+              await DashboardCmsService.saveBanner(newB);
+              Navigator.pop(ctx);
+              _loadCmsData();
+            },
+            child: const Text('Save Banner'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteBanner(String id) async {
+    await DashboardCmsService.deleteBanner(id);
+    _loadCmsData();
+  }
+
+  void _openManageBannerOrderModal() {
+    List<DashboardBannerModel> list = [..._banners];
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Manage Banner Order'),
+          content: SizedBox(
+            width: 400,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: list.length,
+              itemBuilder: (context, idx) {
+                final b = list[idx];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text('${idx + 1}. ${b.title.replaceAll('\n', ' ')}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.arrow_upward, size: 16),
+                        onPressed: idx == 0 ? null : () {
+                          setDialogState(() {
+                            final temp = list[idx];
+                            list[idx] = list[idx - 1];
+                            list[idx - 1] = temp;
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.arrow_downward, size: 16),
+                        onPressed: idx == list.length - 1 ? null : () {
+                          setDialogState(() {
+                            final temp = list[idx];
+                            list[idx] = list[idx + 1];
+                            list[idx + 1] = temp;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                for (int i = 0; i < list.length; i++) {
+                  await DashboardCmsService.saveBanner(
+                    DashboardBannerModel(
+                      id: list[i].id,
+                      title: list[i].title,
+                      subtitle: list[i].subtitle,
+                      ctaText: list[i].ctaText,
+                      ctaDestination: list[i].ctaDestination,
+                      isActive: list[i].isActive,
+                      sortOrder: i + 1,
+                      targetAudience: list[i].targetAudience,
+                    ),
+                  );
+                }
+                Navigator.pop(ctx);
+                _loadCmsData();
+                _showMessage('Banner order updated!');
+              },
+              child: const Text('Save Order'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openQuickStatModal({DashboardQuickStatModel? stat}) {
+    final titleCtrl = TextEditingController(text: stat?.title ?? '');
+    final sourceCtrl = TextEditingController(text: stat?.dataSource ?? 'user_stats.questions_attempted');
+    final changeCtrl = TextEditingController(text: stat?.changeText ?? '↑ 10%');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(stat == null ? 'Add Quick Stat' : 'Edit Quick Stat'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Stat Title')),
+            TextField(controller: sourceCtrl, decoration: const InputDecoration(labelText: 'Data Source Field')),
+            TextField(controller: changeCtrl, decoration: const InputDecoration(labelText: 'Change Label')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final newS = DashboardQuickStatModel(
+                id: stat?.id ?? '',
+                statKey: stat?.statKey ?? titleCtrl.text.toLowerCase().replaceAll(' ', '_'),
+                title: titleCtrl.text,
+                iconName: 'bar_chart',
+                dataSource: sourceCtrl.text,
+                changeText: changeCtrl.text,
+                sortOrder: stat?.sortOrder ?? (_quickStats.length + 1),
+                isEnabled: true,
+              );
+              await DashboardCmsService.saveQuickStat(newS);
+              Navigator.pop(ctx);
+              _loadCmsData();
+            },
+            child: const Text('Save Stat'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteQuickStat(String id) async {
+    await DashboardCmsService.deleteQuickStat(id);
+    _loadCmsData();
+  }
+
+  void _openQuickActionModal({DashboardQuickActionModel? action}) {
+    final titleCtrl = TextEditingController(text: action?.title ?? '');
+    final descCtrl = TextEditingController(text: action?.description ?? '');
+    final destCtrl = TextEditingController(text: action?.destination ?? '/practice');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(action == null ? 'Add Quick Action' : 'Edit Quick Action'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Action Title')),
+            TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description')),
+            TextField(controller: destCtrl, decoration: const InputDecoration(labelText: 'Destination Route')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final newA = DashboardQuickActionModel(
+                id: action?.id ?? '',
+                actionKey: action?.actionKey ?? titleCtrl.text.toLowerCase().replaceAll(' ', '_'),
+                title: titleCtrl.text,
+                description: descCtrl.text,
+                iconName: 'assignment',
+                destination: destCtrl.text,
+                isEnabled: true,
+                sortOrder: action?.sortOrder ?? (_quickActions.length + 1),
+              );
+              await DashboardCmsService.saveQuickAction(newA);
+              Navigator.pop(ctx);
+              _loadCmsData();
+            },
+            child: const Text('Save Action'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteQuickAction(String id) async {
+    await DashboardCmsService.deleteQuickAction(id);
+    _loadCmsData();
+  }
+
+  // ========================================================
+  // SIDEBAR NAVIGATION
+  // ========================================================
+  Widget _buildSidebar(BuildContext context) {
+    return Container(
+      width: 250,
+      color: const Color(0xFF0F172A),
+      child: Column(
+        children: [
+          Container(
+            height: 70,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            alignment: Alignment.centerLeft,
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: const Color(0xFF4F46E5), borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.school, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 10),
+                const Text('ExamPrep Admin', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              children: [
+                _buildSidebarGroupHeader('MAIN'),
+                _buildSidebarItem(Icons.dashboard_outlined, 'Dashboard'),
+                _buildSidebarItem(Icons.people_outline, 'Users'),
+                _buildSidebarItem(Icons.help_outline, 'Questions'),
+                _buildSidebarItem(Icons.assignment_outlined, 'Tests'),
+                _buildSidebarItem(Icons.menu_book_outlined, 'PYQ & NTA'),
+                _buildSidebarItem(Icons.bar_chart_outlined, 'Analytics'),
+
+                const SizedBox(height: 16),
+                _buildSidebarGroupHeader('CONTENT MANAGEMENT'),
+                _buildSidebarItem(Icons.view_carousel_outlined, 'Banners'),
+                _buildSidebarItem(Icons.stacked_bar_chart, 'Quick Stats'),
+                _buildSidebarItem(Icons.touch_app_outlined, 'Quick Actions'),
+                _buildSidebarItem(Icons.dashboard_customize, 'Dashboard Sections', isSelected: true),
+
+                const SizedBox(height: 16),
+                _buildSidebarGroupHeader('SYSTEM'),
+                _buildSidebarItem(Icons.settings_outlined, 'Settings'),
+                _buildSidebarItem(Icons.history, 'Audit Logs'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarGroupHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Text(title, style: const TextStyle(color: Color(0xFF64748B), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+    );
+  }
+
+  Widget _buildSidebarItem(IconData icon, String title, {bool isSelected = false}) {
+    return InkWell(
+      onTap: () => setState(() => _activeSidebar = title),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: isSelected ? Colors.white : const Color(0xFF94A3B8)),
+            const SizedBox(width: 12),
+            Text(title, style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.w500, color: isSelected ? Colors.white : const Color(0xFFCBD5E1))),
+          ],
+        ),
       ),
     );
   }
