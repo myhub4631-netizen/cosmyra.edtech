@@ -2315,14 +2315,38 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 700;
+    final isDesktopWeb = screenWidth >= 768;
 
     if (_loading || _banners.isEmpty) {
       return const SizedBox.shrink();
     }
 
+    // 1. DESKTOP / WEBSITE VIEW: Display up to 3 banners side by side
+    if (isDesktopWeb) {
+      final displayCount = _banners.length >= 3 ? 3 : _banners.length;
+      final webBanners = _banners.take(displayCount).toList();
+
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (int i = 0; i < webBanners.length; i++) ...[
+            if (i > 0) const SizedBox(width: 16),
+            Expanded(
+              child: _buildBannerItem(
+                banner: webBanners[i],
+                height: 180,
+                isMobile: false,
+                isGridItem: true,
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    // 2. MOBILE / APP VIEW: Slider Carousel with Auto-slide & Dots
     return Container(
-      height: isMobile ? 150 : 175,
+      height: 155,
       width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
@@ -2345,161 +2369,13 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
               },
               itemCount: _banners.length,
               itemBuilder: (context, index) {
-                final banner = _banners[index];
-                final bgColor = _parseHexColor(banner.bgColor, const Color(0xFF5B21B6));
-                final btnBg = _parseHexColor(banner.btnColor, const Color(0xFFFACC15));
-                final btnTxt = _parseHexColor(banner.btnTextColor, const Color(0xFF1E1B4B));
-
-                final hasImage = banner.imageUrl != null && banner.imageUrl!.isNotEmpty;
-                ImageProvider? imageProvider;
-                if (hasImage) {
-                  if (banner.imageUrl!.startsWith('data:image')) {
-                    try {
-                      final comma = banner.imageUrl!.indexOf(',');
-                      if (comma != -1) {
-                        final b64 = banner.imageUrl!.substring(comma + 1);
-                        imageProvider = MemoryImage(base64Decode(b64));
-                      }
-                    } catch (_) {}
-                  } else if (banner.imageUrl!.startsWith('http')) {
-                    imageProvider = NetworkImage(banner.imageUrl!);
-                  }
-                }
-
-                return GestureDetector(
-                  onTap: () => _handleDestination(banner.ctaDestination),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: bgColor,
-                      gradient: imageProvider != null
-                          ? null
-                          : LinearGradient(
-                              colors: [bgColor, bgColor.withValues(alpha: 0.85)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                      image: imageProvider != null
-                          ? DecorationImage(
-                              image: imageProvider,
-                              fit: BoxFit.cover,
-                              colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.5), BlendMode.darken),
-                            )
-                          : null,
-                    ),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 16 : 28,
-                    vertical: isMobile ? 14 : 20,
-                  ),
-                  child: Stack(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                                  ),
-                                  child: Text(
-                                    'FEATURED • ${banner.targetAudience}',
-                                    style: GoogleFonts.inter(
-                                      fontSize: isMobile ? 9.5 : 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
-                                      letterSpacing: 0.4,
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(height: isMobile ? 6 : 8),
-
-                                Text(
-                                  banner.title.replaceAll('\n', ' '),
-                                  style: GoogleFonts.inter(
-                                    fontSize: isMobile ? 14.5 : 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                    letterSpacing: -0.3,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                SizedBox(height: isMobile ? 3 : 4),
-
-                                Text(
-                                  banner.subtitle.replaceAll('\n', ' '),
-                                  style: GoogleFonts.inter(
-                                    fontSize: isMobile ? 10.5 : 12,
-                                    fontWeight: FontWeight.w400,
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    height: 1.3,
-                                  ),
-                                  maxLines: isMobile ? 2 : 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                SizedBox(height: isMobile ? 10 : 14),
-
-                                ElevatedButton(
-                                  onPressed: () => _handleDestination(banner.ctaDestination),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: btnBg,
-                                    foregroundColor: btnTxt,
-                                    elevation: 0,
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: isMobile ? 12 : 18,
-                                      vertical: isMobile ? 7 : 10,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        banner.ctaText,
-                                        style: GoogleFonts.inter(
-                                          fontSize: isMobile ? 11 : 12.5,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      const Icon(Icons.arrow_forward_rounded, size: 14),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          if (!isMobile) ...[
-                            const SizedBox(width: 20),
-                            Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.auto_awesome_rounded,
-                                color: Colors.white,
-                                size: 30,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+                return _buildBannerItem(
+                  banner: _banners[index],
+                  height: 155,
+                  isMobile: true,
+                  isGridItem: false,
+                );
+              },
             ),
           ),
 
@@ -2525,6 +2401,156 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBannerItem({
+    required DashboardBannerModel banner,
+    required double height,
+    required bool isMobile,
+    required bool isGridItem,
+  }) {
+    final bgColor = _parseHexColor(banner.bgColor, const Color(0xFF5B21B6));
+    final btnBg = _parseHexColor(banner.btnColor, const Color(0xFFFACC15));
+    final btnTxt = _parseHexColor(banner.btnTextColor, const Color(0xFF1E1B4B));
+
+    final hasImage = banner.imageUrl != null && banner.imageUrl!.isNotEmpty;
+    ImageProvider? imageProvider;
+    if (hasImage) {
+      if (banner.imageUrl!.startsWith('data:image')) {
+        try {
+          final comma = banner.imageUrl!.indexOf(',');
+          if (comma != -1) {
+            final b64 = banner.imageUrl!.substring(comma + 1);
+            imageProvider = MemoryImage(base64Decode(b64));
+          }
+        } catch (_) {}
+      } else if (banner.imageUrl!.startsWith('http')) {
+        imageProvider = NetworkImage(banner.imageUrl!);
+      }
+    }
+
+    return GestureDetector(
+      onTap: () => _handleDestination(banner.ctaDestination),
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: isGridItem
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+          gradient: imageProvider != null
+              ? null
+              : LinearGradient(
+                  colors: [bgColor, bgColor.withValues(alpha: 0.85)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+          image: imageProvider != null
+              ? DecorationImage(
+                  image: imageProvider,
+                  fit: BoxFit.cover,
+                  colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.45), BlendMode.darken),
+                )
+              : null,
+        ),
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 16 : 18,
+          vertical: isMobile ? 12 : 16,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Target Audience Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+              ),
+              child: Text(
+                banner.targetAudience.isNotEmpty ? banner.targetAudience : 'FEATURED',
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            // Title
+            Text(
+              banner.title.replaceAll('\n', ' '),
+              style: GoogleFonts.inter(
+                fontSize: isMobile ? 14 : 16,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: -0.2,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+
+            // Subtitle
+            if (banner.subtitle.isNotEmpty)
+              Text(
+                banner.subtitle.replaceAll('\n', ' '),
+                style: GoogleFonts.inter(
+                  fontSize: isMobile ? 11 : 12,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.white.withValues(alpha: 0.9),
+                  height: 1.25,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            const Spacer(),
+
+            // CTA Button
+            ElevatedButton(
+              onPressed: () => _handleDestination(banner.ctaDestination),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: btnBg,
+                foregroundColor: btnTxt,
+                elevation: 0,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 12 : 14,
+                  vertical: isMobile ? 6 : 8,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    banner.ctaText.isNotEmpty ? banner.ctaText : 'Explore Now',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_forward_rounded, size: 13),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
