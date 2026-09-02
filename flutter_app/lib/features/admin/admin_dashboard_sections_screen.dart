@@ -1340,6 +1340,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
     final bgCtrl = TextEditingController(text: banner?.bgColor ?? '#5B21B6');
     final btnCtrl = TextEditingController(text: banner?.btnColor ?? '#FACC15');
     String audience = banner?.targetAudience ?? 'All Students';
+    String platform = banner?.targetPlatform ?? 'all';
     bool isSaving = false;
 
     showDialog(
@@ -1358,6 +1359,17 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
                 TextField(controller: destCtrl, decoration: const InputDecoration(labelText: 'CTA Destination Route')),
                 TextField(controller: bgCtrl, decoration: const InputDecoration(labelText: 'Background Color (e.g. #5B21B6)')),
                 TextField(controller: btnCtrl, decoration: const InputDecoration(labelText: 'Button Color (e.g. #FACC15)')),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: platform,
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('🌐 & 📱 Both Website & Mobile App')),
+                    DropdownMenuItem(value: 'website', child: Text('🌐 User Website Only')),
+                    DropdownMenuItem(value: 'app', child: Text('📱 User Mobile App Only')),
+                  ],
+                  onChanged: (val) => platform = val ?? 'all',
+                  decoration: const InputDecoration(labelText: 'Target Platform *'),
+                ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: audience,
@@ -1395,6 +1407,7 @@ class _AdminDashboardSectionsScreenState extends State<AdminDashboardSectionsScr
                     isActive: true,
                     sortOrder: banner?.sortOrder ?? (_banners.length + 1),
                     targetAudience: audience,
+                    targetPlatform: platform,
                   );
                   final saved = await DashboardCmsService.saveBanner(newB);
                   debugPrint('[ADMIN CMS] Banner Saved Successfully: ${saved.id}');
