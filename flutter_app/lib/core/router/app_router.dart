@@ -301,6 +301,41 @@ final GoRouter appRouter = GoRouter(
       ),
     ),
     GoRoute(
+      path: '/products',
+      builder: (context, state) => TestSeriesScreen(
+        onBackToDashboard: () => context.go('/dashboard'),
+        onNavigateTab: (idx) {},
+      ),
+    ),
+    GoRoute(
+      path: '/products/:id',
+      builder: (context, state) => TestSeriesScreen(
+        onBackToDashboard: () => context.go('/dashboard'),
+        onNavigateTab: (idx) {},
+      ),
+    ),
+    GoRoute(
+      path: '/product/:id',
+      builder: (context, state) => TestSeriesScreen(
+        onBackToDashboard: () => context.go('/dashboard'),
+        onNavigateTab: (idx) {},
+      ),
+    ),
+    GoRoute(
+      path: '/cart',
+      builder: (context, state) => TestSeriesScreen(
+        onBackToDashboard: () => context.go('/dashboard'),
+        onNavigateTab: (idx) {},
+      ),
+    ),
+    GoRoute(
+      path: '/checkout',
+      builder: (context, state) => TestSeriesScreen(
+        onBackToDashboard: () => context.go('/dashboard'),
+        onNavigateTab: (idx) {},
+      ),
+    ),
+    GoRoute(
       path: '/test/:testId/start',
       builder: (context, state) {
         final String testId = state.pathParameters['testId'] ?? 'test_1';

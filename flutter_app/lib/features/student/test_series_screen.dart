@@ -2,8 +2,12 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/cart_service.dart';
+import 'widgets/ecommerce_checkout_dialog.dart';
+import 'widgets/ecommerce_cart_modal.dart';
 import '../tests/test_screen.dart';
 
 class TestSeriesScreen extends StatefulWidget {
@@ -149,6 +153,40 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   }
 
   Future<void> _startTestSeries(String paperId, String title, int durationMins) async {
+    // 1. Check if test belongs to a paid series
+    final allSeries = _getAllRealTestSeries();
+    TestSeriesCardData? matchingSeries;
+    for (var s in allSeries) {
+      if (s.id == paperId || s.tests.any((t) => (t['id']?.toString() ?? '') == paperId)) {
+        matchingSeries = s;
+        break;
+      }
+    }
+
+    if (matchingSeries != null && !matchingSeries.isFree) {
+      final user = SupabaseService.activeUserSession;
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please sign in or create an account to access "$title".'),
+              action: SnackBarAction(label: 'Sign In', textColor: Colors.white, onPressed: () => context.go('/login')),
+              backgroundColor: const Color(0xFF4F46E5),
+            ),
+          );
+        }
+        return;
+      }
+
+      final hasAccess = await SupabaseService.hasActiveEntitlement(user.id, matchingSeries.id);
+      if (!hasAccess) {
+        if (mounted) {
+          _handlePurchaseOrEnroll(matchingSeries);
+        }
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
     try {
       final questions = await SupabaseService.fetchTestSeriesQuestions(
@@ -508,8 +546,14 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   }
 
   void _handlePurchaseOrEnroll(TestSeriesCardData item) async {
+    if (item.isFree) {
+      _startTestSeries(item.id, item.title, item.durationMinutes);
+      return;
+    }
+
     if (item.purchaseLink.trim().isNotEmpty &&
-        (item.purchaseLink.startsWith('http://') || item.purchaseLink.startsWith('https://'))) {
+        (item.purchaseLink.startsWith('http://') || item.purchaseLink.startsWith('https://')) &&
+        !item.purchaseLink.contains('neet-jee.in')) {
       final uri = Uri.tryParse(item.purchaseLink.trim());
       if (uri != null) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -517,121 +561,23 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       }
     }
 
-    // Otherwise show rich enrollment & checkout dialog
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFECFDF5),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Enroll in Test Series',
-                style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              item.title,
-              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B)),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              item.description,
-              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Test Type', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                      Text('${item.testType} Syllabus', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Estimated Tests', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                      Text('${item.testCount} Tests', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Duration', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                      Text(item.durationFormatted, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Validity', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                      Text(item.validity, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const Divider(height: 16, color: Color(0xFFE2E8F0)),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Total Amount', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
-                      Text(
-                        item.isFree ? 'FREE' : '₹${item.price.toInt()}',
-                        style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF10B981)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _startTestSeries(item.id, item.title, item.durationMinutes);
-            },
-            icon: const Icon(Icons.lock_open_rounded, size: 16, color: Colors.white),
-            label: Text(item.isFree ? 'Start Free Test' : 'Confirm & Access Tests', style: const TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
+    // Open unified production e-commerce checkout dialog
+    final cartItem = CartItem(
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      price: item.price,
+      originalPrice: item.originalPrice,
+      bannerImageUrl: item.bannerImageUrl ?? '',
+      exam: item.exam,
+      validity: item.validity,
+      testCount: item.testCount,
+    );
+
+    EcommerceCheckoutDialog.show(
+      context,
+      singleItem: cartItem,
+      onStartTest: (testId, title, duration) => _startTestSeries(testId, title, duration),
     );
   }
 
@@ -765,9 +711,29 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             ],
           ),
 
-          // Right: Notification Bell & Profile Avatar
+          // Right: Cart Icon, Notification Bell & Profile Avatar
           Row(
             children: [
+              // 1. Interactive Cart Button with Dynamic Badge
+              AnimatedBuilder(
+                animation: CartService.instance,
+                builder: (ctx, _) => IconButton(
+                  tooltip: 'Shopping Cart',
+                  onPressed: () => EcommerceCartModal.show(context, onStartTest: _startTestSeries),
+                  icon: Badge(
+                    isLabelVisible: CartService.instance.isNotEmpty,
+                    label: Text(
+                      '${CartService.instance.itemCount}',
+                      style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    backgroundColor: const Color(0xFFEF4444),
+                    child: const Icon(Icons.shopping_cart_outlined, color: Color(0xFF334155), size: 22),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+
+              // 2. Notification Bell
               Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -1836,11 +1802,34 @@ class _TestSeriesProductDetailDialog extends StatefulWidget {
 class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetailDialog>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _hasPurchased = false;
+  bool _isLoadingAccess = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _checkEntitlementStatus();
+  }
+
+  Future<void> _checkEntitlementStatus() async {
+    final user = SupabaseService.activeUserSession;
+    if (user != null) {
+      final owns = await SupabaseService.hasActiveEntitlement(user.id, widget.item.id);
+      if (mounted) {
+        setState(() {
+          _hasPurchased = owns;
+          _isLoadingAccess = false;
+        });
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _hasPurchased = false;
+          _isLoadingAccess = false;
+        });
+      }
+    }
   }
 
   @override
@@ -2978,7 +2967,7 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
                   ],
                 ),
               Text(
-                'Instant Access • ${item.validity}',
+                _hasPurchased ? 'Unlocked • ${item.validity}' : 'Instant Access • ${item.validity}',
                 style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
               ),
             ],
@@ -2999,55 +2988,113 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
           ),
           const SizedBox(width: 10),
 
-          // Purchase Button (near Download Syllabus)
-          if (item.showPurchaseButton) ...[
+          // DYNAMIC CTAs BASED ON EXACT SPECIFICATIONS:
+          // 1. NOT LOGGED IN -> Sign In / Create Account
+          if (SupabaseService.activeUserSession == null) ...[
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                context.go('/login');
+              },
+              icon: const Icon(Icons.login_rounded, size: 16),
+              label: const Text('Sign In / Create Account', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ),
+          ]
+          // 2. LOGGED IN + ALREADY PURCHASED (OR FREE) -> Open Product / Start Learning
+          else if (_hasPurchased || item.isFree) ...[
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF10B981),
                 foregroundColor: Colors.white,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              onPressed: () => widget.onPurchase(item),
-              icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 16, color: Colors.white),
-              label: Text(
-                item.isFree
-                    ? 'Enroll Free'
-                    : (item.purchaseButtonText.trim().isNotEmpty && item.purchaseButtonText.trim() != 'Join'
-                        ? item.purchaseButtonText.trim()
-                        : 'Join - ₹${item.price.toInt()}'),
-                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+              onPressed: () {
+                Navigator.pop(context);
+                widget.onStartTest(item.id, item.title, item.durationMinutes);
+              },
+              icon: const Icon(Icons.play_arrow_rounded, size: 18),
+              label: const Text('Open Product / Start Learning', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+            ),
+          ]
+          // 3. LOGGED IN + NOT PURCHASED -> Add to Cart + Buy Now
+          else ...[
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF4F46E5),
+                side: const BorderSide(color: Color(0xFF4F46E5)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
+              onPressed: () async {
+                final cartItem = CartItem(
+                  id: item.id,
+                  title: item.title,
+                  description: item.description,
+                  price: item.price,
+                  originalPrice: item.originalPrice,
+                  bannerImageUrl: item.bannerImageUrl ?? '',
+                  exam: item.exam,
+                  validity: item.validity,
+                  testCount: item.testCount,
+                );
+                final added = await CartService.instance.addToCart(cartItem);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(added ? '✓ Added "${item.title}" to Cart!' : 'Product already in your cart or library.'),
+                      backgroundColor: added ? const Color(0xFF4F46E5) : const Color(0xFFF59E0B),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.add_shopping_cart_rounded, size: 16),
+              label: const Text('Add to Cart', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(width: 10),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                final cartItem = CartItem(
+                  id: item.id,
+                  title: item.title,
+                  description: item.description,
+                  price: item.price,
+                  originalPrice: item.originalPrice,
+                  bannerImageUrl: item.bannerImageUrl ?? '',
+                  exam: item.exam,
+                  validity: item.validity,
+                  testCount: item.testCount,
+                );
+                EcommerceCheckoutDialog.show(
+                  context,
+                  singleItem: cartItem,
+                  onStartTest: (testId, title, duration) => widget.onStartTest(testId, title, duration),
+                );
+              },
+              icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 16),
+              label: Text(
+                'Buy Now - ₹${item.price.toInt()}',
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
-
-          // Primary Start Test Button
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2563EB),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              widget.onStartTest(item.id, item.title, item.durationMinutes);
-            },
-            icon: Icon(
-              item.attemptStatus == 'In Progress' ? Icons.play_arrow_rounded : Icons.arrow_forward_rounded,
-              size: 16,
-              color: Colors.white,
-            ),
-            label: Text(
-              item.attemptStatus == 'In Progress'
-                  ? 'Resume Test'
-                  : (item.attemptStatus == 'Completed' ? 'Retake Test' : 'Start First Test'),
-              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-          ),
         ],
       ),
     );

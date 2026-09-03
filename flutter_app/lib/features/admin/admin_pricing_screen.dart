@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/models.dart';
+import '../../core/services/supabase_service.dart';
 import '../../shared/utils/smooth_page_route.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_user_management_screen.dart';
@@ -118,70 +120,79 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                         _buildTopMetricsRow(),
                         const SizedBox(height: 24),
 
-                        // Main Content Row: (4 Plan Cards Grid + Right Sidebar Panels)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Left Section: Subscription Plan Cards + Features Matrix
-                            Expanded(
-                              flex: 8,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Subscription Plans Header & Toggle
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text('Subscription Plans', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                          SizedBox(height: 2),
-                                          Text('Create and manage plans with pricing, duration and features.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                                        ],
-                                      ),
-                                      Row(
-                                        children: [
-                                          const Text('Show Inactive Plans', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                                          const SizedBox(width: 8),
-                                          Switch(
-                                            value: _showInactivePlans,
-                                            activeColor: const Color(0xFF4F46E5),
-                                            onChanged: (val) => setState(() => _showInactivePlans = val),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
+                        // Main Content: Dynamic Tabs
+                        if (_activeTab == 'Orders & Transactions')
+                          _buildOrdersTabContent()
+                        else if (_activeTab == 'Coupons & Offers')
+                          _buildCouponsTabContent()
+                        else if (_activeTab == 'Subscribers')
+                          _buildSubscribersTabContent()
+                        else if (_activeTab == 'Settings')
+                          _buildPlanSettingsCard()
+                        else
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Left Section: Subscription Plan Cards + Features Matrix
+                              Expanded(
+                                flex: 8,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Subscription Plans Header & Toggle
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text('Subscription Plans', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                            SizedBox(height: 2),
+                                            Text('Create and manage plans with pricing, duration and features.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                          ],
+                                        ),
+                                        Row(
+                                          children: [
+                                            const Text('Show Inactive Plans', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                            const SizedBox(width: 8),
+                                            Switch(
+                                              value: _showInactivePlans,
+                                              activeColor: const Color(0xFF4F46E5),
+                                              onChanged: (val) => setState(() => _showInactivePlans = val),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
 
-                                  // 4 Plan Cards Grid
-                                  _buildPlanCardsGrid(),
-                                  const SizedBox(height: 28),
+                                    // 4 Plan Cards Grid
+                                    _buildPlanCardsGrid(),
+                                    const SizedBox(height: 28),
 
-                                  // Bottom Section: Plan Features Management Table
-                                  _buildPlanFeaturesTable(),
-                                ],
+                                    // Bottom Section: Plan Features Management Table
+                                    _buildPlanFeaturesTable(),
+                                  ],
+                                ),
                               ),
-                            ),
 
-                            const SizedBox(width: 20),
+                              const SizedBox(width: 20),
 
-                            // Right Section: Plan Settings + Quick Actions + Plan Performance Stack
-                            SizedBox(
-                              width: 300,
-                              child: Column(
-                                children: [
-                                  _buildPlanSettingsCard(),
-                                  const SizedBox(height: 20),
-                                  _buildQuickActionsCard(),
-                                  const SizedBox(height: 20),
-                                  _buildPlanPerformanceCard(),
-                                ],
+                              // Right Section: Plan Settings + Quick Actions + Plan Performance Stack
+                              SizedBox(
+                                width: 300,
+                                child: Column(
+                                  children: [
+                                    _buildPlanSettingsCard(),
+                                    const SizedBox(height: 20),
+                                    _buildQuickActionsCard(),
+                                    const SizedBox(height: 20),
+                                    _buildPlanPerformanceCard(),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
                       ],
                     ),
                   ),
@@ -452,7 +463,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
 
   // ================= 4. SUB-NAVIGATION TABS =================
   Widget _buildSubNavTabs() {
-    final tabs = ['Plans', 'Features', 'Plan Comparisons', 'Subscribers', 'Settings'];
+    final tabs = ['Plans', 'Orders & Transactions', 'Coupons & Offers', 'Subscribers', 'Settings'];
     return Container(
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
@@ -1051,6 +1062,451 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // ===========================================================================
+  // ORDERS & TRANSACTIONS TAB
+  // ===========================================================================
+  String _ordersStatusFilter = 'All';
+
+  Widget _buildOrdersTabContent() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: SupabaseService.fetchAdminOrders(statusFilter: _ordersStatusFilter),
+      builder: (context, snapshot) {
+        final orders = snapshot.data ?? [];
+        final filterOptions = ['All', 'Completed', 'Pending', 'Failed'];
+
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Customer Orders & Payments', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                      const SizedBox(height: 4),
+                      Text('Real-time ledger of student test series purchases and subscription activations.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                  Row(
+                    children: filterOptions.map((opt) {
+                      final isSel = _ordersStatusFilter == opt;
+                      return Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: ChoiceChip(
+                          label: Text(opt),
+                          selected: isSel,
+                          onSelected: (_) => setState(() => _ordersStatusFilter = opt),
+                          selectedColor: const Color(0xFF4F46E5),
+                          labelStyle: TextStyle(color: isSel ? Colors.white : const Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              if (orders.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(36),
+                  alignment: Alignment.center,
+                  child: const Text('No orders matching the selected filter.', style: TextStyle(color: Color(0xFF64748B))),
+                )
+              else
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Table(
+                    border: TableBorder.all(color: const Color(0xFFE2E8F0)),
+                    columnWidths: const {
+                      0: FlexColumnWidth(2.5),
+                      1: FlexColumnWidth(3),
+                      2: FlexColumnWidth(2),
+                      3: FlexColumnWidth(1.8),
+                      4: FlexColumnWidth(1.8),
+                      5: FlexColumnWidth(2.2),
+                    },
+                    children: [
+                      TableRow(
+                        decoration: const BoxDecoration(color: Color(0xFFF8FAFC)),
+                        children: const [
+                          Padding(padding: EdgeInsets.all(12), child: Text('Order ID', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                          Padding(padding: EdgeInsets.all(12), child: Text('Student / Email', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                          Padding(padding: EdgeInsets.all(12), child: Text('Payment Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                          Padding(padding: EdgeInsets.all(12), child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                          Padding(padding: EdgeInsets.all(12), child: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                          Padding(padding: EdgeInsets.all(12), child: Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                        ],
+                      ),
+                      ...orders.map((ord) {
+                        final id = ord['id']?.toString() ?? '';
+                        final shortId = id.length > 14 ? '${id.substring(0, 14)}...' : id;
+                        final name = ord['user_name']?.toString() ?? 'Student';
+                        final email = ord['user_email']?.toString() ?? '';
+                        final method = ord['payment_method']?.toString() ?? 'UPI';
+                        final total = (ord['total_amount'] as num?)?.toDouble() ?? 0.0;
+                        final status = (ord['status']?.toString() ?? 'completed').toLowerCase();
+                        final dateStr = ord['created_at']?.toString() ?? '';
+                        final shortDate = dateStr.length >= 10 ? dateStr.substring(0, 10) : '';
+
+                        return TableRow(
+                          children: [
+                            Padding(padding: const EdgeInsets.all(12), child: Text(shortId, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold))),
+                            Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  Text(email, style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                                ],
+                              ),
+                            ),
+                            Padding(padding: const EdgeInsets.all(12), child: Text(method, style: const TextStyle(fontSize: 12))),
+                            Padding(padding: const EdgeInsets.all(12), child: Text('₹${total.toInt()}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)))),
+                            Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: status == 'completed' ? const Color(0xFFECFDF5) : const Color(0xFFFEF3C7),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  status.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: status == 'completed' ? const Color(0xFF059669) : const Color(0xFFD97706),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Padding(padding: const EdgeInsets.all(12), child: Text(shortDate, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)))),
+                          ],
+                        );
+                      }).toList(),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ===========================================================================
+  // COUPONS & OFFERS TAB
+  // ===========================================================================
+  Widget _buildCouponsTabContent() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: SupabaseService.fetchAdminCoupons(),
+      builder: (context, snapshot) {
+        final coupons = snapshot.data ?? [];
+
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Promotional Coupons & Discounts', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                      const SizedBox(height: 4),
+                      const Text('Create and manage discount codes for NEET & JEE test series packages.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => _openCreateCouponModal(),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    label: const Text('New Coupon', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: coupons.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (ctx, idx) {
+                  final c = coupons[idx];
+                  final code = c['code']?.toString() ?? '';
+                  final isPerc = c['discount_type'] == 'percentage';
+                  final val = (c['discount_value'] as num?)?.toDouble() ?? 0.0;
+                  final minP = (c['min_purchase'] as num?)?.toDouble() ?? 0.0;
+                  final maxD = (c['max_discount'] as num?)?.toDouble() ?? 0.0;
+                  final isActive = c['is_active'] == true;
+
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEEF2FF),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFC7D2FE)),
+                          ),
+                          child: Text(
+                            code,
+                            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w900, color: const Color(0xFF4F46E5), letterSpacing: 1),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isPerc ? '$val% OFF (Max ₹${maxD.toInt()})' : 'Flat ₹${val.toInt()} OFF',
+                                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Min cart purchase: ₹${minP.toInt()} • Applicable to all test series',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Text(isActive ? 'ACTIVE' : 'INACTIVE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isActive ? const Color(0xFF10B981) : const Color(0xFF94A3B8))),
+                            const SizedBox(width: 8),
+                            Switch(
+                              value: isActive,
+                              activeColor: const Color(0xFF10B981),
+                              onChanged: (val) async {
+                                final updated = Map<String, dynamic>.from(c);
+                                updated['is_active'] = val;
+                                await SupabaseService.saveCoupon(updated);
+                                setState(() {});
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _openCreateCouponModal() {
+    final codeCtrl = TextEditingController();
+    final valCtrl = TextEditingController();
+    final minCtrl = TextEditingController();
+    String discountType = 'percentage';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            width: 440,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Create New Promo Coupon', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: codeCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(labelText: 'Coupon Code (e.g. JEE2026)', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: discountType,
+                        decoration: const InputDecoration(labelText: 'Discount Type', border: OutlineInputBorder()),
+                        items: const [
+                          DropdownMenuItem(value: 'percentage', child: Text('Percentage (%)')),
+                          DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount (₹)')),
+                        ],
+                        onChanged: (val) => setDialogState(() => discountType = val ?? 'percentage'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: valCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(labelText: discountType == 'percentage' ? 'Value (%)' : 'Amount (₹)', border: const OutlineInputBorder()),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: minCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Minimum Cart Subtotal (₹)', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
+                      onPressed: () async {
+                        final code = codeCtrl.text.trim().toUpperCase();
+                        final val = double.tryParse(valCtrl.text.trim()) ?? 10.0;
+                        final minP = double.tryParse(minCtrl.text.trim()) ?? 0.0;
+                        if (code.isNotEmpty) {
+                          await SupabaseService.saveCoupon({
+                            'code': code,
+                            'discount_type': discountType,
+                            'discount_value': val,
+                            'min_purchase': minP,
+                            'max_discount': 500.0,
+                            'is_active': true,
+                            'usage_limit': 1000,
+                          });
+                          Navigator.pop(ctx);
+                          setState(() {});
+                        }
+                      },
+                      child: const Text('Save & Publish Coupon'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // SUBSCRIBERS TAB
+  // ===========================================================================
+  Widget _buildSubscribersTabContent() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: SupabaseService.fetchAdminSubscriptions(),
+      builder: (context, snapshot) {
+        final subs = snapshot.data ?? [];
+
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Subscribers Roster', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+              const SizedBox(height: 4),
+              const Text('Active student subscriptions with expiry and auto-renew tracking.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              const SizedBox(height: 20),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: subs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (ctx, idx) {
+                  final s = subs[idx];
+                  final email = s['user_email']?.toString() ?? '';
+                  final plan = s['plan_title']?.toString() ?? 'Plan';
+                  final status = s['status']?.toString() ?? 'active';
+                  final amount = (s['amount'] as num?)?.toDouble() ?? 299.0;
+                  final cycle = s['billing_cycle']?.toString() ?? 'yearly';
+                  final endDate = s['end_date']?.toString() ?? '';
+                  final endStr = endDate.length >= 10 ? endDate.substring(0, 10) : '';
+
+                  return Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: const Color(0xFF4F46E5),
+                          radius: 18,
+                          child: Text(email.isNotEmpty ? email[0].toUpperCase() : 'S', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(plan, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                              const SizedBox(height: 2),
+                              Text('$email • $cycle billing (₹${amount.toInt()})', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(4)),
+                              child: Text(status.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+                            ),
+                            const SizedBox(height: 4),
+                            Text('Expires: $endStr', style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
