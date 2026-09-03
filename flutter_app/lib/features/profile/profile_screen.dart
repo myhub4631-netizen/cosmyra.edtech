@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
@@ -234,6 +235,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   // 7.5. MY PURCHASES & SUBSCRIPTIONS SECTION
                   _buildMyPurchasesSection(),
+
+                  const SizedBox(height: 16),
+
+                  // 7.6. ORDER HISTORY SECTION
+                  _buildOrderHistorySection(),
 
                   const SizedBox(height: 16),
 
@@ -1248,6 +1254,286 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         );
       },
+    );
+  }
+
+  // 7.6 ORDER HISTORY SECTION
+  Widget _buildOrderHistorySection() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: SupabaseService.fetchUserOrders(_currentProfile.id),
+      builder: (context, snapshot) {
+        final orders = snapshot.data ?? [];
+        final hasOrders = orders.isNotEmpty;
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 4))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.receipt_long_rounded, size: 18, color: Color(0xFF334155)),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Order History & Invoices',
+                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                      ),
+                      Text(
+                        hasOrders ? '${orders.length} Past transactions & billing records' : 'All your purchase receipts will appear here',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded, size: 18, color: Color(0xFF64748B)),
+                    tooltip: 'Refresh Orders',
+                    onPressed: () => setState(() {}),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (!hasOrders) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: const Center(
+                    child: Text('No previous purchases or orders found.', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                  ),
+                ),
+              ] else ...[
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: orders.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (ctx, idx) {
+                    final ord = orders[idx];
+                    final orderId = (ord['id'] ?? 'ORD_${idx + 1000}').toString();
+                    final productName = (ord['product_name'] ?? 'Test Series Package').toString();
+                    final amount = (ord['amount'] ?? ord['total_amount'] ?? 0);
+                    final paymentMethod = (ord['payment_method'] ?? 'Online UPI').toString();
+                    final status = (ord['payment_status'] ?? ord['status'] ?? 'completed').toString().toLowerCase();
+                    final created = ord['created_at'] != null ? DateTime.tryParse(ord['created_at'].toString()) : null;
+                    final dateStr = created != null ? DateFormat('dd MMM yyyy, hh:mm a').format(created) : 'Recently';
+
+                    final isPaid = status == 'completed';
+                    final isPending = status == 'pending';
+                    final isIncomplete = status == 'incomplete';
+
+                    Color statusBg = const Color(0xFFDCFCE7);
+                    Color statusColor = const Color(0xFF15803D);
+                    String statusLabel = 'PAID';
+
+                    if (isPending) {
+                      statusBg = const Color(0xFFFEF3C7);
+                      statusColor = const Color(0xFFB45309);
+                      statusLabel = 'PENDING';
+                    } else if (isIncomplete) {
+                      statusBg = const Color(0xFFFFEDD5);
+                      statusColor = const Color(0xFFC2410C);
+                      statusLabel = 'INCOMPLETE';
+                    } else if (status == 'cancelled') {
+                      statusBg = const Color(0xFFFEE2E2);
+                      statusColor = const Color(0xFFB91C1C);
+                      statusLabel = 'CANCELLED';
+                    }
+
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '#$orderId',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF4F46E5), fontFamily: 'monospace'),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(color: statusBg, borderRadius: BorderRadius.circular(6)),
+                                child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            productName,
+                            style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Text('₹$amount', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: Color(0xFF0F172A))),
+                              Text(' • $paymentMethod', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                              const Spacer(),
+                              Text(dateStr, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                            ],
+                          ),
+                          const Divider(height: 18),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () => _showInvoiceDialog(ord),
+                                icon: const Icon(Icons.receipt_outlined, size: 14),
+                                label: const Text('View Invoice', style: TextStyle(fontSize: 11.5)),
+                              ),
+                              const SizedBox(width: 8),
+                              if (isPaid)
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF10B981),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  onPressed: () => context.go('/test-series'),
+                                  icon: const Icon(Icons.check_circle_outline_rounded, size: 14),
+                                  label: const Text('Access Tests', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                )
+                              else if (isPending || isIncomplete)
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFD97706),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  onPressed: () => context.go('/checkout?id=${ord['product_id'] ?? ''}&title=${Uri.encodeComponent(productName)}&price=$amount'),
+                                  icon: const Icon(Icons.payment_rounded, size: 14),
+                                  label: const Text('Complete Payment', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showInvoiceDialog(Map<String, dynamic> order) {
+    final orderId = (order['id'] ?? 'ORD').toString();
+    final productName = (order['product_name'] ?? 'Test Package').toString();
+    final amount = (order['amount'] ?? order['total_amount'] ?? 0);
+    final paymentMethod = (order['payment_method'] ?? 'UPI').toString();
+    final status = (order['payment_status'] ?? order['status'] ?? 'completed').toString().toUpperCase();
+    final created = order['created_at'] != null ? DateTime.tryParse(order['created_at'].toString()) : null;
+    final dateStr = created != null ? DateFormat('dd MMM yyyy, hh:mm a').format(created) : 'Recently';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: 460,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('COSMYRA NEET JEE', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5))),
+                      const Text('Official Tax Invoice & Receipt', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
+                    child: Text(status, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF15803D))),
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              _buildInvoiceRow('Order ID', '#$orderId'),
+              _buildInvoiceRow('Customer', _currentProfile.fullName),
+              _buildInvoiceRow('Email', _currentProfile.email),
+              _buildInvoiceRow('Mobile', _currentProfile.phoneNumber ?? '-'),
+              _buildInvoiceRow('Item Purchased', productName),
+              _buildInvoiceRow('Date & Time', dateStr),
+              _buildInvoiceRow('Payment Mode', paymentMethod),
+              const Divider(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Total Paid Amount:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  Text('₹$amount', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF10B981))),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Done'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInvoiceRow(String label, String val) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          Flexible(child: Text(val, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
+        ],
+      ),
     );
   }
 

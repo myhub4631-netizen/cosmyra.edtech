@@ -98,7 +98,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     );
     String primaryExam = _currentUserProfile.targetExam.toUpperCase().contains('JEE') ? 'JEE' : 'NEET';
     String jeeSubtype = _currentUserProfile.targetExam.toUpperCase().contains('ADV') ? 'JEE Advanced' : 'JEE Main';
-    int targetYear = _currentUserProfile.targetYear > 2024 ? _currentUserProfile.targetYear : 2026;
+    int targetYear = (_currentUserProfile.targetYear >= 2025 && _currentUserProfile.targetYear <= 2028) ? _currentUserProfile.targetYear : 2026;
+    String? phoneErrorText;
 
     showDialog(
       context: context,
@@ -107,7 +108,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         builder: (ctx, setDialogState) => Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           child: Container(
-            width: 480,
+            width: 500,
             padding: const EdgeInsets.all(24),
             child: SingleChildScrollView(
               child: Column(
@@ -122,7 +123,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                           color: const Color(0xFFEEF2FF),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.school_rounded, color: Color(0xFF4F46E5), size: 24),
+                        child: const Icon(Icons.phone_iphone_rounded, color: Color(0xFF4F46E5), size: 24),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -130,11 +131,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Welcome Aspirant! 🎯',
+                              'Enter Your Mobile Number',
                               style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
                             ),
                             Text(
-                              'Tell us your goal to personalize your test series & rankings',
+                              'Provide your verified mobile number and academic goal',
                               style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                             ),
                           ],
@@ -145,19 +146,25 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   const SizedBox(height: 20),
 
                   // 1. Mobile Number
-                  Text('Mobile Number (For WhatsApp Updates & Tests)', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                  Text('Enter Your Mobile Number', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
                   const SizedBox(height: 6),
                   TextField(
                     controller: phoneCtrl,
                     keyboardType: TextInputType.phone,
                     maxLength: 10,
+                    onChanged: (val) {
+                      if (phoneErrorText != null) {
+                        setDialogState(() => phoneErrorText = null);
+                      }
+                    },
                     decoration: InputDecoration(
                       prefixIcon: const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                         child: Text('+91', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF475569))),
                       ),
-                      hintText: '9876543210',
+                      hintText: 'e.g. 9812345678',
                       counterText: '',
+                      errorText: phoneErrorText,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                     ),
@@ -179,16 +186,22 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                               color: primaryExam == 'NEET' ? const Color(0xFFEEF2FF) : Colors.white,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: primaryExam == 'NEET' ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
+                                color: primaryExam == 'NEET' ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
                                 width: primaryExam == 'NEET' ? 2 : 1,
                               ),
                             ),
-                            child: Column(
-                              children: const [
-                                Text('🩺', style: TextStyle(fontSize: 26)),
-                                SizedBox(height: 4),
-                                Text('NEET (UG)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF0F172A))),
-                                Text('Medical Aspirant', style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text('🩺', style: TextStyle(fontSize: 20)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'NEET (Medical)',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryExam == 'NEET' ? const Color(0xFF4F46E5) : const Color(0xFF334155),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -205,16 +218,22 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                               color: primaryExam == 'JEE' ? const Color(0xFFEEF2FF) : Colors.white,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: primaryExam == 'JEE' ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
+                                color: primaryExam == 'JEE' ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
                                 width: primaryExam == 'JEE' ? 2 : 1,
                               ),
                             ),
-                            child: Column(
-                              children: const [
-                                Text('⚡', style: TextStyle(fontSize: 26)),
-                                SizedBox(height: 4),
-                                Text('JEE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF0F172A))),
-                                Text('Engineering Aspirant', style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text('⚡', style: TextStyle(fontSize: 20)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'JEE (Engineering)',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: primaryExam == 'JEE' ? const Color(0xFF4F46E5) : const Color(0xFF334155),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -226,7 +245,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   // 3. Sub-selection for JEE: Main vs Advanced
                   if (primaryExam == 'JEE') ...[
                     const SizedBox(height: 16),
-                    Text('Choose Your JEE Focus Level:', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                    Text('Select JEE Target Track:', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -264,7 +283,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   Text('Target Exam Year:', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
                   const SizedBox(height: 8),
                   Row(
-                    children: [2026, 2027, 2028].map((yr) {
+                    children: [2025, 2026, 2027, 2028].map((yr) {
                       final isSel = targetYear == yr;
                       return Padding(
                         padding: const EdgeInsets.only(right: 8.0),
@@ -294,11 +313,49 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                       onPressed: () async {
-                        final rawPhone = phoneCtrl.text.trim();
-                        if (rawPhone.length < 10) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please enter a valid 10-digit mobile number.'), backgroundColor: Color(0xFFEF4444)),
-                          );
+                        final rawPhone = phoneCtrl.text.replaceAll(RegExp(r'\D'), '').trim();
+
+                        // Strict Indian Mobile Validation
+                        if (rawPhone.length != 10) {
+                          setDialogState(() {
+                            phoneErrorText = 'Mobile number must be exactly 10 digits.';
+                          });
+                          return;
+                        }
+                        if (!RegExp(r'^[6-9]\d{9}$').hasMatch(rawPhone)) {
+                          setDialogState(() {
+                            phoneErrorText = 'Invalid mobile number. Must start with 6, 7, 8, or 9.';
+                          });
+                          return;
+                        }
+
+                        // Blacklist known dummy/test numbers
+                        const dummyList = [
+                          '9988776655', '9876543210', '0123456789', '1234567890',
+                          '9898989898', '9191919191', '9090909090', '9988998899',
+                          '9999999999', '8888888888', '7777777777', '6666666666',
+                          '9876598765', '9123456789', '9000000000', '9800000000',
+                        ];
+                        if (dummyList.contains(rawPhone)) {
+                          setDialogState(() {
+                            phoneErrorText = 'Dummy/fake numbers like $rawPhone are not permitted. Enter a real active number.';
+                          });
+                          return;
+                        }
+
+                        // Reject numbers with fewer than 4 unique digits (e.g. 9988998899)
+                        if (rawPhone.split('').toSet().length < 4) {
+                          setDialogState(() {
+                            phoneErrorText = 'Please enter a genuine 10-digit mobile number.';
+                          });
+                          return;
+                        }
+
+                        // Reject more than 5 consecutive repeating digits
+                        if (RegExp(r'(\d)\1{5,}').hasMatch(rawPhone)) {
+                          setDialogState(() {
+                            phoneErrorText = 'Repetitive sequences like 000000 or 999999 are not allowed.';
+                          });
                           return;
                         }
 
@@ -323,13 +380,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('✓ Profile updated! Set goal to $chosenExam $targetYear'),
+                              content: Text('✓ Profile verified! Set goal to $chosenExam $targetYear'),
                               backgroundColor: const Color(0xFF10B981),
                             ),
                           );
                         }
                       },
-                      child: const Text('Save & Personalize My Dashboard', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                      child: const Text('Save & Continue to Dashboard', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
