@@ -396,6 +396,13 @@ final GoRouter appRouter = GoRouter(
       ),
     ),
     GoRoute(
+      path: '/store',
+      builder: (context, state) => TestSeriesScreen(
+        onBackToDashboard: () => context.go('/dashboard'),
+        onNavigateTab: (idx) {},
+      ),
+    ),
+    GoRoute(
       path: '/products',
       builder: (context, state) => TestSeriesScreen(
         onBackToDashboard: () => context.go('/dashboard'),
