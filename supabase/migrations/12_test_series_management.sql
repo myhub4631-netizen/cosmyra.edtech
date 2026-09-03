@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS public.test_series (
   duration_minutes INT DEFAULT 180,
   conducting_body TEXT DEFAULT 'NTA',
   difficulty TEXT DEFAULT 'Moderate', -- 'Easy', 'Moderate', 'Advanced', 'Mixed'
+  test_type TEXT DEFAULT 'Full', -- 'Full', 'Part', 'Chapter'
   validity TEXT DEFAULT 'Valid until exam',
   syllabus_url TEXT DEFAULT '',
   attempt_status TEXT DEFAULT 'Not Attempted', -- 'Not Attempted', 'In Progress', 'Completed'

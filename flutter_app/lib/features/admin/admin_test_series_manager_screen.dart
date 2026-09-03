@@ -473,6 +473,7 @@ class _AdminTestSeriesManagerScreenState extends State<AdminTestSeriesManagerScr
     final int testCount = (item['test_count'] is num) ? (item['test_count'] as num).toInt() : 10;
     final int questionCount = (item['question_count'] is num) ? (item['question_count'] as num).toInt() : 200;
     final int durationMins = (item['duration_minutes'] is num) ? (item['duration_minutes'] as num).toInt() : 180;
+    final String testType = item['test_type'] ?? item['testType'] ?? 'Full';
     final String difficulty = item['difficulty'] ?? 'Moderate';
     final String validity = item['validity'] ?? 'Valid until exam';
     final String attemptStatus = item['attempt_status'] ?? 'Not Attempted';
@@ -498,10 +499,9 @@ class _AdminTestSeriesManagerScreenState extends State<AdminTestSeriesManagerScr
           Stack(
             children: [
               ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: SizedBox(
-                  height: 120,
-                  width: double.infinity,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                child: AspectRatio(
+                  aspectRatio: 16 / 6,
                   child: bannerUrl.isNotEmpty
                       ? Image.network(
                           bannerUrl,
@@ -523,42 +523,44 @@ class _AdminTestSeriesManagerScreenState extends State<AdminTestSeriesManagerScr
                         ),
                 ),
               ),
+              // Exam & Year Tag
+              Positioned(
+                top: 10,
+                left: 10,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A).withOpacity(0.85),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '$exam $year',
+                    style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
               // Status Badge
               Positioned(
                 top: 10,
                 right: 10,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                   decoration: BoxDecoration(
-                    color: status == 'Published' ? const Color(0xFF10B981) : const Color(0xFF64748B),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    status,
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-              // Exam & Year Badge
-              Positioned(
-                top: 10,
-                left: 10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
+                    color: status == 'Published'
+                        ? const Color(0xFF10B981)
+                        : (status == 'Archived' ? const Color(0xFF94A3B8) : const Color(0xFFF59E0B)),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    '$exam $year',
-                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    status,
+                    style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
             ],
           ),
 
-          // 2. Content Details
+          // 2. Card Body Content
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(14),
@@ -588,7 +590,8 @@ class _AdminTestSeriesManagerScreenState extends State<AdminTestSeriesManagerScr
                     runSpacing: 4,
                     children: [
                       _buildMiniPill(Icons.category_outlined, category),
-                      _buildMiniPill(Icons.description_outlined, '$testCount Tests'),
+                      _buildMiniPill(Icons.description_outlined, '$testCount Estimated Tests'),
+                      _buildMiniPill(Icons.layers_outlined, 'Type: $testType'),
                       _buildMiniPill(Icons.quiz_outlined, '$questionCount Qs'),
                       _buildMiniPill(Icons.access_time_rounded, durationFormatted),
                       _buildMiniPill(Icons.bar_chart_rounded, difficulty),
@@ -755,6 +758,7 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> {
   late String _exam;
   late String _year;
   late String _category;
+  late String _testType;
   late String _difficulty;
   late String _attemptStatus;
   late String _status;
@@ -788,6 +792,10 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> {
     _exam = d['exam'] ?? 'NEET';
     _year = d['year']?.toString() ?? '2027';
     _category = d['category'] ?? 'Full Syllabus';
+    _testType = (d['test_type'] ?? d['testType'] ?? 'Full').toString();
+    if (!['Full', 'Part', 'Chapter'].contains(_testType)) {
+      _testType = 'Full';
+    }
     _difficulty = d['difficulty'] ?? 'Moderate';
     if (!['Easy', 'Moderate', 'Advanced', 'Mixed', 'Medium', 'High'].contains(_difficulty)) {
       _difficulty = 'Moderate';
@@ -846,6 +854,7 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> {
       'question_count': int.tryParse(_questionCountCtrl.text) ?? 200,
       'duration_minutes': int.tryParse(_durationCtrl.text) ?? 180,
       'difficulty': _difficulty,
+      'test_type': _testType,
       'validity': _validityCtrl.text.trim().isNotEmpty ? _validityCtrl.text.trim() : 'Valid until exam',
       'syllabus_url': _syllabusCtrl.text.trim(),
       'attempt_status': _attemptStatus,
@@ -1127,15 +1136,23 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> {
                             child: TextFormField(
                               controller: _testCountCtrl,
                               keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(labelText: 'Total Tests Count'),
+                              decoration: const InputDecoration(
+                                labelText: 'Total Estimated Tests *',
+                                hintText: 'e.g. 25',
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: TextFormField(
-                              controller: _questionCountCtrl,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(labelText: 'Questions per Test'),
+                            child: DropdownButtonFormField<String>(
+                              value: ['Full', 'Part', 'Chapter'].contains(_testType) ? _testType : 'Full',
+                              decoration: const InputDecoration(labelText: 'Test Type (Full / Part / Chapter) *'),
+                              items: const [
+                                DropdownMenuItem(value: 'Full', child: Text('Full Syllabus')),
+                                DropdownMenuItem(value: 'Part', child: Text('Part Syllabus')),
+                                DropdownMenuItem(value: 'Chapter', child: Text('Chapter Wise')),
+                              ],
+                              onChanged: (v) => setState(() => _testType = v!),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -1146,7 +1163,11 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> {
                               decoration: const InputDecoration(labelText: 'Duration (Minutes)'),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               value: ['Easy', 'Moderate', 'Advanced', 'Mixed'].contains(_difficulty) ? _difficulty : 'Moderate',
@@ -1157,11 +1178,7 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> {
                               onChanged: (v) => setState(() => _difficulty = v!),
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
+                          const SizedBox(width: 12),
                           Expanded(
                             flex: 2,
                             child: TextFormField(

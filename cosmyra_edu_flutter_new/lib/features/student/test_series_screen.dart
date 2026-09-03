@@ -48,6 +48,7 @@ class TestSeriesCardData {
   final int testCount;
   final int durationMinutes;
   final String difficulty; // 'Easy', 'Moderate', 'Advanced', 'Mixed'
+  final String testType; // 'Full', 'Part', 'Chapter'
   final String validity; // 'Valid until exam'
   final String attemptStatus; // 'Not Attempted', 'In Progress', 'Completed'
   final String status;
@@ -73,6 +74,7 @@ class TestSeriesCardData {
     required this.testCount,
     required this.durationMinutes,
     this.difficulty = 'Moderate',
+    this.testType = 'Full',
     this.validity = 'Valid until exam',
     this.attemptStatus = 'Not Attempted',
     required this.status,
@@ -202,6 +204,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         final duration = (cs['duration_minutes'] is num) ? (cs['duration_minutes'] as num).toInt() : 180;
         final testCount = (cs['test_count'] is num) ? (cs['test_count'] as num).toInt() : 10;
         final difficulty = (cs['difficulty'] ?? 'Moderate').toString();
+        final testType = (cs['test_type'] ?? cs['testType'] ?? 'Full').toString();
         final validity = (cs['validity'] ?? 'Valid until exam').toString();
         final attemptStatus = (cs['attempt_status'] ?? cs['attemptStatus'] ?? 'Not Attempted').toString();
         final syllabusUrl = (cs['syllabus_url'] ?? cs['syllabusUrl'] ?? '').toString();
@@ -225,6 +228,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             testCount: testCount,
             durationMinutes: duration,
             difficulty: difficulty,
+            testType: testType,
             validity: validity,
             attemptStatus: attemptStatus,
             syllabusUrl: syllabusUrl,
@@ -264,6 +268,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         final qCount = (p['saved_questions_count'] is num) ? (p['saved_questions_count'] as num).toInt() : (p['question_count'] ?? 200);
         final duration = (p['duration_minutes'] is num) ? (p['duration_minutes'] as num).toInt() : (p['duration'] ?? 180);
         final difficulty = (p['difficulty'] ?? 'Moderate').toString();
+        final testType = (p['test_type'] ?? (p['category'] != null && p['category'].toString().contains('Part') ? 'Part' : (p['category'] != null && p['category'].toString().contains('Chapter') ? 'Chapter' : 'Full'))).toString();
         final validity = (p['validity'] ?? 'Valid until exam').toString();
         final attemptStatus = (p['attempt_status'] ?? 'Not Attempted').toString();
         final syllabusUrl = (p['syllabus_url'] ?? '').toString();
@@ -286,6 +291,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             testCount: 1,
             durationMinutes: duration,
             difficulty: difficulty,
+            testType: testType,
             validity: validity,
             attemptStatus: attemptStatus,
             syllabusUrl: syllabusUrl,
@@ -316,10 +322,9 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
 
     for (var s in seriesList) {
       allCount += s.testCount;
-      final t = (s.title + ' ' + s.description).toLowerCase();
-      if (t.contains('chapter')) {
+      if (s.testType == 'Chapter' || s.title.toLowerCase().contains('chapter')) {
         chapterCount += s.testCount;
-      } else if (t.contains('topic')) {
+      } else if (s.testType == 'Part' || s.title.toLowerCase().contains('part') || s.title.toLowerCase().contains('topic')) {
         topicCount += s.testCount;
       } else {
         fullCount += s.testCount;
@@ -475,6 +480,134 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         const Spacer(),
         Text(value, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF0F172A), fontWeight: FontWeight.w700)),
       ],
+    );
+  }
+
+  void _handlePurchaseOrEnroll(TestSeriesCardData item) async {
+    if (item.purchaseLink.trim().isNotEmpty &&
+        (item.purchaseLink.startsWith('http://') || item.purchaseLink.startsWith('https://'))) {
+      final uri = Uri.tryParse(item.purchaseLink.trim());
+      if (uri != null) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    }
+
+    // Otherwise show rich enrollment & checkout dialog
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Enroll in Test Series',
+                style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              item.title,
+              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B)),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              item.description,
+              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Test Type', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                      Text('${item.testType} Syllabus', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Estimated Tests', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                      Text('${item.testCount} Tests', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Duration', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                      Text(item.durationFormatted, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Validity', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                      Text(item.validity, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const Divider(height: 16, color: Color(0xFFE2E8F0)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Total Amount', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                      Text(
+                        item.isFree ? 'FREE' : '₹${item.price.toInt()}',
+                        style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF10B981)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _startTestSeries(item.id, item.title, item.durationMinutes);
+            },
+            icon: const Icon(Icons.lock_open_rounded, size: 16, color: Colors.white),
+            label: Text(item.isFree ? 'Start Free Test' : 'Confirm & Access Tests', style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1270,129 +1403,138 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
 
                   const SizedBox(height: 14),
 
-                  // Metadata Pills: 5. Number of Tests, 6. Duration, 7. Difficulty, 8. Price, 9. Validity
+                  // Metadata Pills: 5. Estimated Tests, 6. Type, 7. Duration, 8. Difficulty, 9. Price, 10. Validity
                   Wrap(
                     spacing: 8,
                     runSpacing: 6,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      _buildMetaPill(Icons.description_outlined, '${item.testCount} Tests'),
-                      _buildMetaPill(Icons.access_time_rounded, item.durationFormatted),
-                      _buildMetaPill(Icons.bar_chart_rounded, item.difficulty),
-                      _buildMetaPill(Icons.event_available_rounded, item.validity),
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _buildMetaPill(Icons.description_outlined, '${item.testCount} Estimated Tests'),
+                        _buildMetaPill(Icons.layers_outlined, 'Type: ${item.testType}'),
+                        _buildMetaPill(Icons.access_time_rounded, item.durationFormatted),
+                        _buildMetaPill(Icons.bar_chart_rounded, item.difficulty),
+                        _buildMetaPill(Icons.event_available_rounded, item.validity),
 
-                      // 8. Price Pill
-                      if (item.isFree)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                          decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
-                          child: const Text('FREE', style: TextStyle(color: Color(0xFF16A34A), fontSize: 11, fontWeight: FontWeight.w800)),
-                        )
-                      else ...[
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '₹${item.price.toInt()}',
-                              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '₹${item.originalPrice.toInt()}',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                decoration: TextDecoration.lineThrough,
-                                color: const Color(0xFF94A3B8),
+                        // 8. Price Pill
+                        if (item.isFree)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
+                            child: const Text('FREE', style: TextStyle(color: Color(0xFF16A34A), fontSize: 11, fontWeight: FontWeight.w800)),
+                          )
+                        else ...[
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '₹${item.price.toInt()}',
+                                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                              decoration: BoxDecoration(color: const Color(0xFFFEE2E8), borderRadius: BorderRadius.circular(4)),
-                              child: Text(
-                                '${(((item.originalPrice - item.price) / item.originalPrice) * 100).toInt()}% OFF',
-                                style: const TextStyle(color: Color(0xFFDC2626), fontSize: 9.5, fontWeight: FontWeight.bold),
+                              const SizedBox(width: 4),
+                              Text(
+                                '₹${item.originalPrice.toInt()}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  decoration: TextDecoration.lineThrough,
+                                  color: const Color(0xFF94A3B8),
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-
-                  const SizedBox(height: 14),
-                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                  const SizedBox(height: 12),
-
-                  // Action Buttons Row: 11. CTA (Join / Start) & 12. Download Syllabus
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // 12. Download Syllabus CTA Button
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF334155),
-                          side: const BorderSide(color: Color(0xFFCBD5E1)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onPressed: () => _handleDownloadSyllabus(item),
-                        icon: const Icon(Icons.file_download_outlined, size: 16, color: Color(0xFF2563EB)),
-                        label: Text(
-                          'Download Syllabus',
-                          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
-                        ),
-                      ),
-
-                      // 11. CTA Button: Join / Start Test / Resume Test
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (item.showPurchaseButton && item.purchaseLink.isNotEmpty && !item.isFree) ...[
-                            ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF10B981),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(color: const Color(0xFFFEE2E8), borderRadius: BorderRadius.circular(4)),
+                                child: Text(
+                                  '${(((item.originalPrice - item.price) / item.originalPrice) * 100).toInt()}% OFF',
+                                  style: const TextStyle(color: Color(0xFFDC2626), fontSize: 9.5, fontWeight: FontWeight.bold),
+                                ),
                               ),
-                              onPressed: () async {
-                                final uri = Uri.tryParse(item.purchaseLink);
-                                if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
-                              },
-                              child: Text(
-                                item.purchaseButtonText.isNotEmpty ? item.purchaseButtonText : 'Join',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2563EB),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            onPressed: () => _startTestSeries(item.id, item.title, item.durationMinutes),
-                            icon: Icon(
-                              item.attemptStatus == 'In Progress' ? Icons.play_arrow_rounded : Icons.arrow_forward_rounded,
-                              size: 16,
-                              color: Colors.white,
-                            ),
-                            label: Text(
-                              item.attemptStatus == 'In Progress'
-                                  ? 'Resume Test'
-                                  : (item.attemptStatus == 'Completed' ? 'Retake Test' : (item.isFree ? 'Join Free' : 'Start Test')),
-                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
+                            ],
                           ),
                         ],
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                    const SizedBox(height: 12),
+
+                    // Action Buttons Row: Download Syllabus & Purchase Button together, Start Test on Right
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 10,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      alignment: WrapAlignment.spaceBetween,
+                      children: [
+                        // Left Action Cluster: Download Syllabus + Purchase Button NEAR Download Syllabus!
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            // 12. Download Syllabus CTA Button
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF334155),
+                                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () => _handleDownloadSyllabus(item),
+                              icon: const Icon(Icons.file_download_outlined, size: 16, color: Color(0xFF2563EB)),
+                              label: Text(
+                                'Download Syllabus',
+                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+                              ),
+                            ),
+
+                            // Purchase Button NEAR Download Syllabus!
+                            if (item.showPurchaseButton)
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF10B981),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () => _handlePurchaseOrEnroll(item),
+                                icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 16, color: Colors.white),
+                                label: Text(
+                                  item.isFree
+                                      ? 'Enroll Free'
+                                      : (item.purchaseButtonText.trim().isNotEmpty && item.purchaseButtonText.trim() != 'Join'
+                                          ? item.purchaseButtonText.trim()
+                                          : 'Join - ₹${item.price.toInt()}'),
+                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                          ],
+                        ),
+
+                        // Right Action Cluster: Start Test / Resume Test
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () => _startTestSeries(item.id, item.title, item.durationMinutes),
+                          icon: Icon(
+                            item.attemptStatus == 'In Progress' ? Icons.play_arrow_rounded : Icons.arrow_forward_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                          label: Text(
+                            item.attemptStatus == 'In Progress'
+                                ? 'Resume Test'
+                                : (item.attemptStatus == 'Completed' ? 'Retake Test' : 'Start Test'),
+                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),
