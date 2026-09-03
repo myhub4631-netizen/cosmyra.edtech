@@ -335,129 +335,164 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 2. PROFILE CARD
   Widget _buildProfileCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 4))],
-      ),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 460;
+        return Container(
+          padding: EdgeInsets.all(isMobile ? 16 : 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 4))],
+          ),
+          child: Column(
             children: [
-              // Avatar with camera button overlay
-              Stack(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  _buildAvatarWidget(76),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: InkWell(
-                      onTap: () => _showAvatarPickerModal(context),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4F46E5),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                          boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 4, offset: const Offset(0, 2)),
+                  // Avatar with camera button overlay
+                  Stack(
+                    children: [
+                      _buildAvatarWidget(isMobile ? 68 : 76),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: InkWell(
+                          onTap: () => _showAvatarPickerModal(context),
+                          child: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4F46E5),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: [
+                                BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 4, offset: const Offset(0, 2)),
+                              ],
+                            ),
+                            child: const Icon(Icons.camera_alt_rounded, size: 13, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 14),
+                  // Student identity info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _currentProfile.fullName,
+                                style: TextStyle(
+                                  fontSize: isMobile ? 17 : 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.verified_rounded, size: 17, color: Color(0xFF3B82F6)),
                           ],
                         ),
-                        child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                        const SizedBox(height: 3),
+                        Text(
+                          '$_selectedExamDisplay ${_currentProfile.targetYear} Aspirant 🎯',
+                          style: TextStyle(
+                            fontSize: isMobile ? 12 : 13,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on_outlined, size: 13, color: Color(0xFF94A3B8)),
+                            const SizedBox(width: 2),
+                            Flexible(
+                              child: Text(
+                                '${_currentProfile.city}, ${_currentProfile.state}',
+                                style: TextStyle(fontSize: isMobile ? 11 : 12, color: const Color(0xFF94A3B8)),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!isMobile) ...[
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      onPressed: () => _showEditProfileBottomSheet(context),
+                      icon: const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF4F46E5)),
+                      label: const Text('Edit Profile', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFC7D2FE)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
+                    ),
+                  ],
+                ],
+              ),
+
+              if (isMobile) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 36,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showEditProfileBottomSheet(context),
+                    icon: const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF4F46E5)),
+                    label: const Text('Edit Profile & Goals', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFC7D2FE)),
+                      backgroundColor: const Color(0xFFF8FAFC),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 14),
+
+              // Profile completion progress bar
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: const [
+                      Text('Profile 85% complete', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                      Text('85%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF4F46E5))),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: 0.85,
+                      minHeight: 8,
+                      backgroundColor: const Color(0xFFEEF2FF),
+                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4F46E5)),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 16),
-              // Student identity info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            _currentProfile.fullName,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.verified_rounded, size: 18, color: Color(0xFF3B82F6)),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text(
-                          '$_selectedExamDisplay ${_currentProfile.targetYear} Aspirant',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
-                        ),
-                        const SizedBox(width: 4),
-                        const Text('🎯', style: TextStyle(fontSize: 12)),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF94A3B8)),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${_currentProfile.city}, ${_currentProfile.state}',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              // Edit Profile Button
-              OutlinedButton.icon(
-                onPressed: () => _showEditProfileBottomSheet(context),
-                icon: const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF4F46E5)),
-                label: const Text('Edit Profile', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFC7D2FE)),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
             ],
           ),
-
-          const SizedBox(height: 16),
-
-          // Profile completion progress bar
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('Profile 85% complete', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
-                  Text('85%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF4F46E5))),
-                ],
-              ),
-              const SizedBox(height: 6),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: 0.85,
-                  minHeight: 8,
-                  backgroundColor: const Color(0xFFEEF2FF),
-                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4F46E5)),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -493,7 +528,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                 decoration: BoxDecoration(
                   color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
@@ -503,15 +538,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(exam['icon'], size: 16, color: isSelected ? Colors.white : const Color(0xFF64748B)),
-                    const SizedBox(width: 6),
-                    Text(
-                      exam['label'],
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        color: isSelected ? Colors.white : const Color(0xFF64748B),
+                    Icon(exam['icon'], size: 14, color: isSelected ? Colors.white : const Color(0xFF64748B)),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        exam['label'],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                          color: isSelected ? Colors.white : const Color(0xFF64748B),
+                        ),
                       ),
                     ),
                   ],
@@ -1180,69 +1220,91 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     final validDateStr = validUntil.length >= 10 ? validUntil.substring(0, 10) : 'Active';
 
                     return Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFECFDF5),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        title,
-                                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(4)),
-                                      child: const Text('ACTIVE', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
-                                    ),
-                                  ],
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFECFDF5),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
-                                const SizedBox(height: 4),
-                                Row(
+                                child: const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 20),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF64748B)),
-                                    const SizedBox(width: 4),
                                     Text(
-                                      'Valid until $validDateStr • Full CBT Access',
-                                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                      title,
+                                      style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A), height: 1.3),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(4)),
+                                          child: const Text('ACTIVE', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF64748B)),
+                                        const SizedBox(width: 3),
+                                        Flexible(
+                                          child: Text(
+                                            'Valid until $validDateStr',
+                                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2563EB),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            onPressed: () => context.go('/test-series'),
-                            icon: const Icon(Icons.play_arrow_rounded, size: 14),
-                            label: const Text('Continue', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.check_circle_outline, size: 12, color: Color(0xFF6366F1)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Full CBT Access',
+                                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF4F46E5)),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(
+                                height: 32,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2563EB),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  onPressed: () => context.go('/test-series'),
+                                  icon: const Icon(Icons.play_arrow_rounded, size: 14),
+                                  label: const Text('Continue', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -1373,10 +1435,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                '#$orderId',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF4F46E5), fontFamily: 'monospace'),
+                              Expanded(
+                                child: Text(
+                                  '#$orderId',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Color(0xFF4F46E5), fontFamily: 'monospace'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
+                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(color: statusBg, borderRadius: BorderRadius.circular(6)),
@@ -1393,8 +1460,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Row(
                             children: [
                               Text('₹$amount', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: Color(0xFF0F172A))),
-                              Text(' • $paymentMethod', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                              const Spacer(),
+                              Flexible(
+                                child: Text(' • $paymentMethod', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                              ),
+                              const SizedBox(width: 6),
                               Text(dateStr, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                             ],
                           ),
@@ -1404,7 +1473,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             children: [
                               OutlinedButton.icon(
                                 style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 ),
                                 onPressed: () => _showInvoiceDialog(ord),
@@ -1418,11 +1487,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     backgroundColor: const Color(0xFF10B981),
                                     foregroundColor: Colors.white,
                                     elevation: 0,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                   ),
                                   onPressed: () => context.go('/test-series'),
-                                  icon: const Icon(Icons.check_circle_outline_rounded, size: 14),
+                                  icon: const Icon(Icons.check_circle_outline, size: 14),
                                   label: const Text('Access Tests', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                                 )
                               else if (isPending || isIncomplete)
@@ -1431,7 +1500,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     backgroundColor: const Color(0xFFD97706),
                                     foregroundColor: Colors.white,
                                     elevation: 0,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                   ),
                                   onPressed: () => context.go('/checkout?id=${ord['product_id'] ?? ''}&title=${Uri.encodeComponent(productName)}&price=$amount'),
