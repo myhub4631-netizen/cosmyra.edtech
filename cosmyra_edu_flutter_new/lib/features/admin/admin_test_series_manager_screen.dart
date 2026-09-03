@@ -448,7 +448,7 @@ class _AdminTestSeriesManagerScreenState extends State<AdminTestSeriesManagerScr
             crossAxisCount: crossAxisCount,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            mainAxisExtent: 420,
+            mainAxisExtent: 470,
           ),
           itemBuilder: (ctx, i) => _buildTestSeriesCard(filtered[i]),
         );
@@ -461,17 +461,26 @@ class _AdminTestSeriesManagerScreenState extends State<AdminTestSeriesManagerScr
     final String title = item['title'] ?? item['name'] ?? 'Test Series';
     final String desc = item['description'] ?? 'Curated test series for comprehensive exam readiness.';
     final String exam = item['exam'] ?? 'NEET';
-    final String year = item['year']?.toString() ?? '2026';
+    final String year = item['year']?.toString() ?? '2027';
     final String category = item['category'] ?? 'Full Syllabus';
     final String bannerUrl = item['banner_image_url'] ?? '';
     final bool isFree = item['is_free'] == true;
     final double price = (item['price'] is num) ? (item['price'] as num).toDouble() : 299.0;
     final double origPrice = (item['original_price'] is num) ? (item['original_price'] as num).toDouble() : 999.0;
     final String purchaseLink = item['purchase_link'] ?? '';
-    final String buttonText = item['purchase_button_text'] ?? 'Enroll Now';
+    final String buttonText = item['purchase_button_text'] ?? 'Join';
     final String status = item['status'] ?? 'Published';
-    final int testCount = (item['test_count'] is num) ? (item['test_count'] as num).toInt() : 1;
+    final int testCount = (item['test_count'] is num) ? (item['test_count'] as num).toInt() : 10;
     final int questionCount = (item['question_count'] is num) ? (item['question_count'] as num).toInt() : 200;
+    final int durationMins = (item['duration_minutes'] is num) ? (item['duration_minutes'] as num).toInt() : 180;
+    final String difficulty = item['difficulty'] ?? 'Moderate';
+    final String validity = item['validity'] ?? 'Valid until exam';
+    final String attemptStatus = item['attempt_status'] ?? 'Not Attempted';
+    final String syllabusUrl = item['syllabus_url'] ?? '';
+
+    final String durationFormatted = (durationMins >= 60 && durationMins % 60 == 0)
+        ? '${durationMins ~/ 60} Hours'
+        : '$durationMins min';
 
     return Container(
       decoration: BoxDecoration(
@@ -581,6 +590,12 @@ class _AdminTestSeriesManagerScreenState extends State<AdminTestSeriesManagerScr
                       _buildMiniPill(Icons.category_outlined, category),
                       _buildMiniPill(Icons.description_outlined, '$testCount Tests'),
                       _buildMiniPill(Icons.quiz_outlined, '$questionCount Qs'),
+                      _buildMiniPill(Icons.access_time_rounded, durationFormatted),
+                      _buildMiniPill(Icons.bar_chart_rounded, difficulty),
+                      _buildMiniPill(Icons.event_available_rounded, validity),
+                      _buildMiniPill(Icons.pending_actions_rounded, attemptStatus),
+                      if (syllabusUrl.isNotEmpty)
+                        _buildMiniPill(Icons.download_rounded, 'Syllabus Attached'),
                     ],
                   ),
                   const Spacer(),
@@ -734,11 +749,14 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> {
   late TextEditingController _testCountCtrl;
   late TextEditingController _questionCountCtrl;
   late TextEditingController _durationCtrl;
+  late TextEditingController _validityCtrl;
+  late TextEditingController _syllabusCtrl;
 
   late String _exam;
   late String _year;
   late String _category;
   late String _difficulty;
+  late String _attemptStatus;
   late String _status;
   late bool _isFree;
   late bool _showPurchaseButton;
@@ -760,15 +778,24 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> {
     _priceCtrl = TextEditingController(text: (d['price'] ?? 299).toString());
     _origPriceCtrl = TextEditingController(text: (d['original_price'] ?? 999).toString());
     _linkCtrl = TextEditingController(text: d['purchase_link'] ?? 'https://neet-jee.in/test-series');
-    _buttonTextCtrl = TextEditingController(text: d['purchase_button_text'] ?? 'Enroll Now');
-    _testCountCtrl = TextEditingController(text: (d['test_count'] ?? 1).toString());
+    _buttonTextCtrl = TextEditingController(text: d['purchase_button_text'] ?? 'Join');
+    _testCountCtrl = TextEditingController(text: (d['test_count'] ?? 10).toString());
     _questionCountCtrl = TextEditingController(text: (d['question_count'] ?? 200).toString());
     _durationCtrl = TextEditingController(text: (d['duration_minutes'] ?? 180).toString());
+    _validityCtrl = TextEditingController(text: d['validity'] ?? 'Valid until exam');
+    _syllabusCtrl = TextEditingController(text: d['syllabus_url'] ?? d['syllabusUrl'] ?? '');
 
     _exam = d['exam'] ?? 'NEET';
-    _year = d['year']?.toString() ?? '2026';
+    _year = d['year']?.toString() ?? '2027';
     _category = d['category'] ?? 'Full Syllabus';
-    _difficulty = d['difficulty'] ?? 'High';
+    _difficulty = d['difficulty'] ?? 'Moderate';
+    if (!['Easy', 'Moderate', 'Advanced', 'Mixed', 'Medium', 'High'].contains(_difficulty)) {
+      _difficulty = 'Moderate';
+    }
+    _attemptStatus = d['attempt_status'] ?? d['attemptStatus'] ?? 'Not Attempted';
+    if (!['Not Attempted', 'In Progress', 'Completed'].contains(_attemptStatus)) {
+      _attemptStatus = 'Not Attempted';
+    }
     _status = d['status'] ?? 'Published';
     _isFree = d['is_free'] == true;
     _showPurchaseButton = d['show_purchase_button'] != false;
@@ -786,6 +813,8 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> {
     _testCountCtrl.dispose();
     _questionCountCtrl.dispose();
     _durationCtrl.dispose();
+    _validityCtrl.dispose();
+    _syllabusCtrl.dispose();
     super.dispose();
   }
 
@@ -811,17 +840,20 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> {
       'price': double.tryParse(_priceCtrl.text) ?? 299.0,
       'original_price': double.tryParse(_origPriceCtrl.text) ?? 999.0,
       'purchase_link': _linkCtrl.text.trim(),
-      'purchase_button_text': _buttonTextCtrl.text.trim(),
+      'purchase_button_text': _buttonTextCtrl.text.trim().isNotEmpty ? _buttonTextCtrl.text.trim() : 'Join',
       'show_purchase_button': _showPurchaseButton,
       'test_count': int.tryParse(_testCountCtrl.text) ?? 1,
       'question_count': int.tryParse(_questionCountCtrl.text) ?? 200,
       'duration_minutes': int.tryParse(_durationCtrl.text) ?? 180,
       'difficulty': _difficulty,
+      'validity': _validityCtrl.text.trim().isNotEmpty ? _validityCtrl.text.trim() : 'Valid until exam',
+      'syllabus_url': _syllabusCtrl.text.trim(),
+      'attempt_status': _attemptStatus,
       'status': _status,
       'updated_at': DateTime.now().toIso8601String(),
     };
 
-    final res = await SupabaseService.saveTestSeries(data);
+    await SupabaseService.saveTestSeries(data);
     setState(() => _isSaving = false);
 
     if (mounted) {
@@ -1117,12 +1149,50 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _difficulty,
-                              decoration: const InputDecoration(labelText: 'Difficulty'),
-                              items: ['Easy', 'Medium', 'High', 'Advanced']
+                              value: ['Easy', 'Moderate', 'Advanced', 'Mixed'].contains(_difficulty) ? _difficulty : 'Moderate',
+                              decoration: const InputDecoration(labelText: 'Difficulty *'),
+                              items: ['Easy', 'Moderate', 'Advanced', 'Mixed']
                                   .map((d) => DropdownMenuItem(value: d, child: Text(d)))
                                   .toList(),
                               onChanged: (v) => setState(() => _difficulty = v!),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: TextFormField(
+                              controller: _validityCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'Validity *',
+                                hintText: 'e.g. Valid until exam, 1 Year Access',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: TextFormField(
+                              controller: _syllabusCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'Download Syllabus URL (PDF / Web link)',
+                                hintText: 'https://neet-jee.in/syllabus.pdf',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: DropdownButtonFormField<String>(
+                              value: _attemptStatus,
+                              decoration: const InputDecoration(labelText: 'Attempt Status *'),
+                              items: ['Not Attempted', 'In Progress', 'Completed']
+                                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                                  .toList(),
+                              onChanged: (v) => setState(() => _attemptStatus = v!),
                             ),
                           ),
                         ],

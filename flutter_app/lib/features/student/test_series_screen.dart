@@ -41,12 +41,16 @@ class TestSeriesCategoryItem {
 class TestSeriesCardData {
   final String id;
   final String title;
+  final String exam; // 'NEET', 'JEE Main', 'JEE Advanced'
+  final String targetYear; // '2027', '2026'
   final String subtitle;
   final String description;
   final int testCount;
   final int durationMinutes;
-  final String difficulty;
-  final String status; // 'In Progress', 'Not Started', 'Completed'
+  final String difficulty; // 'Easy', 'Moderate', 'Advanced', 'Mixed'
+  final String validity; // 'Valid until exam'
+  final String attemptStatus; // 'Not Attempted', 'In Progress', 'Completed'
+  final String status;
   final String nextTestName;
   final Color iconBgColor;
   final IconData icon;
@@ -57,15 +61,20 @@ class TestSeriesCardData {
   final String purchaseLink;
   final String purchaseButtonText;
   final bool showPurchaseButton;
+  final String syllabusUrl;
 
   TestSeriesCardData({
     required this.id,
     required this.title,
+    this.exam = 'NEET',
+    this.targetYear = '2027',
     required this.subtitle,
     this.description = '',
     required this.testCount,
     required this.durationMinutes,
-    required this.difficulty,
+    this.difficulty = 'Moderate',
+    this.validity = 'Valid until exam',
+    this.attemptStatus = 'Not Attempted',
     required this.status,
     required this.nextTestName,
     required this.iconBgColor,
@@ -75,9 +84,28 @@ class TestSeriesCardData {
     this.price = 299.0,
     this.originalPrice = 999.0,
     this.purchaseLink = '',
-    this.purchaseButtonText = 'Enroll Now',
+    this.purchaseButtonText = 'Join',
     this.showPurchaseButton = true,
+    this.syllabusUrl = '',
   });
+
+  String get durationFormatted {
+    if (durationMinutes <= 0) return '3 Hours';
+    if (durationMinutes >= 60 && durationMinutes % 60 == 0) {
+      final h = durationMinutes ~/ 60;
+      return '$h ${h == 1 ? "Hour" : "Hours"}';
+    }
+    return '$durationMinutes min';
+  }
+
+  String get formattedTargetYear {
+    final cleanExam = exam.contains('JEE') ? (exam.contains('Advanced') ? 'JEE Adv' : 'JEE') : 'NEET';
+    final cleanYear = targetYear.isNotEmpty ? targetYear : '2027';
+    if (cleanYear.toLowerCase().contains('neet') || cleanYear.toLowerCase().contains('jee')) {
+      return cleanYear;
+    }
+    return '$cleanExam $cleanYear';
+  }
 }
 
 class _TestSeriesScreenState extends State<TestSeriesScreen> {
@@ -158,90 +186,302 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
     }
   }
 
-  final List<TestSeriesCategoryItem> _categories = [
-    TestSeriesCategoryItem(
-      title: 'All Series',
-      count: 24,
-      icon: Icons.track_changes_outlined,
-      iconColor: const Color(0xFF2563EB),
-      bgColor: const Color(0xFFEFF6FF),
-    ),
-    TestSeriesCategoryItem(
-      title: 'Full Syllabus',
-      count: 10,
-      icon: Icons.description_outlined,
-      iconColor: const Color(0xFF16A34A),
-      bgColor: const Color(0xFFF0FDF4),
-    ),
-    TestSeriesCategoryItem(
-      title: 'Chapter Wise',
-      count: 8,
-      icon: Icons.auto_stories_outlined,
-      iconColor: const Color(0xFF9333EA),
-      bgColor: const Color(0xFFFAF5FF),
-    ),
-    TestSeriesCategoryItem(
-      title: 'Topic Wise',
-      count: 6,
-      icon: Icons.sell_outlined,
-      iconColor: const Color(0xFFEA580C),
-      bgColor: const Color(0xFFFFF7ED),
-    ),
-  ];
+  List<TestSeriesCardData> _getAllRealTestSeries() {
+    final List<TestSeriesCardData> list = [];
+    final Set<String> seenTitles = {};
 
-  final List<TestSeriesCardData> _allTestSeries = [
-    TestSeriesCardData(
-      id: 'ts1',
-      title: 'NEET 2026 Full Syllabus Test Series',
-      subtitle: 'Complete syllabus mock tests',
-      testCount: 12,
-      durationMinutes: 180,
-      difficulty: 'High',
-      status: 'In Progress',
-      nextTestName: 'Test 09',
-      iconBgColor: const Color(0xFF10B981),
-      icon: Icons.description_rounded,
-    ),
-    TestSeriesCardData(
-      id: 'ts2',
-      title: 'NEET 2026 Chapter Wise Test Series',
-      subtitle: 'Practice by individual chapters',
-      testCount: 8,
-      durationMinutes: 60,
-      difficulty: 'Medium',
-      status: 'Not Started',
-      nextTestName: 'Chapter 01',
-      iconBgColor: const Color(0xFF3B82F6),
-      icon: Icons.menu_book_rounded,
-    ),
-    TestSeriesCardData(
-      id: 'ts3',
-      title: 'NEET 2026 Topic Wise Test Series',
-      subtitle: 'Practice by specific topics',
-      testCount: 6,
-      durationMinutes: 30,
-      difficulty: 'Easy',
-      status: 'In Progress',
-      nextTestName: 'Topic 05',
-      iconBgColor: const Color(0xFF8B5CF6),
-      icon: Icons.bookmark_rounded,
-    ),
-    TestSeriesCardData(
-      id: 'ts4',
-      title: 'NEET 2026 Previous Year Papers',
-      subtitle: 'PYQ based mock tests',
-      testCount: 5,
-      durationMinutes: 180,
-      difficulty: 'High',
-      status: 'Not Started',
-      nextTestName: 'PYQ 2025',
-      iconBgColor: const Color(0xFFEF4444),
-      icon: Icons.track_changes_rounded,
-    ),
-  ];
+    // 1. Load from custom series (from Supabase test_series / tests / shared_prefs)
+    for (var cs in _customSeriesList) {
+      final String title = (cs['title'] ?? cs['name'] ?? '').toString().trim();
+      final String sId = (cs['id'] ?? cs['paper_id'] ?? 'ts_${title.hashCode}').toString();
+      if (title.isNotEmpty && !seenTitles.contains(title.toLowerCase())) {
+        seenTitles.add(title.toLowerCase());
+        final exam = (cs['exam'] ?? 'NEET').toString();
+        final year = (cs['year'] ?? '2027').toString();
+        final qCount = (cs['question_count'] is num) ? (cs['question_count'] as num).toInt() : 200;
+        final duration = (cs['duration_minutes'] is num) ? (cs['duration_minutes'] as num).toInt() : 180;
+        final testCount = (cs['test_count'] is num) ? (cs['test_count'] as num).toInt() : 10;
+        final difficulty = (cs['difficulty'] ?? 'Moderate').toString();
+        final validity = (cs['validity'] ?? 'Valid until exam').toString();
+        final attemptStatus = (cs['attempt_status'] ?? cs['attemptStatus'] ?? 'Not Attempted').toString();
+        final syllabusUrl = (cs['syllabus_url'] ?? cs['syllabusUrl'] ?? '').toString();
+        final isFree = cs['is_free'] == true || cs['isFree'] == true;
+        final price = (cs['price'] is num) ? (cs['price'] as num).toDouble() : (double.tryParse(cs['price']?.toString() ?? '299') ?? 299.0);
+        final origPrice = (cs['original_price'] is num) ? (cs['original_price'] as num).toDouble() : (double.tryParse(cs['original_price']?.toString() ?? '999') ?? 999.0);
+        final purchaseLink = (cs['purchase_link'] ?? '').toString();
+        final buttonText = (cs['purchase_button_text'] ?? 'Join').toString();
+        final showPurchaseButton = cs['show_purchase_button'] != false;
+
+        list.add(
+          TestSeriesCardData(
+            id: sId,
+            title: title,
+            exam: exam,
+            targetYear: year,
+            subtitle: '$exam $year Series ($qCount Qs)',
+            description: (cs['description'] ?? '').toString().trim().isNotEmpty
+                ? cs['description'].toString().trim()
+                : 'Comprehensive mock tests covering full syllabus with step-by-step solutions.',
+            testCount: testCount,
+            durationMinutes: duration,
+            difficulty: difficulty,
+            validity: validity,
+            attemptStatus: attemptStatus,
+            syllabusUrl: syllabusUrl,
+            status: cs['status'] ?? 'Published',
+            nextTestName: cs['paper_name'] ?? 'Test 01',
+            iconBgColor: const Color(0xFF4F46E5),
+            icon: Icons.track_changes_rounded,
+            bannerImageUrl: cs['banner_image_url'] ?? cs['bannerImageUrl'],
+            isFree: isFree,
+            price: price,
+            originalPrice: origPrice,
+            purchaseLink: purchaseLink,
+            purchaseButtonText: buttonText,
+            showPurchaseButton: showPurchaseButton,
+          ),
+        );
+      }
+    }
+
+    // 2. Load from dbPapers marked as test series
+    for (var p in _dbPapers) {
+      final String pId = p['id']?.toString() ?? '';
+      final String tsTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? '').toString().trim();
+      final String pName = (p['paper_name'] ?? p['paperName'] ?? '').toString().trim();
+      final String effectiveTitle = tsTitle.isNotEmpty ? tsTitle : pName;
+
+      final bool isTestSeries = (p['source_category'] == 'Test Series') ||
+          (p['category'] == 'Test Series') ||
+          tsTitle.isNotEmpty ||
+          (p['test_series_option'] != null && p['test_series_option'].toString().isNotEmpty) ||
+          ((p['available_in'] is List) && (p['available_in'] as List).contains('test_series'));
+
+      if (isTestSeries && effectiveTitle.isNotEmpty && !seenTitles.contains(effectiveTitle.toLowerCase())) {
+        seenTitles.add(effectiveTitle.toLowerCase());
+        final exam = (p['exam'] ?? 'NEET').toString();
+        final year = (p['year'] ?? '2027').toString();
+        final qCount = (p['saved_questions_count'] is num) ? (p['saved_questions_count'] as num).toInt() : (p['question_count'] ?? 200);
+        final duration = (p['duration_minutes'] is num) ? (p['duration_minutes'] as num).toInt() : (p['duration'] ?? 180);
+        final difficulty = (p['difficulty'] ?? 'Moderate').toString();
+        final validity = (p['validity'] ?? 'Valid until exam').toString();
+        final attemptStatus = (p['attempt_status'] ?? 'Not Attempted').toString();
+        final syllabusUrl = (p['syllabus_url'] ?? '').toString();
+        final isFree = p['is_free'] == true || p['isFree'] == true;
+        final price = (p['price'] is num) ? (p['price'] as num).toDouble() : 299.0;
+        final origPrice = (p['original_price'] is num) ? (p['original_price'] as num).toDouble() : 999.0;
+        final purchaseLink = (p['purchase_link'] ?? '').toString();
+        final buttonText = (p['purchase_button_text'] ?? 'Join').toString();
+
+        list.add(
+          TestSeriesCardData(
+            id: pId,
+            title: effectiveTitle,
+            exam: exam,
+            targetYear: year,
+            subtitle: '$exam $year Series (${qCount > 0 ? qCount : 200} Qs)',
+            description: (p['description'] ?? '').toString().trim().isNotEmpty
+                ? p['description'].toString().trim()
+                : 'Complete mock tests covering full syllabus with step-by-step solutions.',
+            testCount: 1,
+            durationMinutes: duration,
+            difficulty: difficulty,
+            validity: validity,
+            attemptStatus: attemptStatus,
+            syllabusUrl: syllabusUrl,
+            status: p['status'] == 'Completed' ? 'Completed' : 'Ready',
+            nextTestName: pName,
+            iconBgColor: const Color(0xFF7C3AED),
+            icon: Icons.assignment_turned_in_rounded,
+            bannerImageUrl: p['banner_image_url'] ?? p['bannerImageUrl'],
+            isFree: isFree,
+            price: price,
+            originalPrice: origPrice,
+            purchaseLink: purchaseLink,
+            purchaseButtonText: buttonText,
+            showPurchaseButton: p['show_purchase_button'] != false,
+          ),
+        );
+      }
+    }
+
+    return list;
+  }
+
+  List<TestSeriesCategoryItem> _getCategories(List<TestSeriesCardData> seriesList) {
+    int allCount = 0;
+    int fullCount = 0;
+    int chapterCount = 0;
+    int topicCount = 0;
+
+    for (var s in seriesList) {
+      allCount += s.testCount;
+      final t = (s.title + ' ' + s.description).toLowerCase();
+      if (t.contains('chapter')) {
+        chapterCount += s.testCount;
+      } else if (t.contains('topic')) {
+        topicCount += s.testCount;
+      } else {
+        fullCount += s.testCount;
+      }
+    }
+
+    return [
+      TestSeriesCategoryItem(
+        title: 'All Series',
+        count: allCount,
+        icon: Icons.track_changes_outlined,
+        iconColor: const Color(0xFF2563EB),
+        bgColor: const Color(0xFFEFF6FF),
+      ),
+      TestSeriesCategoryItem(
+        title: 'Full Syllabus',
+        count: fullCount,
+        icon: Icons.description_outlined,
+        iconColor: const Color(0xFF16A34A),
+        bgColor: const Color(0xFFF0FDF4),
+      ),
+      TestSeriesCategoryItem(
+        title: 'Chapter Wise',
+        count: chapterCount,
+        icon: Icons.auto_stories_outlined,
+        iconColor: const Color(0xFF9333EA),
+        bgColor: const Color(0xFFFAF5FF),
+      ),
+      TestSeriesCategoryItem(
+        title: 'Topic Wise',
+        count: topicCount,
+        icon: Icons.sell_outlined,
+        iconColor: const Color(0xFFEA580C),
+        bgColor: const Color(0xFFFFF7ED),
+      ),
+    ];
+  }
+
+  void _handleDownloadSyllabus(TestSeriesCardData item) async {
+    if (item.syllabusUrl.isNotEmpty && (item.syllabusUrl.startsWith('http://') || item.syllabusUrl.startsWith('https://'))) {
+      final uri = Uri.tryParse(item.syllabusUrl);
+      if (uri != null) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    }
+    _showSyllabusModal(item);
+  }
+
+  void _showSyllabusModal(TestSeriesCardData item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: 550,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.menu_book_rounded, color: Color(0xFF4F46E5), size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Test Series Syllabus', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                          Text('${item.exam} • Target ${item.formattedTargetYear}', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                        ],
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: const Icon(Icons.close, size: 20),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(item.title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B))),
+              const SizedBox(height: 6),
+              Text(item.description, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+                child: Column(
+                  children: [
+                    _buildSyllabusRow(Icons.description_outlined, 'Total Tests', '${item.testCount} Tests'),
+                    const Divider(height: 12),
+                    _buildSyllabusRow(Icons.access_time_rounded, 'Duration per Test', item.durationFormatted),
+                    const Divider(height: 12),
+                    _buildSyllabusRow(Icons.bar_chart_rounded, 'Difficulty Level', item.difficulty),
+                    const Divider(height: 12),
+                    _buildSyllabusRow(Icons.event_available_rounded, 'Validity Period', item.validity),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (item.syllabusUrl.isNotEmpty)
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () async {
+                        final uri = Uri.tryParse(item.syllabusUrl);
+                        if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      },
+                      icon: const Icon(Icons.download_rounded, size: 16, color: Colors.white),
+                      label: const Text('Download Official PDF', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                    )
+                  else
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4F46E5),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Done', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSyllabusRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: const Color(0xFF4F46E5)),
+        const SizedBox(width: 8),
+        Text(label, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B), fontWeight: FontWeight.w500)),
+        const Spacer(),
+        Text(value, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF0F172A), fontWeight: FontWeight.w700)),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final allRealSeries = _getAllRealTestSeries();
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
@@ -265,7 +505,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                         const SizedBox(height: 20),
 
                         // 4 KPI Summary Metric Cards Row
-                        _buildKPISummaryRow(),
+                        _buildKPISummaryRow(allRealSeries),
                         const SizedBox(height: 20),
 
                         // Your Progress Card
@@ -273,11 +513,11 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                         const SizedBox(height: 24),
 
                         // Test Series Categories Row
-                        _buildCategoriesSection(),
+                        _buildCategoriesSection(allRealSeries),
                         const SizedBox(height: 24),
 
                         // All Test Series Section Header & Cards List
-                        _buildAllTestSeriesSection(),
+                        _buildAllTestSeriesSection(allRealSeries),
                         const SizedBox(height: 20),
 
                         // Go Premium Banner
@@ -467,7 +707,12 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   // ===========================================================================
   // 3. 4 KPI STAT SUMMARY CARDS ROW
   // ===========================================================================
-  Widget _buildKPISummaryRow() {
+  Widget _buildKPISummaryRow(List<TestSeriesCardData> seriesList) {
+    final int totalTests = seriesList.fold(0, (sum, i) => sum + i.testCount);
+    final int completedTests = seriesList.where((i) => i.attemptStatus == 'Completed').length;
+    final int inProgressTests = seriesList.where((i) => i.attemptStatus == 'In Progress').length;
+    final int attempted = completedTests + inProgressTests;
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
@@ -480,13 +725,13 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       ),
       child: Row(
         children: [
-          _buildKPISingleItem(Icons.article_outlined, const Color(0xFF3B82F6), '24', 'Total Tests'),
+          _buildKPISingleItem(Icons.article_outlined, const Color(0xFF3B82F6), '$totalTests', 'Total Tests'),
           _buildDivider(),
-          _buildKPISingleItem(Icons.check_circle_outline_rounded, const Color(0xFF10B981), '8', 'Tests Attempted'),
+          _buildKPISingleItem(Icons.check_circle_outline_rounded, const Color(0xFF10B981), '$attempted', 'Tests Attempted'),
           _buildDivider(),
-          _buildKPISingleItem(Icons.emoji_events_outlined, const Color(0xFFF59E0B), '3,420', 'Total Score'),
+          _buildKPISingleItem(Icons.emoji_events_outlined, const Color(0xFFF59E0B), totalTests > 0 ? '${seriesList.length}' : '0', 'Test Series'),
           _buildDivider(),
-          _buildKPISingleItem(Icons.track_changes_outlined, const Color(0xFF8B5CF6), '76.4%', 'Avg Accuracy'),
+          _buildKPISingleItem(Icons.track_changes_outlined, const Color(0xFF8B5CF6), attempted > 0 ? '${((completedTests / (attempted > 0 ? attempted : 1)) * 100).toInt()}%' : 'N/A', 'Avg Accuracy'),
         ],
       ),
     );
@@ -637,7 +882,9 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   // ===========================================================================
   // 5. TEST SERIES CATEGORIES ROW
   // ===========================================================================
-  Widget _buildCategoriesSection() {
+  Widget _buildCategoriesSection(List<TestSeriesCardData> seriesList) {
+    final categories = _getCategories(seriesList);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -651,7 +898,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             return SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: _categories.map((cat) {
+                children: categories.map((cat) {
                   final bool isSelected = (_selectedCategory == cat.title);
 
                   return Container(
@@ -717,95 +964,9 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   // ===========================================================================
   // 6. ALL TEST SERIES SECTION HEADER & CARDS LIST
   // ===========================================================================
-  Widget _buildAllTestSeriesSection() {
-    final List<TestSeriesCardData> combinedList = [];
-    final Set<String> seenTitles = {};
-
-    // 1. Add all newly created Test Series from _customSeriesList
-    for (var cs in _customSeriesList) {
-      final String title = (cs['title'] ?? cs['name'] ?? '').toString().trim();
-      final String sId = (cs['id'] ?? cs['paper_id'] ?? 'ts_${title.hashCode}').toString();
-      if (title.isNotEmpty && !seenTitles.contains(title.toLowerCase())) {
-        seenTitles.add(title.toLowerCase());
-        final qCount = (cs['question_count'] is num) ? (cs['question_count'] as num).toInt() : 200;
-        final duration = (cs['duration_minutes'] is num) ? (cs['duration_minutes'] as num).toInt() : 180;
-        combinedList.add(
-          TestSeriesCardData(
-            id: sId,
-            title: title,
-            subtitle: '${cs['exam'] ?? 'NEET'} ${cs['year'] ?? ''} Assigned Test Series ($qCount Questions)',
-            description: cs['description'] ?? '',
-            testCount: (cs['test_count'] is num) ? (cs['test_count'] as num).toInt() : 1,
-            durationMinutes: duration,
-            difficulty: cs['difficulty'] ?? 'High',
-            status: cs['status'] ?? 'Ready',
-            nextTestName: cs['paper_name'] ?? 'Test 01',
-            iconBgColor: const Color(0xFF6366F1),
-            icon: Icons.track_changes_rounded,
-            bannerImageUrl: cs['banner_image_url'] ?? cs['bannerImageUrl'],
-            isFree: cs['is_free'] == true || cs['isFree'] == true,
-            price: (cs['price'] is num) ? (cs['price'] as num).toDouble() : (double.tryParse(cs['price']?.toString() ?? '299') ?? 299.0),
-            originalPrice: (cs['original_price'] is num) ? (cs['original_price'] as num).toDouble() : (double.tryParse(cs['original_price']?.toString() ?? '999') ?? 999.0),
-            purchaseLink: cs['purchase_link'] ?? '',
-            purchaseButtonText: cs['purchase_button_text'] ?? 'Enroll Now',
-            showPurchaseButton: cs['show_purchase_button'] != false,
-          ),
-        );
-      }
-    }
-
-    // 2. Add Test Series and papers from _dbPapers
-    for (var p in _dbPapers) {
-      final String pId = p['id']?.toString() ?? '';
-      final String tsTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? '').toString().trim();
-      final String pName = (p['paper_name'] ?? p['paperName'] ?? 'NEET Assigned Paper').toString().trim();
-      final String effectiveTitle = tsTitle.isNotEmpty ? tsTitle : pName;
-
-      final bool isTestSeries = (p['source_category'] == 'Test Series') ||
-          (p['category'] == 'Test Series') ||
-          tsTitle.isNotEmpty ||
-          (p['test_series_option'] != null && p['test_series_option'].toString().isNotEmpty) ||
-          ((p['available_in'] is List) && (p['available_in'] as List).contains('test_series'));
-
-      if (isTestSeries && !seenTitles.contains(effectiveTitle.toLowerCase())) {
-        seenTitles.add(effectiveTitle.toLowerCase());
-        final qCount = (p['saved_questions_count'] is num) ? (p['saved_questions_count'] as num).toInt() : (p['question_count'] ?? 200);
-        final duration = (p['duration_minutes'] is num) ? (p['duration_minutes'] as num).toInt() : (p['duration'] ?? 180);
-        combinedList.add(
-          TestSeriesCardData(
-            id: pId,
-            title: effectiveTitle,
-            subtitle: '${p['exam'] ?? 'NEET'} ${p['year'] ?? ''} Assigned Test Series (${qCount > 0 ? qCount : 200} Questions)',
-            description: p['description'] ?? '',
-            testCount: 1,
-            durationMinutes: duration,
-            difficulty: 'High',
-            status: p['status'] == 'Completed' ? 'Completed' : 'Ready',
-            nextTestName: pName,
-            iconBgColor: const Color(0xFF7C3AED),
-            icon: Icons.assignment_turned_in_rounded,
-            bannerImageUrl: p['banner_image_url'] ?? p['bannerImageUrl'],
-            isFree: p['is_free'] == true || p['isFree'] == true,
-            price: (p['price'] is num) ? (p['price'] as num).toDouble() : 299.0,
-            originalPrice: (p['original_price'] is num) ? (p['original_price'] as num).toDouble() : 999.0,
-            purchaseLink: p['purchase_link'] ?? '',
-            purchaseButtonText: p['purchase_button_text'] ?? 'Enroll Now',
-            showPurchaseButton: p['show_purchase_button'] != false,
-          ),
-        );
-      }
-    }
-
-    // 3. Add default standard test series
-    for (var ts in _allTestSeries) {
-      if (!seenTitles.contains(ts.title.toLowerCase())) {
-        seenTitles.add(ts.title.toLowerCase());
-        combinedList.add(ts);
-      }
-    }
-
-    // 4. Filter by Category tab if applicable
-    final filteredList = combinedList.where((item) {
+  Widget _buildAllTestSeriesSection(List<TestSeriesCardData> allRealSeries) {
+    // Filter by Category tab if applicable
+    final filteredList = allRealSeries.where((item) {
       if (_selectedCategory == 'Full Syllabus' && !item.title.toLowerCase().contains('full') && !item.subtitle.toLowerCase().contains('full')) {
         return false;
       }
@@ -814,6 +975,15 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       }
       if (_selectedCategory == 'Topic Wise' && !item.title.toLowerCase().contains('topic') && !item.subtitle.toLowerCase().contains('topic')) {
         return false;
+      }
+      // Exam Filter
+      if (_selectedExamFilter != 'All Exams') {
+        final f = _selectedExamFilter.toLowerCase();
+        final match = item.title.toLowerCase().contains(f) ||
+            item.formattedTargetYear.toLowerCase().contains(f) ||
+            '${item.exam} ${item.targetYear}'.toLowerCase().contains(f);
+        if (!match && (f.contains('neet') && !item.exam.toLowerCase().contains('neet'))) return false;
+        if (!match && (f.contains('jee') && !item.exam.toLowerCase().contains('jee'))) return false;
       }
       return true;
     }).toList();
@@ -825,7 +995,10 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('All Test Series (${filteredList.length})', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+            Text(
+              'All Test Series (${filteredList.length})',
+              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+            ),
             if (_isLoading)
               const SizedBox(
                 width: 16,
@@ -844,33 +1017,86 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                   children: [
                     const Icon(Icons.filter_list_rounded, size: 14, color: Color(0xFF2563EB)),
                     const SizedBox(width: 4),
-                    Text('Active Filter: $_selectedCategory', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+                    Text(
+                      'Active Filter: $_selectedCategory',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                    ),
                   ],
                 ),
               ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
 
-        // List of Cards
-        ...filteredList.map((item) => _buildTestSeriesCard(item)).toList(),
+        // List of Cards or Clean Empty State
+        if (filteredList.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+              ],
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFEEF2FF),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.assignment_outlined, size: 28, color: Color(0xFF4F46E5)),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'No Test Series Available',
+                  style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Real test series published by the admin in Admin Test Series Manager will appear here.',
+                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          )
+        else
+          ...filteredList.map((item) => _buildTestSeriesCard(item)),
       ],
     );
   }
 
   Widget _buildTestSeriesCard(TestSeriesCardData item) {
-    final bool isInProgress = item.status == 'In Progress';
-
     final bool hasBanner = item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty;
 
+    // Attempt status badge colors
+    Color attemptBadgeBg;
+    Color attemptBadgeText;
+    if (item.attemptStatus == 'Completed') {
+      attemptBadgeBg = const Color(0xFFDCFCE7);
+      attemptBadgeText = const Color(0xFF15803D);
+    } else if (item.attemptStatus == 'In Progress') {
+      attemptBadgeBg = const Color(0xFFFEF3C7);
+      attemptBadgeText = const Color(0xFFB45309);
+    } else {
+      attemptBadgeBg = const Color(0xFFF1F5F9);
+      attemptBadgeText = const Color(0xFF475569);
+    }
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
-          BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 2)),
         ],
       ),
       child: ClipRRect(
@@ -878,12 +1104,12 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Optional Banner Image Header
+            // Banner Image Header if present
             if (hasBanner)
               Stack(
                 children: [
                   SizedBox(
-                    height: 110,
+                    height: 120,
                     width: double.infinity,
                     child: Image.network(
                       item.bannerImageUrl!,
@@ -895,279 +1121,279 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                     ),
                   ),
                   Positioned(
-                    top: 8,
-                    left: 8,
+                    top: 10,
+                    left: 10,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.75),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        item.subtitle,
-                        style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.bold),
+                        item.formattedTargetYear,
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
-                  if (!item.isFree)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDC2626),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '₹${item.price.toInt()}',
-                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
-                        ),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: item.isFree ? const Color(0xFF10B981) : const Color(0xFFDC2626),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        item.isFree ? 'FREE' : '₹${item.price.toInt()}',
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
                       ),
                     ),
+                  ),
                 ],
               ),
 
-            // Card Body
-            InkWell(
-              onTap: () => _startTestSeries(item.id, item.title, item.durationMinutes),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isMobile = constraints.maxWidth < 620;
-
-                    String nextNameDisplay = item.nextTestName;
-                    if (nextNameDisplay.contains('-') || nextNameDisplay.length > 20) {
-                      nextNameDisplay = 'Paper 01';
-                    }
-
-                    if (isMobile) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: item.iconBgColor,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(item.icon, color: Colors.white, size: 20),
+            // Card Body Content
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header Row: Icon, Test Series Name, Exam, Target Year, Attempt Status
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: item.iconBgColor,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(item.icon, color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 1. Test Series Name
+                            Text(
+                              item.title,
+                              style: GoogleFonts.inter(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF0F172A),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.title,
-                                      style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      item.subtitle,
-                                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w400, color: const Color(0xFF64748B)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: isInProgress ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  item.status,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: isInProgress ? const Color(0xFF047857) : const Color(0xFF1D4ED8),
+                            ),
+                            const SizedBox(height: 6),
+                            // 2. Exam & 3. Target Year Badges
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEEF2FF),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFC7D2FE)),
+                                  ),
+                                  child: Text(
+                                    item.exam,
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF3730A3)),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: [
-                                    _buildMetaPill(Icons.description_outlined, '${item.testCount} Tests'),
-                                    const SizedBox(width: 8),
-                                    _buildMetaPill(Icons.access_time_rounded, '${item.durationMinutes} min'),
-                                    const SizedBox(width: 8),
-                                    _buildMetaPill(Icons.bar_chart_rounded, item.difficulty),
-                                    if (item.isFree) ...[
-                                      const SizedBox(width: 8),
-                                      _buildMetaPill(Icons.card_giftcard_rounded, 'FREE'),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  if (item.showPurchaseButton && item.purchaseLink.isNotEmpty) ...[
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF10B981),
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                        minimumSize: Size.zero,
-                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                                      ),
-                                      onPressed: () async {
-                                        final uri = Uri.tryParse(item.purchaseLink);
-                                        if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                      },
-                                      child: Text(
-                                        item.purchaseButtonText.isNotEmpty ? item.purchaseButtonText : 'Enroll Now',
-                                        style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                  ],
-                                  Text(
-                                    isInProgress ? 'Resume' : 'Start Test',
-                                    style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF0FDF4),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFBBF7D0)),
                                   ),
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF2563EB)),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      );
-                    }
+                                  child: Text(
+                                    'Target: ${item.formattedTargetYear}',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF166534)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
 
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
+                      // 10. Attempt Status Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: attemptBadgeBg,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(color: attemptBadgeText, shape: BoxShape.circle),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              item.attemptStatus,
+                              style: GoogleFonts.inter(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                color: attemptBadgeText,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // 4. Short Description
+                  if (item.description.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      item.description,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: const Color(0xFF475569),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 14),
+
+                  // Metadata Pills: 5. Number of Tests, 6. Duration, 7. Difficulty, 8. Price, 9. Validity
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _buildMetaPill(Icons.description_outlined, '${item.testCount} Tests'),
+                      _buildMetaPill(Icons.access_time_rounded, item.durationFormatted),
+                      _buildMetaPill(Icons.bar_chart_rounded, item.difficulty),
+                      _buildMetaPill(Icons.event_available_rounded, item.validity),
+
+                      // 8. Price Pill
+                      if (item.isFree)
                         Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: item.iconBgColor,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(item.icon, color: Colors.white, size: 22),
-                        ),
-                        const SizedBox(width: 14),
-
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.title,
-                                style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                item.subtitle,
-                                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w400, color: const Color(0xFF64748B)),
-                              ),
-                              const SizedBox(height: 8),
-
-                              SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: [
-                                    _buildMetaPill(Icons.description_outlined, '${item.testCount} Tests'),
-                                    const SizedBox(width: 10),
-                                    _buildMetaPill(Icons.access_time_rounded, '${item.durationMinutes} min'),
-                                    const SizedBox(width: 10),
-                                    _buildMetaPill(Icons.bar_chart_rounded, item.difficulty),
-                                    const SizedBox(width: 10),
-                                    if (item.isFree)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(4)),
-                                        child: const Text('FREE', style: TextStyle(color: Color(0xFF16A34A), fontSize: 10, fontWeight: FontWeight.bold)),
-                                      )
-                                    else ...[
-                                      Text('₹${item.price.toInt()}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                                      const SizedBox(width: 4),
-                                      Text('₹${item.originalPrice.toInt()}', style: const TextStyle(fontSize: 10, decoration: TextDecoration.lineThrough, color: Color(0xFF94A3B8))),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(width: 12),
-
-                        // Purchase CTA & Status
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
+                          child: const Text('FREE', style: TextStyle(color: Color(0xFF16A34A), fontSize: 11, fontWeight: FontWeight.w800)),
+                        )
+                      else ...[
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (item.showPurchaseButton && item.purchaseLink.isNotEmpty) ...[
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF10B981),
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                onPressed: () async {
-                                  final uri = Uri.tryParse(item.purchaseLink);
-                                  if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                },
-                                child: Text(
-                                  item.purchaseButtonText.isNotEmpty ? item.purchaseButtonText : 'Enroll Now',
-                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                            ],
-
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 110),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: isInProgress ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      item.status,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: isInProgress ? const Color(0xFF047857) : const Color(0xFF1D4ED8),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    isInProgress ? 'Resume Test' : 'Start Test',
-                                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
-                                  ),
-                                ],
+                            Text(
+                              '₹${item.price.toInt()}',
+                              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '₹${item.originalPrice.toInt()}',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                decoration: TextDecoration.lineThrough,
+                                color: const Color(0xFF94A3B8),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF94A3B8)),
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(color: const Color(0xFFFEE2E8), borderRadius: BorderRadius.circular(4)),
+                              child: Text(
+                                '${(((item.originalPrice - item.price) / item.originalPrice) * 100).toInt()}% OFF',
+                                style: const TextStyle(color: Color(0xFFDC2626), fontSize: 9.5, fontWeight: FontWeight.bold),
+                              ),
+                            ),
                           ],
                         ),
                       ],
-                    );
-                  },
-                ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 14),
+                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  const SizedBox(height: 12),
+
+                  // Action Buttons Row: 11. CTA (Join / Start) & 12. Download Syllabus
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // 12. Download Syllabus CTA Button
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF334155),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () => _handleDownloadSyllabus(item),
+                        icon: const Icon(Icons.file_download_outlined, size: 16, color: Color(0xFF2563EB)),
+                        label: Text(
+                          'Download Syllabus',
+                          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+                        ),
+                      ),
+
+                      // 11. CTA Button: Join / Start Test / Resume Test
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (item.showPurchaseButton && item.purchaseLink.isNotEmpty && !item.isFree) ...[
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF10B981),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () async {
+                                final uri = Uri.tryParse(item.purchaseLink);
+                                if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              },
+                              child: Text(
+                                item.purchaseButtonText.isNotEmpty ? item.purchaseButtonText : 'Join',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2563EB),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () => _startTestSeries(item.id, item.title, item.durationMinutes),
+                            icon: Icon(
+                              item.attemptStatus == 'In Progress' ? Icons.play_arrow_rounded : Icons.arrow_forward_rounded,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                            label: Text(
+                              item.attemptStatus == 'In Progress'
+                                  ? 'Resume Test'
+                                  : (item.attemptStatus == 'Completed' ? 'Retake Test' : (item.isFree ? 'Join Free' : 'Start Test')),
+                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
@@ -1177,12 +1403,24 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   }
 
   Widget _buildMetaPill(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 12, color: const Color(0xFF64748B)),
-        const SizedBox(width: 4),
-        Text(text, style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: const Color(0xFF64748B)),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
+          ),
+        ],
+      ),
     );
   }
 

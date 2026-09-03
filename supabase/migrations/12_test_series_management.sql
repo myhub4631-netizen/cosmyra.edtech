@@ -28,7 +28,10 @@ CREATE TABLE IF NOT EXISTS public.test_series (
   total_marks NUMERIC(10, 2) DEFAULT 720.00,
   duration_minutes INT DEFAULT 180,
   conducting_body TEXT DEFAULT 'NTA',
-  difficulty TEXT DEFAULT 'High',
+  difficulty TEXT DEFAULT 'Moderate', -- 'Easy', 'Moderate', 'Advanced', 'Mixed'
+  validity TEXT DEFAULT 'Valid until exam',
+  syllabus_url TEXT DEFAULT '',
+  attempt_status TEXT DEFAULT 'Not Attempted', -- 'Not Attempted', 'In Progress', 'Completed'
   status TEXT DEFAULT 'Published', -- 'Draft', 'Published', 'Archived'
   features JSONB DEFAULT '["100+ High Quality Tests", "Detailed Solutions & Explanations", "All India Ranking"]'::jsonb,
   
