@@ -14,6 +14,7 @@ class AppSidebar extends StatefulWidget {
   final VoidCallback? onOpenMistakes;
   final VoidCallback? onOpenMyTests;
   final VoidCallback? onOpenMockTests;
+  final VoidCallback? onOpenTestSeries;
   final VoidCallback? onOpenLeaderboard;
   final VoidCallback? onLogout;
 
@@ -28,6 +29,7 @@ class AppSidebar extends StatefulWidget {
     this.onOpenMistakes,
     this.onOpenMyTests,
     this.onOpenMockTests,
+    this.onOpenTestSeries,
     this.onOpenLeaderboard,
     this.onLogout,
   });
@@ -64,7 +66,7 @@ class _AppSidebarState extends State<AppSidebar> {
       {'icon': Icons.bookmark_border_rounded, 'label': 'Bookmarks', 'route': '/mistakes'},
       {'icon': Icons.cancel_outlined, 'label': 'My Mistakes', 'route': '/mistakes'},
       {'icon': Icons.assignment_turned_in_rounded, 'label': 'My All Tests', 'route': '/my-tests'},
-      {'icon': Icons.calendar_today_rounded, 'label': 'Test Series', 'route': '/mock-tests'},
+      {'icon': Icons.calendar_today_rounded, 'label': 'Test Series', 'route': '/test-series'},
       {'icon': Icons.bar_chart_rounded, 'label': 'Analytics', 'route': '/analytics'},
       {'icon': Icons.emoji_events_outlined, 'label': 'Leaderboard', 'route': '/leaderboard'},
       {'icon': Icons.event_note_rounded, 'label': 'Study Plan', 'route': '/my-tests'},
@@ -217,10 +219,10 @@ class _AppSidebarState extends State<AppSidebar> {
                       }
 
                       if (label == 'Test Series') {
-                        if (widget.onOpenMockTests != null) {
-                          widget.onOpenMockTests!();
+                        if (widget.onOpenTestSeries != null) {
+                          widget.onOpenTestSeries!();
                         } else {
-                          context.go('/mock-tests');
+                          context.go('/test-series');
                         }
                         return;
                       }

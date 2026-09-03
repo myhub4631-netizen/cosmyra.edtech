@@ -150,7 +150,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
         userProfile: _signedUpProfile!,
         activeExam: 'NEET',
         onOpenPractice: () => context.go('/practice'),
-        onOpenMockTests: () => context.go('/mock-tests'),
+        onOpenMockTests: () => context.go('/my-tests'),
+        onOpenTestSeries: () => context.go('/test-series'),
         onOpenPyqs: () => context.go('/pyq'),
         onOpenMistakes: () => context.go('/mistakes'),
       );

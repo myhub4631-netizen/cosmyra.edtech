@@ -101,6 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
         activeExam: 'NEET',
         onOpenPractice: () => Navigator.pushReplacementNamed(context, '/practice'),
         onOpenMockTests: () => Navigator.pushReplacementNamed(context, '/tests'),
+        onOpenTestSeries: () => Navigator.pushReplacementNamed(context, '/test-series'),
         onOpenPyqs: () => Navigator.pushReplacementNamed(context, '/pyq'),
         onOpenMistakes: () => Navigator.pushReplacementNamed(context, '/mistakes'),
       );

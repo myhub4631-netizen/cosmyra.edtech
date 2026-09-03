@@ -357,7 +357,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           activeExam: _activeExam,
           onOpenPractice: _openCustomPracticeWizard,
           onOpenCustomTest: _openCustomTestWizard,
-          onOpenMockTests: () => setState(() => _selectedIndex = 2),
+          onOpenMyTests: () => setState(() => _selectedIndex = 20),
+          onOpenMockTests: () => setState(() => _selectedIndex = 20),
+          onOpenTestSeries: () => setState(() => _selectedIndex = 2),
           onOpenPyqs: () => setState(() => _selectedIndex = 3),
           onOpenMistakes: () => setState(() => _selectedIndex = 4),
           onLogout: () {

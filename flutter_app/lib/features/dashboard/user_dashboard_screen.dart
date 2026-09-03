@@ -19,6 +19,7 @@ class UserDashboardScreen extends StatefulWidget {
   final VoidCallback onOpenMistakes;
   final VoidCallback? onOpenLeaderboard;
   final VoidCallback? onOpenMyTests;
+  final VoidCallback? onOpenTestSeries;
   final VoidCallback? onLogout;
 
   const UserDashboardScreen({
@@ -32,6 +33,7 @@ class UserDashboardScreen extends StatefulWidget {
     required this.onOpenMistakes,
     this.onOpenLeaderboard,
     this.onOpenMyTests,
+    this.onOpenTestSeries,
     this.onLogout,
   });
 
@@ -90,6 +92,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 onOpenPractice: widget.onOpenPractice,
                 onOpenCustomTest: widget.onOpenCustomTest,
                 onOpenMockTests: widget.onOpenMockTests,
+                onOpenTestSeries: widget.onOpenTestSeries,
                 onOpenPyqs: widget.onOpenPyqs,
                 onOpenMistakes: widget.onOpenMistakes,
                 onOpenMyTests: widget.onOpenMyTests,
@@ -111,6 +114,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     if (_isSectionVisible('banner_slider')) ...[
                       DashboardBannerCarousel(
                         onOpenMockTests: widget.onOpenMockTests,
+                        onOpenTestSeries: widget.onOpenTestSeries,
                         onOpenCustomPractice: widget.onOpenPractice,
                         onOpenLeaderboard: widget.onOpenLeaderboard,
                       ),
@@ -154,6 +158,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 onOpenPractice: widget.onOpenPractice,
                 onOpenCustomTest: widget.onOpenCustomTest,
                 onOpenMockTests: widget.onOpenMockTests,
+                onOpenTestSeries: widget.onOpenTestSeries,
                 onOpenPyqs: widget.onOpenPyqs,
                 onOpenMistakes: widget.onOpenMistakes,
                 onOpenMyTests: widget.onOpenMyTests,
@@ -183,6 +188,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                             if (_isSectionVisible('banner_slider')) ...[
                               DashboardBannerCarousel(
                                 onOpenMockTests: widget.onOpenMockTests,
+                                onOpenTestSeries: widget.onOpenTestSeries,
                                 onOpenCustomPractice: widget.onOpenPractice,
                                 onOpenLeaderboard: widget.onOpenLeaderboard,
                               ),
@@ -632,7 +638,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       {'label': 'Custom Test', 'icon': Icons.assignment_outlined, 'color': const Color(0xFF2563EB), 'bg': const Color(0xFFDBEAFE), 'tap': () => context.go('/custom-test')},
       {'label': 'PYQ Practice', 'icon': Icons.menu_book_rounded, 'color': const Color(0xFF7C3AED), 'bg': const Color(0xFFDDD6FE), 'tap': () => context.go('/pyq')},
       {'label': 'NTA Questions', 'icon': Icons.shield_outlined, 'color': const Color(0xFFEA580C), 'bg': const Color(0xFFFFEDD5), 'tap': () => context.go('/nta-practice')},
-      {'label': 'Test Series', 'icon': Icons.calendar_today_outlined, 'color': const Color(0xFFDB2777), 'bg': const Color(0xFFFCE7F3), 'tap': widget.onOpenMockTests},
+      {'label': 'Test Series', 'icon': Icons.calendar_today_outlined, 'color': const Color(0xFFDB2777), 'bg': const Color(0xFFFCE7F3), 'tap': () {
+        if (widget.onOpenTestSeries != null) {
+          widget.onOpenTestSeries!();
+        } else {
+          context.go('/test-series');
+        }
+      }},
     ];
 
     return Column(
@@ -1245,7 +1257,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                       if (item['label'] == 'Custom Test') {
                         context.go('/custom-test');
                       } else if (item['label'] == 'Test Series') {
-                        widget.onOpenMockTests();
+                        if (widget.onOpenTestSeries != null) {
+                          widget.onOpenTestSeries!();
+                        } else {
+                          context.go('/test-series');
+                        }
                       }
                       if (item['label'] == 'PYQ' || item['label'] == 'PYQ Practice') context.go('/pyq');
                       if (item['label'] == 'NTA Questions' || item['label'] == 'NTA Practice') context.go('/nta-practice');
@@ -1788,7 +1804,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         'cardBg': const Color(0xFFFDF2F8),
         'borderColor': const Color(0xFFFCE7F3),
         'iconBg': const Color(0xFFFCE7F3),
-        'onTap': widget.onOpenMockTests,
+        'onTap': () {
+          if (widget.onOpenTestSeries != null) {
+            widget.onOpenTestSeries!();
+          } else {
+            context.go('/test-series');
+          }
+        },
       },
     ];
 
@@ -2202,12 +2224,14 @@ class SmoothLineChartPainter extends CustomPainter {
 
 class DashboardBannerCarousel extends StatefulWidget {
   final VoidCallback? onOpenMockTests;
+  final VoidCallback? onOpenTestSeries;
   final VoidCallback? onOpenCustomPractice;
   final VoidCallback? onOpenLeaderboard;
 
   const DashboardBannerCarousel({
     super.key,
     this.onOpenMockTests,
+    this.onOpenTestSeries,
     this.onOpenCustomPractice,
     this.onOpenLeaderboard,
   });
@@ -2302,11 +2326,17 @@ class _DashboardBannerCarouselState extends State<DashboardBannerCarousel> {
 
     // Handle internal app routes
     final route = trimmed.startsWith('/') ? trimmed : '/$trimmed';
-    if (route == '/mock-tests' || route == '/test-series') {
+    if (route == '/test-series') {
+      if (widget.onOpenTestSeries != null) {
+        widget.onOpenTestSeries!();
+      } else {
+        context.go('/test-series');
+      }
+    } else if (route == '/mock-tests' || route == '/my-tests') {
       if (widget.onOpenMockTests != null) {
         widget.onOpenMockTests!();
       } else {
-        context.go('/mock-tests');
+        context.go('/my-tests');
       }
     } else if (route == '/custom-practice' || route == '/practice') {
       if (widget.onOpenCustomPractice != null) {
