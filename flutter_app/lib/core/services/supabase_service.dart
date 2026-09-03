@@ -7105,7 +7105,15 @@ class SupabaseService {
       if (raw != null && raw.isNotEmpty) {
         final List dec = jsonDecode(raw);
         for (var item in dec) {
-          if (item is Map) assets.add(Map<String, dynamic>.from(item));
+          if (item is Map) {
+            final m = Map<String, dynamic>.from(item);
+            final fn = (m['file_name'] ?? '').toString();
+            if (fn.length > 50 || fn.contains('base64') || fn.contains(';')) {
+              final id = (m['id'] ?? 'asset').toString();
+              m['file_name'] = '${id.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}.png';
+            }
+            assets.add(m);
+          }
         }
       }
     } catch (e) {
@@ -7138,15 +7146,24 @@ class SupabaseService {
         if (img.isNotEmpty) {
           final bannerId = 'banner_${b.id}';
           if (!assets.any((a) => a['public_url'] == img || a['id'] == bannerId)) {
-            final fileName = img.split('/').last.split('?').first;
+            String fileName;
+            if (img.startsWith('data:')) {
+              fileName = 'banner_${b.id}.png';
+            } else {
+              final rawName = img.split('/').last.split('?').first;
+              fileName = (rawName.length > 40 || rawName.contains('base64') || rawName.contains(';'))
+                  ? 'banner_${b.id}.png'
+                  : rawName;
+            }
             final isSvg = fileName.toLowerCase().endsWith('.svg');
+            final approxSizeKb = img.startsWith('data:') ? ((img.length * 3 / 4) / 1024).round() : 142;
             assets.add({
               'id': bannerId,
               'title': b.title.isNotEmpty ? b.title : 'Homepage Promotional Banner',
-              'file_name': fileName.isNotEmpty ? fileName : 'banner_${b.id}.png',
+              'file_name': fileName,
               'file_type': isSvg ? 'svg' : 'image',
               'mime_type': isSvg ? 'image/svg+xml' : 'image/png',
-              'file_size_kb': 142,
+              'file_size_kb': approxSizeKb.clamp(10, 5000),
               'public_url': img,
               'category': 'Promotional Banners',
               'uploader_role': 'admin',
@@ -7169,14 +7186,23 @@ class SupabaseService {
         final title = ts['title']?.toString() ?? 'Test Series';
         final exam = ts['exam']?.toString() ?? 'NEET';
         if (imgUrl.isNotEmpty && !assets.any((a) => a['public_url'] == imgUrl)) {
-          final fileName = imgUrl.split('/').last.split('?').first;
+          String fileName;
+          if (imgUrl.startsWith('data:')) {
+            fileName = 'cover_${ts['id']}.png';
+          } else {
+            final rawName = imgUrl.split('/').last.split('?').first;
+            fileName = (rawName.length > 40 || rawName.contains('base64') || rawName.contains(';'))
+                ? 'cover_${ts['id']}.png'
+                : rawName;
+          }
+          final approxSizeKb = imgUrl.startsWith('data:') ? ((imgUrl.length * 3 / 4) / 1024).round() : 165;
           assets.add({
             'id': 'ts_cover_${ts['id']}',
             'title': '$title (Package Cover)',
-            'file_name': fileName.isNotEmpty ? fileName : 'cover_${ts['id']}.png',
+            'file_name': fileName,
             'file_type': 'image',
             'mime_type': 'image/png',
-            'file_size_kb': 165,
+            'file_size_kb': approxSizeKb.clamp(10, 5000),
             'public_url': imgUrl,
             'category': 'Test Series Covers',
             'uploader_role': 'admin',
@@ -7196,14 +7222,23 @@ class SupabaseService {
       for (var p in pages) {
         final img = p.featuredImageUrl ?? '';
         if (img.isNotEmpty && !assets.any((a) => a['public_url'] == img)) {
-          final fileName = img.split('/').last.split('?').first;
+          String fileName;
+          if (img.startsWith('data:')) {
+            fileName = 'page_${p.slug}.png';
+          } else {
+            final rawName = img.split('/').last.split('?').first;
+            fileName = (rawName.length > 40 || rawName.contains('base64') || rawName.contains(';'))
+                ? 'page_${p.slug}.png'
+                : rawName;
+          }
+          final approxSizeKb = img.startsWith('data:') ? ((img.length * 3 / 4) / 1024).round() : 120;
           assets.add({
             'id': 'page_hero_${p.id}',
             'title': '${p.title} Featured Graphic',
-            'file_name': fileName.isNotEmpty ? fileName : 'page_${p.slug}.png',
+            'file_name': fileName,
             'file_type': 'image',
             'mime_type': 'image/png',
-            'file_size_kb': 120,
+            'file_size_kb': approxSizeKb.clamp(10, 5000),
             'public_url': img,
             'category': 'Website CMS Pages',
             'uploader_role': 'admin',

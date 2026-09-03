@@ -44,7 +44,8 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
     return _assets.where((item) {
       final q = _searchQuery.trim().toLowerCase();
       final title = (item['title'] ?? '').toString().toLowerCase();
-      final fileName = (item['file_name'] ?? '').toString().toLowerCase();
+      final rawFn = (item['file_name'] ?? '').toString();
+      final fileName = (rawFn.length > 50 ? rawFn.substring(0, 50) : rawFn).toLowerCase();
       final category = (item['category'] ?? '').toString().toLowerCase();
       final tags = (item['tags'] as List?)?.join(' ').toLowerCase() ?? '';
 
@@ -62,6 +63,52 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
 
       return matchesQuery && matchesType && matchesCategory;
     }).toList();
+  }
+
+  Widget _buildSafeImageThumbnail(String url, {double? height = 140, BoxFit fit = BoxFit.cover}) {
+    if (url.isEmpty) {
+      return const Center(
+        child: Icon(Icons.image_not_supported_rounded, size: 36, color: Color(0xFF94A3B8)),
+      );
+    }
+    if (url.startsWith('data:image') || (url.startsWith('data:') && url.contains('base64,'))) {
+      try {
+        final commaIndex = url.indexOf(',');
+        if (commaIndex != -1) {
+          final b64 = url.substring(commaIndex + 1);
+          final bytes = base64Decode(b64);
+          return Image.memory(
+            bytes,
+            width: double.infinity,
+            height: height,
+            fit: fit,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => const Center(
+              child: Icon(Icons.broken_image_rounded, size: 36, color: Color(0xFF94A3B8)),
+            ),
+          );
+        }
+      } catch (e) {
+        return const Center(
+          child: Icon(Icons.broken_image_rounded, size: 36, color: Color(0xFF94A3B8)),
+        );
+      }
+    }
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return Image.network(
+        url,
+        width: double.infinity,
+        height: height,
+        fit: fit,
+        gaplessPlayback: true,
+        errorBuilder: (_, __, ___) => const Center(
+          child: Icon(Icons.image_not_supported_rounded, size: 36, color: Color(0xFF94A3B8)),
+        ),
+      );
+    }
+    return const Center(
+      child: Icon(Icons.image_rounded, size: 36, color: Color(0xFF94A3B8)),
+    );
   }
 
   int get _imageCount => _assets.where((a) => a['file_type'] == 'image').length;
@@ -507,11 +554,7 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                             )
                           : ClipRRect(
                               borderRadius: BorderRadius.circular(12),
-                              child: Image.network(
-                                url,
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_rounded, size: 48, color: Color(0xFF94A3B8)),
-                              ),
+                              child: _buildSafeImageThumbnail(url, fit: BoxFit.contain),
                             ),
                 ),
               ),
@@ -520,7 +563,9 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      url,
+                      url.startsWith('data:')
+                          ? '[Embedded Data URI • ${(url.length / 1024).toStringAsFixed(1)} KB]'
+                          : (url.length > 50 ? '${url.substring(0, 47)}...' : url),
                       style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -770,13 +815,7 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                           ? const Icon(Icons.polyline_rounded, size: 48, color: Color(0xFF8B5CF6))
                           : ClipRRect(
                               borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
-                              child: Image.network(
-                                url,
-                                width: double.infinity,
-                                height: 140,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_rounded, size: 36, color: Color(0xFF94A3B8)),
-                              ),
+                              child: _buildSafeImageThumbnail(url, height: 140),
                             ),
                 ),
                 Positioned(
@@ -812,7 +851,7 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  fileName,
+                  fileName.length > 30 ? '${fileName.substring(0, 27)}...' : fileName,
                   style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -913,7 +952,12 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(a['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  Text(a['file_name'] ?? '', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  Text(
+                    (a['file_name'] ?? '').toString().length > 30
+                        ? '${(a['file_name'] ?? '').toString().substring(0, 27)}...'
+                        : (a['file_name'] ?? '').toString(),
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  ),
                 ],
               ),
             ),
