@@ -4,4 +4,4 @@ Disallow: /admin/
 Disallow: /superadmin/
 Disallow: /api/
 
-Sitemap: https://cosmyra.edtech/sitemap.xml
+Sitemap: https://neet-jee.in/sitemap.xml

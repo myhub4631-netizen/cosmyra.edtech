@@ -566,7 +566,7 @@ class _AdminPageEditorScreenState extends State<AdminPageEditorScreen> with Sing
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text('Cosmyra NEET JEE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF202124))),
-                          Text('https://cosmyra.edtech/pages/$displaySlug', style: const TextStyle(fontSize: 11, color: Color(0xFF5F6368))),
+                          Text('https://neet-jee.in/pages/$displaySlug', style: const TextStyle(fontSize: 11, color: Color(0xFF5F6368))),
                         ],
                       ),
                     ),
@@ -627,7 +627,7 @@ class _AdminPageEditorScreenState extends State<AdminPageEditorScreen> with Sing
             controller: _canonicalUrlController,
             decoration: InputDecoration(
               labelText: 'Canonical URL (Optional)',
-              hintText: 'https://cosmyra.edtech/pages/about-us',
+              hintText: 'https://neet-jee.in/pages/about-us',
               helperText: 'Leave blank to use default canonical URL',
               isDense: true,
               filled: true,

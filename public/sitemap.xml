@@ -1,57 +1,57 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://cosmyra.edtech/</loc>
+    <loc>https://neet-jee.in/</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://cosmyra.edtech/practice</loc>
+    <loc>https://neet-jee.in/practice</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://cosmyra.edtech/mock-tests</loc>
+    <loc>https://neet-jee.in/mock-tests</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://cosmyra.edtech/test-series</loc>
+    <loc>https://neet-jee.in/test-series</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://cosmyra.edtech/pyq</loc>
+    <loc>https://neet-jee.in/pyq</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://cosmyra.edtech/blog</loc>
+    <loc>https://neet-jee.in/blog</loc>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://cosmyra.edtech/about-us</loc>
+    <loc>https://neet-jee.in/about-us</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://cosmyra.edtech/contact-us</loc>
+    <loc>https://neet-jee.in/contact-us</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://cosmyra.edtech/faq</loc>
+    <loc>https://neet-jee.in/faq</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://cosmyra.edtech/privacy-policy</loc>
+    <loc>https://neet-jee.in/privacy-policy</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://cosmyra.edtech/terms-of-service</loc>
+    <loc>https://neet-jee.in/terms-of-service</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>

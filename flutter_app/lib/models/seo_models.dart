@@ -61,15 +61,15 @@ class SeoGlobalSettingsModel {
     this.defaultMetaTitle = 'Cosmyra NEET JEE - Practice Today, Achieve Tomorrow',
     this.defaultMetaDescription = 'Cosmyra NEET JEE provides comprehensive online exam prep with high-yield question banks, full-length mock tests, detailed analytics, and expert-crafted study materials.',
     this.defaultKeywords = 'NEET 2026, JEE 2026, NEET preparation, JEE Main, mock tests, question bank, test series, Cosmyra',
-    this.canonicalBaseUrl = 'https://cosmyra.edtech',
+    this.canonicalBaseUrl = 'https://neet-jee.in',
     this.defaultOgTitle = 'Cosmyra NEET JEE | Ace Your Medical & Engineering Entrance',
     this.defaultOgDescription = 'Join thousands of students cracking NEET & JEE with Cosmyra\'s AI-powered practice engine and top faculty test series.',
-    this.defaultOgImage = 'https://cosmyra.edtech/icons/Icon-512.png',
+    this.defaultOgImage = 'https://neet-jee.in/icons/Icon-512.png',
     this.twitterCardType = 'summary_large_image',
     this.twitterSiteHandle = '@cosmyra_edu',
     this.organizationName = 'Cosmyra Technologies Pvt. Ltd.',
-    this.organizationLogoUrl = 'https://cosmyra.edtech/assets/images/cosmyra_logo.png',
-    this.organizationContactEmail = 'support@cosmyra.edtech',
+    this.organizationLogoUrl = 'https://neet-jee.in/assets/images/cosmyra_logo.png',
+    this.organizationContactEmail = 'support@neet-jee.in',
     this.organizationPhone = '+91 98765 43210',
     this.robotsTxtContent = '''User-agent: *
 Allow: /
@@ -77,7 +77,7 @@ Disallow: /admin/
 Disallow: /superadmin/
 Disallow: /api/
 
-Sitemap: https://cosmyra.edtech/sitemap.xml''',
+Sitemap: https://neet-jee.in/sitemap.xml''',
     this.sitemapXmlEnabled = true,
     this.gscVerificationMethod = 'meta_tag',
     this.gscVerificationCode = 'U3bHrqMV9245aSAvvNJxbuheY1mOPNFDfXZkGbEvHys',
@@ -112,7 +112,7 @@ Sitemap: https://cosmyra.edtech/sitemap.xml''',
       defaultMetaTitle: json['default_meta_title']?.toString() ?? 'Cosmyra NEET JEE - Practice Today, Achieve Tomorrow',
       defaultMetaDescription: json['default_meta_description']?.toString() ?? '',
       defaultKeywords: json['default_keywords']?.toString() ?? '',
-      canonicalBaseUrl: json['canonical_base_url']?.toString() ?? 'https://cosmyra.edtech',
+      canonicalBaseUrl: json['canonical_base_url']?.toString() ?? 'https://neet-jee.in',
       defaultOgTitle: json['default_og_title']?.toString() ?? '',
       defaultOgDescription: json['default_og_description']?.toString() ?? '',
       defaultOgImage: json['default_og_image']?.toString() ?? '',

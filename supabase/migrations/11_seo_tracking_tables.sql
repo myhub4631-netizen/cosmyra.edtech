@@ -171,7 +171,7 @@ INSERT INTO public.seo_global_settings (
   'Cosmyra NEET JEE - Practice Today, Achieve Tomorrow',
   'Prepare for NEET and JEE with Cosmyra. Practice thousands of curated questions, take realistic mock tests, analyze performance, and master topics with top educators.',
   'NEET 2026, JEE Main 2026, NEET mock tests, online question bank, PYQ papers, medical entrance, engineering prep, Cosmyra',
-  'https://cosmyra.edtech',
+  'https://neet-jee.in',
   'U3bHrqMV9245aSAvvNJxbuheY1mOPNFDfXZkGbEvHys',
   true
 ) ON CONFLICT (id) DO NOTHING;
@@ -191,8 +191,8 @@ INSERT INTO public.seo_schemas (
   "@context": "https://schema.org",
   "@type": "EducationalOrganization",
   "name": "Cosmyra NEET JEE",
-  "url": "https://cosmyra.edtech",
-  "logo": "https://cosmyra.edtech/assets/images/cosmyra_logo.png",
+  "url": "https://neet-jee.in",
+  "logo": "https://neet-jee.in/assets/images/cosmyra_logo.png",
   "sameAs": [
     "https://facebook.com/cosmyraedu",
     "https://twitter.com/cosmyra_edu",
@@ -216,10 +216,10 @@ INSERT INTO public.seo_schemas (
   "@context": "https://schema.org",
   "@type": "WebSite",
   "name": "Cosmyra NEET JEE",
-  "url": "https://cosmyra.edtech",
+  "url": "https://neet-jee.in",
   "potentialAction": {
     "@type": "SearchAction",
-    "target": "https://cosmyra.edtech/practice?q={search_term_string}",
+    "target": "https://neet-jee.in/practice?q={search_term_string}",
     "query-input": "required name=search_term_string"
   }
 }',

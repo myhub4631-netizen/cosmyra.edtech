@@ -790,7 +790,7 @@ class _AdminBlogEditorScreenState extends State<AdminBlogEditorScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text('Cosmyra NEET JEE Blog', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF202124))),
-                          Text('https://cosmyra.edtech/blog/$displaySlug', style: const TextStyle(fontSize: 11, color: Color(0xFF5F6368))),
+                          Text('https://neet-jee.in/blog/$displaySlug', style: const TextStyle(fontSize: 11, color: Color(0xFF5F6368))),
                         ],
                       ),
                     ),
@@ -851,7 +851,7 @@ class _AdminBlogEditorScreenState extends State<AdminBlogEditorScreen> {
             controller: _canonicalUrlController,
             decoration: InputDecoration(
               labelText: 'Canonical URL (Optional)',
-              hintText: 'https://cosmyra.edtech/blog/...',
+              hintText: 'https://neet-jee.in/blog/...',
               helperText: 'Leave blank to use default canonical URL',
               isDense: true,
               filled: true,

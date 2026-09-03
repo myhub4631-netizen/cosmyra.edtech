@@ -420,7 +420,7 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
                     const SizedBox(height: 14),
                     _textField(controller: _keywordsCtrl, label: 'Default Meta Keywords (Comma separated)', hint: 'NEET 2026, JEE Main, Mock Tests, Cosmyra'),
                     const SizedBox(height: 14),
-                    _textField(controller: _canonicalUrlCtrl, label: 'Canonical Base URL *', hint: 'https://cosmyra.edtech'),
+                    _textField(controller: _canonicalUrlCtrl, label: 'Canonical Base URL *', hint: 'https://neet-jee.in'),
                   ],
                 ),
               ),
@@ -436,7 +436,7 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
                     const SizedBox(height: 14),
                     _textField(controller: _ogDescCtrl, label: 'Default Open Graph Description', hint: 'Join thousands of students cracking NEET & JEE...', maxLines: 2),
                     const SizedBox(height: 14),
-                    _textField(controller: _ogImageCtrl, label: 'Default Social Share Image URL (1200x630px recommended)', hint: 'https://cosmyra.edtech/icons/Icon-512.png'),
+                    _textField(controller: _ogImageCtrl, label: 'Default Social Share Image URL (1200x630px recommended)', hint: 'https://neet-jee.in/icons/Icon-512.png'),
                     const SizedBox(height: 14),
                     Row(
                       children: [
@@ -471,7 +471,7 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
                       children: [
                         Expanded(child: _textField(controller: _orgNameCtrl, label: 'Organization Legal Name', hint: 'Cosmyra Technologies Pvt. Ltd.')),
                         const SizedBox(width: 14),
-                        Expanded(child: _textField(controller: _orgEmailCtrl, label: 'Support / Contact Email', hint: 'support@cosmyra.edtech')),
+                        Expanded(child: _textField(controller: _orgEmailCtrl, label: 'Support / Contact Email', hint: 'support@neet-jee.in')),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -479,7 +479,7 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
                       children: [
                         Expanded(child: _textField(controller: _orgPhoneCtrl, label: 'Support Phone Number', hint: '+91 98765 43210')),
                         const SizedBox(width: 14),
-                        Expanded(child: _textField(controller: _orgLogoCtrl, label: 'Organization Logo URL', hint: 'https://cosmyra.edtech/assets/images/cosmyra_logo.png')),
+                        Expanded(child: _textField(controller: _orgLogoCtrl, label: 'Organization Logo URL', hint: 'https://neet-jee.in/assets/images/cosmyra_logo.png')),
                       ],
                     ),
                   ],
@@ -1115,7 +1115,7 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
                           Icon(Icons.link_rounded, color: Color(0xFF4F46E5), size: 20),
                           SizedBox(width: 8),
                           Text('Live Sitemap Endpoint: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                          Text('https://cosmyra.edtech/sitemap.xml', style: TextStyle(fontFamily: 'monospace', color: Color(0xFF4F46E5), fontSize: 13)),
+                          Text('https://neet-jee.in/sitemap.xml', style: TextStyle(fontFamily: 'monospace', color: Color(0xFF4F46E5), fontSize: 13)),
                         ],
                       ),
                     ),
