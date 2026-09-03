@@ -6250,6 +6250,118 @@ class SupabaseService {
     },
   ];
 
+  /// Fetch all coupons (alias for Admin Pricing screen)
+  static Future<List<Map<String, dynamic>>> fetchAdminCoupons() => fetchAllCoupons();
+
+  /// Fetch all coupons (for Admin Dashboard and Cart validation)
+  static Future<List<Map<String, dynamic>>> fetchAllCoupons() async {
+    final List<Map<String, dynamic>> list = [];
+    final Set<String> seenCodes = {};
+
+    // 1. Remote Supabase coupons
+    try {
+      final res = await client.from('coupons').select().order('created_at', ascending: false);
+      if (res != null && (res as List).isNotEmpty) {
+        for (var item in res) {
+          final map = Map<String, dynamic>.from(item as Map);
+          final code = (map['code'] ?? '').toString().toUpperCase();
+          if (code.isNotEmpty && !seenCodes.contains(code)) {
+            seenCodes.add(code);
+            list.add(map);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice querying coupons table from Supabase: $e');
+    }
+
+    // 2. Locally edited coupons from SharedPreferences
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString('cosmyra_admin_coupons');
+      if (str != null && str.isNotEmpty) {
+        final decoded = jsonDecode(str) as List<dynamic>;
+        for (var item in decoded) {
+          final map = Map<String, dynamic>.from(item as Map);
+          final code = (map['code'] ?? '').toString().toUpperCase();
+          if (code.isNotEmpty && !seenCodes.contains(code)) {
+            seenCodes.add(code);
+            list.add(map);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice reading local admin coupons: $e');
+    }
+
+    // 3. Fallback to default seed coupons
+    for (var def in _defaultSeedCoupons) {
+      final code = (def['code'] ?? '').toString().toUpperCase();
+      if (!seenCodes.contains(code)) {
+        seenCodes.add(code);
+        list.add(Map<String, dynamic>.from(def));
+      }
+    }
+
+    return list;
+  }
+
+  static Future<void> saveCoupon(Map<String, dynamic> coupon) async {
+    final list = await fetchAllCoupons();
+    final String code = (coupon['code'] ?? '').toString().toUpperCase();
+    coupon['code'] = code;
+    coupon['updated_at'] = DateTime.now().toIso8601String();
+
+    final index = list.indexWhere((e) => (e['code'] ?? '').toString().toUpperCase() == code);
+    if (index >= 0) {
+      list[index] = coupon;
+    } else {
+      list.insert(0, coupon);
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_admin_coupons', jsonEncode(list));
+    } catch (e) {
+      debugPrint('Error caching coupon locally: $e');
+    }
+
+    try {
+      await client.from('coupons').upsert(coupon);
+    } catch (e) {
+      debugPrint('Notice saving coupon to Supabase: $e');
+    }
+  }
+
+  static Future<void> deleteCoupon(String code) async {
+    final cleanCode = code.trim().toUpperCase();
+    final list = await fetchAllCoupons();
+    list.removeWhere((e) => (e['code'] ?? '').toString().toUpperCase() == cleanCode);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_admin_coupons', jsonEncode(list));
+    } catch (e) {
+      debugPrint('Error deleting local coupon: $e');
+    }
+
+    try {
+      await client.from('coupons').delete().eq('code', cleanCode);
+    } catch (e) {
+      debugPrint('Notice deleting coupon in Supabase: $e');
+    }
+  }
+
+  static Future<void> toggleCouponStatus(String code, bool isActive) async {
+    final cleanCode = code.trim().toUpperCase();
+    final list = await fetchAllCoupons();
+    final item = list.firstWhere((e) => (e['code'] ?? '').toString().toUpperCase() == cleanCode, orElse: () => {});
+    if (item.isNotEmpty) {
+      item['is_active'] = isActive;
+      await saveCoupon(item);
+    }
+  }
+
   /// Validate coupon against Supabase or seed fallback
   static Future<Map<String, dynamic>> validateCoupon(String rawCode, double cartSubtotal) async {
     final code = rawCode.trim().toUpperCase();
@@ -6271,7 +6383,8 @@ class SupabaseService {
     }
 
     if (matchedCoupon == null) {
-      final local = _defaultSeedCoupons.firstWhere(
+      final all = await fetchAllCoupons();
+      final local = all.firstWhere(
         (c) => (c['code'] as String).toUpperCase() == code && c['is_active'] == true,
         orElse: () => {},
       );
@@ -6699,34 +6812,6 @@ class SupabaseService {
     return subs;
   }
 
-  /// Admin: Fetch active coupons
-  static Future<List<Map<String, dynamic>>> fetchAdminCoupons() async {
-    final List<Map<String, dynamic>> coupons = [];
-
-    try {
-      final res = await client.from('coupons').select().order('created_at', ascending: false);
-      if (res is List) {
-        coupons.addAll(res.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
-      }
-    } catch (e) {
-      debugPrint('Notice fetching coupons from Supabase: $e');
-    }
-
-    if (coupons.isEmpty) {
-      coupons.addAll(_defaultSeedCoupons);
-    }
-
-    return coupons;
-  }
-
-  /// Admin: Save / create coupon
-  static Future<void> saveCoupon(Map<String, dynamic> couponData) async {
-    try {
-      await client.from('coupons').upsert(couponData);
-    } catch (e) {
-      debugPrint('Notice upserting coupon to Supabase: $e');
-    }
-  }
 }
 
 

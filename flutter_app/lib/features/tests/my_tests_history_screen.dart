@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
@@ -436,7 +437,7 @@ class _MyTestsHistoryScreenState extends State<MyTestsHistoryScreen> {
               ),
             ),
             InkWell(
-              onTap: widget.onBack ?? () => Navigator.of(context).maybePop(),
+              onTap: widget.onBack ?? () => (context.canPop() ? context.pop() : context.go('/dashboard')),
               borderRadius: BorderRadius.circular(10),
               child: const Padding(
                 padding: EdgeInsets.all(6.0),

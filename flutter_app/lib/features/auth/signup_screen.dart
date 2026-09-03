@@ -91,7 +91,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Account created successfully! Welcome to ExamPrep.'),
+            content: Text('Account created successfully! Welcome to Cosmyra NEET | JEE.'),
             backgroundColor: Color(0xFF10B981),
           ),
         );
@@ -118,7 +118,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Account created successfully! Welcome to ExamPrep.'),
+              content: Text('Account created successfully! Welcome to Cosmyra NEET | JEE.'),
               backgroundColor: Color(0xFF10B981),
             ),
           );
@@ -332,7 +332,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         ),
         const SizedBox(height: 14),
         const Text(
-          'Join thousands of aspirants who are preparing smarter every day with ExamPrep.',
+          'Join thousands of aspirants who are preparing smarter every day with Cosmyra NEET | JEE.',
           style: TextStyle(fontSize: 15, color: Color(0xFF475569), height: 1.4),
         ),
         const SizedBox(height: 32),

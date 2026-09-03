@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/app_sidebar.dart';
@@ -261,20 +262,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         Row(
           children: [
-            Builder(
-              builder: (ctx) => InkWell(
-                onTap: () => Scaffold.of(ctx).openDrawer(),
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.all(6.0),
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: const Icon(Icons.menu_rounded, size: 20, color: Color(0xFF0F172A)),
+            InkWell(
+              onTap: () => context.canPop() ? context.pop() : context.go('/dashboard'),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.all(6.0),
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
+                child: const Icon(Icons.arrow_back_rounded, size: 20, color: Color(0xFF0F172A)),
               ),
             ),
             Column(
@@ -346,34 +345,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // Avatar with camera button overlay
               Stack(
                 children: [
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF4F46E5)]),
-                      boxShadow: [BoxShadow(color: const Color(0xFF4F46E5).withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 4))],
-                    ),
-                    child: Center(
-                      child: Text(
-                        _currentProfile.fullName.isNotEmpty ? _currentProfile.fullName[0].toUpperCase() : 'M',
-                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                    ),
-                  ),
+                  _buildAvatarWidget(76),
                   Positioned(
                     right: 0,
                     bottom: 0,
                     child: InkWell(
-                      onTap: () => _showEditProfileBottomSheet(context),
+                      onTap: () => _showAvatarPickerModal(context),
                       child: Container(
-                        padding: const EdgeInsets.all(5),
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: const Color(0xFF4F46E5),
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 4, offset: const Offset(0, 2)),
+                          ],
                         ),
-                        child: const Icon(Icons.camera_alt_rounded, size: 13, color: Colors.white),
+                        child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
                       ),
                     ),
                   ),
@@ -1620,6 +1608,270 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       },
     );
+  }
+
+  Widget _buildAvatarWidget(double size) {
+    final avatar = _currentProfile.avatarUrl ?? '';
+    if (avatar.startsWith('avatar:')) {
+      final emoji = avatar.replaceFirst('avatar:', '');
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xFFF1F5F9),
+          border: Border.all(color: const Color(0xFFCBD5E1), width: 2),
+        ),
+        child: Center(
+          child: Text(emoji, style: TextStyle(fontSize: size * 0.48)),
+        ),
+      );
+    } else if (avatar.startsWith('data:image') || avatar.startsWith('http')) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFF4F46E5), width: 2),
+          image: DecorationImage(
+            image: avatar.startsWith('data:image')
+                ? MemoryImage(base64Decode(avatar.split(',').last))
+                : NetworkImage(avatar) as ImageProvider,
+            fit: BoxFit.cover,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF4F46E5)]),
+        boxShadow: [BoxShadow(color: const Color(0xFF4F46E5).withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 4))],
+      ),
+      child: Center(
+        child: Text(
+          _currentProfile.fullName.isNotEmpty ? _currentProfile.fullName[0].toUpperCase() : 'M',
+          style: TextStyle(fontSize: size * 0.42, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+      ),
+    );
+  }
+
+  void _showAvatarPickerModal(BuildContext context) {
+    final presetAvatars = [
+      {'label': 'Future Doctor', 'emoji': '🩺', 'color': 0xFF2563EB},
+      {'label': 'Aspirant Scholar', 'emoji': '🤓', 'color': 0xFF7C3AED},
+      {'label': 'Top Ranker', 'emoji': '🎓', 'color': 0xFF059669},
+      {'label': 'Surgeon Specialist', 'emoji': '👨‍⚕️', 'color': 0xFF0891B2},
+      {'label': 'Medical Expert', 'emoji': '👩‍⚕️', 'color': 0xFFDB2777},
+      {'label': 'Science Chemist', 'emoji': '🔬', 'color': 0xFFEA580C},
+      {'label': 'Gold Medalist', 'emoji': '🏆', 'color': 0xFFD97706},
+      {'label': 'Focused Ninja', 'emoji': '🥷', 'color': 0xFF475569},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Choose Your Avatar or Photo',
+                    style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+                  ),
+                  IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Select an aspirant avatar or upload a custom photo (Max 100 KB)',
+                style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 18),
+
+              // Upload Custom Button (Max 100 KB)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
+                    side: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.cloud_upload_rounded, color: Color(0xFF4F46E5)),
+                  label: Text(
+                    'Upload Custom Profile Photo (Max 100 KB)',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF4F46E5)),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await _pickAndUploadProfilePic();
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 20),
+              Text('Preset Aspirant Avatars', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF334155))),
+              const SizedBox(height: 12),
+
+              // Preset Avatars Grid
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.9,
+                ),
+                itemCount: presetAvatars.length,
+                itemBuilder: (context, idx) {
+                  final av = presetAvatars[idx];
+                  final emoji = av['emoji'] as String;
+                  final label = av['label'] as String;
+                  final color = Color(av['color'] as int);
+                  final isSelected = _currentProfile.avatarUrl == 'avatar:$emoji';
+
+                  return InkWell(
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final updated = _currentProfile.copyWith(avatarUrl: 'avatar:$emoji');
+                      await _saveProfileData(updated);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('✓ Selected $label avatar!'), backgroundColor: const Color(0xFF10B981)),
+                        );
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: isSelected ? color.withOpacity(0.15) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? color : const Color(0xFFE2E8F0),
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(emoji, style: const TextStyle(fontSize: 28)),
+                          const SizedBox(height: 4),
+                          Text(
+                            label,
+                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndUploadProfilePic() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      final bytes = file.bytes;
+
+      if (bytes == null || bytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not read image file.'), backgroundColor: Color(0xFFEF4444)),
+          );
+        }
+        return;
+      }
+
+      // Enforce 100 KB max limit
+      const maxAllowedBytes = 100 * 1024; // 100 KB
+      if (bytes.lengthInBytes > maxAllowedBytes) {
+        final double sizeKb = bytes.lengthInBytes / 1024.0;
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: const [
+                  Icon(Icons.warning_amber_rounded, color: Color(0xFFEA580C)),
+                  SizedBox(width: 8),
+                  Text('Image Too Large'),
+                ],
+              ),
+              content: Text(
+                'Selected photo is ${sizeKb.toStringAsFixed(1)} KB.\n\nMaximum allowed upload size is 100 KB. Please compress your photo or select one of the preset aspirant avatars.',
+                style: const TextStyle(fontSize: 13.5, height: 1.4),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('OK'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showAvatarPickerModal(context);
+                  },
+                  child: const Text('Choose Preset Avatar'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+
+      // Convert to base64 Data URL (reliable, fast, works across web and mobile)
+      final mime = file.extension?.toLowerCase() == 'png' ? 'image/png' : 'image/jpeg';
+      final base64String = base64Encode(bytes);
+      final dataUrl = 'data:$mime;base64,$base64String';
+
+      final updated = _currentProfile.copyWith(avatarUrl: dataUrl);
+      await _saveProfileData(updated);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✓ Profile picture updated successfully!'), backgroundColor: Color(0xFF10B981)),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error uploading profile picture: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: $e'), backgroundColor: const Color(0xFFEF4444)),
+        );
+      }
+    }
   }
 }
 

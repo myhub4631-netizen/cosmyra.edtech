@@ -391,6 +391,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false, onTap: () => context.go('/admin/questions/upload')),
                 _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => context.go('/admin/hierarchy')),
                 _buildSidebarTile('Pricing & Plans', Icons.sell_outlined, false, onTap: () => context.go('/admin/pricing')),
+                _buildSidebarTile('Coupon Management', Icons.discount_outlined, false, onTap: () => context.go('/admin/coupons')),
                 _buildSidebarTile('Banner Management', Icons.view_carousel_rounded, false, onTap: () => context.go('/admin/banners')),
                 _buildSidebarTile('Chapters & Topics', Icons.auto_stories_rounded, false, onTap: () => context.go('/admin/chapters')),
                 _buildSidebarTile('Tags & Topics', Icons.label_outline_rounded, false, onTap: () => context.go('/admin/topics')),

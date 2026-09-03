@@ -64,7 +64,7 @@ class _ResponsiveLayoutShellState extends State<ResponsiveLayoutShell> {
                               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              'ExamPrep • NEET & JEE',
+                              'Cosmyra • NEET & JEE',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
                             ),
                           ],

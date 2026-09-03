@@ -719,13 +719,19 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
               ),
               const SizedBox(width: 4),
               Container(
-                width: 32,
-                height: 32,
+                padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
-                child: const Icon(Icons.school_rounded, color: Colors.white, size: 18),
+                child: Image.asset(
+                  'assets/images/cosmyra_logo.png',
+                  height: 30,
+                  width: 30,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, color: Color(0xFF4F46E5), size: 20),
+                ),
               ),
               const SizedBox(width: 10),
               Column(
@@ -733,7 +739,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'ExamPrep',
+                    'Cosmyra NEET | JEE',
                     style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
                   ),
                   Row(

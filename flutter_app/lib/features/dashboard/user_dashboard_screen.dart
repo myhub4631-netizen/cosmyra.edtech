@@ -104,7 +104,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             body: SafeArea(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
+                padding: const EdgeInsets.fromLTRB(14.0, 8.0, 14.0, 96.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -910,65 +910,82 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       {'icon': Icons.person_outline_rounded, 'label': 'Profile'},
     ];
 
-    return Container(
-      height: 64,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: List.generate(navs.length, (idx) {
-          final isSelected = _mobileBottomNavIndex == idx;
-          final item = navs[idx];
+    return SafeArea(
+      top: false,
+      bottom: true,
+      child: Container(
+        height: 64,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: const Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F172A).withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: List.generate(navs.length, (idx) {
+            final isSelected = _mobileBottomNavIndex == idx;
+            final item = navs[idx];
 
-          return InkWell(
-            onTap: () {
-              setState(() => _mobileBottomNavIndex = idx);
-              if (idx == 1) widget.onOpenPractice();
-              if (idx == 2) {
-                if (widget.onOpenMyTests != null) {
-                  widget.onOpenMyTests!();
-                } else {
-                  widget.onOpenMockTests();
+            return InkWell(
+              onTap: () {
+                setState(() => _mobileBottomNavIndex = idx);
+                if (idx == 0) {
+                  // Already on home
+                } else if (idx == 1) {
+                  widget.onOpenPractice();
+                } else if (idx == 2) {
+                  if (widget.onOpenMyTests != null) {
+                    widget.onOpenMyTests!();
+                  } else {
+                    widget.onOpenMockTests();
+                  }
+                } else if (idx == 3) {
+                  if (widget.onOpenLeaderboard != null) {
+                    widget.onOpenLeaderboard!();
+                  } else {
+                    context.push('/leaderboard');
+                  }
+                } else if (idx == 4) {
+                  // Direct navigation to Profile Screen
+                  context.push('/profile');
                 }
-              }
-              if (idx == 3) {
-                if (widget.onOpenLeaderboard != null) {
-                  widget.onOpenLeaderboard!();
-                } else {
-                  context.go('/leaderboard');
-                }
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFFF3E8FF) : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    item['icon'] as IconData,
-                    size: 20,
-                    color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item['label'] as String,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFFF3E8FF) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      item['icon'] as IconData,
+                      size: 21,
                       color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      item['label'] as String,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        }),
+            );
+          }),
+        ),
       ),
     );
   }
@@ -1203,12 +1220,19 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2563EB),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
-                  child: const Icon(Icons.school, color: Colors.white, size: 22),
+                  child: Image.asset(
+                    'assets/images/cosmyra_logo.png',
+                    height: 34,
+                    width: 34,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.school, color: Color(0xFF4F46E5), size: 24),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1216,7 +1240,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Cosmyra Edu',
+                        'Cosmyra NEET | JEE',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
