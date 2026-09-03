@@ -615,7 +615,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       }
     }
 
-    // Open unified production e-commerce checkout dialog
+    // Navigate to dedicated full page checkout
     final cartItem = CartItem(
       id: item.id,
       title: item.title,
@@ -628,27 +628,12 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       testCount: item.testCount,
     );
 
-    EcommerceCheckoutDialog.show(
-      context,
-      singleItem: cartItem,
-      onStartTest: (testId, title, duration) => _startTestSeries(testId, title, duration),
-    );
+    context.push('/checkout', extra: cartItem);
   }
 
   void _showProductDetailsModal(TestSeriesCardData item) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => _TestSeriesProductDetailDialog(
-        item: item,
-        dbPapers: _dbPapers,
-        onStartTest: (testId, title, duration) {
-          _startTestSeries(testId, title, duration);
-        },
-        onDownloadSyllabus: (it) => _handleDownloadSyllabus(it),
-        onPurchase: (it) => _handlePurchaseOrEnroll(it),
-      ),
-    );
+    // Navigate directly to dedicated full-page product description
+    context.push('/product/${item.id}');
   }
 
   @override
@@ -773,7 +758,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                 animation: CartService.instance,
                 builder: (ctx, _) => IconButton(
                   tooltip: 'Shopping Cart',
-                  onPressed: () => EcommerceCartModal.show(context, onStartTest: _startTestSeries),
+                  onPressed: () => context.push('/cart'),
                   icon: Badge(
                     isLabelVisible: CartService.instance.isNotEmpty,
                     label: Text(

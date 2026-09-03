@@ -20,6 +20,10 @@ import '../../features/mistakes_bookmarks/mistakes_bookmarks_screen.dart';
 import '../../features/analytics/analytics_screen.dart';
 import '../../features/leaderboard/leaderboard_screen.dart';
 import '../../features/student/test_series_screen.dart';
+import '../../features/student/product_detail_screen.dart';
+import '../../features/student/checkout_screen.dart';
+import '../../features/student/cart_screen.dart';
+import '../services/cart_service.dart';
 import '../../features/tests/mock_tests_screen.dart';
 import '../../features/tests/test_screen.dart';
 import '../../features/tests/test_result_screen.dart';
@@ -309,31 +313,33 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/products/:id',
-      builder: (context, state) => TestSeriesScreen(
-        onBackToDashboard: () => context.go('/dashboard'),
-        onNavigateTab: (idx) {},
+      builder: (context, state) => ProductDetailScreen(
+        productId: state.pathParameters['id'] ?? 'ts_neet_all_india_2026',
       ),
     ),
     GoRoute(
       path: '/product/:id',
-      builder: (context, state) => TestSeriesScreen(
-        onBackToDashboard: () => context.go('/dashboard'),
-        onNavigateTab: (idx) {},
+      builder: (context, state) => ProductDetailScreen(
+        productId: state.pathParameters['id'] ?? 'ts_neet_all_india_2026',
       ),
     ),
     GoRoute(
       path: '/cart',
-      builder: (context, state) => TestSeriesScreen(
-        onBackToDashboard: () => context.go('/dashboard'),
-        onNavigateTab: (idx) {},
-      ),
+      builder: (context, state) => const CartScreen(),
     ),
     GoRoute(
       path: '/checkout',
-      builder: (context, state) => TestSeriesScreen(
-        onBackToDashboard: () => context.go('/dashboard'),
-        onNavigateTab: (idx) {},
-      ),
+      builder: (context, state) {
+        CartItem? item;
+        if (state.extra is CartItem) {
+          item = state.extra as CartItem;
+        }
+        final productId = state.uri.queryParameters['id'] ?? state.uri.queryParameters['productId'];
+        return CheckoutScreen(
+          singleItem: item,
+          productId: productId,
+        );
+      },
     ),
     GoRoute(
       path: '/test/:testId/start',

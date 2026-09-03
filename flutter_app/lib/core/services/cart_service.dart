@@ -72,6 +72,8 @@ class CartService extends ChangeNotifier {
   bool get isEmpty => _items.isEmpty;
   bool get isNotEmpty => _items.isNotEmpty;
   Map<String, dynamic>? get appliedCoupon => _appliedCoupon;
+  String? get appliedCouponCode => _appliedCoupon?['code']?.toString();
+  double get finalTotal => finalAmount;
   bool get isLoading => _isLoading;
 
   double get subtotal {
