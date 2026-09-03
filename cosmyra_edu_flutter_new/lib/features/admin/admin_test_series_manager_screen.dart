@@ -1024,13 +1024,24 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     }
   }
 
+  String _normalizeTestType(String? raw) {
+    final t = (raw ?? '').trim();
+    if (t == 'Full' || t == 'Full Syllabus') return 'Full Syllabus';
+    if (t == 'Part + Unit + Full' || t == 'Part + Unit + Full Syllabus') return 'Part + Unit + Full Syllabus';
+    if (t == 'Chapter + Part + Unit + Full' || t == 'Chapter + Part + Unit + Full Syllabus') return 'Chapter + Part + Unit + Full Syllabus';
+    if (t == 'Part' || t == 'Part Syllabus') return 'Part Syllabus';
+    if (t == 'Chapter' || t == 'Chapter Wise') return 'Chapter Wise';
+    if (t == 'Topic' || t == 'Topic Wise') return 'Topic Wise';
+    return 'Full Syllabus';
+  }
+
   // --- SUB DIALOG: ADD CUSTOM TEST ---
   void _showAddTestDialog() {
     final titleCtrl = TextEditingController(text: 'Mock Test ${_tests.length + 1}');
     final qCtrl = TextEditingController(text: _exam.contains('JEE') ? '90' : '200');
     final marksCtrl = TextEditingController(text: _exam.contains('JEE') ? '300' : '720');
     final durCtrl = TextEditingController(text: '180');
-    String type = _testType;
+    String type = _normalizeTestType(_testType);
 
     showDialog(
       context: context,
@@ -1045,16 +1056,31 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
             ],
           ),
           content: SizedBox(
-            width: 440,
+            width: 460,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   TextFormField(
                     controller: titleCtrl,
                     decoration: const InputDecoration(labelText: 'Test Name / Title *', hintText: 'e.g. Full Syllabus Mock 01'),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    value: type,
+                    decoration: const InputDecoration(labelText: 'Test Type *'),
+                    items: const [
+                      DropdownMenuItem(value: 'Full Syllabus', child: Text('Full Syllabus')),
+                      DropdownMenuItem(value: 'Part + Unit + Full Syllabus', child: Text('Part + Unit + Full Syllabus')),
+                      DropdownMenuItem(value: 'Chapter + Part + Unit + Full Syllabus', child: Text('Chapter + Part + Unit + Full Syllabus')),
+                      DropdownMenuItem(value: 'Part Syllabus', child: Text('Part Syllabus')),
+                      DropdownMenuItem(value: 'Chapter Wise', child: Text('Chapter Wise')),
+                      DropdownMenuItem(value: 'Topic Wise', child: Text('Topic Wise')),
+                    ],
+                    onChanged: (v) => setDlgState(() => type = v!),
+                  ),
+                  const SizedBox(height: 14),
                   Row(
                     children: [
                       Expanded(
@@ -1074,7 +1100,7 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Row(
                     children: [
                       Expanded(
@@ -1087,16 +1113,14 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                       const SizedBox(width: 12),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: ['Full', 'Part + Unit + Full', 'Chapter + Part + Unit + Full', 'Part', 'Chapter'].contains(type) ? type : 'Full',
-                          decoration: const InputDecoration(labelText: 'Test Type *'),
+                          value: 'Not Attempted',
+                          decoration: const InputDecoration(labelText: 'Initial Status *'),
                           items: const [
-                            DropdownMenuItem(value: 'Full', child: Text('Full Syllabus')),
-                            DropdownMenuItem(value: 'Part + Unit + Full', child: Text('Part + Unit + Full')),
-                            DropdownMenuItem(value: 'Chapter + Part + Unit + Full', child: Text('Chapter + Part + Unit + Full')),
-                            DropdownMenuItem(value: 'Part', child: Text('Part Syllabus')),
-                            DropdownMenuItem(value: 'Chapter', child: Text('Chapter Wise')),
+                            DropdownMenuItem(value: 'Not Attempted', child: Text('Not Attempted')),
+                            DropdownMenuItem(value: 'In Progress', child: Text('In Progress')),
+                            DropdownMenuItem(value: 'Completed', child: Text('Completed')),
                           ],
-                          onChanged: (v) => setDlgState(() => type = v!),
+                          onChanged: (_) {},
                         ),
                       ),
                     ],
@@ -1107,7 +1131,7 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
+            ElevatedButton.icon(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
               onPressed: () {
                 if (titleCtrl.text.trim().isEmpty) return;
@@ -1125,12 +1149,190 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                 });
                 Navigator.pop(ctx);
               },
-              child: const Text('Add Test'),
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Add Test'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  // --- SUB DIALOG: EDIT EXISTING TEST ---
+  void _showEditTestDialog(int index) {
+    if (index < 0 || index >= _tests.length) return;
+    final t = _tests[index];
+    final titleCtrl = TextEditingController(text: (t['title'] ?? 'Test ${index + 1}').toString());
+    final qCtrl = TextEditingController(text: (t['questions'] ?? 200).toString());
+    final marksCtrl = TextEditingController(text: (t['marks'] ?? 720).toString());
+    final durCtrl = TextEditingController(text: (t['duration'] ?? 180).toString());
+    String type = _normalizeTestType(t['type']?.toString());
+    String status = (t['status'] ?? 'Not Attempted').toString();
+    if (!['Not Attempted', 'In Progress', 'Completed'].contains(status)) {
+      status = 'Not Attempted';
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.edit_note_rounded, color: Color(0xFF4F46E5), size: 20),
+              ),
+              const SizedBox(width: 10),
+              Text('Edit Test #${index + 1}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    controller: titleCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Test Name / Title *',
+                      hintText: 'e.g. Part Test 1',
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    value: type,
+                    decoration: const InputDecoration(labelText: 'Test Type *'),
+                    items: const [
+                      DropdownMenuItem(value: 'Full Syllabus', child: Text('Full Syllabus')),
+                      DropdownMenuItem(value: 'Part + Unit + Full Syllabus', child: Text('Part + Unit + Full Syllabus')),
+                      DropdownMenuItem(value: 'Chapter + Part + Unit + Full Syllabus', child: Text('Chapter + Part + Unit + Full Syllabus')),
+                      DropdownMenuItem(value: 'Part Syllabus', child: Text('Part Syllabus')),
+                      DropdownMenuItem(value: 'Chapter Wise', child: Text('Chapter Wise')),
+                      DropdownMenuItem(value: 'Topic Wise', child: Text('Topic Wise')),
+                    ],
+                    onChanged: (v) => setDlgState(() => type = v!),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: qCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: 'Questions Count *'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextFormField(
+                          controller: marksCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: 'Total Marks *'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: durCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: 'Duration (Minutes) *'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: status,
+                          decoration: const InputDecoration(labelText: 'Attempt Status *'),
+                          items: const [
+                            DropdownMenuItem(value: 'Not Attempted', child: Text('Not Attempted')),
+                            DropdownMenuItem(value: 'In Progress', child: Text('In Progress')),
+                            DropdownMenuItem(value: 'Completed', child: Text('Completed')),
+                          ],
+                          onChanged: (v) => setDlgState(() => status = v!),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
+              onPressed: () {
+                if (titleCtrl.text.trim().isEmpty) return;
+                setState(() {
+                  _tests[index] = {
+                    ...t,
+                    'title': titleCtrl.text.trim(),
+                    'questions': int.tryParse(qCtrl.text.trim()) ?? 200,
+                    'marks': int.tryParse(marksCtrl.text.trim()) ?? 720,
+                    'duration': int.tryParse(durCtrl.text.trim()) ?? 180,
+                    'type': type,
+                    'status': status,
+                  };
+                });
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('✓ Updated "${titleCtrl.text.trim()}" successfully!'),
+                    duration: const Duration(seconds: 2),
+                    backgroundColor: const Color(0xFF10B981),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.check_rounded, size: 16),
+              label: const Text('Save Test Changes'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _moveTestUp(int index) {
+    if (index > 0) {
+      setState(() {
+        final item = _tests.removeAt(index);
+        _tests.insert(index - 1, item);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Moved test to #$index'),
+          duration: const Duration(milliseconds: 900),
+          backgroundColor: const Color(0xFF4F46E5),
+        ),
+      );
+    }
+  }
+
+  void _moveTestDown(int index) {
+    if (index < _tests.length - 1) {
+      setState(() {
+        final item = _tests.removeAt(index);
+        _tests.insert(index + 1, item);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Moved test to #${index + 2}'),
+          duration: const Duration(milliseconds: 900),
+          backgroundColor: const Color(0xFF4F46E5),
+        ),
+      );
+    }
   }
 
   // --- SUB DIALOG: LINK PUBLISHED PAPER ---
@@ -2069,7 +2271,28 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                 ],
               ),
             )
-          else
+          else ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFDBEAFE)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, color: Color(0xFF2563EB), size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Use ↑ and ↓ buttons to reorder tests. Click the type pill to change test type, or pencil icon to edit full test specifications.',
+                      style: TextStyle(fontSize: 11.5, color: Color(0xFF1E40AF), fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -2081,11 +2304,11 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                 final qCount = t['questions'] ?? 200;
                 final marks = t['marks'] ?? 720;
                 final duration = t['duration'] ?? 180;
-                final type = (t['type'] ?? 'Full').toString();
+                final type = _normalizeTestType((t['type'] ?? 'Full').toString());
                 final status = (t['status'] ?? 'Not Attempted').toString();
 
                 return Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
@@ -2093,6 +2316,7 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                   ),
                   child: Row(
                     children: [
+                      // Order Badge
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
@@ -2105,41 +2329,164 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                         ),
                       ),
                       const SizedBox(width: 12),
+
+                      // Test Details (Clickable to Edit)
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF0F172A))),
-                            const SizedBox(height: 4),
-                            Wrap(
-                              spacing: 8,
+                        child: InkWell(
+                          onTap: () => _showEditTestDialog(idx),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildMiniBadge('$qCount Qs'),
-                                _buildMiniBadge('$marks Marks'),
-                                _buildMiniBadge('$duration Mins'),
-                                _buildMiniBadge('$type Syllabus'),
-                                _buildMiniBadge(status, color: const Color(0xFF10B981)),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        title,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF0F172A)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    _buildMiniBadge('$qCount Qs'),
+                                    _buildMiniBadge('$marks Marks'),
+                                    _buildMiniBadge('$duration Mins'),
+                                    // Interactive Test Type Dropdown Chip
+                                    _buildTypeChangeChip(idx, type),
+                                    _buildMiniBadge(
+                                      status,
+                                      color: status == 'Completed'
+                                          ? const Color(0xFF10B981)
+                                          : (status == 'In Progress' ? const Color(0xFFF59E0B) : const Color(0xFF64748B)),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
-                        tooltip: 'Remove Test',
-                        onPressed: () {
-                          setState(() {
-                            _tests.removeAt(idx);
-                            _testCountCtrl.text = _tests.length.toString();
-                          });
-                        },
+
+                      // Reorder and Edit Actions
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_upward_rounded, size: 18),
+                            color: idx > 0 ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                            tooltip: 'Move Up in Order',
+                            onPressed: idx > 0 ? () => _moveTestUp(idx) : null,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.arrow_downward_rounded, size: 18),
+                            color: idx < _tests.length - 1 ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                            tooltip: 'Move Down in Order',
+                            onPressed: idx < _tests.length - 1 ? () => _moveTestDown(idx) : null,
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, color: Color(0xFF4F46E5), size: 18),
+                            tooltip: 'Edit Test Details',
+                            onPressed: () => _showEditTestDialog(idx),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                            tooltip: 'Remove Test',
+                            onPressed: () {
+                              setState(() {
+                                _tests.removeAt(idx);
+                                _testCountCtrl.text = _tests.length.toString();
+                              });
+                            },
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 );
               },
             ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildTypeChangeChip(int idx, String currentType) {
+    const types = [
+      'Full Syllabus',
+      'Part + Unit + Full Syllabus',
+      'Chapter + Part + Unit + Full Syllabus',
+      'Part Syllabus',
+      'Chapter Wise',
+      'Topic Wise',
+    ];
+
+    return PopupMenuButton<String>(
+      tooltip: 'Change Test Type (Click to select)',
+      onSelected: (newType) {
+        setState(() {
+          _tests[idx]['type'] = newType;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Test #${idx + 1} type changed to "$newType"'),
+            duration: const Duration(seconds: 1),
+            backgroundColor: const Color(0xFF4F46E5),
+          ),
+        );
+      },
+      itemBuilder: (ctx) => types
+          .map((t) => PopupMenuItem(
+                value: t,
+                child: Row(
+                  children: [
+                    Icon(
+                      t == currentType ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                      size: 15,
+                      color: t == currentType ? const Color(0xFF4F46E5) : const Color(0xFF94A3B8),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      t,
+                      style: TextStyle(
+                        fontWeight: t == currentType ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 12,
+                        color: t == currentType ? const Color(0xFF4F46E5) : const Color(0xFF1E293B),
+                      ),
+                    ),
+                  ],
+                ),
+              ))
+          .toList(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEEF2FF),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: const Color(0xFFC7D2FE)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.tune_rounded, size: 11, color: Color(0xFF4F46E5)),
+            const SizedBox(width: 4),
+            Text(
+              currentType,
+              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
+            ),
+            const SizedBox(width: 3),
+            const Icon(Icons.arrow_drop_down_rounded, size: 14, color: Color(0xFF4F46E5)),
+          ],
+        ),
       ),
     );
   }
