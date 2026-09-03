@@ -5113,7 +5113,245 @@ class SupabaseService {
       return null;
     }
   }
+
+  // =========================================================================
+  // ADVANCED SEO & TRACKING MANAGER SERVICE METHODS
+  // =========================================================================
+
+  /// Fetch Global SEO & Tracking Settings
+  static Future<SeoGlobalSettingsModel> fetchSeoGlobalSettings() async {
+    try {
+      final res = await client.from('seo_global_settings').select('*').limit(1).maybeSingle();
+      if (res != null) {
+        return SeoGlobalSettingsModel.fromJson(res);
+      }
+    } catch (e) {
+      debugPrint('Error fetching SEO global settings from Supabase: $e');
+    }
+    return SeoGlobalSettingsModel();
+  }
+
+  /// Save Global SEO & Tracking Settings
+  static Future<bool> saveSeoGlobalSettings(SeoGlobalSettingsModel settings) async {
+    try {
+      final payload = settings.toJson();
+      final existing = await client.from('seo_global_settings').select('id').limit(1).maybeSingle();
+      if (existing != null && existing['id'] != null) {
+        await client.from('seo_global_settings').update(payload).eq('id', existing['id']);
+      } else {
+        await client.from('seo_global_settings').insert(payload);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error saving SEO global settings: $e');
+      return false;
+    }
+  }
+
+  /// Fetch Modular SEO Custom Scripts
+  static Future<List<SeoCustomScriptModel>> fetchSeoCustomScripts() async {
+    try {
+      final res = await client.from('seo_custom_scripts').select('*').order('priority_order', ascending: true);
+      return (res as List).map((e) => SeoCustomScriptModel.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('Error fetching custom scripts: $e');
+      return [];
+    }
+  }
+
+  /// Save or Update Custom Script
+  static Future<SeoCustomScriptModel?> saveSeoCustomScript(SeoCustomScriptModel script) async {
+    try {
+      if (script.id.isEmpty) {
+        final res = await client.from('seo_custom_scripts').insert(script.toJson(forInsert: false)).select().single();
+        return SeoCustomScriptModel.fromJson(res);
+      } else {
+        final res = await client.from('seo_custom_scripts').update(script.toJson(forInsert: false)).eq('id', script.id).select().single();
+        return SeoCustomScriptModel.fromJson(res);
+      }
+    } catch (e) {
+      debugPrint('Error saving custom script: $e');
+      return null;
+    }
+  }
+
+  /// Delete Custom Script
+  static Future<bool> deleteSeoCustomScript(String id) async {
+    try {
+      await client.from('seo_custom_scripts').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting custom script ($id): $e');
+      return false;
+    }
+  }
+
+  /// Toggle Custom Script Active Status
+  static Future<bool> toggleSeoCustomScript(String id, bool isActive) async {
+    try {
+      await client.from('seo_custom_scripts').update({
+        'is_active': isActive,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error toggling script status ($id): $e');
+      return false;
+    }
+  }
+
+  /// Fetch Structured Schemas (JSON-LD)
+  static Future<List<SeoSchemaModel>> fetchSeoSchemas() async {
+    try {
+      final res = await client.from('seo_schemas').select('*').order('created_at', ascending: true);
+      return (res as List).map((e) => SeoSchemaModel.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('Error fetching schemas: $e');
+      return [];
+    }
+  }
+
+  /// Save or Update Schema
+  static Future<SeoSchemaModel?> saveSeoSchema(SeoSchemaModel schema) async {
+    try {
+      if (schema.id.isEmpty) {
+        final res = await client.from('seo_schemas').insert(schema.toJson(forInsert: false)).select().single();
+        return SeoSchemaModel.fromJson(res);
+      } else {
+        final res = await client.from('seo_schemas').update(schema.toJson(forInsert: false)).eq('id', schema.id).select().single();
+        return SeoSchemaModel.fromJson(res);
+      }
+    } catch (e) {
+      debugPrint('Error saving schema: $e');
+      return null;
+    }
+  }
+
+  /// Delete Schema
+  static Future<bool> deleteSeoSchema(String id) async {
+    try {
+      await client.from('seo_schemas').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting schema ($id): $e');
+      return false;
+    }
+  }
+
+  /// Toggle Schema Active Status
+  static Future<bool> toggleSeoSchema(String id, bool isActive) async {
+    try {
+      await client.from('seo_schemas').update({
+        'is_active': isActive,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error toggling schema status ($id): $e');
+      return false;
+    }
+  }
+
+  /// Run Comprehensive SEO Health Audit across all published pages and blog posts
+  static Future<SeoHealthAuditModel> runSeoHealthAudit() async {
+    int missingTitles = 0;
+    int missingDescriptions = 0;
+    int missingCanonicals = 0;
+    int missingOgImages = 0;
+    int noindexPages = 0;
+    final List<SeoHealthIssue> issues = [];
+
+    final pages = await fetchCmsPages();
+    final blogs = await fetchBlogPosts();
+
+    for (final p in pages) {
+      final url = '/pages/${p.slug}';
+      if (p.seoTitle == null || p.seoTitle!.trim().isEmpty) {
+        missingTitles++;
+        issues.add(SeoHealthIssue(
+          type: 'warning',
+          title: 'Missing Custom SEO Title',
+          description: 'Page "${p.title}" does not have a dedicated SEO Meta Title.',
+          pageUrl: url,
+          suggestion: 'Add an SEO Title (50-60 chars) to improve click-through rates on Google.',
+        ));
+      }
+      if (p.metaDescription == null || p.metaDescription!.trim().isEmpty) {
+        missingDescriptions++;
+        issues.add(SeoHealthIssue(
+          type: 'error',
+          title: 'Missing Meta Description',
+          description: 'Page "${p.title}" has no meta description.',
+          pageUrl: url,
+          suggestion: 'Provide a 150-160 character meta description explaining the content.',
+        ));
+      }
+      if (p.canonicalUrl == null || p.canonicalUrl!.trim().isEmpty) {
+        missingCanonicals++;
+      }
+      if (p.ogImageUrl == null || p.ogImageUrl!.trim().isEmpty) {
+        missingOgImages++;
+      }
+      if (!p.robotsIndex) {
+        noindexPages++;
+        issues.add(SeoHealthIssue(
+          type: 'info',
+          title: 'Page Marked as NOINDEX',
+          description: 'Page "${p.title}" has robots noindex enabled.',
+          pageUrl: url,
+          suggestion: 'Confirm this page is meant to be hidden from search engines.',
+        ));
+      }
+    }
+
+    for (final b in blogs) {
+      final url = '/blog/${b.slug}';
+      if (b.seoTitle == null || b.seoTitle!.trim().isEmpty) {
+        missingTitles++;
+      }
+      if (b.metaDescription == null || b.metaDescription!.trim().isEmpty) {
+        missingDescriptions++;
+        issues.add(SeoHealthIssue(
+          type: 'warning',
+          title: 'Missing Blog Meta Description',
+          description: 'Article "${b.title}" has no custom meta description.',
+          pageUrl: url,
+          suggestion: 'Add a concise summary for Google search snippet display.',
+        ));
+      }
+      if (b.ogImageUrl == null && (b.featuredImageUrl == null || b.featuredImageUrl!.isEmpty)) {
+        missingOgImages++;
+        issues.add(SeoHealthIssue(
+          type: 'warning',
+          title: 'Missing Social Share Cover',
+          description: 'Article "${b.title}" does not have a cover/OG image.',
+          pageUrl: url,
+          suggestion: 'Upload a 1200x630px image for vibrant WhatsApp and Twitter link cards.',
+        ));
+      }
+    }
+
+    final totalChecked = pages.length + blogs.length;
+    int penalty = (missingDescriptions * 10) + (missingTitles * 5) + (missingOgImages * 3);
+    int score = 100 - (totalChecked > 0 ? (penalty / (totalChecked * 2)).round() : 0);
+    if (score < 20) score = 20;
+    if (score > 100) score = 100;
+
+    return SeoHealthAuditModel(
+      totalPagesChecked: pages.length,
+      totalBlogsChecked: blogs.length,
+      healthScore: score,
+      missingTitlesCount: missingTitles,
+      missingDescriptionsCount: missingDescriptions,
+      missingCanonicalsCount: missingCanonicals,
+      missingOgImagesCount: missingOgImages,
+      noindexPagesCount: noindexPages,
+      issues: issues,
+      auditedAt: DateTime.now(),
+    );
+  }
 }
+
 
 
 

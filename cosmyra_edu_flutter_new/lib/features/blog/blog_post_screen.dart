@@ -3,6 +3,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/seo_tracking_service.dart';
 
 class BlogPostScreen extends StatefulWidget {
   final String slug;
@@ -41,6 +42,7 @@ class _BlogPostScreenState extends State<BlogPostScreen> {
       });
       if (post != null) {
         SupabaseService.incrementBlogPostViews(post.id);
+        SeoTrackingService.applyBlogSeo(post);
       }
     }
   }

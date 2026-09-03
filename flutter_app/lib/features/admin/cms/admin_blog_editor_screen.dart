@@ -31,7 +31,17 @@ class _AdminBlogEditorScreenState extends State<AdminBlogEditorScreen> {
   late TextEditingController _featuredImageController;
   late TextEditingController _seoTitleController;
   late TextEditingController _metaDescController;
+  late TextEditingController _canonicalUrlController;
+  late TextEditingController _ogTitleController;
+  late TextEditingController _ogDescController;
+  late TextEditingController _ogImageController;
+  late TextEditingController _twitterTitleController;
+  late TextEditingController _twitterDescController;
+  late TextEditingController _twitterImageController;
+  late TextEditingController _schemaJsonLdController;
 
+  bool _robotsIndex = true;
+  bool _robotsFollow = true;
   String? _selectedCategoryId;
   String _status = 'draft';
   bool _isSaving = false;
@@ -55,6 +65,16 @@ class _AdminBlogEditorScreenState extends State<AdminBlogEditorScreen> {
     _featuredImageController = TextEditingController(text: p?.featuredImageUrl ?? '');
     _seoTitleController = TextEditingController(text: p?.seoTitle ?? '');
     _metaDescController = TextEditingController(text: p?.metaDescription ?? '');
+    _canonicalUrlController = TextEditingController(text: p?.canonicalUrl ?? '');
+    _ogTitleController = TextEditingController(text: p?.ogTitle ?? '');
+    _ogDescController = TextEditingController(text: p?.ogDescription ?? '');
+    _ogImageController = TextEditingController(text: p?.ogImageUrl ?? '');
+    _twitterTitleController = TextEditingController(text: p?.twitterTitle ?? '');
+    _twitterDescController = TextEditingController(text: p?.twitterDescription ?? '');
+    _twitterImageController = TextEditingController(text: p?.twitterImageUrl ?? '');
+    _schemaJsonLdController = TextEditingController(text: p?.schemaJsonLd ?? '');
+    _robotsIndex = p?.robotsIndex ?? true;
+    _robotsFollow = p?.robotsFollow ?? true;
 
     _selectedCategoryId = p?.categoryId;
     if (_selectedCategoryId == null && _localCategories.isNotEmpty) {
@@ -65,6 +85,8 @@ class _AdminBlogEditorScreenState extends State<AdminBlogEditorScreen> {
     if (widget.postToEdit == null) {
       _titleController.addListener(_onTitleChanged);
     }
+    _seoTitleController.addListener(() => setState(() {}));
+    _metaDescController.addListener(() => setState(() {}));
   }
 
   void _onTitleChanged() {
@@ -91,6 +113,14 @@ class _AdminBlogEditorScreenState extends State<AdminBlogEditorScreen> {
     _featuredImageController.dispose();
     _seoTitleController.dispose();
     _metaDescController.dispose();
+    _canonicalUrlController.dispose();
+    _ogTitleController.dispose();
+    _ogDescController.dispose();
+    _ogImageController.dispose();
+    _twitterTitleController.dispose();
+    _twitterDescController.dispose();
+    _twitterImageController.dispose();
+    _schemaJsonLdController.dispose();
     super.dispose();
   }
 
@@ -242,6 +272,16 @@ class _AdminBlogEditorScreenState extends State<AdminBlogEditorScreen> {
       authorName: _authorController.text.trim().isNotEmpty ? _authorController.text.trim() : 'Cosmyra Academic Team',
       seoTitle: _seoTitleController.text.trim().isNotEmpty ? _seoTitleController.text.trim() : null,
       metaDescription: _metaDescController.text.trim().isNotEmpty ? _metaDescController.text.trim() : null,
+      canonicalUrl: _canonicalUrlController.text.trim().isNotEmpty ? _canonicalUrlController.text.trim() : null,
+      robotsIndex: _robotsIndex,
+      robotsFollow: _robotsFollow,
+      ogTitle: _ogTitleController.text.trim().isNotEmpty ? _ogTitleController.text.trim() : null,
+      ogDescription: _ogDescController.text.trim().isNotEmpty ? _ogDescController.text.trim() : null,
+      ogImageUrl: _ogImageController.text.trim().isNotEmpty ? _ogImageController.text.trim() : null,
+      twitterTitle: _twitterTitleController.text.trim().isNotEmpty ? _twitterTitleController.text.trim() : null,
+      twitterDescription: _twitterDescController.text.trim().isNotEmpty ? _twitterDescController.text.trim() : null,
+      twitterImageUrl: _twitterImageController.text.trim().isNotEmpty ? _twitterImageController.text.trim() : null,
+      schemaJsonLd: _schemaJsonLdController.text.trim().isNotEmpty ? _schemaJsonLdController.text.trim() : null,
       readTimeMinutes: readTime,
       viewsCount: widget.postToEdit?.viewsCount ?? 0,
       createdAt: widget.postToEdit?.createdAt ?? DateTime.now(),
@@ -684,6 +724,16 @@ class _AdminBlogEditorScreenState extends State<AdminBlogEditorScreen> {
   }
 
   Widget _buildSeoCard() {
+    final displayTitle = _seoTitleController.text.trim().isNotEmpty
+        ? _seoTitleController.text.trim()
+        : (_titleController.text.trim().isNotEmpty ? _titleController.text.trim() : 'Blog Title | Cosmyra NEET JEE Blog');
+    final displaySlug = _slugController.text.trim().isNotEmpty ? _slugController.text.trim() : 'sample-blog-post';
+    final displayDesc = _metaDescController.text.trim().isNotEmpty
+        ? _metaDescController.text.trim()
+        : (_excerptController.text.trim().isNotEmpty
+            ? _excerptController.text.trim()
+            : 'Read our high-yield medical and engineering entrance prep guide, strategy breakdowns, and exam analysis on Cosmyra.');
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -694,30 +744,176 @@ class _AdminBlogEditorScreenState extends State<AdminBlogEditorScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('SEO Optimization', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Search Engine Optimization (SEO)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0E7FF),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text('Google Live Preview', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4338CA))),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Google SERP Snippet Box
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 18,
+                      height: 18,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF0F172A),
+                      ),
+                      child: const Center(
+                        child: Text('C', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Cosmyra NEET JEE Blog', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF202124))),
+                          Text('https://cosmyra.edtech/blog/$displaySlug', style: const TextStyle(fontSize: 11, color: Color(0xFF5F6368))),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  displayTitle,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1A0DAB)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  displayDesc,
+                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF4D5156), height: 1.4),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // SEO Title Field
           TextFormField(
             controller: _seoTitleController,
-            decoration: const InputDecoration(
-              labelText: 'SEO Title',
-              hintText: 'Custom title for Google search',
+            decoration: InputDecoration(
+              labelText: 'SEO Meta Title',
+              hintText: 'Defaults to blog title if empty',
+              helperText: '${_seoTitleController.text.length}/60 characters (Optimal: 50-60)',
               isDense: true,
               filled: true,
               fillColor: Colors.white,
-              border: OutlineInputBorder(),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
+
+          // Meta Description Field
           TextFormField(
             controller: _metaDescController,
             maxLines: 3,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Meta Description',
-              hintText: 'Brief snippet for search results (150-160 chars)',
+              hintText: 'Brief summary for Google search result snippets...',
+              helperText: '${_metaDescController.text.length}/160 characters (Optimal: 150-160)',
               isDense: true,
               filled: true,
               fillColor: Colors.white,
-              border: OutlineInputBorder(),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Canonical URL
+          TextFormField(
+            controller: _canonicalUrlController,
+            decoration: InputDecoration(
+              labelText: 'Canonical URL (Optional)',
+              hintText: 'https://cosmyra.edtech/blog/...',
+              helperText: 'Leave blank to use default canonical URL',
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Robots Directives
+          Row(
+            children: [
+              Expanded(
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Index Article', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Allow Google to index', style: TextStyle(fontSize: 11)),
+                  value: _robotsIndex,
+                  activeColor: const Color(0xFF059669),
+                  onChanged: (v) => setState(() => _robotsIndex = v),
+                ),
+              ),
+              Expanded(
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Follow Links', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Allow crawlers to follow links', style: TextStyle(fontSize: 11)),
+                  value: _robotsFollow,
+                  activeColor: const Color(0xFF059669),
+                  onChanged: (v) => setState(() => _robotsFollow = v),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Social Share Cover
+          TextFormField(
+            controller: _ogImageController,
+            decoration: InputDecoration(
+              labelText: 'Social Share Image (Open Graph / Twitter)',
+              hintText: 'https://...',
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Custom Schema JSON-LD
+          TextFormField(
+            controller: _schemaJsonLdController,
+            maxLines: 4,
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            decoration: InputDecoration(
+              labelText: 'Custom JSON-LD Schema (Optional)',
+              hintText: '{\n  "@context": "https://schema.org",\n  "@type": "BlogPosting"\n}',
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
         ],

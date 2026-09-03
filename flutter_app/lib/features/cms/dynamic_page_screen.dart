@@ -3,6 +3,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/seo_tracking_service.dart';
 
 class DynamicPageScreen extends StatefulWidget {
   final String slug;
@@ -39,6 +40,9 @@ class _DynamicPageScreenState extends State<DynamicPageScreen> {
         _page = page;
         _isLoading = false;
       });
+      if (page != null) {
+        SeoTrackingService.applyPageSeo(page);
+      }
     }
   }
 

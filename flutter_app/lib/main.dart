@@ -6,6 +6,8 @@ import 'core/services/crash_analytics_service.dart';
 import 'core/router/app_router.dart';
 import 'firebase_options.dart';
 
+import 'core/services/seo_tracking_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy(); // Removes # hash from Flutter Web URLs
@@ -16,6 +18,7 @@ void main() async {
   );
 
   await SupabaseService.initialize();
+  await SeoTrackingService.initialize();
   runApp(const CosmyraApp());
 }
 

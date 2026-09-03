@@ -1,4 +1,3 @@
-import 'dart:convert';
 
 /// CMS Page Model
 class CmsPageModel {
@@ -10,6 +9,16 @@ class CmsPageModel {
   final String status; // 'draft', 'published'
   final String? seoTitle;
   final String? metaDescription;
+  final String? canonicalUrl;
+  final bool robotsIndex;
+  final bool robotsFollow;
+  final String? ogTitle;
+  final String? ogDescription;
+  final String? ogImageUrl;
+  final String? twitterTitle;
+  final String? twitterDescription;
+  final String? twitterImageUrl;
+  final String? schemaJsonLd;
   final String? featuredImageUrl;
   final bool isSystem;
   final String authorName;
@@ -26,6 +35,16 @@ class CmsPageModel {
     this.status = 'draft',
     this.seoTitle,
     this.metaDescription,
+    this.canonicalUrl,
+    this.robotsIndex = true,
+    this.robotsFollow = true,
+    this.ogTitle,
+    this.ogDescription,
+    this.ogImageUrl,
+    this.twitterTitle,
+    this.twitterDescription,
+    this.twitterImageUrl,
+    this.schemaJsonLd,
     this.featuredImageUrl,
     this.isSystem = false,
     this.authorName = 'Cosmyra Admin',
@@ -47,6 +66,16 @@ class CmsPageModel {
       status: json['status']?.toString() ?? 'draft',
       seoTitle: json['seo_title']?.toString(),
       metaDescription: json['meta_description']?.toString(),
+      canonicalUrl: json['canonical_url']?.toString(),
+      robotsIndex: json['robots_index'] != false,
+      robotsFollow: json['robots_follow'] != false,
+      ogTitle: json['og_title']?.toString(),
+      ogDescription: json['og_description']?.toString(),
+      ogImageUrl: json['og_image_url']?.toString(),
+      twitterTitle: json['twitter_title']?.toString(),
+      twitterDescription: json['twitter_description']?.toString(),
+      twitterImageUrl: json['twitter_image_url']?.toString(),
+      schemaJsonLd: json['schema_json_ld']?.toString(),
       featuredImageUrl: json['featured_image_url']?.toString(),
       isSystem: json['is_system'] == true,
       authorName: json['author_name']?.toString() ?? 'Cosmyra Admin',
@@ -65,6 +94,16 @@ class CmsPageModel {
       'status': status,
       'seo_title': seoTitle?.trim(),
       'meta_description': metaDescription?.trim(),
+      'canonical_url': canonicalUrl?.trim(),
+      'robots_index': robotsIndex,
+      'robots_follow': robotsFollow,
+      'og_title': ogTitle?.trim(),
+      'og_description': ogDescription?.trim(),
+      'og_image_url': ogImageUrl?.trim(),
+      'twitter_title': twitterTitle?.trim(),
+      'twitter_description': twitterDescription?.trim(),
+      'twitter_image_url': twitterImageUrl?.trim(),
+      'schema_json_ld': schemaJsonLd?.trim(),
       'featured_image_url': featuredImageUrl?.trim(),
       'is_system': isSystem,
       'author_name': authorName,
@@ -91,6 +130,16 @@ class CmsPageModel {
     String? status,
     String? seoTitle,
     String? metaDescription,
+    String? canonicalUrl,
+    bool? robotsIndex,
+    bool? robotsFollow,
+    String? ogTitle,
+    String? ogDescription,
+    String? ogImageUrl,
+    String? twitterTitle,
+    String? twitterDescription,
+    String? twitterImageUrl,
+    String? schemaJsonLd,
     String? featuredImageUrl,
     bool? isSystem,
     String? authorName,
@@ -107,6 +156,16 @@ class CmsPageModel {
       status: status ?? this.status,
       seoTitle: seoTitle ?? this.seoTitle,
       metaDescription: metaDescription ?? this.metaDescription,
+      canonicalUrl: canonicalUrl ?? this.canonicalUrl,
+      robotsIndex: robotsIndex ?? this.robotsIndex,
+      robotsFollow: robotsFollow ?? this.robotsFollow,
+      ogTitle: ogTitle ?? this.ogTitle,
+      ogDescription: ogDescription ?? this.ogDescription,
+      ogImageUrl: ogImageUrl ?? this.ogImageUrl,
+      twitterTitle: twitterTitle ?? this.twitterTitle,
+      twitterDescription: twitterDescription ?? this.twitterDescription,
+      twitterImageUrl: twitterImageUrl ?? this.twitterImageUrl,
+      schemaJsonLd: schemaJsonLd ?? this.schemaJsonLd,
       featuredImageUrl: featuredImageUrl ?? this.featuredImageUrl,
       isSystem: isSystem ?? this.isSystem,
       authorName: authorName ?? this.authorName,
@@ -210,6 +269,16 @@ class CmsBlogPostModel {
   final String authorName;
   final String? seoTitle;
   final String? metaDescription;
+  final String? canonicalUrl;
+  final bool robotsIndex;
+  final bool robotsFollow;
+  final String? ogTitle;
+  final String? ogDescription;
+  final String? ogImageUrl;
+  final String? twitterTitle;
+  final String? twitterDescription;
+  final String? twitterImageUrl;
+  final String? schemaJsonLd;
   final int readTimeMinutes;
   final int viewsCount;
   final DateTime createdAt;
@@ -230,6 +299,16 @@ class CmsBlogPostModel {
     this.authorName = 'Cosmyra Academic Team',
     this.seoTitle,
     this.metaDescription,
+    this.canonicalUrl,
+    this.robotsIndex = true,
+    this.robotsFollow = true,
+    this.ogTitle,
+    this.ogDescription,
+    this.ogImageUrl,
+    this.twitterTitle,
+    this.twitterDescription,
+    this.twitterImageUrl,
+    this.schemaJsonLd,
     this.readTimeMinutes = 5,
     this.viewsCount = 0,
     required this.createdAt,
@@ -276,6 +355,16 @@ class CmsBlogPostModel {
       authorName: json['author_name']?.toString() ?? 'Cosmyra Academic Team',
       seoTitle: json['seo_title']?.toString(),
       metaDescription: json['meta_description']?.toString(),
+      canonicalUrl: json['canonical_url']?.toString(),
+      robotsIndex: json['robots_index'] != false,
+      robotsFollow: json['robots_follow'] != false,
+      ogTitle: json['og_title']?.toString(),
+      ogDescription: json['og_description']?.toString(),
+      ogImageUrl: json['og_image_url']?.toString(),
+      twitterTitle: json['twitter_title']?.toString(),
+      twitterDescription: json['twitter_description']?.toString(),
+      twitterImageUrl: json['twitter_image_url']?.toString(),
+      schemaJsonLd: json['schema_json_ld']?.toString(),
       readTimeMinutes: (json['read_time_minutes'] as num?)?.toInt() ?? 5,
       viewsCount: (json['views_count'] as num?)?.toInt() ?? 0,
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now() : DateTime.now(),
@@ -297,6 +386,16 @@ class CmsBlogPostModel {
       'author_name': authorName.trim(),
       'seo_title': seoTitle?.trim(),
       'meta_description': metaDescription?.trim(),
+      'canonical_url': canonicalUrl?.trim(),
+      'robots_index': robotsIndex,
+      'robots_follow': robotsFollow,
+      'og_title': ogTitle?.trim(),
+      'og_description': ogDescription?.trim(),
+      'og_image_url': ogImageUrl?.trim(),
+      'twitter_title': twitterTitle?.trim(),
+      'twitter_description': twitterDescription?.trim(),
+      'twitter_image_url': twitterImageUrl?.trim(),
+      'schema_json_ld': schemaJsonLd?.trim(),
       'read_time_minutes': readTimeMinutes,
       'updated_at': DateTime.now().toIso8601String(),
     };
@@ -326,6 +425,16 @@ class CmsBlogPostModel {
     String? authorName,
     String? seoTitle,
     String? metaDescription,
+    String? canonicalUrl,
+    bool? robotsIndex,
+    bool? robotsFollow,
+    String? ogTitle,
+    String? ogDescription,
+    String? ogImageUrl,
+    String? twitterTitle,
+    String? twitterDescription,
+    String? twitterImageUrl,
+    String? schemaJsonLd,
     int? readTimeMinutes,
     int? viewsCount,
     DateTime? createdAt,
@@ -346,6 +455,16 @@ class CmsBlogPostModel {
       authorName: authorName ?? this.authorName,
       seoTitle: seoTitle ?? this.seoTitle,
       metaDescription: metaDescription ?? this.metaDescription,
+      canonicalUrl: canonicalUrl ?? this.canonicalUrl,
+      robotsIndex: robotsIndex ?? this.robotsIndex,
+      robotsFollow: robotsFollow ?? this.robotsFollow,
+      ogTitle: ogTitle ?? this.ogTitle,
+      ogDescription: ogDescription ?? this.ogDescription,
+      ogImageUrl: ogImageUrl ?? this.ogImageUrl,
+      twitterTitle: twitterTitle ?? this.twitterTitle,
+      twitterDescription: twitterDescription ?? this.twitterDescription,
+      twitterImageUrl: twitterImageUrl ?? this.twitterImageUrl,
+      schemaJsonLd: schemaJsonLd ?? this.schemaJsonLd,
       readTimeMinutes: readTimeMinutes ?? this.readTimeMinutes,
       viewsCount: viewsCount ?? this.viewsCount,
       createdAt: createdAt ?? this.createdAt,

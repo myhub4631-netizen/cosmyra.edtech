@@ -48,6 +48,7 @@ import '../../features/admin/cms/admin_page_editor_screen.dart';
 import '../../features/admin/cms/admin_blog_manager_screen.dart';
 import '../../features/admin/cms/admin_blog_editor_screen.dart';
 import '../../features/admin/cms/admin_navigation_manager_screen.dart';
+import '../../features/admin/seo/admin_seo_screen.dart';
 import '../../features/cms/dynamic_page_screen.dart';
 import '../../features/blog/blog_list_screen.dart';
 import '../../features/blog/blog_post_screen.dart';
@@ -904,8 +905,14 @@ final GoRouter appRouter = GoRouter(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
       ),
     ),
+    GoRoute(
+      path: '/admin/seo',
+      builder: (context, state) => AdminSeoScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
 
-    // Super Admin CMS shortcuts
+    // Super Admin CMS & SEO shortcuts
     GoRoute(
       path: '/superadmin/pages',
       builder: (context, state) => AdminPageManagerScreen(
@@ -921,6 +928,12 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/superadmin/navigation',
       builder: (context, state) => AdminNavigationManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/superadmin/seo',
+      builder: (context, state) => AdminSeoScreen(
         userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
       ),
     ),

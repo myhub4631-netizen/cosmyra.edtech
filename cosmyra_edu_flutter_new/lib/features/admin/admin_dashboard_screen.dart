@@ -414,6 +414,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 _buildSidebarTile('Page Manager (All Pages)', Icons.article_outlined, false, onTap: () => context.go('/admin/pages')),
                 _buildSidebarTile('Blog & Articles', Icons.edit_note_rounded, false, onTap: () => context.go('/admin/blog')),
                 _buildSidebarTile('Navigation & Menus', Icons.menu_open_rounded, false, onTap: () => context.go('/admin/navigation')),
+                _buildSidebarTile('SEO & Tracking Manager', Icons.travel_explore_rounded, false, onTap: () => context.go('/admin/seo')),
                 _buildSidebarTile('Privacy Policy (CMS)', Icons.policy_outlined, false, onTap: () => context.go('/admin/privacy-policy')),
                 _buildSidebarTile('Terms of Service (CMS)', Icons.gavel_rounded, false, onTap: () => context.go('/admin/terms')),
 

@@ -21,8 +21,18 @@ class _AdminPageEditorScreenState extends State<AdminPageEditorScreen> with Sing
   late TextEditingController _contentController;
   late TextEditingController _seoTitleController;
   late TextEditingController _metaDescController;
+  late TextEditingController _canonicalUrlController;
+  late TextEditingController _ogTitleController;
+  late TextEditingController _ogDescController;
+  late TextEditingController _ogImageController;
+  late TextEditingController _twitterTitleController;
+  late TextEditingController _twitterDescController;
+  late TextEditingController _twitterImageController;
+  late TextEditingController _schemaJsonLdController;
   late TextEditingController _featuredImageController;
 
+  bool _robotsIndex = true;
+  bool _robotsFollow = true;
   String _status = 'draft';
   bool _isSystem = false;
   bool _isSaving = false;
@@ -38,7 +48,17 @@ class _AdminPageEditorScreenState extends State<AdminPageEditorScreen> with Sing
     _contentController = TextEditingController(text: p?.content ?? '');
     _seoTitleController = TextEditingController(text: p?.seoTitle ?? '');
     _metaDescController = TextEditingController(text: p?.metaDescription ?? '');
+    _canonicalUrlController = TextEditingController(text: p?.canonicalUrl ?? '');
+    _ogTitleController = TextEditingController(text: p?.ogTitle ?? '');
+    _ogDescController = TextEditingController(text: p?.ogDescription ?? '');
+    _ogImageController = TextEditingController(text: p?.ogImageUrl ?? '');
+    _twitterTitleController = TextEditingController(text: p?.twitterTitle ?? '');
+    _twitterDescController = TextEditingController(text: p?.twitterDescription ?? '');
+    _twitterImageController = TextEditingController(text: p?.twitterImageUrl ?? '');
+    _schemaJsonLdController = TextEditingController(text: p?.schemaJsonLd ?? '');
     _featuredImageController = TextEditingController(text: p?.featuredImageUrl ?? '');
+    _robotsIndex = p?.robotsIndex ?? true;
+    _robotsFollow = p?.robotsFollow ?? true;
     _status = p?.status ?? 'draft';
     _isSystem = p?.isSystem ?? false;
 
@@ -46,6 +66,8 @@ class _AdminPageEditorScreenState extends State<AdminPageEditorScreen> with Sing
     if (widget.pageToEdit == null) {
       _titleController.addListener(_onTitleChanged);
     }
+    _seoTitleController.addListener(() => setState(() {}));
+    _metaDescController.addListener(() => setState(() {}));
   }
 
   void _onTitleChanged() {
@@ -67,6 +89,14 @@ class _AdminPageEditorScreenState extends State<AdminPageEditorScreen> with Sing
     _contentController.dispose();
     _seoTitleController.dispose();
     _metaDescController.dispose();
+    _canonicalUrlController.dispose();
+    _ogTitleController.dispose();
+    _ogDescController.dispose();
+    _ogImageController.dispose();
+    _twitterTitleController.dispose();
+    _twitterDescController.dispose();
+    _twitterImageController.dispose();
+    _schemaJsonLdController.dispose();
     _featuredImageController.dispose();
     super.dispose();
   }
@@ -76,50 +106,41 @@ class _AdminPageEditorScreenState extends State<AdminPageEditorScreen> with Sing
     final selection = _contentController.selection;
     final start = selection.start >= 0 ? selection.start : text.length;
     final end = selection.end >= 0 ? selection.end : text.length;
-    final selectedText = text.substring(start, end);
 
-    final replacement = '$before$selectedText$after';
-    final newText = text.replaceRange(start, end, replacement);
+    final newText = text.replaceRange(start, end, '$before$after');
     _contentController.value = TextEditingValue(
       text: newText,
-      selection: TextSelection.collapsed(offset: start + before.length + selectedText.length),
+      selection: TextSelection.collapsed(offset: start + before.length),
     );
   }
 
   Future<void> _pickAndUploadImage() async {
     try {
+      setState(() => _isUploadingImage = true);
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
         withData: true,
       );
 
-      if (result != null && result.files.isNotEmpty && result.files.first.bytes != null) {
-        setState(() => _isUploadingImage = true);
-        final file = result.files.first;
-        final url = await SupabaseService.uploadCmsImage(file.bytes!, file.name);
-
-        if (mounted) {
-          setState(() => _isUploadingImage = false);
-          if (url != null) {
-            _featuredImageController.text = url;
-            _insertMarkdown('![${file.name}]($url)\n');
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Image uploaded and inserted!'), backgroundColor: Color(0xFF10B981)),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to upload image.'), backgroundColor: Color(0xFFDC2626)),
-            );
-          }
+      if (result != null && result.files.single.bytes != null) {
+        final bytes = result.files.single.bytes!;
+        final name = result.files.single.name;
+        final url = await SupabaseService.uploadCmsImage(bytes, name);
+        if (url != null) {
+          _insertMarkdown('![$name]($url)');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Image uploaded and inserted!')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to upload image.')),
+          );
         }
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isUploadingImage = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload error: $e'), backgroundColor: const Color(0xFFDC2626)),
-        );
-      }
+      debugPrint('Error uploading image: $e');
+    } finally {
+      if (mounted) setState(() => _isUploadingImage = false);
     }
   }
 
@@ -141,6 +162,16 @@ class _AdminPageEditorScreenState extends State<AdminPageEditorScreen> with Sing
       status: finalStatus,
       seoTitle: _seoTitleController.text.trim().isNotEmpty ? _seoTitleController.text.trim() : null,
       metaDescription: _metaDescController.text.trim().isNotEmpty ? _metaDescController.text.trim() : null,
+      canonicalUrl: _canonicalUrlController.text.trim().isNotEmpty ? _canonicalUrlController.text.trim() : null,
+      robotsIndex: _robotsIndex,
+      robotsFollow: _robotsFollow,
+      ogTitle: _ogTitleController.text.trim().isNotEmpty ? _ogTitleController.text.trim() : null,
+      ogDescription: _ogDescController.text.trim().isNotEmpty ? _ogDescController.text.trim() : null,
+      ogImageUrl: _ogImageController.text.trim().isNotEmpty ? _ogImageController.text.trim() : null,
+      twitterTitle: _twitterTitleController.text.trim().isNotEmpty ? _twitterTitleController.text.trim() : null,
+      twitterDescription: _twitterDescController.text.trim().isNotEmpty ? _twitterDescController.text.trim() : null,
+      twitterImageUrl: _twitterImageController.text.trim().isNotEmpty ? _twitterImageController.text.trim() : null,
+      schemaJsonLd: _schemaJsonLdController.text.trim().isNotEmpty ? _schemaJsonLdController.text.trim() : null,
       featuredImageUrl: _featuredImageController.text.trim().isNotEmpty ? _featuredImageController.text.trim() : null,
       isSystem: _isSystem,
       authorName: widget.pageToEdit?.authorName ?? 'Cosmyra Admin',
@@ -471,6 +502,14 @@ class _AdminPageEditorScreenState extends State<AdminPageEditorScreen> with Sing
   }
 
   Widget _buildSeoCard() {
+    final displayTitle = _seoTitleController.text.trim().isNotEmpty
+        ? _seoTitleController.text.trim()
+        : (_titleController.text.trim().isNotEmpty ? _titleController.text.trim() : 'Page Title | Cosmyra NEET JEE');
+    final displaySlug = _slugController.text.trim().isNotEmpty ? _slugController.text.trim() : 'sample-slug';
+    final displayDesc = _metaDescController.text.trim().isNotEmpty
+        ? _metaDescController.text.trim()
+        : 'Cosmyra NEET JEE preparation platform offers mock tests, test series, and comprehensive study notes for medical and engineering entrance exams.';
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -481,26 +520,172 @@ class _AdminPageEditorScreenState extends State<AdminPageEditorScreen> with Sing
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Search Engine Optimization (SEO)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Search Engine Optimization (SEO)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0E7FF),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text('Google Live Preview', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4338CA))),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
+
+          // Google SERP Snippet Box
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 18,
+                      height: 18,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF0F172A),
+                      ),
+                      child: const Center(
+                        child: Text('C', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Cosmyra NEET JEE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF202124))),
+                          Text('https://cosmyra.edtech/pages/$displaySlug', style: const TextStyle(fontSize: 11, color: Color(0xFF5F6368))),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  displayTitle,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1A0DAB)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  displayDesc,
+                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF4D5156), height: 1.4),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // SEO Title Field
           TextFormField(
             controller: _seoTitleController,
             decoration: InputDecoration(
               labelText: 'SEO Meta Title',
               hintText: 'Defaults to page title if empty',
+              helperText: '${_seoTitleController.text.length}/60 characters (Optimal: 50-60)',
               isDense: true,
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
+
+          // Meta Description Field
           TextFormField(
             controller: _metaDescController,
             maxLines: 3,
             decoration: InputDecoration(
               labelText: 'Meta Description',
-              hintText: 'Brief summary for Google search result snippets (150-160 chars)',
+              hintText: 'Brief summary for Google search result snippets...',
+              helperText: '${_metaDescController.text.length}/160 characters (Optimal: 150-160)',
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Canonical URL
+          TextFormField(
+            controller: _canonicalUrlController,
+            decoration: InputDecoration(
+              labelText: 'Canonical URL (Optional)',
+              hintText: 'https://cosmyra.edtech/pages/about-us',
+              helperText: 'Leave blank to use default canonical URL',
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Robots Directives
+          Row(
+            children: [
+              Expanded(
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Index Page', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Allow search engines to index', style: TextStyle(fontSize: 11)),
+                  value: _robotsIndex,
+                  activeColor: const Color(0xFF059669),
+                  onChanged: (v) => setState(() => _robotsIndex = v),
+                ),
+              ),
+              Expanded(
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Follow Links', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  subtitle: const Text('Allow crawlers to follow links', style: TextStyle(fontSize: 11)),
+                  value: _robotsFollow,
+                  activeColor: const Color(0xFF059669),
+                  onChanged: (v) => setState(() => _robotsFollow = v),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Social Share Cover
+          TextFormField(
+            controller: _ogImageController,
+            decoration: InputDecoration(
+              labelText: 'Social Share Image (Open Graph / Twitter)',
+              hintText: 'https://...',
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Custom Schema JSON-LD
+          TextFormField(
+            controller: _schemaJsonLdController,
+            maxLines: 4,
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            decoration: InputDecoration(
+              labelText: 'Custom JSON-LD Schema (Optional)',
+              hintText: '{\n  "@context": "https://schema.org",\n  "@type": "WebPage"\n}',
               isDense: true,
               filled: true,
               fillColor: Colors.white,
