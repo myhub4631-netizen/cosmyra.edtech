@@ -107,9 +107,12 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          clipBehavior: Clip.antiAlias,
           child: Container(
-            width: 500,
-            padding: const EdgeInsets.all(24),
+            constraints: const BoxConstraints(maxWidth: 460),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -132,21 +135,21 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                           children: [
                             Text(
                               'Enter Your Mobile Number',
-                              style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                              style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
                             ),
                             Text(
                               'Provide your verified mobile number and academic goal',
-                              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                              style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
                             ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
 
                   // 1. Mobile Number
-                  Text('Enter Your Mobile Number', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                  Text('Enter Your Mobile Number', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
                   const SizedBox(height: 6),
                   TextField(
                     controller: phoneCtrl,
@@ -180,8 +183,9 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                         child: InkWell(
                           onTap: () => setDialogState(() => primaryExam = 'NEET'),
                           borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                             decoration: BoxDecoration(
                               color: primaryExam == 'NEET' ? const Color(0xFFEEF2FF) : Colors.white,
                               borderRadius: BorderRadius.circular(12),
@@ -190,16 +194,25 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                                 width: primaryExam == 'NEET' ? 2 : 1,
                               ),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Text('🩺', style: TextStyle(fontSize: 20)),
-                                const SizedBox(width: 8),
+                                const Text('🩺', style: TextStyle(fontSize: 22)),
+                                const SizedBox(height: 4),
                                 Text(
-                                  'NEET (Medical)',
+                                  'NEET',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: primaryExam == 'NEET' ? const Color(0xFF4F46E5) : const Color(0xFF334155),
+                                    fontSize: 14,
+                                    color: primaryExam == 'NEET' ? const Color(0xFF4F46E5) : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                Text(
+                                  'Medical',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: primaryExam == 'NEET' ? const Color(0xFF6366F1) : const Color(0xFF64748B),
                                   ),
                                 ),
                               ],
@@ -207,13 +220,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: InkWell(
                           onTap: () => setDialogState(() => primaryExam = 'JEE'),
                           borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                             decoration: BoxDecoration(
                               color: primaryExam == 'JEE' ? const Color(0xFFEEF2FF) : Colors.white,
                               borderRadius: BorderRadius.circular(12),
@@ -222,16 +236,25 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                                 width: primaryExam == 'JEE' ? 2 : 1,
                               ),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Text('⚡', style: TextStyle(fontSize: 20)),
-                                const SizedBox(width: 8),
+                                const Text('⚡', style: TextStyle(fontSize: 22)),
+                                const SizedBox(height: 4),
                                 Text(
-                                  'JEE (Engineering)',
+                                  'JEE',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: primaryExam == 'JEE' ? const Color(0xFF4F46E5) : const Color(0xFF334155),
+                                    fontSize: 14,
+                                    color: primaryExam == 'JEE' ? const Color(0xFF4F46E5) : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                Text(
+                                  'Engineering',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: primaryExam == 'JEE' ? const Color(0xFF6366F1) : const Color(0xFF64748B),
                                   ),
                                 ),
                               ],
@@ -244,34 +267,62 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
                   // 3. Sub-selection for JEE: Main vs Advanced
                   if (primaryExam == 'JEE') ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     Text('Select JEE Target Track:', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
                     const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
-                          child: ChoiceChip(
-                            label: const Text('JEE Main'),
-                            selected: jeeSubtype == 'JEE Main',
-                            selectedColor: const Color(0xFF4F46E5),
-                            labelStyle: TextStyle(
-                              color: jeeSubtype == 'JEE Main' ? Colors.white : const Color(0xFF334155),
-                              fontWeight: FontWeight.bold,
+                          child: InkWell(
+                            onTap: () => setDialogState(() => jeeSubtype = 'JEE Main'),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: jeeSubtype == 'JEE Main' ? const Color(0xFF4F46E5) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: jeeSubtype == 'JEE Main' ? const Color(0xFF4338CA) : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'JEE Main',
+                                  style: TextStyle(
+                                    color: jeeSubtype == 'JEE Main' ? Colors.white : const Color(0xFF334155),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ),
                             ),
-                            onSelected: (_) => setDialogState(() => jeeSubtype = 'JEE Main'),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: ChoiceChip(
-                            label: const Text('JEE Advanced'),
-                            selected: jeeSubtype == 'JEE Advanced',
-                            selectedColor: const Color(0xFF4F46E5),
-                            labelStyle: TextStyle(
-                              color: jeeSubtype == 'JEE Advanced' ? Colors.white : const Color(0xFF334155),
-                              fontWeight: FontWeight.bold,
+                          child: InkWell(
+                            onTap: () => setDialogState(() => jeeSubtype = 'JEE Advanced'),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: jeeSubtype == 'JEE Advanced' ? const Color(0xFF4F46E5) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: jeeSubtype == 'JEE Advanced' ? const Color(0xFF4338CA) : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'JEE Advanced',
+                                  style: TextStyle(
+                                    color: jeeSubtype == 'JEE Advanced' ? Colors.white : const Color(0xFF334155),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ),
                             ),
-                            onSelected: (_) => setDialogState(() => jeeSubtype = 'JEE Advanced'),
                           ),
                         ),
                       ],
@@ -285,17 +336,42 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   Row(
                     children: [2025, 2026, 2027, 2028].map((yr) {
                       final isSel = targetYear == yr;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: ChoiceChip(
-                          label: Text('$yr'),
-                          selected: isSel,
-                          selectedColor: const Color(0xFF10B981),
-                          labelStyle: TextStyle(
-                            color: isSel ? Colors.white : const Color(0xFF334155),
-                            fontWeight: FontWeight.bold,
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3.0),
+                          child: InkWell(
+                            onTap: () => setDialogState(() => targetYear = yr),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isSel ? const Color(0xFF10B981) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isSel ? const Color(0xFF059669) : const Color(0xFFE2E8F0),
+                                  width: isSel ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (isSel) ...[
+                                    const Icon(Icons.check_rounded, size: 13, color: Colors.white),
+                                    const SizedBox(width: 2),
+                                  ],
+                                  Text(
+                                    '$yr',
+                                    style: TextStyle(
+                                      color: isSel ? Colors.white : const Color(0xFF334155),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                          onSelected: (_) => setDialogState(() => targetYear = yr),
                         ),
                       );
                     }).toList(),
