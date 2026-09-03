@@ -28,6 +28,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   CartItem? _activeItem;
   bool _isLoadingProduct = true;
 
+  bool _isAlreadyOwned = false;
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +79,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _activeItem = item;
           _isLoadingProduct = false;
         });
+        _checkEntitlement();
       }
       return;
     }
@@ -106,6 +109,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
       _isLoadingProduct = false;
     });
+    _checkEntitlement();
+  }
+
+  Future<void> _checkEntitlement() async {
+    final user = SupabaseService.activeUserSession;
+    if (user != null) {
+      final pId = _activeItem?.id ?? (CartService.instance.items.isNotEmpty ? CartService.instance.items.first.id : '');
+      if (pId.isNotEmpty) {
+        final owns = await SupabaseService.hasActiveEntitlement(user.id, pId);
+        if (mounted) setState(() => _isAlreadyOwned = owns);
+      }
+    }
   }
 
   double get _subtotal {
@@ -158,6 +173,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _processPayment() async {
+    if (_isAlreadyOwned) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You already own this test series! Redirecting to your tests...'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+      context.go('/my-tests');
+      return;
+    }
+
     setState(() => _isProcessingPayment = true);
 
     final user = SupabaseService.activeUserSession ??
@@ -641,22 +667,39 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ],
             ),
             const Spacer(),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            if (_isAlreadyOwned) ...[
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () {
+                  final targetId = _activeItem?.id ?? 'ts_neet_all_india_2026';
+                  context.go('/product/$targetId');
+                },
+                icon: const Icon(Icons.check_circle_rounded, size: 18),
+                label: const Text('Already Owned • Access Tests', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
               ),
-              onPressed: _isProcessingPayment ? null : _processPayment,
-              icon: _isProcessingPayment
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Icon(Icons.lock_outline_rounded, size: 18),
-              label: Text(
-                _isProcessingPayment ? 'Processing...' : 'Pay ₹${_finalTotal.toInt()}',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ] else ...[
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: _isProcessingPayment ? null : _processPayment,
+                icon: _isProcessingPayment
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.lock_outline_rounded, size: 16),
+                label: Text(
+                  _isProcessingPayment ? 'Securing...' : 'Pay ₹${_finalTotal.toInt()}',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

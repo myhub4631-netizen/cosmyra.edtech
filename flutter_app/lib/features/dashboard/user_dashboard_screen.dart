@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
@@ -67,6 +68,277 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         _currentUserProfile = currentUser;
       });
     }
+    _checkAndShowCohortOnboarding();
+  }
+
+  Future<void> _checkAndShowCohortOnboarding() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = _currentUserProfile.id;
+      final bool alreadyCompleted = prefs.getBool('cohort_onboarding_completed_$userId') ?? false;
+
+      final phoneStr = _currentUserProfile.phoneNumber ?? '';
+      final bool missingPhone = phoneStr.trim().isEmpty || phoneStr.contains('0000000000');
+      final bool missingCohort = _currentUserProfile.targetExam.trim().isEmpty || _currentUserProfile.targetExam == 'NEET & JEE';
+
+      if (!alreadyCompleted && (missingPhone || missingCohort) && mounted) {
+        Future.delayed(const Duration(milliseconds: 600), () {
+          if (mounted) _showCohortSelectionModal();
+        });
+      }
+    } catch (e) {
+      debugPrint('Notice checking cohort onboarding: $e');
+    }
+  }
+
+  void _showCohortSelectionModal() {
+    final rawPhone = _currentUserProfile.phoneNumber ?? '';
+    final phoneCtrl = TextEditingController(
+      text: rawPhone.replaceAll('+91', '').replaceAll('-', '').trim(),
+    );
+    String primaryExam = _currentUserProfile.targetExam.toUpperCase().contains('JEE') ? 'JEE' : 'NEET';
+    String jeeSubtype = _currentUserProfile.targetExam.toUpperCase().contains('ADV') ? 'JEE Advanced' : 'JEE Main';
+    int targetYear = _currentUserProfile.targetYear > 2024 ? _currentUserProfile.targetYear : 2026;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            width: 480,
+            padding: const EdgeInsets.all(24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEEF2FF),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.school_rounded, color: Color(0xFF4F46E5), size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Welcome Aspirant! 🎯',
+                              style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                            ),
+                            Text(
+                              'Tell us your goal to personalize your test series & rankings',
+                              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // 1. Mobile Number
+                  Text('Mobile Number (For WhatsApp Updates & Tests)', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    maxLength: 10,
+                    decoration: InputDecoration(
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        child: Text('+91', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                      ),
+                      hintText: '9876543210',
+                      counterText: '',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 2. Exam Goal: NEET vs JEE
+                  Text('What examination are you preparing for?', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setDialogState(() => primaryExam = 'NEET'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: primaryExam == 'NEET' ? const Color(0xFFEEF2FF) : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: primaryExam == 'NEET' ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
+                                width: primaryExam == 'NEET' ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              children: const [
+                                Text('🩺', style: TextStyle(fontSize: 26)),
+                                SizedBox(height: 4),
+                                Text('NEET (UG)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF0F172A))),
+                                Text('Medical Aspirant', style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setDialogState(() => primaryExam = 'JEE'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: primaryExam == 'JEE' ? const Color(0xFFEEF2FF) : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: primaryExam == 'JEE' ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
+                                width: primaryExam == 'JEE' ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              children: const [
+                                Text('⚡', style: TextStyle(fontSize: 26)),
+                                SizedBox(height: 4),
+                                Text('JEE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF0F172A))),
+                                Text('Engineering Aspirant', style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // 3. Sub-selection for JEE: Main vs Advanced
+                  if (primaryExam == 'JEE') ...[
+                    const SizedBox(height: 16),
+                    Text('Choose Your JEE Focus Level:', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ChoiceChip(
+                            label: const Text('JEE Main'),
+                            selected: jeeSubtype == 'JEE Main',
+                            selectedColor: const Color(0xFF4F46E5),
+                            labelStyle: TextStyle(
+                              color: jeeSubtype == 'JEE Main' ? Colors.white : const Color(0xFF334155),
+                              fontWeight: FontWeight.bold,
+                            ),
+                            onSelected: (_) => setDialogState(() => jeeSubtype = 'JEE Main'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ChoiceChip(
+                            label: const Text('JEE Advanced'),
+                            selected: jeeSubtype == 'JEE Advanced',
+                            selectedColor: const Color(0xFF4F46E5),
+                            labelStyle: TextStyle(
+                              color: jeeSubtype == 'JEE Advanced' ? Colors.white : const Color(0xFF334155),
+                              fontWeight: FontWeight.bold,
+                            ),
+                            onSelected: (_) => setDialogState(() => jeeSubtype = 'JEE Advanced'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  // 4. Target Year
+                  const SizedBox(height: 16),
+                  Text('Target Exam Year:', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [2026, 2027, 2028].map((yr) {
+                      final isSel = targetYear == yr;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: ChoiceChip(
+                          label: Text('$yr'),
+                          selected: isSel,
+                          selectedColor: const Color(0xFF10B981),
+                          labelStyle: TextStyle(
+                            color: isSel ? Colors.white : const Color(0xFF334155),
+                            fontWeight: FontWeight.bold,
+                          ),
+                          onSelected: (_) => setDialogState(() => targetYear = yr),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Submit Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4F46E5),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () async {
+                        final rawPhone = phoneCtrl.text.trim();
+                        if (rawPhone.length < 10) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please enter a valid 10-digit mobile number.'), backgroundColor: Color(0xFFEF4444)),
+                          );
+                          return;
+                        }
+
+                        final chosenExam = primaryExam == 'NEET' ? 'NEET' : jeeSubtype;
+                        final fullPhone = '+91$rawPhone';
+
+                        final updated = _currentUserProfile.copyWith(
+                          phoneNumber: fullPhone,
+                          targetExam: chosenExam,
+                          targetYear: targetYear,
+                        );
+
+                        // Save to Supabase and cache
+                        await SupabaseService.updateProfile(updated);
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('cohort_onboarding_completed_${updated.id}', true);
+
+                        if (mounted) {
+                          setState(() {
+                            _currentUserProfile = updated;
+                          });
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('✓ Profile updated! Set goal to $chosenExam $targetYear'),
+                              backgroundColor: const Color(0xFF10B981),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Save & Personalize My Dashboard', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override

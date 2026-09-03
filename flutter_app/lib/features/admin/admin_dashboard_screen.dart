@@ -393,11 +393,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 _buildSidebarTile('Pricing & Plans', Icons.sell_outlined, false, onTap: () => context.go('/admin/pricing')),
                 _buildSidebarTile('Coupon Management', Icons.discount_outlined, false, onTap: () => context.go('/admin/coupons')),
                 _buildSidebarTile('Banner Management', Icons.view_carousel_rounded, false, onTap: () => context.go('/admin/banners')),
+                _buildSidebarTile('Media & Asset Manager', Icons.perm_media_outlined, false, onTap: () => context.go('/admin/media')),
                 _buildSidebarTile('Chapters & Topics', Icons.auto_stories_rounded, false, onTap: () => context.go('/admin/chapters')),
                 _buildSidebarTile('Tags & Topics', Icons.label_outline_rounded, false, onTap: () => context.go('/admin/topics')),
                 _buildSidebarTile('PYQs & Papers', Icons.description_outlined, false, onTap: () => context.go('/admin/papers')),
                 _buildSidebarTile('Mistake Book', Icons.history_edu_outlined, false, onTap: () => context.go('/mistakes')),
                 _buildSidebarTile('Bookmarks', Icons.bookmark_outline_rounded, false, onTap: () => context.go('/bookmarks')),
+
+                const SizedBox(height: 16),
+                _buildSidebarSectionLabel('SALES & ORDERS'),
+                _buildSidebarTile('Orders & Purchases', Icons.shopping_bag_outlined, false, onTap: () => context.go('/admin/orders')),
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('USERS & ROLES'),

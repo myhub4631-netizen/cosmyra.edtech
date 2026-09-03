@@ -56,6 +56,8 @@ import '../../features/admin/seo/admin_seo_screen.dart';
 import '../../features/admin/admin_test_series_manager_screen.dart';
 import '../../features/admin/admin_recommendations_screen.dart';
 import '../../features/admin/admin_coupons_screen.dart';
+import '../../features/admin/admin_media_screen.dart';
+import '../../features/admin/admin_orders_screen.dart';
 import '../../features/cms/dynamic_page_screen.dart';
 import '../../features/blog/blog_list_screen.dart';
 import '../../features/blog/blog_post_screen.dart';
@@ -1068,6 +1070,22 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/superadmin/coupons',
       builder: (context, state) => const AdminCouponManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/media',
+      builder: (context, state) => const AdminMediaScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/media',
+      builder: (context, state) => const AdminMediaScreen(),
+    ),
+    GoRoute(
+      path: '/admin/orders',
+      builder: (context, state) => const AdminOrdersScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/orders',
+      builder: (context, state) => const AdminOrdersScreen(),
     ),
 
     // Super Admin CMS & SEO shortcuts

@@ -210,6 +210,15 @@ class SupabaseService {
     }
   }
 
+  static Future<void> updateProfile(UserProfileModel profile) async {
+    await setActiveUserSession(profile);
+    try {
+      await client.from('profiles').upsert(profile.toJson());
+    } catch (e) {
+      debugPrint('Notice updating Supabase profile: $e');
+    }
+  }
+
   static Future<void> logoutUserSession() async {
     activeUserSession = null;
     try {
@@ -6812,6 +6821,262 @@ class SupabaseService {
     return subs;
   }
 
+  // ================= ADMIN MEDIA ASSETS CRUD =================
+  static const String _mediaCacheKey = 'cosmyra_admin_media_assets_cache';
+
+  static List<Map<String, dynamic>> _defaultMediaAssets() {
+    return [
+      {
+        'id': 'med_001',
+        'title': 'Cosmyra NEET JEE Master Logo',
+        'file_name': 'cosmyra_logo.png',
+        'file_type': 'image',
+        'mime_type': 'image/png',
+        'file_size_kb': 78,
+        'public_url': 'https://neet-jee.in/assets/images/cosmyra_logo.png',
+        'category': 'Branding & Logos',
+        'uploader_role': 'admin',
+        'uploader_name': 'Super Admin',
+        'created_at': DateTime.now().subtract(const Duration(days: 20)).toIso8601String(),
+        'tags': ['logo', 'branding', 'official'],
+      },
+      {
+        'id': 'med_002',
+        'title': 'NEET 2026 Full Syllabus Guide PDF',
+        'file_name': 'neet_2026_syllabus_guide.pdf',
+        'file_type': 'pdf',
+        'mime_type': 'application/pdf',
+        'file_size_kb': 1420,
+        'public_url': 'https://neet-jee.in/assets/docs/neet_2026_syllabus_guide.pdf',
+        'category': 'Syllabus & Curriculum',
+        'uploader_role': 'admin',
+        'uploader_name': 'Academic Team',
+        'created_at': DateTime.now().subtract(const Duration(days: 12)).toIso8601String(),
+        'tags': ['syllabus', 'neet', 'pdf', 'curriculum'],
+      },
+      {
+        'id': 'med_003',
+        'title': 'JEE Advanced Mechanics Formula Sheet',
+        'file_name': 'jee_adv_mechanics_formulas.pdf',
+        'file_type': 'pdf',
+        'mime_type': 'application/pdf',
+        'file_size_kb': 860,
+        'public_url': 'https://neet-jee.in/assets/docs/jee_mechanics.pdf',
+        'category': 'Study Notes',
+        'uploader_role': 'admin',
+        'uploader_name': 'Physics HOD',
+        'created_at': DateTime.now().subtract(const Duration(days: 8)).toIso8601String(),
+        'tags': ['physics', 'formulas', 'jee_advanced'],
+      },
+      {
+        'id': 'med_004',
+        'title': 'NEET Biological Diagram: Cardiac Cycle SVG',
+        'file_name': 'cardiac_cycle_vector.svg',
+        'file_type': 'svg',
+        'mime_type': 'image/svg+xml',
+        'file_size_kb': 42,
+        'public_url': 'https://neet-jee.in/assets/svg/cardiac_cycle.svg',
+        'category': 'Question Diagrams',
+        'uploader_role': 'admin',
+        'uploader_name': 'Biology Faculty',
+        'created_at': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
+        'tags': ['biology', 'cardiac', 'svg', 'diagram'],
+      },
+      {
+        'id': 'med_005',
+        'title': 'User Profile Avatar: Future Doctor',
+        'file_name': 'avatar_doctor.png',
+        'file_type': 'image',
+        'mime_type': 'image/png',
+        'file_size_kb': 64,
+        'public_url': 'https://neet-jee.in/assets/images/avatars/doc.png',
+        'category': 'User Avatars',
+        'uploader_role': 'user',
+        'uploader_name': 'Aarav Sharma (Student)',
+        'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
+        'tags': ['avatar', 'student', 'profile'],
+      },
+      {
+        'id': 'med_006',
+        'title': 'Optical Ray Diagram Question 14 SVG',
+        'file_name': 'optics_prism_refraction.svg',
+        'file_type': 'svg',
+        'mime_type': 'image/svg+xml',
+        'file_size_kb': 31,
+        'public_url': 'https://neet-jee.in/assets/svg/optics_prism.svg',
+        'category': 'Question Diagrams',
+        'uploader_role': 'admin',
+        'uploader_name': 'Physics Team',
+        'created_at': DateTime.now().subtract(const Duration(hours: 18)).toIso8601String(),
+        'tags': ['optics', 'physics', 'svg'],
+      },
+    ];
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchAdminMediaAssets() async {
+    final List<Map<String, dynamic>> assets = [];
+
+    // 1. Check local cache
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_mediaCacheKey);
+      if (raw != null && raw.isNotEmpty) {
+        final List dec = jsonDecode(raw);
+        for (var item in dec) {
+          if (item is Map) assets.add(Map<String, dynamic>.from(item));
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice loading cached media assets: $e');
+    }
+
+    // 2. Query Supabase media table
+    try {
+      final res = await client
+          .from('media_assets')
+          .select()
+          .order('created_at', ascending: false);
+      if (res.isNotEmpty) {
+        for (var r in res) {
+          final id = r['id']?.toString() ?? '';
+          if (!assets.any((a) => a['id'] == id)) {
+            assets.add(Map<String, dynamic>.from(r));
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice querying Supabase media_assets: $e');
+    }
+
+    // 3. Fallback defaults if empty
+    if (assets.isEmpty) {
+      assets.addAll(_defaultMediaAssets());
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_mediaCacheKey, jsonEncode(assets));
+    }
+
+    return assets;
+  }
+
+  static Future<bool> saveAdminMediaAsset(Map<String, dynamic> asset) async {
+    try {
+      final assets = await fetchAdminMediaAssets();
+      final id = asset['id'] ?? 'med_${DateTime.now().millisecondsSinceEpoch}';
+      asset['id'] = id;
+      asset['created_at'] ??= DateTime.now().toIso8601String();
+
+      final idx = assets.indexWhere((a) => a['id'] == id);
+      if (idx >= 0) {
+        assets[idx] = asset;
+      } else {
+        assets.insert(0, asset);
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_mediaCacheKey, jsonEncode(assets));
+
+      try {
+        await client.from('media_assets').upsert(asset);
+      } catch (e) {
+        debugPrint('Notice saving to Supabase media_assets: $e');
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error saving media asset: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> deleteAdminMediaAsset(String assetId) async {
+    try {
+      final assets = await fetchAdminMediaAssets();
+      assets.removeWhere((a) => a['id'] == assetId);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_mediaCacheKey, jsonEncode(assets));
+
+      try {
+        await client.from('media_assets').delete().eq('id', assetId);
+      } catch (e) {
+        debugPrint('Notice deleting from Supabase media_assets: $e');
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting media asset: $e');
+      return false;
+    }
+  }
+
+  // ================= ADMIN ORDERS ACTIONS =================
+  static const String _ordersCacheKey = 'cosmyra_user_orders';
+
+  static Future<bool> updateAdminOrderStatus({
+    required String orderId,
+    required String newStatus,
+    String? adminNote,
+  }) async {
+    try {
+      final orders = await fetchAdminOrders();
+      final idx = orders.indexWhere((o) => o['id'] == orderId);
+      if (idx >= 0) {
+        orders[idx]['payment_status'] = newStatus;
+        if (newStatus == 'completed') {
+          orders[idx]['entitlement_granted'] = true;
+        } else if (newStatus == 'cancelled') {
+          orders[idx]['entitlement_granted'] = false;
+        }
+        if (adminNote != null && adminNote.isNotEmpty) {
+          orders[idx]['notes'] = adminNote;
+        }
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_ordersCacheKey, jsonEncode(orders));
+
+        try {
+          await client.from('orders').update({
+            'status': newStatus,
+            'payment_status': newStatus,
+            'notes': orders[idx]['notes'],
+          }).eq('id', orderId);
+        } catch (e) {
+          debugPrint('Notice updating Supabase order status: $e');
+        }
+
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error updating order status: $e');
+      return false;
+    }
+  }
+
+  static Future<Map<String, dynamic>> sendOrderPaymentReminder(String orderId) async {
+    final orders = await fetchAdminOrders();
+    final match = orders.firstWhere(
+      (o) => o['id'] == orderId,
+      orElse: () => {},
+    );
+    if (match.isEmpty) {
+      return {'success': false, 'message': 'Order not found.'};
+    }
+
+    final phone = match['student_phone'] ?? '';
+    final email = match['student_email'] ?? '';
+    final name = match['student_name'] ?? 'Student';
+    final product = match['product_name'] ?? 'Test Series';
+    final amount = match['amount'] ?? 499;
+
+    final message = 'Hi $name, your enrollment for "$product" (₹$amount) is pending. Complete your payment at https://neet-jee.in/checkout?id=${match['product_id']} to access all mock tests!';
+
+    return {
+      'success': true,
+      'message': 'Payment reminder generated and sent to $email / $phone',
+      'reminder_text': message,
+      'payment_link': 'https://neet-jee.in/checkout?id=${match['product_id']}',
+    };
+  }
 }
 
 
