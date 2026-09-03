@@ -53,7 +53,18 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   // Test Series Selection State
   String _testSeriesOption = 'existing'; // 'existing' or 'new'
   String _existingTestSeries = 'NEET 2026 Full Syllabus Test Series';
+  // Test Series Commercial & Metadata Controllers
   late TextEditingController _newTestSeriesCtrl;
+  late TextEditingController _testSeriesDescCtrl;
+  late TextEditingController _testSeriesBannerCtrl;
+  late TextEditingController _testSeriesPriceCtrl;
+  late TextEditingController _testSeriesOrigPriceCtrl;
+  late TextEditingController _testSeriesPurchaseLinkCtrl;
+  late TextEditingController _testSeriesButtonTextCtrl;
+  bool _testSeriesIsFree = false;
+  bool _testSeriesShowButton = true;
+  List<Map<String, dynamic>> _loadedSeriesObjects = [];
+
   List<String> _availableTestSeriesList = [
     'NEET 2026 Full Syllabus Test Series',
     'NEET 2026 Chapter Wise Test Series',
@@ -95,6 +106,12 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     _positiveMarksCtrl = TextEditingController(text: '+4');
     _instructionsCtrl = TextEditingController();
     _newTestSeriesCtrl = TextEditingController();
+    _testSeriesDescCtrl = TextEditingController(text: 'Comprehensive mock tests covering full syllabus with step-by-step solutions.');
+    _testSeriesBannerCtrl = TextEditingController(text: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=60');
+    _testSeriesPriceCtrl = TextEditingController(text: '299');
+    _testSeriesOrigPriceCtrl = TextEditingController(text: '999');
+    _testSeriesPurchaseLinkCtrl = TextEditingController(text: 'https://neet-jee.in/test-series');
+    _testSeriesButtonTextCtrl = TextEditingController(text: 'Enroll Now - ₹299');
     _loadCustomTestSeries();
   }
 
@@ -103,6 +120,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       final list = await SupabaseService.fetchAllTestSeries();
       if (list.isNotEmpty && mounted) {
         setState(() {
+          _loadedSeriesObjects = list;
           for (var item in list) {
             final String title = (item['title'] ?? item['name'] ?? '').toString().trim();
             if (title.isNotEmpty && !_availableTestSeriesList.contains(title)) {
@@ -116,6 +134,26 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     }
   }
 
+  void _onExistingTestSeriesSelected(String title) {
+    setState(() {
+      _existingTestSeries = title;
+      final found = _loadedSeriesObjects.firstWhere(
+        (e) => (e['title'] ?? e['name'] ?? '').toString().trim().toLowerCase() == title.trim().toLowerCase(),
+        orElse: () => {},
+      );
+      if (found.isNotEmpty) {
+        if (found['description'] != null) _testSeriesDescCtrl.text = found['description'].toString();
+        if (found['banner_image_url'] != null) _testSeriesBannerCtrl.text = found['banner_image_url'].toString();
+        if (found['price'] != null) _testSeriesPriceCtrl.text = found['price'].toString();
+        if (found['original_price'] != null) _testSeriesOrigPriceCtrl.text = found['original_price'].toString();
+        if (found['purchase_link'] != null) _testSeriesPurchaseLinkCtrl.text = found['purchase_link'].toString();
+        if (found['purchase_button_text'] != null) _testSeriesButtonTextCtrl.text = found['purchase_button_text'].toString();
+        if (found['is_free'] != null) _testSeriesIsFree = found['is_free'] == true;
+        if (found['show_purchase_button'] != null) _testSeriesShowButton = found['show_purchase_button'] != false;
+      }
+    });
+  }
+
   @override
   void dispose() {
     _paperNameCtrl.dispose();
@@ -127,7 +165,17 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     _positiveMarksCtrl.dispose();
     _instructionsCtrl.dispose();
     _newTestSeriesCtrl.dispose();
+    _testSeriesDescCtrl.dispose();
+    _testSeriesBannerCtrl.dispose();
+    _priceCtrlDispose();
     super.dispose();
+  }
+
+  void _priceCtrlDispose() {
+    _testSeriesPriceCtrl.dispose();
+    _testSeriesOrigPriceCtrl.dispose();
+    _testSeriesPurchaseLinkCtrl.dispose();
+    _testSeriesButtonTextCtrl.dispose();
   }
 
   Future<void> _handleProceed() async {
@@ -215,15 +263,23 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           'id': SupabaseService.toValidUuid('ts_${_examName}_${_year}_$effectiveTestSeriesTitle'),
           'title': effectiveTestSeriesTitle,
           'name': effectiveTestSeriesTitle,
+          'description': _testSeriesDescCtrl.text.trim(),
+          'banner_image_url': _testSeriesBannerCtrl.text.trim(),
           'exam': _examName,
           'year': _year,
           'category': 'Full Syllabus',
           'paper_id': paperId,
           'paper_name': pName,
+          'is_free': _testSeriesIsFree,
+          'price': double.tryParse(_testSeriesPriceCtrl.text) ?? 299.0,
+          'original_price': double.tryParse(_testSeriesOrigPriceCtrl.text) ?? 999.0,
+          'purchase_link': _testSeriesPurchaseLinkCtrl.text.trim(),
+          'purchase_button_text': _testSeriesButtonTextCtrl.text.trim(),
+          'show_purchase_button': _testSeriesShowButton,
           'question_count': int.tryParse(_questionCountCtrl.text) ?? 200,
           'duration_minutes': int.tryParse(_durationCtrl.text) ?? 180,
           'difficulty': 'High',
-          'status': 'Ready',
+          'status': 'Published',
         });
       } catch (e) {
         debugPrint('Notice persisting test series in step 1: $e');
@@ -926,13 +982,83 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                           ? _existingTestSeries
                           : _availableTestSeriesList.first,
                       items: _availableTestSeriesList,
-                      onChanged: (val) => setState(() => _existingTestSeries = val!),
+                      onChanged: (val) => _onExistingTestSeriesSelected(val!),
                     )
                   else
                     _buildTextField(
                       label: 'New Test Series Title *',
                       controller: _newTestSeriesCtrl,
                     ),
+
+                  const SizedBox(height: 12),
+                  // Test Series Description
+                  _buildTextField(
+                    label: 'Test Series Description / Features',
+                    controller: _testSeriesDescCtrl,
+                  ),
+
+                  const SizedBox(height: 12),
+                  // Banner URL & Free toggle
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: _buildTextField(
+                          label: 'Banner Image URL',
+                          controller: _testSeriesBannerCtrl,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        flex: 2,
+                        child: Row(
+                          children: [
+                            Checkbox(
+                              value: _testSeriesIsFree,
+                              activeColor: const Color(0xFF4F46E5),
+                              onChanged: (v) => setState(() => _testSeriesIsFree = v ?? false),
+                            ),
+                            const Text('100% Free Series', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E1B4B))),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  if (!_testSeriesIsFree) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            label: 'Discounted Price (₹)',
+                            controller: _testSeriesPriceCtrl,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildTextField(
+                            label: 'Original Price / MRP (₹)',
+                            controller: _testSeriesOrigPriceCtrl,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildTextField(
+                            label: 'Purchase Link / URL',
+                            controller: _testSeriesPurchaseLinkCtrl,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildTextField(
+                            label: 'Button Text',
+                            controller: _testSeriesButtonTextCtrl,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

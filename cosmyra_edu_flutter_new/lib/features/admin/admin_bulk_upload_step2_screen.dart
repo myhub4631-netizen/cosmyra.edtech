@@ -502,6 +502,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       'exam': _paperData?['exam'] ?? _paperData?['exam_name'] ?? 'NEET',
       'year': _paperData?['year']?.toString() ?? '2026',
       'paperName': _paperData?['paper_name'] ?? _paperData?['paperName'] ?? widget.paperName,
+      'test_series_id': _paperId,
+      'test_series_title': _paperData?['test_series_title'] ?? _paperData?['testSeriesTitle'] ?? '',
     };
 
     final res = await SupabaseService.saveQuestionMapWithStatus(qMap);

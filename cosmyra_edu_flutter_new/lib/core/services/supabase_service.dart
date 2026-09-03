@@ -3982,10 +3982,10 @@ class SupabaseService {
     return fullData;
   }
 
-  /// Persist a Test Series (in Supabase tests table and SharedPreferences cache)
+  /// Persist a Test Series (in Supabase test_series/tests table and SharedPreferences cache)
   static Future<Map<String, dynamic>> saveTestSeries(Map<String, dynamic> seriesData) async {
     final String seriesId = seriesData['id'] ?? toValidUuid('ts_${DateTime.now().millisecondsSinceEpoch}');
-    final String title = seriesData['title'] ?? seriesData['name'] ?? 'NEET Test Series';
+    final String title = (seriesData['title'] ?? seriesData['name'] ?? 'NEET Test Series').toString().trim();
 
     final fullData = {
       'id': seriesId,
@@ -3995,36 +3995,83 @@ class SupabaseService {
       'exam': seriesData['exam'] ?? 'NEET',
       'year': seriesData['year']?.toString() ?? '2026',
       'category': seriesData['category'] ?? 'Full Syllabus',
+      'banner_image_url': seriesData['banner_image_url'] ?? seriesData['bannerImageUrl'] ?? 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=60',
+      'is_free': seriesData['is_free'] == true || seriesData['isFree'] == true,
+      'price': (seriesData['price'] is num) ? (seriesData['price'] as num).toDouble() : (double.tryParse(seriesData['price']?.toString() ?? '299') ?? 299.0),
+      'original_price': (seriesData['original_price'] is num) ? (seriesData['original_price'] as num).toDouble() : (double.tryParse(seriesData['original_price']?.toString() ?? seriesData['originalPrice']?.toString() ?? '999') ?? 999.0),
+      'currency': seriesData['currency'] ?? 'INR',
+      'purchase_link': seriesData['purchase_link'] ?? seriesData['purchaseLink'] ?? 'https://neet-jee.in/test-series',
+      'purchase_button_text': seriesData['purchase_button_text'] ?? seriesData['purchaseButtonText'] ?? 'Enroll Now',
+      'show_purchase_button': seriesData['show_purchase_button'] != false && seriesData['showPurchaseButton'] != false,
+      'features': seriesData['features'] ?? [
+        '100+ High Quality Tests',
+        'Detailed Solutions & Explanations',
+        'All India Ranking',
+      ],
       'test_count': (seriesData['test_count'] is num) ? (seriesData['test_count'] as num).toInt() : (seriesData['testCount'] ?? 1),
       'question_count': (seriesData['question_count'] is num) ? (seriesData['question_count'] as num).toInt() : (seriesData['questionCount'] ?? 200),
       'duration_minutes': (seriesData['duration_minutes'] is num) ? (seriesData['duration_minutes'] as num).toInt() : (seriesData['durationMinutes'] ?? 180),
       'difficulty': seriesData['difficulty'] ?? 'High',
-      'status': seriesData['status'] ?? 'Ready',
+      'status': seriesData['status'] ?? 'Published',
       'paper_id': seriesData['paper_id'] ?? seriesData['paperId'] ?? '',
       'paper_name': seriesData['paper_name'] ?? seriesData['paperName'] ?? '',
       'created_at': seriesData['created_at'] ?? DateTime.now().toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
     };
 
-    // 1. Try to upsert into Supabase tests table if available
+    // 1. Try to upsert into Supabase test_series table
+    bool savedToSupabase = false;
     try {
-      await client.from('tests').upsert({
+      await client.from('test_series').upsert({
         'id': seriesId,
         'title': title,
         'description': fullData['description'],
+        'exam': fullData['exam'],
+        'year': fullData['year'],
+        'category': fullData['category'],
+        'banner_image_url': fullData['banner_image_url'],
+        'is_free': fullData['is_free'],
+        'price': fullData['price'],
+        'original_price': fullData['original_price'],
+        'currency': fullData['currency'],
+        'purchase_link': fullData['purchase_link'],
+        'purchase_button_text': fullData['purchase_button_text'],
+        'show_purchase_button': fullData['show_purchase_button'],
+        'test_count': fullData['test_count'],
+        'question_count': fullData['question_count'],
         'duration_minutes': fullData['duration_minutes'],
-        'total_marks': 720.0,
-        'is_published': true,
-        'exam_id': fullData['exam'].toString().contains('JEE')
-            ? '22222222-2222-2222-2222-222222222222'
-            : '11111111-1111-1111-1111-111111111111',
-        'created_by': '81543168-fc78-4c7e-91e8-969ee2d11a03',
+        'difficulty': fullData['difficulty'],
+        'status': fullData['status'],
+        'paper_id': fullData['paper_id'],
+        'paper_name': fullData['paper_name'],
+        'updated_at': DateTime.now().toIso8601String(),
       });
+      savedToSupabase = true;
     } catch (e) {
-      debugPrint('Supabase tests upsert note (using local cache): $e');
+      debugPrint('Supabase test_series upsert note (will fallback to tests table): $e');
     }
 
-    // 2. Persist to SharedPreferences
+    // 2. Secondary fallback to tests table
+    if (!savedToSupabase) {
+      try {
+        await client.from('tests').upsert({
+          'id': seriesId,
+          'title': title,
+          'description': fullData['description'],
+          'duration_minutes': fullData['duration_minutes'],
+          'total_marks': 720.0,
+          'is_published': fullData['status'] != 'Draft',
+          'exam_id': fullData['exam'].toString().contains('JEE')
+              ? '22222222-2222-2222-2222-222222222222'
+              : '11111111-1111-1111-1111-111111111111',
+          'created_by': '81543168-fc78-4c7e-91e8-969ee2d11a03',
+        });
+      } catch (e) {
+        debugPrint('Supabase tests upsert note: $e');
+      }
+    }
+
+    // 3. Persist to SharedPreferences cache
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString('cosmyra_saved_test_series') ?? '[]';
@@ -4043,42 +4090,110 @@ class SupabaseService {
     return fullData;
   }
 
-  /// Fetch all created Test Series from Supabase and cache
-  static Future<List<Map<String, dynamic>>> fetchAllTestSeries() async {
-    final List<Map<String, dynamic>> list = [];
+  /// Delete a Test Series from Supabase and local storage
+  static Future<bool> deleteTestSeries(String seriesId) async {
+    bool ok = false;
+    // 1. Delete from Supabase test_series
+    try {
+      await client.from('test_series').delete().eq('id', seriesId);
+      ok = true;
+    } catch (e) {
+      debugPrint('Notice deleting from test_series: $e');
+    }
 
-    // 1. Local cache
+    // 2. Delete from Supabase tests
+    try {
+      await client.from('tests').delete().eq('id', seriesId);
+      ok = true;
+    } catch (e) {
+      debugPrint('Notice deleting from tests: $e');
+    }
+
+    // 3. Delete from local cache
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString('cosmyra_saved_test_series');
       if (raw != null && raw.isNotEmpty) {
-        final List<dynamic> decoded = jsonDecode(raw);
-        list.addAll(decoded.map((e) => Map<String, dynamic>.from(e as Map)));
+        final List<dynamic> list = jsonDecode(raw);
+        list.removeWhere((item) => item['id'] == seriesId);
+        await prefs.setString('cosmyra_saved_test_series', jsonEncode(list));
+        ok = true;
       }
     } catch (e) {
-      debugPrint('Notice loading local test series: $e');
+      debugPrint('Notice deleting from local test series: $e');
     }
 
-    // 2. Supabase tests table
+    return ok;
+  }
+
+  /// Duplicate a Test Series with new ID and (Copy) title
+  static Future<Map<String, dynamic>?> duplicateTestSeries(String seriesId) async {
+    final all = await fetchAllTestSeries();
+    final found = all.firstWhere((item) => item['id'] == seriesId, orElse: () => {});
+    if (found.isEmpty) return null;
+
+    final copyData = Map<String, dynamic>.from(found);
+    final newId = toValidUuid('ts_${DateTime.now().millisecondsSinceEpoch}');
+    copyData['id'] = newId;
+    copyData['title'] = '${found['title']} (Copy)';
+    copyData['name'] = '${found['title']} (Copy)';
+    copyData['created_at'] = DateTime.now().toIso8601String();
+    copyData['updated_at'] = DateTime.now().toIso8601String();
+
+    return await saveTestSeries(copyData);
+  }
+
+  /// Fetch all created Test Series from Supabase and cache
+  static Future<List<Map<String, dynamic>>> fetchAllTestSeries() async {
+    final List<Map<String, dynamic>> list = [];
+    final Set<String> seenIds = {};
+
+    // 1. Fetch from Supabase test_series table
+    try {
+      final res = await client.from('test_series').select().order('created_at', ascending: false);
+      if (res != null && (res as List).isNotEmpty) {
+        for (var row in res) {
+          final map = Map<String, dynamic>.from(row as Map);
+          final sId = map['id']?.toString() ?? '';
+          if (sId.isNotEmpty && !seenIds.contains(sId)) {
+            seenIds.add(sId);
+            list.add(map);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice querying Supabase test_series table: $e');
+    }
+
+    // 2. Fetch from Supabase tests table
     try {
       final res = await client.from('tests').select().order('created_at', ascending: false);
       if (res != null && (res as List).isNotEmpty) {
         for (var row in res) {
           final map = Map<String, dynamic>.from(row as Map);
           final String sId = map['id']?.toString() ?? '';
-          final idx = list.indexWhere((i) => i['id'] == sId);
-          if (idx == -1) {
+          if (sId.isNotEmpty && !seenIds.contains(sId)) {
+            seenIds.add(sId);
             list.add({
               'id': sId,
               'title': map['title'] ?? 'Test Series',
               'name': map['title'] ?? 'Test Series',
+              'description': map['description'] ?? 'Curated test series for comprehensive exam readiness.',
               'exam': 'NEET',
               'year': '2026',
               'category': 'Full Syllabus',
+              'banner_image_url': 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=60',
+              'is_free': false,
+              'price': 299.0,
+              'original_price': 999.0,
+              'purchase_link': 'https://neet-jee.in/test-series',
+              'purchase_button_text': 'Enroll Now - ₹299',
+              'show_purchase_button': true,
               'test_count': 1,
+              'question_count': 200,
               'duration_minutes': map['duration_minutes'] ?? 180,
               'difficulty': 'High',
-              'status': 'Ready',
+              'status': 'Published',
               'paper_id': sId,
             });
           }
@@ -4088,7 +4203,53 @@ class SupabaseService {
       debugPrint('Notice querying Supabase tests table: $e');
     }
 
+    // 3. Local cache merge
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('cosmyra_saved_test_series');
+      if (raw != null && raw.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(raw);
+        for (var item in decoded) {
+          final map = Map<String, dynamic>.from(item as Map);
+          final sId = map['id']?.toString() ?? '';
+          if (sId.isNotEmpty) {
+            final idx = list.indexWhere((i) => i['id'] == sId);
+            if (idx != -1) {
+              list[idx] = map; // overwrite with rich local cache data
+            } else {
+              seenIds.add(sId);
+              list.add(map);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice loading local test series: $e');
+    }
+
     return list;
+  }
+
+  /// Fetch questions linked to a specific Test Series or Paper for editing
+  static Future<List<Map<String, dynamic>>> fetchQuestionsForTestSeries(String seriesId, {String? paperId}) async {
+    final List<Map<String, dynamic>> questions = [];
+    try {
+      var query = client.from('questions').select();
+      if (paperId != null && paperId.isNotEmpty) {
+        query = query.or('test_series_id.eq.$seriesId,paper_id.eq.$paperId');
+      } else {
+        query = query.eq('test_series_id', seriesId);
+      }
+      final res = await query.order('created_at', ascending: true);
+      if (res != null && (res as List).isNotEmpty) {
+        for (var q in res) {
+          questions.add(Map<String, dynamic>.from(q as Map));
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice fetching questions for test series from Supabase: $e');
+    }
+    return questions;
   }
 
   /// Load active upload paper session from SharedPreferences or Supabase

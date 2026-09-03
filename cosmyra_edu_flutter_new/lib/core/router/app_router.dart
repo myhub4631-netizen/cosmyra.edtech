@@ -49,6 +49,7 @@ import '../../features/admin/cms/admin_blog_manager_screen.dart';
 import '../../features/admin/cms/admin_blog_editor_screen.dart';
 import '../../features/admin/cms/admin_navigation_manager_screen.dart';
 import '../../features/admin/seo/admin_seo_screen.dart';
+import '../../features/admin/admin_test_series_manager_screen.dart';
 import '../../features/cms/dynamic_page_screen.dart';
 import '../../features/blog/blog_list_screen.dart';
 import '../../features/blog/blog_post_screen.dart';
@@ -913,8 +914,29 @@ final GoRouter appRouter = GoRouter(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
       ),
     ),
+    GoRoute(
+      path: '/admin/test-series-manager',
+      builder: (context, state) => AdminTestSeriesManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        onBack: () => context.go('/admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/test-series',
+      builder: (context, state) => AdminTestSeriesManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        onBack: () => context.go('/admin'),
+      ),
+    ),
 
     // Super Admin CMS & SEO shortcuts
+    GoRoute(
+      path: '/superadmin/test-series-manager',
+      builder: (context, state) => AdminTestSeriesManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+        onBack: () => context.go('/superadmin/dashboard'),
+      ),
+    ),
     GoRoute(
       path: '/superadmin/pages',
       builder: (context, state) => AdminPageManagerScreen(
