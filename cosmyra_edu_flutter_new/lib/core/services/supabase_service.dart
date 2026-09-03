@@ -3921,11 +3921,13 @@ class SupabaseService {
       'subjects': paperData['subjects'] ?? ['Physics', 'Chemistry', 'Botany', 'Zoology'],
       'shift': paperData['shift'] ?? '',
       'instructions': paperData['instructions'] ?? '',
-      'test_series_option': paperData['testSeriesOption'] ?? '',
-      'existing_test_series': paperData['existingTestSeries'] ?? '',
-      'new_test_series_name': paperData['newTestSeriesName'] ?? '',
+      'test_series_option': paperData['testSeriesOption'] ?? paperData['test_series_option'] ?? '',
+      'existing_test_series': paperData['existingTestSeries'] ?? paperData['existing_test_series'] ?? '',
+      'new_test_series_name': paperData['newTestSeriesName'] ?? paperData['new_test_series_name'] ?? '',
+      'test_series_title': paperData['testSeriesTitle'] ?? paperData['test_series_title'] ?? (paperData['testSeriesOption'] == 'new' ? paperData['newTestSeriesName'] : paperData['existingTestSeries']) ?? '',
+      'is_test_series': paperData['is_test_series'] == true || paperData['sourceCategory'] == 'Test Series' || paperData['source_category'] == 'Test Series',
       'status': paperData['status'] ?? 'Draft',
-      'saved_questions_count': paperData['savedQuestionsCount'] ?? 0,
+      'saved_questions_count': paperData['savedQuestionsCount'] ?? paperData['saved_questions_count'] ?? 0,
       'created_at': paperData['created_at'] ?? DateTime.now().toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
     };
@@ -3953,7 +3955,140 @@ class SupabaseService {
       debugPrint('Error persisting paper to SharedPreferences: $e');
     }
 
+    // Auto-register in Test Series catalog if associated with a test series
+    final String tsTitle = (fullData['test_series_title']?.toString() ?? '').trim();
+    if (tsTitle.isNotEmpty || fullData['is_test_series'] == true) {
+      try {
+        final title = tsTitle.isNotEmpty ? tsTitle : (fullData['paper_name'] ?? 'NEET Test Series');
+        await saveTestSeries({
+          'id': toValidUuid('ts_${fullData['exam']}_${fullData['year']}_$title'),
+          'title': title,
+          'name': title,
+          'exam': fullData['exam'],
+          'year': fullData['year'],
+          'category': 'Full Syllabus',
+          'paper_id': paperId,
+          'paper_name': fullData['paper_name'],
+          'question_count': fullData['question_count'],
+          'duration_minutes': fullData['duration_minutes'],
+          'difficulty': 'High',
+          'status': 'Ready',
+        });
+      } catch (tsErr) {
+        debugPrint('Notice auto-registering test series: $tsErr');
+      }
+    }
+
     return fullData;
+  }
+
+  /// Persist a Test Series (in Supabase tests table and SharedPreferences cache)
+  static Future<Map<String, dynamic>> saveTestSeries(Map<String, dynamic> seriesData) async {
+    final String seriesId = seriesData['id'] ?? toValidUuid('ts_${DateTime.now().millisecondsSinceEpoch}');
+    final String title = seriesData['title'] ?? seriesData['name'] ?? 'NEET Test Series';
+
+    final fullData = {
+      'id': seriesId,
+      'title': title,
+      'name': title,
+      'description': seriesData['description'] ?? 'Curated test series for comprehensive exam readiness.',
+      'exam': seriesData['exam'] ?? 'NEET',
+      'year': seriesData['year']?.toString() ?? '2026',
+      'category': seriesData['category'] ?? 'Full Syllabus',
+      'test_count': (seriesData['test_count'] is num) ? (seriesData['test_count'] as num).toInt() : (seriesData['testCount'] ?? 1),
+      'question_count': (seriesData['question_count'] is num) ? (seriesData['question_count'] as num).toInt() : (seriesData['questionCount'] ?? 200),
+      'duration_minutes': (seriesData['duration_minutes'] is num) ? (seriesData['duration_minutes'] as num).toInt() : (seriesData['durationMinutes'] ?? 180),
+      'difficulty': seriesData['difficulty'] ?? 'High',
+      'status': seriesData['status'] ?? 'Ready',
+      'paper_id': seriesData['paper_id'] ?? seriesData['paperId'] ?? '',
+      'paper_name': seriesData['paper_name'] ?? seriesData['paperName'] ?? '',
+      'created_at': seriesData['created_at'] ?? DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    // 1. Try to upsert into Supabase tests table if available
+    try {
+      await client.from('tests').upsert({
+        'id': seriesId,
+        'title': title,
+        'description': fullData['description'],
+        'duration_minutes': fullData['duration_minutes'],
+        'total_marks': 720.0,
+        'is_published': true,
+        'exam_id': fullData['exam'].toString().contains('JEE')
+            ? '22222222-2222-2222-2222-222222222222'
+            : '11111111-1111-1111-1111-111111111111',
+        'created_by': '81543168-fc78-4c7e-91e8-969ee2d11a03',
+      });
+    } catch (e) {
+      debugPrint('Supabase tests upsert note (using local cache): $e');
+    }
+
+    // 2. Persist to SharedPreferences
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('cosmyra_saved_test_series') ?? '[]';
+      final List<dynamic> list = jsonDecode(raw);
+      final idx = list.indexWhere((item) => item['id'] == seriesId || item['title'] == title);
+      if (idx != -1) {
+        list[idx] = fullData;
+      } else {
+        list.insert(0, fullData);
+      }
+      await prefs.setString('cosmyra_saved_test_series', jsonEncode(list));
+    } catch (e) {
+      debugPrint('Error persisting test series to SharedPreferences: $e');
+    }
+
+    return fullData;
+  }
+
+  /// Fetch all created Test Series from Supabase and cache
+  static Future<List<Map<String, dynamic>>> fetchAllTestSeries() async {
+    final List<Map<String, dynamic>> list = [];
+
+    // 1. Local cache
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('cosmyra_saved_test_series');
+      if (raw != null && raw.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(raw);
+        list.addAll(decoded.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+    } catch (e) {
+      debugPrint('Notice loading local test series: $e');
+    }
+
+    // 2. Supabase tests table
+    try {
+      final res = await client.from('tests').select().order('created_at', ascending: false);
+      if (res != null && (res as List).isNotEmpty) {
+        for (var row in res) {
+          final map = Map<String, dynamic>.from(row as Map);
+          final String sId = map['id']?.toString() ?? '';
+          final idx = list.indexWhere((i) => i['id'] == sId);
+          if (idx == -1) {
+            list.add({
+              'id': sId,
+              'title': map['title'] ?? 'Test Series',
+              'name': map['title'] ?? 'Test Series',
+              'exam': 'NEET',
+              'year': '2026',
+              'category': 'Full Syllabus',
+              'test_count': 1,
+              'duration_minutes': map['duration_minutes'] ?? 180,
+              'difficulty': 'High',
+              'status': 'Ready',
+              'paper_id': sId,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice querying Supabase tests table: $e');
+    }
+
+    return list;
   }
 
   /// Load active upload paper session from SharedPreferences or Supabase

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../tests/test_screen.dart';
 
 class TestSeriesScreen extends StatefulWidget {
   final VoidCallback? onBackToDashboard;
@@ -67,6 +68,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   String _selectedExamFilter = 'NEET 2026';
   bool _isLoading = false;
   List<Map<String, dynamic>> _dbPapers = [];
+  List<Map<String, dynamic>> _customSeriesList = [];
 
   @override
   void initState() {
@@ -75,10 +77,14 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   }
 
   Future<void> _loadPapers() async {
+    setState(() => _isLoading = true);
     final papers = await SupabaseService.fetchAllPapersAndTestSeries();
+    final customSeries = await SupabaseService.fetchAllTestSeries();
     if (mounted) {
       setState(() {
         _dbPapers = papers;
+        _customSeriesList = customSeries;
+        _isLoading = false;
       });
     }
   }
@@ -98,22 +104,27 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       if (!mounted) return;
 
       if (questions.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('No questions assigned to "$title" yet. Upload questions via Question Bank.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        return;
+        questions.addAll(SupabaseService.getSampleQuestions(20));
       }
 
       if (widget.onStartTestSeriesSession != null) {
         widget.onStartTestSeriesSession!(questions, durationMins);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Loaded ${questions.length} questions for $title!'),
-            backgroundColor: Colors.green,
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CustomTestScreen(
+              questions: questions,
+              durationMinutes: durationMins,
+              onTestSubmitted: (attempt, answers) {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('✓ Test Series completed and submitted!'),
+                    backgroundColor: Color(0xFF10B981),
+                  ),
+                );
+              },
+            ),
           ),
         );
       }
@@ -389,25 +400,47 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
           ],
         ),
 
-        // Exam Filter Button
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: [
-              BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
-            ],
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.calendar_today_outlined, size: 13, color: Color(0xFF10B981)),
-              const SizedBox(width: 6),
-              Text(_selectedExamFilter, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B))),
-              const SizedBox(width: 4),
-              const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
-            ],
+        // Exam & Year Filter Dropdown Popup
+        PopupMenuButton<String>(
+          tooltip: 'Select Exam / Year',
+          initialValue: _selectedExamFilter,
+          onSelected: (val) => setState(() => _selectedExamFilter = val),
+          itemBuilder: (ctx) => [
+            const PopupMenuItem(value: 'All Exams', child: Text('All Exams & Years')),
+            ...List.generate(2029 - 1988 + 1, (i) {
+              final y = 2029 - i;
+              return PopupMenuItem(
+                value: 'NEET $y',
+                child: Text('NEET $y'),
+              );
+            }),
+            ...List.generate(2029 - 1988 + 1, (i) {
+              final y = 2029 - i;
+              return PopupMenuItem(
+                value: 'JEE Main $y',
+                child: Text('JEE Main $y'),
+              );
+            }),
+          ],
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_today_outlined, size: 13, color: Color(0xFF10B981)),
+                const SizedBox(width: 6),
+                Text(_selectedExamFilter, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B))),
+                const SizedBox(width: 4),
+                const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
+              ],
+            ),
           ),
         ),
       ],
@@ -668,31 +701,89 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   // 6. ALL TEST SERIES SECTION HEADER & CARDS LIST
   // ===========================================================================
   Widget _buildAllTestSeriesSection() {
-    // Combine hardcoded + dynamic database papers
-    final List<TestSeriesCardData> combinedList = List.from(_allTestSeries);
+    final List<TestSeriesCardData> combinedList = [];
+    final Set<String> seenTitles = {};
+
+    // 1. Add all newly created Test Series from _customSeriesList
+    for (var cs in _customSeriesList) {
+      final String title = (cs['title'] ?? cs['name'] ?? '').toString().trim();
+      final String sId = (cs['id'] ?? cs['paper_id'] ?? 'ts_${title.hashCode}').toString();
+      if (title.isNotEmpty && !seenTitles.contains(title.toLowerCase())) {
+        seenTitles.add(title.toLowerCase());
+        final qCount = (cs['question_count'] is num) ? (cs['question_count'] as num).toInt() : 200;
+        final duration = (cs['duration_minutes'] is num) ? (cs['duration_minutes'] as num).toInt() : 180;
+        combinedList.add(
+          TestSeriesCardData(
+            id: sId,
+            title: title,
+            subtitle: '${cs['exam'] ?? 'NEET'} ${cs['year'] ?? ''} Assigned Test Series ($qCount Questions)',
+            testCount: (cs['test_count'] is num) ? (cs['test_count'] as num).toInt() : 1,
+            durationMinutes: duration,
+            difficulty: cs['difficulty'] ?? 'High',
+            status: cs['status'] ?? 'Ready',
+            nextTestName: cs['paper_name'] ?? 'Test 01',
+            iconBgColor: const Color(0xFF6366F1),
+            icon: Icons.track_changes_rounded,
+          ),
+        );
+      }
+    }
+
+    // 2. Add Test Series and papers from _dbPapers
     for (var p in _dbPapers) {
-      final String pId = p['id'] ?? '';
-      if (!combinedList.any((item) => item.id == pId)) {
-        final pName = p['paper_name'] ?? p['paperName'] ?? 'NEET 2026 Phase 1';
+      final String pId = p['id']?.toString() ?? '';
+      final String tsTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? '').toString().trim();
+      final String pName = (p['paper_name'] ?? p['paperName'] ?? 'NEET Assigned Paper').toString().trim();
+      final String effectiveTitle = tsTitle.isNotEmpty ? tsTitle : pName;
+
+      final bool isTestSeries = (p['source_category'] == 'Test Series') ||
+          (p['category'] == 'Test Series') ||
+          tsTitle.isNotEmpty ||
+          (p['test_series_option'] != null && p['test_series_option'].toString().isNotEmpty) ||
+          ((p['available_in'] is List) && (p['available_in'] as List).contains('test_series'));
+
+      if (isTestSeries && !seenTitles.contains(effectiveTitle.toLowerCase())) {
+        seenTitles.add(effectiveTitle.toLowerCase());
         final qCount = (p['saved_questions_count'] is num) ? (p['saved_questions_count'] as num).toInt() : (p['question_count'] ?? 200);
         final duration = (p['duration_minutes'] is num) ? (p['duration_minutes'] as num).toInt() : (p['duration'] ?? 180);
-        combinedList.insert(
-          0,
+        combinedList.add(
           TestSeriesCardData(
             id: pId,
-            title: pName,
-            subtitle: '${p['exam'] ?? 'NEET'} ${p['year'] ?? '2026'} Assigned Paper ($qCount Questions)',
-            testCount: qCount > 0 ? qCount : 1,
+            title: effectiveTitle,
+            subtitle: '${p['exam'] ?? 'NEET'} ${p['year'] ?? ''} Assigned Test Series (${qCount > 0 ? qCount : 200} Questions)',
+            testCount: 1,
             durationMinutes: duration,
             difficulty: 'High',
-            status: p['status'] == 'Completed' ? 'Completed' : 'Not Started',
-            nextTestName: 'Paper $pId',
+            status: p['status'] == 'Completed' ? 'Completed' : 'Ready',
+            nextTestName: pName,
             iconBgColor: const Color(0xFF7C3AED),
             icon: Icons.assignment_turned_in_rounded,
           ),
         );
       }
     }
+
+    // 3. Add default standard test series
+    for (var ts in _allTestSeries) {
+      if (!seenTitles.contains(ts.title.toLowerCase())) {
+        seenTitles.add(ts.title.toLowerCase());
+        combinedList.add(ts);
+      }
+    }
+
+    // 4. Filter by Category tab if applicable
+    final filteredList = combinedList.where((item) {
+      if (_selectedCategory == 'Full Syllabus' && !item.title.toLowerCase().contains('full') && !item.subtitle.toLowerCase().contains('full')) {
+        return false;
+      }
+      if (_selectedCategory == 'Chapter Wise' && !item.title.toLowerCase().contains('chapter') && !item.subtitle.toLowerCase().contains('chapter')) {
+        return false;
+      }
+      if (_selectedCategory == 'Topic Wise' && !item.title.toLowerCase().contains('topic') && !item.subtitle.toLowerCase().contains('topic')) {
+        return false;
+      }
+      return true;
+    }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -701,7 +792,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('All Test Series', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+            Text('All Test Series (${filteredList.length})', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
             if (_isLoading)
               const SizedBox(
                 width: 16,
@@ -720,7 +811,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                   children: [
                     const Icon(Icons.filter_list_rounded, size: 14, color: Color(0xFF2563EB)),
                     const SizedBox(width: 4),
-                    Text('Filter', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+                    Text('Active Filter: $_selectedCategory', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
                   ],
                 ),
               ),
@@ -729,7 +820,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         const SizedBox(height: 12),
 
         // List of Cards
-        ...combinedList.map((item) => _buildTestSeriesCard(item)).toList(),
+        ...filteredList.map((item) => _buildTestSeriesCard(item)).toList(),
       ],
     );
   }

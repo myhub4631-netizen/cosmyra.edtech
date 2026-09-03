@@ -802,8 +802,8 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/admin/test-series',
-      builder: (context, state) => AdminQuestionsBankDashboard(
-        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      builder: (context, state) => TestSeriesScreen(
+        onBackToDashboard: () => context.go('/admin'),
       ),
     ),
     GoRoute(

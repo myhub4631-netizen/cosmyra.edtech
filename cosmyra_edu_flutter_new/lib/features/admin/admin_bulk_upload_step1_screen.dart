@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
 import 'admin_bulk_upload_step2_screen.dart';
@@ -20,6 +21,12 @@ class AdminBulkUploadStep1Screen extends StatefulWidget {
 }
 
 class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen> {
+  // Years range from 2029 down to 1988
+  static final List<String> availableYears = List<String>.generate(
+    2029 - 1988 + 1,
+    (index) => (2029 - index).toString(),
+  );
+
   // Form Controllers
   late TextEditingController _paperNameCtrl;
   late TextEditingController _paperCodeCtrl;
@@ -47,6 +54,12 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   String _testSeriesOption = 'existing'; // 'existing' or 'new'
   String _existingTestSeries = 'NEET 2026 Full Syllabus Test Series';
   late TextEditingController _newTestSeriesCtrl;
+  List<String> _availableTestSeriesList = [
+    'NEET 2026 Full Syllabus Test Series',
+    'NEET 2026 Chapter Wise Test Series',
+    'NEET 2026 Topic Wise Test Series',
+    'NEET 2026 Previous Year Papers',
+  ];
 
   // Checkboxes for subjects
   bool _subjectPhysics = true;
@@ -82,6 +95,25 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     _positiveMarksCtrl = TextEditingController(text: '+4');
     _instructionsCtrl = TextEditingController();
     _newTestSeriesCtrl = TextEditingController();
+    _loadCustomTestSeries();
+  }
+
+  Future<void> _loadCustomTestSeries() async {
+    try {
+      final list = await SupabaseService.fetchAllTestSeries();
+      if (list.isNotEmpty && mounted) {
+        setState(() {
+          for (var item in list) {
+            final String title = (item['title'] ?? item['name'] ?? '').toString().trim();
+            if (title.isNotEmpty && !_availableTestSeriesList.contains(title)) {
+              _availableTestSeriesList.insert(0, title);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Notice loading test series: $e');
+    }
   }
 
   @override
@@ -120,22 +152,36 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     final String pName = _paperNameCtrl.text.trim().isNotEmpty ? _paperNameCtrl.text.trim() : 'NEET 2026 Phase 1';
     final String paperId = SupabaseService.toValidUuid('paper_${_examName}_${_year}_${_phaseSession}_$pName');
 
+    final String effectiveTestSeriesTitle = _sourceCategory == 'Test Series'
+        ? (_testSeriesOption == 'new' && _newTestSeriesCtrl.text.trim().isNotEmpty
+            ? _newTestSeriesCtrl.text.trim()
+            : _existingTestSeries)
+        : '';
+
     final Map<String, dynamic> paperDetails = {
       'id': paperId,
       'sourceCategory': _sourceCategory,
+      'source_category': _sourceCategory,
       'available_in': availableInModules,
       'availableIn': availableInModules,
       'examName': _examName,
+      'exam': _examName,
       'year': _year,
       'phaseSession': _phaseSession,
+      'phase_session': _phaseSession,
       'paperType': _paperType,
+      'paper_type': _paperType,
       'paperName': pName,
+      'paper_name': pName,
       'paperCode': _paperCodeCtrl.text.trim(),
+      'paper_code': _paperCodeCtrl.text.trim(),
       'language': _language,
       'conductingBody': _conductingBody,
+      'conducting_body': _conductingBody,
       'questionCount': int.tryParse(_questionCountCtrl.text) ?? 200,
       'totalMarks': int.tryParse(_totalMarksCtrl.text) ?? 720,
       'durationMinutes': int.tryParse(_durationCtrl.text) ?? 180,
+      'duration': int.tryParse(_durationCtrl.text) ?? 180,
       'negativeMarking': _negativeMarking == 'Yes',
       'negativeMarks': double.tryParse(_negativeMarksCtrl.text) ?? -4.0,
       'positiveMarks': double.tryParse(_positiveMarksCtrl.text) ?? 4.0,
@@ -151,7 +197,38 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       'difficultyDistribution': _difficultyDistribution,
       'questionOrdering': _questionOrdering,
       'showSectionBreaks': _showSectionBreaks,
+      'testSeriesOption': _testSeriesOption,
+      'test_series_option': _testSeriesOption,
+      'existingTestSeries': _existingTestSeries,
+      'existing_test_series': _existingTestSeries,
+      'newTestSeriesName': _newTestSeriesCtrl.text.trim(),
+      'new_test_series_name': _newTestSeriesCtrl.text.trim(),
+      'testSeriesTitle': effectiveTestSeriesTitle,
+      'test_series_title': effectiveTestSeriesTitle,
+      'is_test_series': _sourceCategory == 'Test Series' || availableInModules.contains('test_series'),
     };
+
+    // Immediately persist created Test Series so it shows up in Test Series section
+    if (_sourceCategory == 'Test Series' && effectiveTestSeriesTitle.isNotEmpty) {
+      try {
+        await SupabaseService.saveTestSeries({
+          'id': SupabaseService.toValidUuid('ts_${_examName}_${_year}_$effectiveTestSeriesTitle'),
+          'title': effectiveTestSeriesTitle,
+          'name': effectiveTestSeriesTitle,
+          'exam': _examName,
+          'year': _year,
+          'category': 'Full Syllabus',
+          'paper_id': paperId,
+          'paper_name': pName,
+          'question_count': int.tryParse(_questionCountCtrl.text) ?? 200,
+          'duration_minutes': int.tryParse(_durationCtrl.text) ?? 180,
+          'difficulty': 'High',
+          'status': 'Ready',
+        });
+      } catch (e) {
+        debugPrint('Notice persisting test series in step 1: $e');
+      }
+    }
 
     try {
       await SupabaseService.savePaperRecord(paperDetails);
@@ -513,8 +590,34 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           setState(() {
             _activeSidebarItem = title;
           });
-          if (title == 'Dashboard' && widget.onBack != null) {
-            widget.onBack!();
+          if (title == 'Dashboard') {
+            if (widget.onBack != null) {
+              widget.onBack!();
+            } else {
+              context.go('/admin');
+            }
+          } else if (title == 'Question & Paper Bank') {
+            context.go('/admin/questions');
+          } else if (title == 'Exams') {
+            context.go('/admin/exams');
+          } else if (title == 'Subjects') {
+            context.go('/admin/subjects');
+          } else if (title == 'Chapters') {
+            context.go('/admin/chapters');
+          } else if (title == 'Topics') {
+            context.go('/admin/topics');
+          } else if (title == 'NTA Mock Papers') {
+            context.go('/admin/mock-papers');
+          } else if (title == 'Custom Practice') {
+            context.go('/practice');
+          } else if (title == 'Custom Tests') {
+            context.go('/mock-tests');
+          } else if (title == 'PYQ Practice') {
+            context.go('/pyq');
+          } else if (title == 'Test Series') {
+            context.go('/test-series');
+          } else if (title == 'Mock Tests') {
+            context.go('/mock-tests');
           }
         },
       ),
@@ -683,7 +786,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                   _buildDropdownField(
                     label: 'Year *',
                     value: _year,
-                    items: ['2026', '2025', '2024', '2023', '2022'],
+                    items: availableYears,
                     onChanged: (val) => setState(() => _year = val!),
                   ),
                   _buildDropdownField(
@@ -819,13 +922,10 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                   if (_testSeriesOption == 'existing')
                     _buildDropdownField(
                       label: 'Select Test Series *',
-                      value: _existingTestSeries,
-                      items: [
-                        'NEET 2026 Full Syllabus Test Series',
-                        'NEET 2026 Chapter Wise Test Series',
-                        'NEET 2026 Topic Wise Test Series',
-                        'NEET 2026 Previous Year Papers',
-                      ],
+                      value: _availableTestSeriesList.contains(_existingTestSeries)
+                          ? _existingTestSeries
+                          : _availableTestSeriesList.first,
+                      items: _availableTestSeriesList,
                       onChanged: (val) => setState(() => _existingTestSeries = val!),
                     )
                   else
@@ -1428,6 +1528,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           height: 42,
           child: DropdownButtonFormField<String>(
             value: items.contains(displayValue) ? displayValue : items.first,
+            menuMaxHeight: 320,
             icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 20),
             style: TextStyle(
               fontSize: 13,

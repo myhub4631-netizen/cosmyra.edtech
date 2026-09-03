@@ -381,6 +381,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           'exam': _paperData?['exam'] ?? _paperData?['exam_name'] ?? 'NEET',
           'year': _paperData?['year']?.toString() ?? '2026',
           'paperName': _paperData?['paper_name'] ?? _paperData?['paperName'] ?? widget.paperName,
+          'test_series_id': _paperId,
+          'test_series_title': _paperData?['test_series_title'] ?? _paperData?['testSeriesTitle'] ?? '',
         };
 
         final ok = await SupabaseService.saveQuestionMap(qMap);
@@ -396,6 +398,33 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       setState(() {
         _addedCount = _questionsList.where((q) => q.isSaved).length;
       });
+
+      // Update paper record with saved questions count and mark Published
+      try {
+        final updatedPaper = Map<String, dynamic>.from(_paperData ?? {});
+        updatedPaper['saved_questions_count'] = _addedCount;
+        updatedPaper['status'] = 'Published';
+        await SupabaseService.savePaperRecord(updatedPaper);
+
+        final tsTitle = (updatedPaper['test_series_title'] ?? updatedPaper['new_test_series_name'] ?? updatedPaper['existing_test_series'] ?? '').toString().trim();
+        if (tsTitle.isNotEmpty || updatedPaper['source_category'] == 'Test Series') {
+          await SupabaseService.saveTestSeries({
+            'id': SupabaseService.toValidUuid('ts_${updatedPaper['exam']}_${updatedPaper['year']}_$tsTitle'),
+            'title': tsTitle.isNotEmpty ? tsTitle : (updatedPaper['paper_name'] ?? 'NEET Test Series'),
+            'exam': updatedPaper['exam'] ?? 'NEET',
+            'year': updatedPaper['year']?.toString() ?? '2026',
+            'category': 'Full Syllabus',
+            'paper_id': _paperId,
+            'paper_name': widget.paperName,
+            'question_count': _addedCount,
+            'duration_minutes': int.tryParse(updatedPaper['duration_minutes']?.toString() ?? '180') ?? 180,
+            'difficulty': 'High',
+            'status': 'Published',
+          });
+        }
+      } catch (paperErr) {
+        debugPrint('Notice updating paper/test series record status: $paperErr');
+      }
 
       if (showToast && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -73,7 +73,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
   int _timeSpentSeconds = 101700;
   Map<String, int> _subjectPYQCounts = {};
 
-  final List<int> _availableYearsList = [2025, 2024, 2023, 2022, 2021, 2020];
+  final List<int> _availableYearsList = List<int>.generate(2029 - 1988 + 1, (i) => 2029 - i);
 
   String _searchQuery = '';
   int _activeViewTab = 0; // 0 = Chapters, 1 = Topics
