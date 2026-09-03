@@ -384,6 +384,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 const SizedBox(height: 6),
 
                 _buildSidebarTile('Test Series Manager', Icons.track_changes_rounded, false, onTap: () => context.go('/admin/test-series-manager')),
+                _buildSidebarTile('Recommendation Manager', Icons.recommend_rounded, false, onTap: () => context.go('/admin/recommendations')),
                 _buildSidebarTile('Paper Predictions', Icons.note_alt_outlined, false, onTap: () => context.go('/admin/predictions')),
                 _buildSidebarTile('Question & Paper Bank', Icons.quiz_outlined, false, onTap: () => context.go('/admin/questions')),
                 _buildSidebarTile('Upload Questions (Step 1)', Icons.cloud_upload_outlined, false, onTap: () => context.go('/admin/questions/upload')),

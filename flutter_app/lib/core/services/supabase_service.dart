@@ -4601,6 +4601,195 @@ class SupabaseService {
     return list;
   }
 
+  // =========================================================================
+  // HOME SCREEN RECOMMENDATIONS (Managed by Admin Dashboard)
+  // =========================================================================
+  static List<Map<String, dynamic>> get defaultCuratedRecommendations => [
+    {
+      'id': 'rec_neet_master',
+      'test_series_id': 'ts_neet_all_india_2026',
+      'badge': 'BESTSELLER',
+      'badge_color': 0xFF2563EB, // Royal Blue
+      'icon_type': 'cap',
+      'title': 'NEET MASTER',
+      'subtitle': 'Full Syllabus Test Series',
+      'tests_count': 20,
+      'questions_count': 3600,
+      'validity': 'Till NEET 2026',
+      'price': 499.0,
+      'original_price': 999.0,
+      'is_active': true,
+      'order_index': 0,
+    },
+    {
+      'id': 'rec_neet_sprint',
+      'test_series_id': 'ts_neet_chapter_wise_2026',
+      'badge': 'POPULAR',
+      'badge_color': 0xFFEA580C, // Vibrant Orange
+      'icon_type': 'bolt',
+      'title': 'NEET SPRINT',
+      'subtitle': 'Chapter-wise Test Series',
+      'tests_count': 40,
+      'questions_count': 2000,
+      'validity': 'Till NEET 2026',
+      'price': 399.0,
+      'original_price': 799.0,
+      'is_active': true,
+      'order_index': 1,
+    },
+    {
+      'id': 'rec_nta_pyq',
+      'test_series_id': 'ts_neet_pyq_2024_2025',
+      'badge': 'TRENDING',
+      'badge_color': 0xFF9333EA, // Purple
+      'icon_type': 'cube',
+      'title': 'NTA PYQ',
+      'subtitle': '2023-2025 + Solutions',
+      'tests_count': 150,
+      'questions_count': 4500,
+      'validity': 'Lifetime',
+      'price': 299.0,
+      'original_price': 599.0,
+      'is_active': true,
+      'order_index': 2,
+    },
+    {
+      'id': 'rec_neet_topic_booster',
+      'test_series_id': 'ts_neet_high_yield_topics_2026',
+      'badge': 'HIGH YIELD',
+      'badge_color': 0xFF10B981, // Emerald Green
+      'icon_type': 'target',
+      'title': 'NEET TOPIC BOOSTER',
+      'subtitle': 'High-Yield Topic-wise Tests',
+      'tests_count': 10,
+      'questions_count': 1800,
+      'validity': 'Till NEET 2026',
+      'price': 199.0,
+      'original_price': 499.0,
+      'is_active': true,
+      'order_index': 3,
+    },
+  ];
+
+  static Future<List<Map<String, dynamic>>> fetchHomeRecommendations() async {
+    final List<Map<String, dynamic>> list = [];
+    final Set<String> seenIds = {};
+
+    // 1. Fetch from Supabase recommendations table if present
+    try {
+      final res = await client.from('home_recommendations').select().order('order_index', ascending: true);
+      if (res != null && (res as List).isNotEmpty) {
+        for (var item in res) {
+          final map = Map<String, dynamic>.from(item as Map);
+          final id = map['id']?.toString() ?? '';
+          if (id.isNotEmpty && !seenIds.contains(id)) {
+            seenIds.add(id);
+            list.add(map);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice querying home_recommendations from Supabase: $e');
+    }
+
+    // 2. Fetch locally stored recommendations from admin edits
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString('cosmyra_home_recommendations');
+      if (str != null && str.isNotEmpty) {
+        final decoded = jsonDecode(str) as List<dynamic>;
+        for (var item in decoded) {
+          final map = Map<String, dynamic>.from(item as Map);
+          final id = map['id']?.toString() ?? '';
+          if (id.isNotEmpty && !seenIds.contains(id)) {
+            seenIds.add(id);
+            list.add(map);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice reading local home recommendations: $e');
+    }
+
+    // 3. Fallback to defaultCuratedRecommendations to ensure 100% reliability
+    for (var def in defaultCuratedRecommendations) {
+      final id = def['id']?.toString() ?? '';
+      if (!seenIds.contains(id)) {
+        seenIds.add(id);
+        list.add(def);
+      }
+    }
+
+    // Cache locally for offline/fast load
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_home_recommendations', jsonEncode(list));
+    } catch (_) {}
+
+    list.sort((a, b) {
+      final int orderA = (a['order_index'] as num?)?.toInt() ?? 0;
+      final int orderB = (b['order_index'] as num?)?.toInt() ?? 0;
+      return orderA.compareTo(orderB);
+    });
+
+    return list;
+  }
+
+  static Future<void> saveHomeRecommendation(Map<String, dynamic> item) async {
+    final list = await fetchHomeRecommendations();
+    final String id = item['id']?.toString() ?? 'rec_${DateTime.now().millisecondsSinceEpoch}';
+    item['id'] = id;
+
+    final index = list.indexWhere((e) => e['id']?.toString() == id);
+    if (index >= 0) {
+      list[index] = item;
+    } else {
+      list.add(item);
+    }
+
+    // Save to local storage
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_home_recommendations', jsonEncode(list));
+    } catch (e) {
+      debugPrint('Error saving home recommendation locally: $e');
+    }
+
+    // Attempt remote save to Supabase
+    try {
+      await client.from('home_recommendations').upsert(item);
+    } catch (e) {
+      debugPrint('Notice syncing home recommendation to Supabase: $e');
+    }
+  }
+
+  static Future<void> deleteHomeRecommendation(String id) async {
+    final list = await fetchHomeRecommendations();
+    list.removeWhere((e) => e['id']?.toString() == id);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_home_recommendations', jsonEncode(list));
+    } catch (e) {
+      debugPrint('Error deleting local recommendation: $e');
+    }
+
+    try {
+      await client.from('home_recommendations').delete().eq('id', id);
+    } catch (e) {
+      debugPrint('Notice deleting recommendation in Supabase: $e');
+    }
+  }
+
+  static Future<void> toggleRecommendationStatus(String id, bool isActive) async {
+    final list = await fetchHomeRecommendations();
+    final item = list.firstWhere((e) => e['id']?.toString() == id, orElse: () => {});
+    if (item.isNotEmpty) {
+      item['is_active'] = isActive;
+      await saveHomeRecommendation(item);
+    }
+  }
+
   /// Fetch questions linked to a specific Test Series or Paper for editing
   static Future<List<Map<String, dynamic>>> fetchQuestionsForTestSeries(String seriesId, {String? paperId}) async {
     final List<Map<String, dynamic>> questions = [];

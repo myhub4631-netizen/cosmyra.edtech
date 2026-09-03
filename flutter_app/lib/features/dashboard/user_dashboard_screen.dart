@@ -8,6 +8,7 @@ import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/app_sidebar.dart';
 import '../auth/login_screen.dart';
+import 'widgets/recommended_test_series_section.dart';
 
 class UserDashboardScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -102,6 +103,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             ),
             body: SafeArea(
               child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -136,7 +138,15 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     // 5. Quick Actions Row
                     if (_isSectionVisible('quick_actions')) ...[
                       _buildMobileQuickActions(),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // 6. Recommended Test Series Section & Go Premium Banner
+                    if (_isSectionVisible('recommended_section')) ...[
+                      RecommendedTestSeriesSection(
+                        onViewAll: () => context.go('/test-series'),
+                      ),
+                      const SizedBox(height: 16),
                     ],
                   ],
                 ),
@@ -176,6 +186,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     // Main Scrollable Content Body
                     Expanded(
                       child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
                         padding: const EdgeInsets.all(28.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,6 +221,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                             // Quick Start Section Header + 5 Cards Grid Row
                             if (_isSectionVisible('quick_actions')) ...[
                               _buildQuickStartSection(),
+                              const SizedBox(height: 28),
+                            ],
+
+                            // Recommended Test Series Section & Go Premium Banner
+                            if (_isSectionVisible('recommended_section')) ...[
+                              RecommendedTestSeriesSection(
+                                onViewAll: () => context.go('/test-series'),
+                              ),
                               const SizedBox(height: 28),
                             ],
 

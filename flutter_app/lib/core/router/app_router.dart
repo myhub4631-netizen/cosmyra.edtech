@@ -54,6 +54,7 @@ import '../../features/admin/cms/admin_blog_editor_screen.dart';
 import '../../features/admin/cms/admin_navigation_manager_screen.dart';
 import '../../features/admin/seo/admin_seo_screen.dart';
 import '../../features/admin/admin_test_series_manager_screen.dart';
+import '../../features/admin/admin_recommendations_screen.dart';
 import '../../features/cms/dynamic_page_screen.dart';
 import '../../features/blog/blog_list_screen.dart';
 import '../../features/blog/blog_post_screen.dart';
@@ -1050,6 +1051,14 @@ final GoRouter appRouter = GoRouter(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
         onBack: () => context.go('/admin'),
       ),
+    ),
+    GoRoute(
+      path: '/admin/recommendations',
+      builder: (context, state) => const AdminRecommendationsScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/recommendations',
+      builder: (context, state) => const AdminRecommendationsScreen(),
     ),
 
     // Super Admin CMS & SEO shortcuts
