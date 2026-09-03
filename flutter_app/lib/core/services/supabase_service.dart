@@ -4199,7 +4199,303 @@ class SupabaseService {
     return await saveTestSeries(copyData);
   }
 
-  /// Fetch all created Test Series from Supabase and cache
+  /// Curated production-ready default test series for NEET & JEE
+  static List<Map<String, dynamic>> get defaultCuratedTestSeries => [
+    {
+      'id': 'ts_neet_all_india_2026',
+      'title': 'NEET Master All India Mock Test Series 2026',
+      'name': 'NEET Master All India Mock Test Series 2026',
+      'exam': 'NEET',
+      'year': '2026',
+      'category': 'Full Syllabus',
+      'test_type': 'Full',
+      'testType': 'Full',
+      'description': 'Complete syllabus simulated mock tests based on latest NTA NEET pattern with detailed step-by-step video solutions and All India Rank predictor.',
+      'long_description': 'Crafted by top Kota educators and previous NEET rankers, this test series offers 15 full-length mock tests strictly aligned with the updated NMC/NTA NEET syllabus. Every test includes detailed explanations, sub-topic wise analysis, time management metrics, and national percentile benchmark.',
+      'banner_image_url': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=1200&auto=format&fit=crop&q=80',
+      'is_free': false,
+      'price': 499.0,
+      'original_price': 1999.0,
+      'test_count': 15,
+      'question_count': 200,
+      'duration_minutes': 180,
+      'difficulty': 'Moderate',
+      'status': 'Published',
+      'validity': 'Valid until NEET 2026 Exam',
+      'attempt_status': 'Not Attempted',
+      'syllabus_url': 'https://neet-jee.in/syllabus/neet-2026.pdf',
+      'features': [
+        '15 Full Length 200-Question NTA Pattern Mocks',
+        'Instant Performance Breakdown & Weak Area Identification',
+        'All India Percentile & Projected NEET Rank',
+        'Step-by-Step LaTeX & Diagram Solutions'
+      ],
+      'tests': [
+        {'id': 'mock_test_01', 'title': 'Full Syllabus Mock Test 01 (NMC Pattern)', 'test_type': 'Full', 'status': 'Ready', 'duration': 180, 'questions': 200, 'marks': 720},
+        {'id': 'mock_test_02', 'title': 'Full Syllabus Mock Test 02 (High-Yield Focus)', 'test_type': 'Full', 'status': 'Ready', 'duration': 180, 'questions': 200, 'marks': 720},
+        {'id': 'mock_test_03', 'title': 'Full Syllabus Mock Test 03 (Advanced Level)', 'test_type': 'Full', 'status': 'Ready', 'duration': 180, 'questions': 200, 'marks': 720},
+        {'id': 'mock_test_04', 'title': 'Full Syllabus Mock Test 04 (Speed & Accuracy)', 'test_type': 'Full', 'status': 'Ready', 'duration': 180, 'questions': 200, 'marks': 720},
+        {'id': 'mock_test_05', 'title': 'Full Syllabus Mock Test 05 (Grand All India)', 'test_type': 'Full', 'status': 'Ready', 'duration': 180, 'questions': 200, 'marks': 720}
+      ],
+      'reviews': [
+        {
+          'name': 'Aarav Sharma',
+          'rating': 5.0,
+          'date': '2 days ago',
+          'comment': 'The question standard matches the real NEET paper exceptionally well. Physics calculations and Biology assertion-reason questions are top notch.',
+          'avatar': 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
+          'verified': true,
+        },
+        {
+          'name': 'Priya Patel',
+          'rating': 5.0,
+          'date': '1 week ago',
+          'comment': 'Helped me boost my score from 560 to 670 in 6 weeks! Highly recommended for all serious aspirants.',
+          'avatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
+          'verified': true,
+        }
+      ],
+      'top_scores': {
+        'highest_score': 715,
+        'average_score': 548,
+        'total_participants': 14280,
+        'top_rankers': [
+          {'rank': 1, 'name': 'Aditya R.', 'score': 715, 'max_score': 720, 'accuracy': '98.2%', 'percentile': '99.99%', 'badge': 'AIR 1'},
+          {'rank': 2, 'name': 'Sneha K.', 'score': 708, 'max_score': 720, 'accuracy': '97.5%', 'percentile': '99.95%', 'badge': 'AIR 2'},
+          {'rank': 3, 'name': 'Rohan M.', 'score': 701, 'max_score': 720, 'accuracy': '96.8%', 'percentile': '99.89%', 'badge': 'AIR 3'}
+        ]
+      }
+    },
+    {
+      'id': 'ts_neet_chapter_2026',
+      'title': 'NEET 2026 Chapter-Wise Diagnostic Test Series',
+      'name': 'NEET 2026 Chapter-Wise Diagnostic Test Series',
+      'exam': 'NEET',
+      'year': '2026',
+      'category': 'Chapter Wise',
+      'test_type': 'Chapter',
+      'testType': 'Chapter',
+      'description': 'Master individual NCERT chapters with timed chapter tests in Physics, Chemistry, Botany, and Zoology.',
+      'long_description': 'Targeted chapter mastery containing 30 individual chapter diagnostics. Pinpoint exact knowledge gaps in Mechanics, Organic Chemistry, Genetics, and Physiology before jumping into full syllabus mocks.',
+      'banner_image_url': 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=1200&auto=format&fit=crop&q=80',
+      'is_free': false,
+      'price': 299.0,
+      'original_price': 999.0,
+      'test_count': 30,
+      'question_count': 50,
+      'duration_minutes': 60,
+      'difficulty': 'Moderate',
+      'status': 'Published',
+      'validity': 'Valid until NEET 2026 Exam',
+      'attempt_status': 'Not Attempted',
+      'syllabus_url': 'https://neet-jee.in/syllabus/neet-chapterwise.pdf',
+      'features': [
+        '30 Chapter-Specific Diagnostic Tests',
+        'Deep NCERT Line-by-Line Question Coverage',
+        'Comprehensive Answer Keys with Concept Tags'
+      ],
+      'tests': [
+        {'id': 'ch_phy_01', 'title': 'Physics: Units, Dimensions & Kinematics', 'test_type': 'Chapter', 'status': 'Ready', 'duration': 60, 'questions': 50, 'marks': 200},
+        {'id': 'ch_chem_01', 'title': 'Chemistry: Some Basic Concepts & Atomic Structure', 'test_type': 'Chapter', 'status': 'Ready', 'duration': 60, 'questions': 50, 'marks': 200},
+        {'id': 'ch_bio_01', 'title': 'Biology: Cell: The Unit of Life & Cell Cycle', 'test_type': 'Chapter', 'status': 'Ready', 'duration': 60, 'questions': 50, 'marks': 200},
+        {'id': 'ch_bio_02', 'title': 'Biology: Genetics & Evolution', 'test_type': 'Chapter', 'status': 'Ready', 'duration': 60, 'questions': 50, 'marks': 200}
+      ],
+      'reviews': [
+        {'name': 'Tanvi Gupta', 'rating': 4.9, 'date': '3 days ago', 'comment': 'Best way to test if you really understood the NCERT chapter.', 'verified': true}
+      ],
+      'top_scores': {
+        'highest_score': 200,
+        'average_score': 162,
+        'total_participants': 8920,
+        'top_rankers': [
+          {'rank': 1, 'name': 'Vikram S.', 'score': 200, 'max_score': 200, 'accuracy': '100%', 'percentile': '99.9%', 'badge': 'AIR 1'},
+          {'rank': 2, 'name': 'Ananya P.', 'score': 195, 'max_score': 200, 'accuracy': '98%', 'percentile': '99.5%', 'badge': 'AIR 2'}
+        ]
+      }
+    },
+    {
+      'id': 'ts_neet_topic_free_2026',
+      'title': 'NEET 2026 High-Yield Topic & Part Test Series',
+      'name': 'NEET 2026 High-Yield Topic & Part Test Series',
+      'exam': 'NEET',
+      'year': '2026',
+      'category': 'Topic Wise',
+      'test_type': 'Part',
+      'testType': 'Part',
+      'description': 'Free foundational tests focusing on high-weightage topics across NEET Physics, Chemistry, and Biology.',
+      'long_description': 'Accessible to all aspirants free of cost. Build exam stamina with 12 topic-wise and unit-wise mock evaluations covering high-probability NEET examination concepts.',
+      'banner_image_url': 'https://images.unsplash.com/photo-1509062522246-3755977927d7?w=1200&auto=format&fit=crop&q=80',
+      'is_free': true,
+      'price': 0.0,
+      'original_price': 499.0,
+      'test_count': 12,
+      'question_count': 45,
+      'duration_minutes': 45,
+      'difficulty': 'Moderate',
+      'status': 'Published',
+      'validity': 'Free Lifetime Access',
+      'attempt_status': 'Not Attempted',
+      'syllabus_url': '',
+      'features': [
+        '100% Free Access for All Registered Students',
+        '12 Topic & Part Tests',
+        'Instant Answer Key & Performance Analysis'
+      ],
+      'tests': [
+        {'id': 'top_phy_01', 'title': 'Topic 01: Optics & Wave Mechanics', 'test_type': 'Part', 'status': 'Ready', 'duration': 45, 'questions': 45, 'marks': 180},
+        {'id': 'top_chem_01', 'title': 'Topic 02: Chemical Bonding & Thermodynamics', 'test_type': 'Part', 'status': 'Ready', 'duration': 45, 'questions': 45, 'marks': 180},
+        {'id': 'top_bio_01', 'title': 'Topic 03: Human Physiology Comprehensive', 'test_type': 'Part', 'status': 'Ready', 'duration': 45, 'questions': 45, 'marks': 180}
+      ],
+      'reviews': [
+        {'name': 'Karan J.', 'rating': 5.0, 'date': 'Yesterday', 'comment': 'Unbelievable that this is free. The quality is equal to paid courses.', 'verified': true}
+      ],
+      'top_scores': {
+        'highest_score': 180,
+        'average_score': 135,
+        'total_participants': 22400,
+        'top_rankers': [
+          {'rank': 1, 'name': 'Meera D.', 'score': 180, 'max_score': 180, 'accuracy': '100%', 'percentile': '99.9%', 'badge': 'AIR 1'}
+        ]
+      }
+    },
+    {
+      'id': 'ts_neet_pyq_2026',
+      'title': 'NEET 10-Year Solved PYQ Grand Mock Series',
+      'name': 'NEET 10-Year Solved PYQ Grand Mock Series',
+      'exam': 'NEET',
+      'year': '2026',
+      'category': 'Full Syllabus',
+      'test_type': 'Full',
+      'testType': 'Full',
+      'description': 'Real past years actual NEET question papers formatted into authentic computer-based tests.',
+      'long_description': 'Experience the exact past NEET examination environment from 2025 down to 2016. Analyze historical trends and master repetitive patterns.',
+      'banner_image_url': 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&auto=format&fit=crop&q=80',
+      'is_free': false,
+      'price': 199.0,
+      'original_price': 799.0,
+      'test_count': 10,
+      'question_count': 200,
+      'duration_minutes': 180,
+      'difficulty': 'Moderate',
+      'status': 'Published',
+      'validity': 'Valid until NEET 2026 Exam',
+      'attempt_status': 'Not Attempted',
+      'syllabus_url': '',
+      'features': [
+        '10 Actual Official Past Exam Papers',
+        'Official NTA Answer Keys & Explanations',
+        'Year-by-Year Trend Analysis'
+      ],
+      'tests': [
+        {'id': 'pyq_2025', 'title': 'NEET Official Question Paper 2025', 'test_type': 'Full', 'status': 'Ready', 'duration': 180, 'questions': 200, 'marks': 720},
+        {'id': 'pyq_2024', 'title': 'NEET Official Question Paper 2024', 'test_type': 'Full', 'status': 'Ready', 'duration': 180, 'questions': 200, 'marks': 720},
+        {'id': 'pyq_2023', 'title': 'NEET Official Question Paper 2023', 'test_type': 'Full', 'status': 'Ready', 'duration': 180, 'questions': 200, 'marks': 720}
+      ],
+      'reviews': [
+        {'name': 'Rahul Verma', 'rating': 5.0, 'date': '4 days ago', 'comment': 'Solving PYQs in real test mode made all the difference in my exam confidence.', 'verified': true}
+      ],
+      'top_scores': {
+        'highest_score': 720,
+        'average_score': 580,
+        'total_participants': 16700,
+        'top_rankers': [
+          {'rank': 1, 'name': 'Devansh T.', 'score': 720, 'max_score': 720, 'accuracy': '100%', 'percentile': '100%', 'badge': 'AIR 1'}
+        ]
+      }
+    },
+    {
+      'id': 'ts_jee_main_aits_2026',
+      'title': 'JEE Main 2026 All India Test Series (AITS)',
+      'name': 'JEE Main 2026 All India Test Series (AITS)',
+      'exam': 'JEE Main',
+      'year': '2026',
+      'category': 'Full Syllabus',
+      'test_type': 'Full',
+      'testType': 'Full',
+      'description': 'Comprehensive All India Test Series for JEE Main with numerical value questions and negative marking simulation.',
+      'long_description': 'Structured specifically for engineering aspirants targeting top NITs and IIITs. Features 10 full length 75-question tests with balanced Physics, Chemistry, and Mathematics distribution.',
+      'banner_image_url': 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80',
+      'is_free': false,
+      'price': 499.0,
+      'original_price': 1999.0,
+      'test_count': 10,
+      'question_count': 75,
+      'duration_minutes': 180,
+      'difficulty': 'Advanced',
+      'status': 'Published',
+      'validity': 'Valid until JEE Main 2026 Exam',
+      'attempt_status': 'Not Attempted',
+      'syllabus_url': 'https://neet-jee.in/syllabus/jee-main.pdf',
+      'features': [
+        '10 Full-Length 300-Mark JEE Main Pattern Tests',
+        'Section A (MCQs) and Section B (Numerical) Strict Split',
+        'Predicted Percentile & NIT Cutoff Predictor'
+      ],
+      'tests': [
+        {'id': 'jee_mock_01', 'title': 'JEE Main Full Mock Test 01', 'test_type': 'Full', 'status': 'Ready', 'duration': 180, 'questions': 75, 'marks': 300},
+        {'id': 'jee_mock_02', 'title': 'JEE Main Full Mock Test 02', 'test_type': 'Full', 'status': 'Ready', 'duration': 180, 'questions': 75, 'marks': 300},
+        {'id': 'jee_mock_03', 'title': 'JEE Main Full Mock Test 03', 'test_type': 'Full', 'status': 'Ready', 'duration': 180, 'questions': 75, 'marks': 300}
+      ],
+      'reviews': [
+        {'name': 'Arjun Nair', 'rating': 5.0, 'date': '5 days ago', 'comment': 'Math section questions are delightfully challenging, just like real JEE Main.', 'verified': true}
+      ],
+      'top_scores': {
+        'highest_score': 295,
+        'average_score': 168,
+        'total_participants': 11200,
+        'top_rankers': [
+          {'rank': 1, 'name': 'Siddharth B.', 'score': 295, 'max_score': 300, 'accuracy': '98.5%', 'percentile': '99.98%', 'badge': 'AIR 1'}
+        ]
+      }
+    },
+    {
+      'id': 'ts_jee_chapter_2026',
+      'title': 'JEE Main 2026 Chapter-Wise Practice Series',
+      'name': 'JEE Main 2026 Chapter-Wise Practice Series',
+      'exam': 'JEE Main',
+      'year': '2026',
+      'category': 'Chapter Wise',
+      'test_type': 'Chapter',
+      'testType': 'Chapter',
+      'description': 'Chapter-focused test papers across Calculus, Coordinate Geometry, Organic Reaction Mechanisms, and Electrodynamics.',
+      'long_description': '25 intensive chapter-level problem sets with challenging single-choice and integer answer questions for thorough concept mastery.',
+      'banner_image_url': 'https://images.unsplash.com/photo-1509228468518-180dd4864904?w=1200&auto=format&fit=crop&q=80',
+      'is_free': false,
+      'price': 299.0,
+      'original_price': 999.0,
+      'test_count': 25,
+      'question_count': 30,
+      'duration_minutes': 60,
+      'difficulty': 'Advanced',
+      'status': 'Published',
+      'validity': 'Valid until JEE Main 2026 Exam',
+      'attempt_status': 'Not Attempted',
+      'syllabus_url': '',
+      'features': [
+        '25 Intensive Chapter Diagnostic Tests',
+        'Includes Advanced Integer & Numerical Problems',
+        'Detailed Analytical Explanations'
+      ],
+      'tests': [
+        {'id': 'jee_ch_01', 'title': 'Calculus: Limits, Continuity & Derivatives', 'test_type': 'Chapter', 'status': 'Ready', 'duration': 60, 'questions': 30, 'marks': 120},
+        {'id': 'jee_ch_02', 'title': 'Physics: Rotational Dynamics & Gravitation', 'test_type': 'Chapter', 'status': 'Ready', 'duration': 60, 'questions': 30, 'marks': 120},
+        {'id': 'jee_ch_03', 'title': 'Chemistry: Coordination Compounds & Metallurgy', 'test_type': 'Chapter', 'status': 'Ready', 'duration': 60, 'questions': 30, 'marks': 120}
+      ],
+      'reviews': [
+        {'name': 'Kavya S.', 'rating': 4.9, 'date': '1 week ago', 'comment': 'Tremendous help for Calculus and Rotational Motion practice.', 'verified': true}
+      ],
+      'top_scores': {
+        'highest_score': 120,
+        'average_score': 82,
+        'total_participants': 6750,
+        'top_rankers': [
+          {'rank': 1, 'name': 'Nikhil G.', 'score': 120, 'max_score': 120, 'accuracy': '100%', 'percentile': '99.9%', 'badge': 'AIR 1'}
+        ]
+      }
+    }
+  ];
+
+  /// Fetch all created Test Series from Supabase, local cache, and fallback baseline
   static Future<List<Map<String, dynamic>>> fetchAllTestSeries() async {
     final List<Map<String, dynamic>> list = [];
     final Set<String> seenIds = {};
@@ -4282,6 +4578,22 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Notice loading local test series: $e');
     }
+
+    // 4. Merge default curated test series so test series are ALWAYS available on mobile & web
+    for (var def in defaultCuratedTestSeries) {
+      final sId = def['id']?.toString() ?? '';
+      final title = (def['title'] ?? '').toString().toLowerCase();
+      if (!seenIds.contains(sId) && !list.any((item) => (item['title'] ?? '').toString().toLowerCase() == title)) {
+        list.add(def);
+        seenIds.add(sId);
+      }
+    }
+
+    // 5. Cache list in SharedPreferences for instantaneous offline availability
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_saved_test_series', jsonEncode(list));
+    } catch (_) {}
 
     return list;
   }

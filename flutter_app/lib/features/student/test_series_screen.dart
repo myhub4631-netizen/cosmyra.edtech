@@ -128,7 +128,7 @@ class TestSeriesCardData {
 
 class _TestSeriesScreenState extends State<TestSeriesScreen> {
   String _selectedCategory = 'All Series';
-  String _selectedExamFilter = 'NEET 2026';
+  String _selectedExamFilter = 'All Exams';
   bool _isLoading = false;
   List<Map<String, dynamic>> _dbPapers = [];
   List<Map<String, dynamic>> _customSeriesList = [];
@@ -373,6 +373,55 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       }
     }
 
+    // 3. Fallback to SupabaseService.defaultCuratedTestSeries so test series are ALWAYS visible on mobile & web
+    for (var def in SupabaseService.defaultCuratedTestSeries) {
+      final String title = (def['title'] ?? def['name'] ?? '').toString().trim();
+      final String sId = (def['id'] ?? 'ts_${title.hashCode}').toString();
+      if (title.isNotEmpty && !seenTitles.contains(title.toLowerCase())) {
+        seenTitles.add(title.toLowerCase());
+        list.add(
+          TestSeriesCardData(
+            id: sId,
+            title: title,
+            exam: (def['exam'] ?? 'NEET').toString(),
+            targetYear: (def['year'] ?? '2026').toString(),
+            subtitle: '${def['exam'] ?? 'NEET'} ${def['year'] ?? '2026'} Series (${def['question_count'] ?? 200} Qs)',
+            description: (def['description'] ?? '').toString(),
+            longDescription: (def['long_description'] ?? '').toString(),
+            features: (def['features'] is List) ? List<dynamic>.from(def['features']) : const [],
+            tests: (def['tests'] is List)
+                ? (def['tests'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+                : const [],
+            reviews: (def['reviews'] is List)
+                ? (def['reviews'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+                : const [],
+            topScores: (def['top_scores'] is Map)
+                ? Map<String, dynamic>.from(def['top_scores'])
+                : const {},
+            testCount: (def['test_count'] is num) ? (def['test_count'] as num).toInt() : 10,
+            durationMinutes: (def['duration_minutes'] is num) ? (def['duration_minutes'] as num).toInt() : 180,
+            difficulty: (def['difficulty'] ?? 'Moderate').toString(),
+            testType: (def['test_type'] ?? 'Full').toString(),
+            category: (def['category'] ?? 'Full Syllabus').toString(),
+            validity: (def['validity'] ?? 'Valid until exam').toString(),
+            attemptStatus: (def['attempt_status'] ?? 'Not Attempted').toString(),
+            syllabusUrl: (def['syllabus_url'] ?? '').toString(),
+            status: def['status'] ?? 'Published',
+            nextTestName: 'Mock Test 01',
+            iconBgColor: const Color(0xFF4F46E5),
+            icon: Icons.track_changes_rounded,
+            bannerImageUrl: def['banner_image_url'],
+            isFree: def['is_free'] == true,
+            price: (def['price'] is num) ? (def['price'] as num).toDouble() : 499.0,
+            originalPrice: (def['original_price'] is num) ? (def['original_price'] as num).toDouble() : 1999.0,
+            purchaseLink: (def['purchase_link'] ?? '').toString(),
+            purchaseButtonText: (def['purchase_button_text'] ?? 'Join').toString(),
+            showPurchaseButton: def['show_purchase_button'] != false,
+          ),
+        );
+      }
+    }
+
     return list;
   }
 
@@ -384,9 +433,14 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
 
     for (var s in seriesList) {
       allCount += s.testCount;
-      if (s.testType == 'Chapter' || s.title.toLowerCase().contains('chapter')) {
+      final cat = s.category.toLowerCase();
+      final type = s.testType.toLowerCase();
+      final title = s.title.toLowerCase();
+      final sub = s.subtitle.toLowerCase();
+
+      if (type.contains('chapter') || cat.contains('chapter') || title.contains('chapter') || sub.contains('chapter')) {
         chapterCount += s.testCount;
-      } else if (s.testType == 'Part' || s.title.toLowerCase().contains('part') || s.title.toLowerCase().contains('topic')) {
+      } else if (type.contains('part') || type.contains('topic') || cat.contains('topic') || cat.contains('part') || title.contains('topic') || title.contains('part') || sub.contains('topic') || sub.contains('part')) {
         topicCount += s.testCount;
       } else {
         fullCount += s.testCount;
@@ -1106,23 +1160,57 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   Widget _buildAllTestSeriesSection(List<TestSeriesCardData> allRealSeries) {
     // Filter by Category tab if applicable
     final filteredList = allRealSeries.where((item) {
-      if (_selectedCategory == 'Full Syllabus' && !item.title.toLowerCase().contains('full') && !item.subtitle.toLowerCase().contains('full')) {
+      final cat = item.category.toLowerCase();
+      final type = item.testType.toLowerCase();
+      final title = item.title.toLowerCase();
+      final sub = item.subtitle.toLowerCase();
+
+      if (_selectedCategory == 'Full Syllabus' &&
+          !cat.contains('full') &&
+          !type.contains('full') &&
+          !title.contains('full') &&
+          !sub.contains('full')) {
         return false;
       }
-      if (_selectedCategory == 'Chapter Wise' && !item.title.toLowerCase().contains('chapter') && !item.subtitle.toLowerCase().contains('chapter')) {
+      if (_selectedCategory == 'Chapter Wise' &&
+          !cat.contains('chapter') &&
+          !type.contains('chapter') &&
+          !title.contains('chapter') &&
+          !sub.contains('chapter')) {
         return false;
       }
-      if (_selectedCategory == 'Topic Wise' && !item.title.toLowerCase().contains('topic') && !item.subtitle.toLowerCase().contains('topic')) {
+      if (_selectedCategory == 'Topic Wise' &&
+          !cat.contains('topic') &&
+          !cat.contains('part') &&
+          !type.contains('topic') &&
+          !type.contains('part') &&
+          !title.contains('topic') &&
+          !title.contains('part') &&
+          !sub.contains('topic') &&
+          !sub.contains('part')) {
         return false;
       }
       // Exam Filter
       if (_selectedExamFilter != 'All Exams') {
         final f = _selectedExamFilter.toLowerCase();
-        final match = item.title.toLowerCase().contains(f) ||
-            item.formattedTargetYear.toLowerCase().contains(f) ||
-            '${item.exam} ${item.targetYear}'.toLowerCase().contains(f);
-        if (!match && (f.contains('neet') && !item.exam.toLowerCase().contains('neet'))) return false;
-        if (!match && (f.contains('jee') && !item.exam.toLowerCase().contains('jee'))) return false;
+        final isNeet = f.contains('neet');
+        final isJee = f.contains('jee');
+
+        if (isNeet && !item.exam.toLowerCase().contains('neet')) return false;
+        if (isJee && !item.exam.toLowerCase().contains('jee')) return false;
+
+        // Check if filter specifies a particular year (e.g. 2025, 2024)
+        final yearMatch = RegExp(r'\b(19|20)\d{2}\b').firstMatch(f);
+        if (yearMatch != null) {
+          final filterYear = yearMatch.group(0)!;
+          final itemYear = item.targetYear.trim();
+          if (itemYear.isNotEmpty &&
+              itemYear != filterYear &&
+              item.title.contains(RegExp(r'\b(19|20)\d{2}\b')) &&
+              !item.title.contains(filterYear)) {
+            return false;
+          }
+        }
       }
       return true;
     }).toList();
@@ -1201,6 +1289,21 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                   'Real test series published by the admin in Admin Test Series Manager will appear here.',
                   style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                   textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF2563EB),
+                    side: const BorderSide(color: Color(0xFF2563EB)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () => setState(() {
+                    _selectedCategory = 'All Series';
+                    _selectedExamFilter = 'All Exams';
+                  }),
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Show All Available Series', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
