@@ -77,11 +77,72 @@ UserProfileModel _getEffectiveProfile() {
   return SupabaseService.getMockProfile(role: 'student');
 }
 
+UserProfileModel _getEffectiveAdminProfile() {
+  if (SupabaseService.activeUserSession != null) {
+    return SupabaseService.activeUserSession!;
+  }
+  return SupabaseService.getMockProfile(role: 'admin');
+}
+
 final GoRouter appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
   initialLocation: '/',
   debugLogDiagnostics: true,
   errorBuilder: (context, state) => NotFoundScreen(path: state.uri.toString()),
+  redirect: (BuildContext context, GoRouterState state) {
+    final session = SupabaseService.activeUserSession;
+    final bool isLoggedIn = session != null;
+    final String path = state.uri.path;
+
+    // 1. Admin route protection: /admin and all /admin/*
+    if (path == '/admin' || path.startsWith('/admin/')) {
+      if (!isLoggedIn) {
+        final dest = state.uri.toString();
+        return '/login?redirect=${Uri.encodeComponent(dest)}';
+      }
+      final role = session.role.toLowerCase();
+      final bool isAdmin = role == 'admin' || role == 'superadmin' || session.isAdmin || session.isSuperAdmin;
+      if (!isAdmin) {
+        // Non-admin signed-in user is blocked from admin dashboard
+        return '/dashboard';
+      }
+    }
+
+    // 2. Protected student routes: strictly require user to be signed in
+    final protectedStudentPaths = [
+      '/dashboard',
+      '/user/dashboard',
+      '/checkout',
+      '/profile',
+      '/my-tests',
+      '/mistakes',
+      '/mistakes-bookmarks',
+      '/analytics',
+    ];
+    final bool requiresAuth = protectedStudentPaths.any((p) => path == p || path.startsWith('$p/'));
+
+    if (requiresAuth) {
+      if (!isLoggedIn) {
+        final dest = state.uri.toString();
+        return '/login?redirect=${Uri.encodeComponent(dest)}';
+      }
+    }
+
+    // 3. Auth routes: /login, /signup
+    if (path == '/login' || path == '/signup') {
+      if (isLoggedIn) {
+        final redirectParam = state.uri.queryParameters['redirect'];
+        if (redirectParam != null && redirectParam.trim().isNotEmpty && redirectParam != '/login' && redirectParam != '/signup') {
+          return redirectParam;
+        }
+        final role = session.role.toLowerCase();
+        final bool isAdmin = role == 'admin' || role == 'superadmin' || session.isAdmin || session.isSuperAdmin;
+        return isAdmin ? '/admin' : '/dashboard';
+      }
+    }
+
+    return null; // Public routes allowed
+  },
   routes: [
     // =========================================================================
     // PUBLIC & AUTHENTICATION ROUTES
@@ -110,7 +171,18 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/signup',
-      builder: (context, state) => const SignUpScreen(),
+      builder: (context, state) => SignUpScreen(
+        onSignUpSuccess: (userProfile) {
+          final redirect = state.uri.queryParameters['redirect'];
+          if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
+            context.go(redirect);
+          } else if (userProfile.isAdmin || userProfile.isSuperAdmin) {
+            context.go('/admin');
+          } else {
+            context.go('/dashboard');
+          }
+        },
+      ),
     ),
     GoRoute(
       path: '/privacy-policy',
@@ -196,7 +268,12 @@ final GoRouter appRouter = GoRouter(
         onOpenTestSeries: () => context.go('/test-series'),
         onOpenPyqs: () => context.go('/pyq'),
         onOpenMistakes: () => context.go('/mistakes'),
-        onLogout: () => context.go('/login'),
+        onLogout: () async {
+          await SupabaseService.logoutUserSession();
+          if (context.mounted) {
+            context.go('/login');
+          }
+        },
       ),
     ),
     GoRoute(
@@ -211,7 +288,12 @@ final GoRouter appRouter = GoRouter(
         onOpenTestSeries: () => context.go('/test-series'),
         onOpenPyqs: () => context.go('/pyq'),
         onOpenMistakes: () => context.go('/mistakes'),
-        onLogout: () => context.go('/login'),
+        onLogout: () async {
+          await SupabaseService.logoutUserSession();
+          if (context.mounted) {
+            context.go('/login');
+          }
+        },
       ),
     ),
     GoRoute(
@@ -737,13 +819,13 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/admin',
       builder: (context, state) => AdminDashboardScreen(
-        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        userProfile: _getEffectiveAdminProfile(),
       ),
     ),
     GoRoute(
       path: '/admin/dashboard',
       builder: (context, state) => AdminDashboardScreen(
-        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        userProfile: _getEffectiveAdminProfile(),
       ),
     ),
     GoRoute(

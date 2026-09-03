@@ -563,6 +563,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   if (isUnlocked) {
                     _startTest(testId, testTitle, durationMins);
                   } else {
+                    if (SupabaseService.activeUserSession == null) {
+                      context.push('/login?redirect=${Uri.encodeComponent('/checkout?id=${item.id}')}');
+                      return;
+                    }
                     // Navigate to checkout
                     final cartItem = CartItem(
                       id: item.id,
@@ -863,7 +867,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                onPressed: () => context.go('/login'),
+                onPressed: () => context.push('/login?redirect=${Uri.encodeComponent('/checkout?id=${item.id}')}'),
                 icon: const Icon(Icons.login_rounded, size: 16),
                 label: const Text('Sign In to Enroll', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               ),

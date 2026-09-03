@@ -63,7 +63,10 @@ class _LoginScreenState extends State<LoginScreen> {
         if (widget.onLoginSuccess != null) {
           widget.onLoginSuccess!(userProfile);
         } else {
-          if (userProfile.isSuperAdmin) {
+          final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
+          if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
+            context.go(redirect);
+          } else if (userProfile.isSuperAdmin) {
             context.go('/superadmin');
           } else if (userProfile.isAdmin) {
             context.go('/admin');

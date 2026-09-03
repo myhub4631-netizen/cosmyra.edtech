@@ -34,6 +34,9 @@ class SupabaseService {
       debugPrint('Supabase init warning: $e');
     }
     await _loadTaxonomyFromLocalStorage();
+    try {
+      await getCurrentUser();
+    } catch (_) {}
   }
 
   static final List<UserProfileModel> _localRegisteredUsers = [];

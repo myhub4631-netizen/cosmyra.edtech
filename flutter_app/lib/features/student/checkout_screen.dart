@@ -251,6 +251,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
 
     final user = SupabaseService.activeUserSession;
+    if (user == null) {
+      return _buildAuthRequiredBarrier();
+    }
+
     final List<CartItem> items = _activeItem != null
         ? [_activeItem!]
         : (CartService.instance.items.isNotEmpty
@@ -721,6 +725,80 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                   onPressed: () => context.go('/test-series'),
                   child: const Text('Explore More Test Series', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAuthRequiredBarrier() {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/test-series'),
+        ),
+        title: Text('Checkout', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 520),
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4)),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: const BoxDecoration(color: Color(0xFFEEF2FF), shape: BoxShape.circle),
+                  child: const Icon(Icons.lock_person_rounded, color: Color(0xFF4F46E5), size: 34),
+                ),
+                const SizedBox(height: 20),
+                Text('Sign In Required', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
+                const SizedBox(height: 10),
+                Text(
+                  'Please sign in or create an account to enroll in this test series. Your account ensures your test analytics, All India Rank, and solutions are safely synced.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF64748B), height: 1.5),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => context.push('/login?redirect=${Uri.encodeComponent('/checkout')}'),
+                  icon: const Icon(Icons.login_rounded, size: 18),
+                  label: const Text('Sign In to Continue', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF64748B),
+                    minimumSize: const Size(double.infinity, 44),
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => context.canPop() ? context.pop() : context.go('/test-series'),
+                  child: const Text('Return to Test Series', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
