@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+export 'cms_models.dart';
 
 /// User Profile & Role Model
 class UserProfileModel {

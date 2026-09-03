@@ -410,9 +410,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 _buildSidebarTile('Leaderboard', Icons.leaderboard_outlined, false, onTap: () => context.go('/admin/leaderboard')),
 
                 const SizedBox(height: 16),
-                _buildSidebarSectionLabel('SYSTEM & SETTINGS'),
+                _buildSidebarSectionLabel('WEBSITE & CMS MANAGER'),
+                _buildSidebarTile('Page Manager (All Pages)', Icons.article_outlined, false, onTap: () => context.go('/admin/pages')),
+                _buildSidebarTile('Blog & Articles', Icons.edit_note_rounded, false, onTap: () => context.go('/admin/blog')),
+                _buildSidebarTile('Navigation & Menus', Icons.menu_open_rounded, false, onTap: () => context.go('/admin/navigation')),
                 _buildSidebarTile('Privacy Policy (CMS)', Icons.policy_outlined, false, onTap: () => context.go('/admin/privacy-policy')),
                 _buildSidebarTile('Terms of Service (CMS)', Icons.gavel_rounded, false, onTap: () => context.go('/admin/terms')),
+
+                const SizedBox(height: 16),
+                _buildSidebarSectionLabel('SYSTEM & SETTINGS'),
                 _buildSidebarTile('System Settings', Icons.settings_outlined, false, onTap: () => context.go('/admin/settings')),
                 _buildSidebarTile('Notification Center', Icons.notifications_none_rounded, false, onTap: () => context.go('/admin/notifications')),
                 _buildSidebarTile('Backup & Restore', Icons.cloud_sync_outlined, false),

@@ -4730,6 +4730,390 @@ class SupabaseService {
 
   /// Save Terms of Service
   static Future<bool> saveTermsOfService(String termsText) => saveCmsPageContent('terms_of_service', termsText);
+
+  // =========================================================================
+  // CMS & BLOG & NAVIGATION SERVICE METHODS
+  // =========================================================================
+
+  /// Fetch all CMS pages with optional status/search filters
+  static Future<List<CmsPageModel>> fetchCmsPages({String? search, String? status}) async {
+    try {
+      var query = client.from('cms_pages').select('*');
+      if (status != null && status != 'all' && status.isNotEmpty) {
+        query = query.eq('status', status);
+      }
+      if (search != null && search.trim().isNotEmpty) {
+        query = query.or('title.ilike.%${search.trim()}%,slug.ilike.%${search.trim()}%');
+      }
+      final res = await query.order('updated_at', ascending: false);
+      final list = (res as List).map((e) => CmsPageModel.fromJson(e as Map<String, dynamic>)).toList();
+      return list;
+    } catch (e) {
+      debugPrint('Error fetching CMS pages from Supabase: $e');
+      return [];
+    }
+  }
+
+  /// Fetch single CMS page by slug
+  static Future<CmsPageModel?> fetchCmsPageBySlug(String slug) async {
+    try {
+      final res = await client.from('cms_pages').select('*').eq('slug', slug.trim().toLowerCase()).maybeSingle();
+      if (res != null) {
+        return CmsPageModel.fromJson(res);
+      }
+    } catch (e) {
+      debugPrint('Error fetching page by slug ($slug): $e');
+    }
+    return null;
+  }
+
+  /// Fetch single CMS page by ID
+  static Future<CmsPageModel?> fetchCmsPageById(String id) async {
+    try {
+      final res = await client.from('cms_pages').select('*').eq('id', id).maybeSingle();
+      if (res != null) {
+        return CmsPageModel.fromJson(res);
+      }
+    } catch (e) {
+      debugPrint('Error fetching page by id ($id): $e');
+    }
+    return null;
+  }
+
+  /// Save (create or update) a CMS page
+  static Future<CmsPageModel?> saveCmsPage(CmsPageModel page) async {
+    try {
+      if (page.id.isEmpty) {
+        // Insert new
+        final res = await client.from('cms_pages').insert(page.toJson(forInsert: false)).select().single();
+        return CmsPageModel.fromJson(res);
+      } else {
+        // Update existing
+        final res = await client.from('cms_pages').update(page.toJson(forInsert: false)).eq('id', page.id).select().single();
+        return CmsPageModel.fromJson(res);
+      }
+    } catch (e) {
+      debugPrint('Error saving CMS page: $e');
+      return null;
+    }
+  }
+
+  /// Delete a CMS page by ID
+  static Future<bool> deleteCmsPage(String id) async {
+    try {
+      await client.from('cms_pages').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting CMS page ($id): $e');
+      return false;
+    }
+  }
+
+  /// Toggle publish status for a page
+  static Future<bool> toggleCmsPagePublish(String id, bool publish) async {
+    try {
+      await client.from('cms_pages').update({
+        'status': publish ? 'published' : 'draft',
+        'published_at': publish ? DateTime.now().toIso8601String() : null,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error toggling page publish ($id): $e');
+      return false;
+    }
+  }
+
+  /// Duplicate a page
+  static Future<CmsPageModel?> duplicateCmsPage(CmsPageModel page) async {
+    try {
+      final newSlug = '${page.slug}-copy-${DateTime.now().millisecondsSinceEpoch % 10000}';
+      final newTitle = '${page.title} (Copy)';
+      final newPage = page.copyWith(
+        id: '',
+        title: newTitle,
+        slug: newSlug,
+        status: 'draft',
+        publishedAt: null,
+      );
+      return await saveCmsPage(newPage);
+    } catch (e) {
+      debugPrint('Error duplicating page: $e');
+      return null;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // BLOG POSTS & CATEGORIES
+  // -------------------------------------------------------------------------
+
+  /// Fetch blog categories
+  static Future<List<CmsBlogCategoryModel>> fetchBlogCategories() async {
+    try {
+      final res = await client.from('cms_blog_categories').select('*').order('sort_order', ascending: true);
+      return (res as List).map((e) => CmsBlogCategoryModel.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('Error fetching blog categories: $e');
+      return [];
+    }
+  }
+
+  /// Save blog category
+  static Future<CmsBlogCategoryModel?> saveBlogCategory(CmsBlogCategoryModel category) async {
+    try {
+      if (category.id.isEmpty) {
+        final res = await client.from('cms_blog_categories').insert(category.toJson(forInsert: false)).select().single();
+        return CmsBlogCategoryModel.fromJson(res);
+      } else {
+        final res = await client.from('cms_blog_categories').update(category.toJson(forInsert: false)).eq('id', category.id).select().single();
+        return CmsBlogCategoryModel.fromJson(res);
+      }
+    } catch (e) {
+      debugPrint('Error saving blog category: $e');
+      return null;
+    }
+  }
+
+  /// Fetch blog posts
+  static Future<List<CmsBlogPostModel>> fetchBlogPosts({
+    String? categoryId,
+    String? search,
+    String? status,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    try {
+      var query = client.from('cms_blog_posts').select('*, cms_blog_categories(name)');
+      if (status != null && status != 'all' && status.isNotEmpty) {
+        query = query.eq('status', status);
+      }
+      if (categoryId != null && categoryId.isNotEmpty && categoryId != 'all') {
+        query = query.eq('category_id', categoryId);
+      }
+      if (search != null && search.trim().isNotEmpty) {
+        query = query.or('title.ilike.%${search.trim()}%,slug.ilike.%${search.trim()}%');
+      }
+      final res = await query.order('created_at', ascending: false).range(offset, offset + limit - 1);
+      return (res as List).map((e) => CmsBlogPostModel.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('Error fetching blog posts: $e');
+      return [];
+    }
+  }
+
+  /// Fetch single blog post by slug
+  static Future<CmsBlogPostModel?> fetchBlogPostBySlug(String slug) async {
+    try {
+      final res = await client.from('cms_blog_posts').select('*, cms_blog_categories(name)').eq('slug', slug.trim().toLowerCase()).maybeSingle();
+      if (res != null) {
+        return CmsBlogPostModel.fromJson(res);
+      }
+    } catch (e) {
+      debugPrint('Error fetching blog post by slug ($slug): $e');
+    }
+    return null;
+  }
+
+  /// Fetch single blog post by ID
+  static Future<CmsBlogPostModel?> fetchBlogPostById(String id) async {
+    try {
+      final res = await client.from('cms_blog_posts').select('*, cms_blog_categories(name)').eq('id', id).maybeSingle();
+      if (res != null) {
+        return CmsBlogPostModel.fromJson(res);
+      }
+    } catch (e) {
+      debugPrint('Error fetching blog post by id ($id): $e');
+    }
+    return null;
+  }
+
+  /// Save blog post
+  static Future<CmsBlogPostModel?> saveBlogPost(CmsBlogPostModel post) async {
+    try {
+      if (post.id.isEmpty) {
+        final res = await client.from('cms_blog_posts').insert(post.toJson(forInsert: false)).select('*, cms_blog_categories(name)').single();
+        return CmsBlogPostModel.fromJson(res);
+      } else {
+        final res = await client.from('cms_blog_posts').update(post.toJson(forInsert: false)).eq('id', post.id).select('*, cms_blog_categories(name)').single();
+        return CmsBlogPostModel.fromJson(res);
+      }
+    } catch (e) {
+      debugPrint('Error saving blog post: $e');
+      return null;
+    }
+  }
+
+  /// Delete blog post
+  static Future<bool> deleteBlogPost(String id) async {
+    try {
+      await client.from('cms_blog_posts').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting blog post ($id): $e');
+      return false;
+    }
+  }
+
+  /// Toggle publish status for a blog post
+  static Future<bool> toggleBlogPostPublish(String id, bool publish) async {
+    try {
+      await client.from('cms_blog_posts').update({
+        'status': publish ? 'published' : 'draft',
+        'published_at': publish ? DateTime.now().toIso8601String() : null,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error toggling blog post publish ($id): $e');
+      return false;
+    }
+  }
+
+  /// Duplicate a blog post
+  static Future<CmsBlogPostModel?> duplicateBlogPost(CmsBlogPostModel post) async {
+    try {
+      final newSlug = '${post.slug}-copy-${DateTime.now().millisecondsSinceEpoch % 10000}';
+      final newTitle = '${post.title} (Copy)';
+      final newPost = post.copyWith(
+        id: '',
+        title: newTitle,
+        slug: newSlug,
+        status: 'draft',
+        viewsCount: 0,
+        publishedAt: null,
+      );
+      return await saveBlogPost(newPost);
+    } catch (e) {
+      debugPrint('Error duplicating blog post: $e');
+      return null;
+    }
+  }
+
+  /// Increment views count on a blog post
+  static Future<void> incrementBlogPostViews(String id) async {
+    try {
+      await client.rpc('increment_blog_views', params: {'post_id': id});
+    } catch (_) {
+      try {
+        final current = await client.from('cms_blog_posts').select('views_count').eq('id', id).maybeSingle();
+        if (current != null) {
+          final count = (current['views_count'] as num?)?.toInt() ?? 0;
+          await client.from('cms_blog_posts').update({'views_count': count + 1}).eq('id', id);
+        }
+      } catch (e) {
+        debugPrint('Could not increment views: $e');
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // NAVIGATION MENUS & ITEMS
+  // -------------------------------------------------------------------------
+
+  /// Fetch all navigation menus
+  static Future<List<CmsNavigationMenuModel>> fetchNavigationMenus() async {
+    try {
+      final res = await client.from('cms_navigation_menus').select('*').order('name', ascending: true);
+      return (res as List).map((e) => CmsNavigationMenuModel.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('Error fetching navigation menus: $e');
+      return [];
+    }
+  }
+
+  /// Fetch navigation items for a specific menu ID
+  static Future<List<CmsNavigationItemModel>> fetchNavigationItems(String menuId) async {
+    try {
+      final res = await client.from('cms_navigation_items').select('*').eq('menu_id', menuId).order('sort_order', ascending: true);
+      return (res as List).map((e) => CmsNavigationItemModel.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      debugPrint('Error fetching navigation items ($menuId): $e');
+      return [];
+    }
+  }
+
+  /// Fetch active navigation items by menu key (e.g. 'header_main', 'footer_main')
+  static Future<List<CmsNavigationItemModel>> fetchNavigationItemsByMenuKey(String menuKey) async {
+    try {
+      final menu = await client.from('cms_navigation_menus').select('id').eq('key', menuKey).maybeSingle();
+      if (menu != null && menu['id'] != null) {
+        final res = await client
+            .from('cms_navigation_items')
+            .select('*')
+            .eq('menu_id', menu['id'])
+            .eq('is_visible', true)
+            .order('sort_order', ascending: true);
+        return (res as List).map((e) => CmsNavigationItemModel.fromJson(e as Map<String, dynamic>)).toList();
+      }
+    } catch (e) {
+      debugPrint('Error fetching nav items for key $menuKey: $e');
+    }
+    return [];
+  }
+
+  /// Save or update navigation item
+  static Future<CmsNavigationItemModel?> saveNavigationItem(CmsNavigationItemModel item) async {
+    try {
+      if (item.id.isEmpty) {
+        final res = await client.from('cms_navigation_items').insert(item.toJson(forInsert: false)).select().single();
+        return CmsNavigationItemModel.fromJson(res);
+      } else {
+        final res = await client.from('cms_navigation_items').update(item.toJson(forInsert: false)).eq('id', item.id).select().single();
+        return CmsNavigationItemModel.fromJson(res);
+      }
+    } catch (e) {
+      debugPrint('Error saving navigation item: $e');
+      return null;
+    }
+  }
+
+  /// Delete navigation item
+  static Future<bool> deleteNavigationItem(String id) async {
+    try {
+      await client.from('cms_navigation_items').delete().eq('id', id);
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting navigation item ($id): $e');
+      return false;
+    }
+  }
+
+  /// Batch update sort order for navigation items
+  static Future<bool> reorderNavigationItems(List<CmsNavigationItemModel> items) async {
+    try {
+      for (int i = 0; i < items.length; i++) {
+        await client.from('cms_navigation_items').update({
+          'sort_order': i + 1,
+          'updated_at': DateTime.now().toIso8601String(),
+        }).eq('id', items[i].id);
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error reordering navigation items: $e');
+      return false;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // STORAGE MEDIA UPLOAD
+  // -------------------------------------------------------------------------
+
+  /// Upload an image to Supabase Storage 'cms-media' bucket and return public URL
+  static Future<String?> uploadCmsImage(List<int> bytes, String fileName) async {
+    try {
+      final sanitizedName = '${DateTime.now().millisecondsSinceEpoch}_${fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_')}';
+      await client.storage.from('cms-media').uploadBinary(
+        sanitizedName,
+        Uint8List.fromList(bytes),
+      );
+      final publicUrl = client.storage.from('cms-media').getPublicUrl(sanitizedName);
+      return publicUrl;
+    } catch (e) {
+      debugPrint('Error uploading CMS image to Supabase Storage: $e');
+      return null;
+    }
+  }
 }
+
 
 

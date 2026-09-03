@@ -43,6 +43,14 @@ import '../../features/legal/privacy_policy_screen.dart';
 import '../../features/admin/admin_privacy_policy_manager_screen.dart';
 import '../../features/legal/terms_of_service_screen.dart';
 import '../../features/admin/admin_terms_manager_screen.dart';
+import '../../features/admin/cms/admin_page_manager_screen.dart';
+import '../../features/admin/cms/admin_page_editor_screen.dart';
+import '../../features/admin/cms/admin_blog_manager_screen.dart';
+import '../../features/admin/cms/admin_blog_editor_screen.dart';
+import '../../features/admin/cms/admin_navigation_manager_screen.dart';
+import '../../features/cms/dynamic_page_screen.dart';
+import '../../features/blog/blog_list_screen.dart';
+import '../../features/blog/blog_post_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -113,6 +121,58 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/terms-of-service',
       builder: (context, state) => const TermsOfServiceScreen(),
+    ),
+    GoRoute(
+      path: '/pages/:slug',
+      builder: (context, state) => DynamicPageScreen(
+        slug: state.pathParameters['slug'] ?? '',
+      ),
+    ),
+    GoRoute(
+      path: '/about-us',
+      builder: (context, state) => const DynamicPageScreen(slug: 'about-us'),
+    ),
+    GoRoute(
+      path: '/contact-us',
+      builder: (context, state) => const DynamicPageScreen(slug: 'contact-us'),
+    ),
+    GoRoute(
+      path: '/disclaimer',
+      builder: (context, state) => const DynamicPageScreen(slug: 'disclaimer'),
+    ),
+    GoRoute(
+      path: '/refund-policy',
+      builder: (context, state) => const DynamicPageScreen(slug: 'refund-policy'),
+    ),
+    GoRoute(
+      path: '/shipping-policy',
+      builder: (context, state) => const DynamicPageScreen(slug: 'shipping-policy'),
+    ),
+    GoRoute(
+      path: '/cookie-policy',
+      builder: (context, state) => const DynamicPageScreen(slug: 'cookie-policy'),
+    ),
+    GoRoute(
+      path: '/faq',
+      builder: (context, state) => const DynamicPageScreen(slug: 'faq'),
+    ),
+    GoRoute(
+      path: '/careers',
+      builder: (context, state) => const DynamicPageScreen(slug: 'careers'),
+    ),
+    GoRoute(
+      path: '/help',
+      builder: (context, state) => const DynamicPageScreen(slug: 'help'),
+    ),
+    GoRoute(
+      path: '/blog',
+      builder: (context, state) => const BlogListScreen(),
+    ),
+    GoRoute(
+      path: '/blog/:slug',
+      builder: (context, state) => BlogPostScreen(
+        slug: state.pathParameters['slug'] ?? '',
+      ),
     ),
 
     // =========================================================================
@@ -814,6 +874,54 @@ final GoRouter appRouter = GoRouter(
       path: '/admin/cms/terms',
       builder: (context, state) => AdminTermsManagerScreen(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+
+    // --- CMS & Dynamic Content Routes ---
+    GoRoute(
+      path: '/admin/pages',
+      builder: (context, state) => AdminPageManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/pages/new',
+      builder: (context, state) => const AdminPageEditorScreen(),
+    ),
+    GoRoute(
+      path: '/admin/blog',
+      builder: (context, state) => AdminBlogManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/blog/new',
+      builder: (context, state) => const AdminBlogEditorScreen(),
+    ),
+    GoRoute(
+      path: '/admin/navigation',
+      builder: (context, state) => AdminNavigationManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+
+    // Super Admin CMS shortcuts
+    GoRoute(
+      path: '/superadmin/pages',
+      builder: (context, state) => AdminPageManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/superadmin/blog',
+      builder: (context, state) => AdminBlogManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/superadmin/navigation',
+      builder: (context, state) => AdminNavigationManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
       ),
     ),
 

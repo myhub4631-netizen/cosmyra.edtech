@@ -470,14 +470,13 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
               ],
             ),
           ),
-          ListTile(leading: const Icon(Icons.home_outlined), title: const Text('Home'), onTap: () => Navigator.pop(context)),
-          ListTile(leading: const Icon(Icons.play_circle_outline), title: const Text('Practice'), onTap: () => Navigator.pop(context)),
-          ListTile(leading: const Icon(Icons.assignment_outlined), title: const Text('Tests'), onTap: () => Navigator.pop(context)),
-          ListTile(leading: const Icon(Icons.auto_stories_outlined), title: const Text('PYQ & NTA'), onTap: () => Navigator.pop(context)),
-          ListTile(leading: const Icon(Icons.menu_book_outlined), title: const Text('Study Material'), onTap: () => Navigator.pop(context)),
-          ListTile(leading: const Icon(Icons.emoji_events_outlined), title: const Text('Leaderboard'), onTap: () => Navigator.pop(context)),
-          ListTile(leading: const Icon(Icons.monetization_on_outlined), title: const Text('Pricing'), onTap: () => Navigator.pop(context)),
-          ListTile(leading: const Icon(Icons.info_outline), title: const Text('About Us'), onTap: () => Navigator.pop(context)),
+          ListTile(leading: const Icon(Icons.home_outlined), title: const Text('Home'), onTap: () { Navigator.pop(context); context.go('/'); }),
+          ListTile(leading: const Icon(Icons.play_circle_outline), title: const Text('Practice'), onTap: () { Navigator.pop(context); context.go('/practice'); }),
+          ListTile(leading: const Icon(Icons.assignment_outlined), title: const Text('Mock Tests'), onTap: () { Navigator.pop(context); context.go('/mock-tests'); }),
+          ListTile(leading: const Icon(Icons.auto_stories_outlined), title: const Text('PYQ & NTA'), onTap: () { Navigator.pop(context); context.go('/pyq'); }),
+          ListTile(leading: const Icon(Icons.edit_note_rounded, color: Color(0xFF4F46E5)), title: const Text('Blog & Insights', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))), onTap: () { Navigator.pop(context); context.go('/blog'); }),
+          ListTile(leading: const Icon(Icons.info_outline), title: const Text('About Us'), onTap: () { Navigator.pop(context); context.go('/about-us'); }),
+          ListTile(leading: const Icon(Icons.help_outline_rounded), title: const Text('FAQ'), onTap: () { Navigator.pop(context); context.go('/faq'); }),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined, color: Color(0xFF0D7A53)),
             title: const Text('Privacy Policy', style: TextStyle(color: Color(0xFF0D7A53), fontWeight: FontWeight.w600)),
@@ -491,7 +490,7 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
             title: const Text('Terms of Service', style: TextStyle(color: Color(0xFF0D7A53), fontWeight: FontWeight.w600)),
             onTap: () {
               Navigator.pop(context);
-              context.go('/terms');
+              context.go('/terms-of-service');
             },
           ),
           const Divider(),
@@ -587,14 +586,13 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildNavLink('Home', isActive: true),
-                      _buildNavLink('Practice ∨'),
-                      _buildNavLink('Tests ∨'),
-                      _buildNavLink('PYQ ∨'),
-                      _buildNavLink('Study Material'),
-                      _buildNavLink('Leaderboard'),
-                      _buildNavLink('Pricing'),
-                      _buildNavLink('About Us'),
+                      _buildNavLink('Home', isActive: true, onTap: () => context.go('/')),
+                      _buildNavLink('Practice ∨', onTap: () => context.go('/practice')),
+                      _buildNavLink('Tests ∨', onTap: () => context.go('/mock-tests')),
+                      _buildNavLink('PYQ ∨', onTap: () => context.go('/pyq')),
+                      _buildNavLink('Test Series', onTap: () => context.go('/test-series')),
+                      _buildNavLink('Blog', onTap: () => context.go('/blog')),
+                      _buildNavLink('About Us', onTap: () => context.go('/about-us')),
                     ],
                   ),
                 ),
@@ -653,25 +651,29 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
     );
   }
 
-  Widget _buildNavLink(String title, {bool isActive = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-              color: isActive ? const Color(0xFF4F46E5) : const Color(0xFF475569),
+  Widget _buildNavLink(String title, {bool isActive = false, VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                color: isActive ? const Color(0xFF4F46E5) : const Color(0xFF475569),
+              ),
             ),
-          ),
-          if (isActive) ...[
-            const SizedBox(height: 3),
-            Container(height: 2, width: 14, color: const Color(0xFF4F46E5)),
+            if (isActive) ...[
+              const SizedBox(height: 3),
+              Container(height: 2, width: 14, color: const Color(0xFF4F46E5)),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -1247,15 +1249,31 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
                 child: const Text('Home', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
               ),
               InkWell(
+                onTap: () => context.go('/about-us'),
+                child: const Text('About Us', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+              ),
+              InkWell(
+                onTap: () => context.go('/blog'),
+                child: const Text('Blog & Insights', style: TextStyle(fontSize: 12.5, color: Color(0xFF4F46E5), fontWeight: FontWeight.bold)),
+              ),
+              InkWell(
                 onTap: () => context.go('/privacy-policy'),
-                child: const Text('Privacy Policy', style: TextStyle(fontSize: 12.5, color: Color(0xFF0D7A53), fontWeight: FontWeight.w600)),
+                child: const Text('Privacy Policy', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
               ),
               InkWell(
-                onTap: () => context.go('/terms'),
-                child: const Text('Terms of Service', style: TextStyle(fontSize: 12.5, color: Color(0xFF0D7A53), fontWeight: FontWeight.w600)),
+                onTap: () => context.go('/terms-of-service'),
+                child: const Text('Terms of Service', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
               ),
               InkWell(
-                onTap: () => context.go('/contact'),
+                onTap: () => context.go('/refund-policy'),
+                child: const Text('Refund Policy', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+              ),
+              InkWell(
+                onTap: () => context.go('/faq'),
+                child: const Text('FAQ', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+              ),
+              InkWell(
+                onTap: () => context.go('/contact-us'),
                 child: const Text('Contact Us', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
               ),
             ],
