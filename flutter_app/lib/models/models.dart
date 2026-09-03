@@ -119,9 +119,15 @@ class UserProfileModel {
     return UserProfileModel(
       id: json['id'] ?? '',
       email: json['email'] ?? '',
-      fullName: json['full_name'] ?? json['fullName'] ?? 'Mahboob Hasan',
+      fullName: (json['full_name'] != null && json['full_name'].toString().trim().isNotEmpty)
+          ? json['full_name'].toString().trim()
+          : (json['fullName'] != null && json['fullName'].toString().trim().isNotEmpty)
+              ? json['fullName'].toString().trim()
+              : (json['email'] != null && json['email'].toString().contains('@'))
+                  ? json['email'].toString().split('@').first
+                  : 'Student',
       avatarUrl: json['avatar_url'],
-      phoneNumber: json['phone_number'],
+      phoneNumber: json['phone_number'] ?? json['phoneNumber'] ?? json['phone'] ?? json['mobile'] ?? json['mobile_number'],
       targetExam: json['target_exam'] ?? 'NEET',
       targetYear: json['target_year'] ?? 2026,
       role: json['role'] ?? 'student',

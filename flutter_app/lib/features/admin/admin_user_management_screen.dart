@@ -26,6 +26,7 @@ class AdminUserModel {
   final String lastActive;
   final String joinedOn;
   final String phone;
+  final String cohort;
   final String regSource;
   String adminNotes;
   final String avatarInitials;
@@ -41,12 +42,49 @@ class AdminUserModel {
     required this.status,
     required this.lastActive,
     required this.joinedOn,
-    this.phone = '+91 98765 43210',
+    this.phone = '',
+    this.cohort = 'NEET 2026',
     this.regSource = 'Web Portal',
     this.adminNotes = '',
     required this.avatarInitials,
     required this.avatarColor,
   });
+
+  AdminUserModel copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? userIdCode,
+    String? role,
+    List<String>? examAccess,
+    String? status,
+    String? lastActive,
+    String? joinedOn,
+    String? phone,
+    String? cohort,
+    String? regSource,
+    String? adminNotes,
+    String? avatarInitials,
+    Color? avatarColor,
+  }) {
+    return AdminUserModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      userIdCode: userIdCode ?? this.userIdCode,
+      role: role ?? this.role,
+      examAccess: examAccess ?? this.examAccess,
+      status: status ?? this.status,
+      lastActive: lastActive ?? this.lastActive,
+      joinedOn: joinedOn ?? this.joinedOn,
+      phone: phone ?? this.phone,
+      cohort: cohort ?? this.cohort,
+      regSource: regSource ?? this.regSource,
+      adminNotes: adminNotes ?? this.adminNotes,
+      avatarInitials: avatarInitials ?? this.avatarInitials,
+      avatarColor: avatarColor ?? this.avatarColor,
+    );
+  }
 }
 
 class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
@@ -129,17 +167,28 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
           ? finalName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
           : (finalEmail.isNotEmpty ? finalEmail[0].toUpperCase() : 'U');
 
+      final realPhone = (p.phoneNumber != null &&
+              p.phoneNumber!.trim().isNotEmpty &&
+              p.phoneNumber != '+91 98765 43210')
+          ? p.phoneNumber!.trim()
+          : '';
+      final exam = p.targetExam.isNotEmpty ? p.targetExam : 'NEET';
+      final year = p.targetYear > 0 ? p.targetYear : 2026;
+      final classLvl = (p.classLevel.isNotEmpty && p.classLevel != 'Dropper') ? ' • ${p.classLevel}' : '';
+      final realCohort = '$exam $year$classLvl';
+
       return AdminUserModel(
         id: p.id,
         name: finalName,
         email: finalEmail,
         userIdCode: p.id.length >= 6 ? p.id.substring(0, 6).toUpperCase() : p.id,
         role: finalRole,
-        examAccess: [p.targetExam.isNotEmpty ? p.targetExam : 'NEET & JEE'],
+        examAccess: [exam],
         status: 'Active',
         lastActive: 'Just now',
         joinedOn: 'Aug 26, 2026',
-        phone: (p.phoneNumber != null && p.phoneNumber!.isNotEmpty) ? p.phoneNumber! : '+91 98765 43210',
+        phone: realPhone,
+        cohort: realCohort,
         regSource: 'Web Portal',
         avatarInitials: initials,
         avatarColor: finalEmail.toLowerCase().trim() == '1mdollar2027@gmail.com' ? const Color(0xFF6366F1) : const Color(0xFF3B82F6),
@@ -157,20 +206,12 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
             final inits = fName.isNotEmpty
                 ? fName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
                 : u.avatarInitials;
-            return AdminUserModel(
-              id: u.id,
+            return u.copyWith(
               name: fName,
               email: fEmail,
-              userIdCode: u.userIdCode,
               role: fRole,
-              examAccess: u.examAccess,
               status: edit['status'] ?? u.status,
-              lastActive: u.lastActive,
-              joinedOn: u.joinedOn,
-              phone: u.phone,
-              regSource: u.regSource,
               avatarInitials: inits,
-              avatarColor: u.avatarColor,
             );
           }
           return u;
@@ -205,7 +246,8 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         status: 'Active',
         lastActive: 'Just now',
         joinedOn: 'Aug 26, 2026',
-        phone: '+91 98765 43210',
+        phone: '',
+        cohort: 'NEET & JEE 2027',
         regSource: 'System Master Admin',
         avatarInitials: 'M1',
         avatarColor: const Color(0xFF6366F1),
@@ -220,7 +262,8 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         status: 'Active',
         lastActive: 'Just now',
         joinedOn: 'Aug 26, 2026',
-        phone: '+91 98765 43210',
+        phone: '',
+        cohort: 'NEET 2026',
         regSource: 'Web Portal',
         avatarInitials: 'M2',
         avatarColor: const Color(0xFF3B82F6),
@@ -235,7 +278,8 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         status: 'Active',
         lastActive: 'Just now',
         joinedOn: 'Aug 26, 2026',
-        phone: '+91 98765 43210',
+        phone: '',
+        cohort: 'NEET 2026',
         regSource: 'Web Portal',
         avatarInitials: 'M1',
         avatarColor: const Color(0xFF3B82F6),
@@ -1641,22 +1685,39 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: u.avatarColor,
-                    child: Text(u.avatarInitials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(u.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A))),
-                      Text('ID: ${u.userIdCode}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                    ],
-                  ),
-                ],
+              Expanded(
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: u.avatarColor,
+                      child: Text(u.avatarInitials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            u.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            u.email,
+                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF4F46E5), fontWeight: FontWeight.w500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text('ID: ${u.userIdCode}', style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.close, color: Color(0xFF94A3B8), size: 18),
@@ -1697,8 +1758,20 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Detail Properties List
-          _buildDetailRow(Icons.phone_outlined, 'Phone', u.phone),
+          // Detail Properties List - Real Name, Email, Phone, Cohort
+          _buildDetailRow(Icons.person_outline_rounded, 'Real Name of User', u.name),
+          _buildDetailRow(Icons.mail_outline_rounded, 'Email Address', u.email),
+          _buildDetailRow(
+            Icons.phone_outlined,
+            'Phone Number',
+            u.phone.trim().isNotEmpty ? u.phone : 'Not Provided',
+          ),
+          _buildDetailRow(
+            Icons.school_outlined,
+            'Target Cohort',
+            u.cohort.trim().isNotEmpty ? u.cohort : 'NEET 2026',
+          ),
+          const Divider(height: 20, color: Color(0xFFF1F5F9)),
           
           const SizedBox(height: 12),
           const Text('Reassign Role', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
@@ -1745,22 +1818,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                     setState(() {
                       final idx = _allUsers.indexWhere((item) => item.id == u.id);
                       if (idx != -1) {
-                        _allUsers[idx] = AdminUserModel(
-                          id: u.id,
-                          name: u.name,
-                          email: u.email,
-                          userIdCode: u.userIdCode,
-                          role: newRole,
-                          examAccess: u.examAccess,
-                          status: u.status,
-                          lastActive: u.lastActive,
-                          joinedOn: u.joinedOn,
-                          phone: u.phone,
-                          regSource: u.regSource,
-                          adminNotes: u.adminNotes,
-                          avatarInitials: u.avatarInitials,
-                          avatarColor: u.avatarColor,
-                        );
+                        _allUsers[idx] = _allUsers[idx].copyWith(role: newRole);
                         _selectedUserForDetail = _allUsers[idx];
                       }
                     });
@@ -1826,22 +1884,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                     setState(() {
                       final idx = _allUsers.indexWhere((item) => item.id == u.id);
                       if (idx != -1) {
-                        _allUsers[idx] = AdminUserModel(
-                          id: u.id,
-                          name: u.name,
-                          email: u.email,
-                          userIdCode: u.userIdCode,
-                          role: u.role,
-                          examAccess: u.examAccess,
-                          status: val,
-                          lastActive: u.lastActive,
-                          joinedOn: u.joinedOn,
-                          phone: u.phone,
-                          regSource: u.regSource,
-                          adminNotes: u.adminNotes,
-                          avatarInitials: u.avatarInitials,
-                          avatarColor: u.avatarColor,
-                        );
+                        _allUsers[idx] = _allUsers[idx].copyWith(status: val);
                         _selectedUserForDetail = _allUsers[idx];
                       }
                     });
@@ -2183,21 +2226,11 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                           final initials = newName.isNotEmpty
                               ? newName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
                               : user.avatarInitials;
-                          _allUsers[idx] = AdminUserModel(
-                            id: user.id,
+                          _allUsers[idx] = _allUsers[idx].copyWith(
                             name: newName.isNotEmpty ? newName : user.name,
                             email: newEmail.isNotEmpty ? newEmail : user.email,
-                            userIdCode: user.userIdCode,
                             role: role,
-                            examAccess: user.examAccess,
-                            status: user.status,
-                            lastActive: user.lastActive,
-                            joinedOn: user.joinedOn,
-                            phone: user.phone,
-                            regSource: user.regSource,
-                            adminNotes: user.adminNotes,
                             avatarInitials: initials,
-                            avatarColor: user.avatarColor,
                           );
                           if (_selectedUserForDetail?.id == user.id || _selectedUserForDetail?.email == user.email) {
                             _selectedUserForDetail = _allUsers[idx];
