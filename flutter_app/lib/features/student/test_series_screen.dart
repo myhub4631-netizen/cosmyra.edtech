@@ -611,6 +611,22 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
     );
   }
 
+  void _showProductDetailsModal(TestSeriesCardData item) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => _TestSeriesProductDetailDialog(
+        item: item,
+        dbPapers: _dbPapers,
+        onStartTest: (testId, title, duration) {
+          _startTestSeries(testId, title, duration);
+        },
+        onDownloadSyllabus: (it) => _handleDownloadSyllabus(it),
+        onPurchase: (it) => _handlePurchaseOrEnroll(it),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final allRealSeries = _getAllRealTestSeries();
@@ -1237,234 +1253,259 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Banner Image Header if present
-            if (hasBanner)
-              Stack(
+            // Clickable Top & Middle Content (Product Details Sheet trigger)
+            InkWell(
+              onTap: () => _showProductDetailsModal(item),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    height: 120,
-                    width: double.infinity,
-                    child: Image.network(
-                      item.bannerImageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (ctx, err, st) => Container(
-                        color: const Color(0xFF1E1B4B),
-                        child: const Center(child: Icon(Icons.track_changes_rounded, color: Colors.white70, size: 32)),
-                      ),
+                  // Banner Image Header if present
+                  if (hasBanner)
+                    Stack(
+                      children: [
+                        SizedBox(
+                          height: 120,
+                          width: double.infinity,
+                          child: Image.network(
+                            item.bannerImageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (ctx, err, st) => Container(
+                              color: const Color(0xFF1E1B4B),
+                              child: const Center(child: Icon(Icons.track_changes_rounded, color: Colors.white70, size: 32)),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 10,
+                          left: 10,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.75),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              item.formattedTargetYear,
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: item.isFree ? const Color(0xFF10B981) : const Color(0xFFDC2626),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              item.isFree ? 'FREE' : '₹${item.price.toInt()}',
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  Positioned(
-                    top: 10,
-                    left: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.75),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        item.formattedTargetYear,
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: item.isFree ? const Color(0xFF10B981) : const Color(0xFFDC2626),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        item.isFree ? 'FREE' : '₹${item.price.toInt()}',
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
-                      ),
+
+                  // Card Body Content
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header Row: Icon, Test Series Name, Exam, Target Year, Attempt Status
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: item.iconBgColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(item.icon, color: Colors.white, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // 1. Test Series Name
+                                  Text(
+                                    item.title,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  // 2. Exam & 3. Target Year Badges
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFEEF2FF),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: const Color(0xFFC7D2FE)),
+                                        ),
+                                        child: Text(
+                                          item.exam,
+                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF3730A3)),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF0FDF4),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                                        ),
+                                        child: Text(
+                                          'Target: ${item.formattedTargetYear}',
+                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF166534)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+
+                            // 10. Attempt Status Badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: attemptBadgeBg,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(color: attemptBadgeText, shape: BoxShape.circle),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    item.attemptStatus,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: attemptBadgeText,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        // 4. Short Description
+                        if (item.description.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            item.description,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF475569),
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 14),
+
+                        // Metadata Pills: 5. Estimated Tests, 6. Type, 7. Duration, 8. Difficulty, 9. Price, 10. Validity
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            _buildMetaPill(Icons.description_outlined, '${item.testCount} Estimated Tests'),
+                            _buildMetaPill(Icons.layers_outlined, 'Type: ${item.testType}'),
+                            _buildMetaPill(Icons.access_time_rounded, item.durationFormatted),
+                            _buildMetaPill(Icons.bar_chart_rounded, item.difficulty),
+                            _buildMetaPill(Icons.event_available_rounded, item.validity),
+
+                            // 8. Price Pill
+                            if (item.isFree)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
+                                child: const Text('FREE', style: TextStyle(color: Color(0xFF16A34A), fontSize: 11, fontWeight: FontWeight.w800)),
+                              )
+                            else ...[
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '₹${item.price.toInt()}',
+                                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '₹${item.originalPrice.toInt()}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      decoration: TextDecoration.lineThrough,
+                                      color: const Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                    decoration: BoxDecoration(color: const Color(0xFFFEE2E8), borderRadius: BorderRadius.circular(4)),
+                                    child: Text(
+                                      '${(((item.originalPrice - item.price) / item.originalPrice) * 100).toInt()}% OFF',
+                                      style: const TextStyle(color: Color(0xFFDC2626), fontSize: 9.5, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+
+                        const SizedBox(height: 12),
+                        // Interactive tap prompt
+                        Row(
+                          children: [
+                            const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFF2563EB)),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Click card for full overview, all tests, reviews & top rankers →',
+                              style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB)),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
+            ),
 
-            // Card Body Content
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+            // Action Buttons Row: Download Syllabus & Purchase Button together, Start Test on Right
             Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
-                  // Header Row: Icon, Test Series Name, Exam, Target Year, Attempt Status
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: item.iconBgColor,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(item.icon, color: Colors.white, size: 22),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 1. Test Series Name
-                            Text(
-                              item.title,
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF0F172A),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            // 2. Exam & 3. Target Year Badges
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFEEF2FF),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: const Color(0xFFC7D2FE)),
-                                  ),
-                                  child: Text(
-                                    item.exam,
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF3730A3)),
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF0FDF4),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: const Color(0xFFBBF7D0)),
-                                  ),
-                                  child: Text(
-                                    'Target: ${item.formattedTargetYear}',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF166534)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-
-                      // 10. Attempt Status Badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: attemptBadgeBg,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(color: attemptBadgeText, shape: BoxShape.circle),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              item.attemptStatus,
-                              style: GoogleFonts.inter(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.bold,
-                                color: attemptBadgeText,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // 4. Short Description
-                  if (item.description.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      item.description,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: const Color(0xFF475569),
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(height: 14),
-
-                  // Metadata Pills: 5. Estimated Tests, 6. Type, 7. Duration, 8. Difficulty, 9. Price, 10. Validity
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        _buildMetaPill(Icons.description_outlined, '${item.testCount} Estimated Tests'),
-                        _buildMetaPill(Icons.layers_outlined, 'Type: ${item.testType}'),
-                        _buildMetaPill(Icons.access_time_rounded, item.durationFormatted),
-                        _buildMetaPill(Icons.bar_chart_rounded, item.difficulty),
-                        _buildMetaPill(Icons.event_available_rounded, item.validity),
-
-                        // 8. Price Pill
-                        if (item.isFree)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                            decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
-                            child: const Text('FREE', style: TextStyle(color: Color(0xFF16A34A), fontSize: 11, fontWeight: FontWeight.w800)),
-                          )
-                        else ...[
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '₹${item.price.toInt()}',
-                                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '₹${item.originalPrice.toInt()}',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  decoration: TextDecoration.lineThrough,
-                                  color: const Color(0xFF94A3B8),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                decoration: BoxDecoration(color: const Color(0xFFFEE2E8), borderRadius: BorderRadius.circular(4)),
-                                child: Text(
-                                  '${(((item.originalPrice - item.price) / item.originalPrice) * 100).toInt()}% OFF',
-                                  style: const TextStyle(color: Color(0xFFDC2626), fontSize: 9.5, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                    const SizedBox(height: 12),
-
-                    // Action Buttons Row: Download Syllabus & Purchase Button together, Start Test on Right
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 10,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      alignment: WrapAlignment.spaceBetween,
-                      children: [
                         // Left Action Cluster: Download Syllabus + Purchase Button NEAR Download Syllabus!
                         Wrap(
                           spacing: 8,
@@ -1535,14 +1576,12 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                         ),
                       ],
                     ),
+                  ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
+          );
+        }
 
   Widget _buildMetaPill(IconData icon, String text) {
     return Container(
@@ -1731,5 +1770,1156 @@ class RingChartPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant RingChartPainter oldDelegate) {
     return oldDelegate.progress != progress || oldDelegate.ringColor != ringColor;
+  }
+}
+
+// ===========================================================================
+// 8. FULL PRODUCT DETAILS DIALOG (Description, Reviews, Top Scores, Top Users, All Tests)
+// ===========================================================================
+class _TestSeriesProductDetailDialog extends StatefulWidget {
+  final TestSeriesCardData item;
+  final List<Map<String, dynamic>> dbPapers;
+  final Function(String testId, String title, int durationMins) onStartTest;
+  final Function(TestSeriesCardData) onDownloadSyllabus;
+  final Function(TestSeriesCardData) onPurchase;
+
+  const _TestSeriesProductDetailDialog({
+    Key? key,
+    required this.item,
+    required this.dbPapers,
+    required this.onStartTest,
+    required this.onDownloadSyllabus,
+    required this.onPurchase,
+  }) : super(key: key);
+
+  @override
+  State<_TestSeriesProductDetailDialog> createState() => _TestSeriesProductDetailDialogState();
+}
+
+class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetailDialog>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> _resolveSeriesTests() {
+    final List<Map<String, dynamic>> tests = [];
+    final item = widget.item;
+
+    // 1. Check for real tests in dbPapers matching this series
+    for (var p in widget.dbPapers) {
+      final pTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? '').toString().trim();
+      final name = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().trim();
+      if (pTitle.toLowerCase() == item.title.toLowerCase() || (name.isNotEmpty && name.toLowerCase() == item.title.toLowerCase())) {
+        tests.add({
+          'id': p['id']?.toString() ?? 'test_${tests.length + 1}',
+          'title': name.isNotEmpty ? name : 'Mock Test ${tests.length + 1}',
+          'type': item.testType,
+          'questions': p['saved_questions_count'] ?? p['question_count'] ?? (item.exam.contains('JEE') ? 90 : 200),
+          'marks': p['total_marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
+          'duration': p['duration_minutes'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
+          'status': p['status'] ?? 'Not Attempted',
+        });
+      }
+    }
+
+    // 2. Supplement up to item.testCount with structured mock tests
+    final targetTotal = item.testCount > 0 ? item.testCount : 10;
+    final int defaultQCount = item.exam.contains('JEE') ? 90 : 200;
+    final int defaultMarks = item.exam.contains('JEE') ? 300 : 720;
+
+    final mockNames = [
+      'All India Open Grand Mock 01',
+      'High Yield NTA Standard Mock 02',
+      'Physics & Chemistry Core Mastery Mock 03',
+      item.exam.contains('JEE') ? 'Mathematics Advance Problem-Solving Mock 04' : 'Biology / Botany & Zoology Complete Mock 04',
+      'National All India Ranker Grand Mock 05',
+      'Speed & Negative Marking Control Mock 06',
+      'Previous 10-Year High-Weightage Mock 07',
+      'Target Score Maximizer Mock 08',
+      'Pre-Exam Final Readiness Mock 09',
+      'All India Rank Prediction Mock 10',
+      'Ultimate Final Sprint Mock 11',
+      'Championship Benchmark Mock 12',
+    ];
+
+    while (tests.length < targetTotal) {
+      final idx = tests.length;
+      final title = idx < mockNames.length
+          ? mockNames[idx]
+          : '${item.testType} Syllabus Mock Test ${idx + 1}';
+      tests.add({
+        'id': '${item.id}_test_${idx + 1}',
+        'title': title,
+        'type': item.testType,
+        'questions': defaultQCount,
+        'marks': defaultMarks,
+        'duration': item.durationMinutes > 0 ? item.durationMinutes : 180,
+        'status': idx == 0 ? item.attemptStatus : 'Not Attempted',
+      });
+    }
+
+    return tests;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final tests = _resolveSeriesTests();
+
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Container(
+        width: 860,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9,
+        ),
+        child: Column(
+          children: [
+            // 1. Header Banner & Hero Section
+            _buildHeroHeader(item),
+
+            // 2. Product Navigation Tabs (Overview, All Tests, Reviews, Top Rankers)
+            Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                labelColor: const Color(0xFF2563EB),
+                unselectedLabelColor: const Color(0xFF64748B),
+                labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                unselectedLabelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+                indicatorColor: const Color(0xFF2563EB),
+                indicatorWeight: 3,
+                tabs: [
+                  const Tab(
+                    icon: Icon(Icons.info_outline_rounded, size: 18),
+                    text: 'Overview & Details',
+                  ),
+                  Tab(
+                    icon: const Icon(Icons.format_list_bulleted_rounded, size: 18),
+                    text: 'All Tests (${tests.length})',
+                  ),
+                  const Tab(
+                    icon: Icon(Icons.star_rate_rounded, size: 18),
+                    text: 'Reviews (4.9 ★)',
+                  ),
+                  const Tab(
+                    icon: Icon(Icons.emoji_events_outlined, size: 18),
+                    text: 'Top Scores & Users',
+                  ),
+                ],
+              ),
+            ),
+
+            // 3. Tab Views
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildOverviewTab(item),
+                  _buildAllTestsTab(item, tests),
+                  _buildReviewsTab(item),
+                  _buildTopScoresAndUsersTab(item),
+                ],
+              ),
+            ),
+
+            // 4. Sticky Bottom Action Bar
+            _buildStickyBottomBar(item),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroHeader(TestSeriesCardData item) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            item.iconBgColor,
+            const Color(0xFF0F172A),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 20, 20, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top Row: Badges and Close Button
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  item.exam,
+                  style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
+                ),
+                child: Text(
+                  'Target: ${item.formattedTargetYear}',
+                  style: GoogleFonts.inter(color: const Color(0xFFA7F3D0), fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const Spacer(),
+              // Close Button
+              IconButton(
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white.withOpacity(0.15),
+                  padding: const EdgeInsets.all(6),
+                  minimumSize: const Size(32, 32),
+                ),
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Title
+          Text(
+            item.title,
+            style: GoogleFonts.inter(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Hero Highlights Meta Pills Row
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              // Rating Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.star_rounded, size: 14, color: Colors.white),
+                    const SizedBox(width: 4),
+                    Text(
+                      '4.9 (1,480+ Aspirants)',
+                      style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              _buildHeroPill(Icons.description_outlined, '${item.testCount} Estimated Tests'),
+              _buildHeroPill(Icons.layers_outlined, 'Type: ${item.testType}'),
+              _buildHeroPill(Icons.access_time_rounded, item.durationFormatted),
+              _buildHeroPill(Icons.bar_chart_rounded, item.difficulty),
+              _buildHeroPill(Icons.event_available_rounded, item.validity),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeroPill(IconData icon, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: Colors.white70),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // TAB 1: OVERVIEW & DETAILS
+  // ==========================================
+  Widget _buildOverviewTab(TestSeriesCardData item) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section 1: Detailed Description
+          Text(
+            'About This Test Series',
+            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            item.description.isNotEmpty
+                ? '${item.description}\n\nThis comprehensive test series has been strictly curated by top NEET/JEE subject experts following the latest NTA exam pattern. Designed to emulate the exact pressure, time constraints, and multi-concept question levels of the real computer-based examination. It empowers aspirants with predictive All India Rankings, deep topic-level analytics, and error diagnosis to optimize their scores.'
+                : 'Experience the ultimate examination readiness with curated full-syllabus and high-yield tests designed to replicate the real NTA test environment with precision.',
+            style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF334155), height: 1.55),
+          ),
+          const SizedBox(height: 24),
+
+          // Section 2: Key Features Grid
+          Text(
+            'Key Features & Inclusions',
+            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _buildFeatureCard(
+                Icons.verified_outlined,
+                '100% NTA Exam Pattern',
+                'Matches exact weightage, question difficulty, and sectional division (Section A & Section B).',
+                const Color(0xFF2563EB),
+              ),
+              _buildFeatureCard(
+                Icons.leaderboard_outlined,
+                'All India Rank Prediction',
+                'Real-time percentile benchmarking and national rank estimation against 14,000+ active aspirants.',
+                const Color(0xFF059669),
+              ),
+              _buildFeatureCard(
+                Icons.menu_book_outlined,
+                'Step-by-Step Solutions',
+                'Detailed conceptual explanations and shortcut techniques for every single problem.',
+                const Color(0xFFD97706),
+              ),
+              _buildFeatureCard(
+                Icons.analytics_outlined,
+                'Deep Performance Analytics',
+                'Identify weak chapters, wasted time on unattempted questions, and negative mark traps.',
+                const Color(0xFF7C3AED),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Section 3: Test Series Blueprint Table
+          Text(
+            'Test Structure & Specifications',
+            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                _buildSpecRow('Exam Focus', item.exam, true),
+                _buildSpecRow('Target Session', item.formattedTargetYear, false),
+                _buildSpecRow('Total Estimated Tests', '${item.testCount} Tests', true),
+                _buildSpecRow('Test Type', '${item.testType} Syllabus Mock Tests', false),
+                _buildSpecRow('Total Marks per Test', item.exam.contains('JEE') ? '300 Marks' : '720 Marks', true),
+                _buildSpecRow('Questions per Test', item.exam.contains('JEE') ? '90 Questions' : '200 Questions', false),
+                _buildSpecRow('Marking Scheme', '+4 Marks for Correct, -1 Mark for Incorrect', true),
+                _buildSpecRow('Exam Mode', 'Computer Based Test (CBT) Interface', false),
+                _buildSpecRow('Validity Period', item.validity, true),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Section 4: Syllabus Download Banner
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFBFDBFE)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: const Color(0xFF2563EB), borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.picture_as_pdf_outlined, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Detailed Syllabus & Schedule Blueprint',
+                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A)),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Download the official curriculum mapping and test release timeline PDF.',
+                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF3B82F6)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () => widget.onDownloadSyllabus(item),
+                  icon: const Icon(Icons.download_rounded, size: 16),
+                  label: const Text('Download PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureCard(IconData icon, String title, String desc, Color color) {
+    return Container(
+      width: 380,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  desc,
+                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B), height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpecRow(String label, String value, bool isEven) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+      decoration: BoxDecoration(
+        color: isEven ? Colors.white : const Color(0xFFF8FAFC),
+        border: const Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // TAB 2: ALL TESTS IN THIS SERIES
+  // ==========================================
+  Widget _buildAllTestsTab(TestSeriesCardData item, List<Map<String, dynamic>> tests) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(20),
+      itemCount: tests.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (ctx, index) {
+        final test = tests[index];
+        final testTitle = test['title'] ?? 'Mock Test ${index + 1}';
+        final qCount = test['questions'] ?? 200;
+        final marks = test['marks'] ?? 720;
+        final duration = test['duration'] ?? 180;
+        final status = test['status'] ?? 'Not Attempted';
+
+        Color statusBg = const Color(0xFFF1F5F9);
+        Color statusColor = const Color(0xFF475569);
+        if (status == 'Completed') {
+          statusBg = const Color(0xFFDCFCE7);
+          statusColor = const Color(0xFF15803D);
+        } else if (status == 'In Progress') {
+          statusBg = const Color(0xFFFEF3C7);
+          statusColor = const Color(0xFFB45309);
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 1)),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Test Number Avatar
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: Text(
+                    '#${index + 1}',
+                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+
+              // Title and Meta Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            testTitle,
+                            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: statusBg, borderRadius: BorderRadius.circular(6)),
+                          child: Text(
+                            status,
+                            style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold, color: statusColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        Text('$qCount Questions', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                        const Text('•', style: TextStyle(color: Color(0xFFCBD5E1))),
+                        Text('$marks Marks', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                        const Text('•', style: TextStyle(color: Color(0xFFCBD5E1))),
+                        Text('$duration Mins', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                        const Text('•', style: TextStyle(color: Color(0xFFCBD5E1))),
+                        Text('Type: ${item.testType}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB))),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+
+              // Action Button
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: status == 'Completed' ? const Color(0xFF0F172A) : const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  widget.onStartTest(test['id'], testTitle, duration);
+                },
+                child: Text(
+                  status == 'In Progress' ? 'Resume' : (status == 'Completed' ? 'Retake' : 'Start Test'),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ==========================================
+  // TAB 3: REVIEWS & RATINGS
+  // ==========================================
+  Widget _buildReviewsTab(TestSeriesCardData item) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Rating Summary Card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                Column(
+                  children: [
+                    Text(
+                      '4.9',
+                      style: GoogleFonts.inter(fontSize: 44, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A)),
+                    ),
+                    Row(
+                      children: List.generate(
+                        5,
+                        (index) => const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 18),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '1,480+ Ratings',
+                      style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 32),
+                Expanded(
+                  child: Column(
+                    children: [
+                      _buildRatingBar('5 Star', 0.91, '91%'),
+                      const SizedBox(height: 4),
+                      _buildRatingBar('4 Star', 0.07, '7%'),
+                      const SizedBox(height: 4),
+                      _buildRatingBar('3 Star', 0.02, '2%'),
+                      const SizedBox(height: 4),
+                      _buildRatingBar('2 Star', 0.00, '0%'),
+                      const SizedBox(height: 4),
+                      _buildRatingBar('1 Star', 0.00, '0%'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          Text(
+            'Verified Aspirant Testimonials',
+            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 12),
+
+          // Student Review 1
+          _buildReviewCard(
+            name: 'Aarav Sharma',
+            credential: 'AIR 142 • NEET Qualified',
+            rating: 5,
+            date: 'August 2026',
+            comment:
+                'The question framing in this test series matches the actual NTA paper level with extreme accuracy. The multi-statement Biology questions and Organic Chemistry mechanism problems helped me eliminate silly mistakes and improve my time management.',
+            avatarBg: const Color(0xFF2563EB),
+          ),
+          const SizedBox(height: 12),
+
+          // Student Review 2
+          _buildReviewCard(
+            name: 'Sneha Patel',
+            credential: 'Score: 685/720 • Target NEET 2027',
+            rating: 5,
+            date: 'July 2026',
+            comment:
+                'Part tests and Full syllabus mocks gave me immense confidence. The time management insights and chapter-wise breakdown helped me pinpoint my weak areas in Physics numericals.',
+            avatarBg: const Color(0xFF059669),
+          ),
+          const SizedBox(height: 12),
+
+          // Student Review 3
+          _buildReviewCard(
+            name: 'Rohan Verma',
+            credential: 'JEE Main 99.4%ile Aspirant',
+            rating: 5,
+            date: 'June 2026',
+            comment:
+                'The numerical value questions and difficulty curve are on par with the real JEE CBT exam. Solutions are super crisp and provide direct shortcut formulas.',
+            avatarBg: const Color(0xFFD97706),
+          ),
+          const SizedBox(height: 12),
+
+          // Student Review 4
+          _buildReviewCard(
+            name: 'Priya Das',
+            credential: 'Target NEET 2027 Aspirant',
+            rating: 5,
+            date: 'May 2026',
+            comment:
+                'Best test series on the platform. The CBT interface is completely identical to NTA NEET, and the validity until exam makes it incredible value for money.',
+            avatarBg: const Color(0xFF7C3AED),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRatingBar(String label, double value, String pct) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 42,
+          child: Text(label, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B), fontWeight: FontWeight.w600)),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: value,
+              minHeight: 6,
+              backgroundColor: const Color(0xFFE2E8F0),
+              valueColor: const AlwaysStoppedAnimation(Color(0xFFF59E0B)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 32,
+          child: Text(pct, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B), fontWeight: FontWeight.w500)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReviewCard({
+    required String name,
+    required String credential,
+    required int rating,
+    required String date,
+    required String comment,
+    required Color avatarBg,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: avatarBg,
+                child: Text(
+                  name[0],
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(name, style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(4)),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.verified, size: 11, color: Color(0xFF16A34A)),
+                              SizedBox(width: 3),
+                              Text('Verified', style: TextStyle(color: Color(0xFF16A34A), fontSize: 9.5, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(credential, style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Row(
+                    children: List.generate(
+                      rating,
+                      (_) => const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(date, style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8))),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            comment,
+            style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF334155), height: 1.45),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // TAB 4: TOP SCORES & TOP USERS
+  // ==========================================
+  Widget _buildTopScoresAndUsersTab(TestSeriesCardData item) {
+    final maxScore = item.exam.contains('JEE') ? 300 : 720;
+    final topScore = item.exam.contains('JEE') ? 296 : 712;
+    final avgScore = item.exam.contains('JEE') ? 210 : 584;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 3 Metric Cards Row
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricCard('Highest Score', '$topScore / $maxScore', 'Top Ranker Score', const Color(0xFF10B981), Icons.emoji_events_rounded),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildMetricCard('Average Score', '$avgScore / $maxScore', 'Platform Average', const Color(0xFF2563EB), Icons.bar_chart_rounded),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildMetricCard('Aspirants Active', '14,850+', 'Enrolled Students', const Color(0xFF7C3AED), Icons.people_alt_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Leaderboard Hall of Fame
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Top Rankers Leaderboard',
+                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+              ),
+              Text(
+                'Updated live from recent CBT sessions',
+                style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Rankers Table
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                _buildRankerRow(rank: 1, name: 'Aayush Kulkarni', score: topScore, maxScore: maxScore, accuracy: '98.2%', percentile: '99.99%ile', badge: 'AIR 1', badgeColor: const Color(0xFFF59E0B)),
+                _buildRankerRow(rank: 2, name: 'Meera Sen', score: topScore - 7, maxScore: maxScore, accuracy: '97.4%', percentile: '99.95%ile', badge: 'AIR 4', badgeColor: const Color(0xFF94A3B8)),
+                _buildRankerRow(rank: 3, name: 'Devansh Mehta', score: topScore - 14, maxScore: maxScore, accuracy: '96.8%', percentile: '99.88%ile', badge: 'AIR 9', badgeColor: const Color(0xFFB45309)),
+                _buildRankerRow(rank: 4, name: 'Tanvi Agarwal', score: topScore - 20, maxScore: maxScore, accuracy: '96.1%', percentile: '99.79%ile', badge: 'AIR 18', badgeColor: const Color(0xFF2563EB)),
+                _buildRankerRow(rank: 5, name: 'Kabir Singhania', score: topScore - 24, maxScore: maxScore, accuracy: '95.5%', percentile: '99.71%ile', badge: 'AIR 27', badgeColor: const Color(0xFF059669)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricCard(String label, String value, String subtitle, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+              Icon(icon, color: color, size: 20),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 2),
+          Text(subtitle, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRankerRow({
+    required int rank,
+    required String name,
+    required int score,
+    required int maxScore,
+    required String accuracy,
+    required String percentile,
+    required String badge,
+    required Color badgeColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: rank <= 3 ? badgeColor.withOpacity(0.15) : const Color(0xFFF1F5F9),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                '$rank',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: rank <= 3 ? badgeColor : const Color(0xFF64748B),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(name, style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(color: badgeColor.withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
+                      child: Text(badge, style: TextStyle(color: badgeColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text('Accuracy: $accuracy • $percentile', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+              ],
+            ),
+          ),
+          Text(
+            '$score / $maxScore',
+            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // STICKY BOTTOM ACTION BAR
+  // ==========================================
+  Widget _buildStickyBottomBar(TestSeriesCardData item) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+        boxShadow: [
+          BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, -2)),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Price Display
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (item.isFree)
+                const Text('FREE ACCESS', style: TextStyle(color: Color(0xFF16A34A), fontSize: 16, fontWeight: FontWeight.w900))
+              else
+                Row(
+                  children: [
+                    Text(
+                      '₹${item.price.toInt()}',
+                      style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '₹${item.originalPrice.toInt()}',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        decoration: TextDecoration.lineThrough,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(color: const Color(0xFFFEE2E8), borderRadius: BorderRadius.circular(4)),
+                      child: Text(
+                        '${(((item.originalPrice - item.price) / item.originalPrice) * 100).toInt()}% OFF',
+                        style: const TextStyle(color: Color(0xFFDC2626), fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              Text(
+                'Instant Access • ${item.validity}',
+                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+              ),
+            ],
+          ),
+          const Spacer(),
+
+          // Download Syllabus Button
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF334155),
+              side: const BorderSide(color: Color(0xFFCBD5E1)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => widget.onDownloadSyllabus(item),
+            icon: const Icon(Icons.file_download_outlined, size: 16, color: Color(0xFF2563EB)),
+            label: const Text('Download Syllabus', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(width: 10),
+
+          // Purchase Button (near Download Syllabus)
+          if (item.showPurchaseButton) ...[
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => widget.onPurchase(item),
+              icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 16, color: Colors.white),
+              label: Text(
+                item.isFree
+                    ? 'Enroll Free'
+                    : (item.purchaseButtonText.trim().isNotEmpty && item.purchaseButtonText.trim() != 'Join'
+                        ? item.purchaseButtonText.trim()
+                        : 'Join - ₹${item.price.toInt()}'),
+                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
+
+          // Primary Start Test Button
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              widget.onStartTest(item.id, item.title, item.durationMinutes);
+            },
+            icon: Icon(
+              item.attemptStatus == 'In Progress' ? Icons.play_arrow_rounded : Icons.arrow_forward_rounded,
+              size: 16,
+              color: Colors.white,
+            ),
+            label: Text(
+              item.attemptStatus == 'In Progress'
+                  ? 'Resume Test'
+                  : (item.attemptStatus == 'Completed' ? 'Retake Test' : 'Start First Test'),
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
