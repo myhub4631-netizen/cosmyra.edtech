@@ -6,7 +6,6 @@ import '../../models/models.dart';
 import '../../models/pyq_models.dart';
 import '../../shared/widgets/not_found_screen.dart';
 import '../../features/landing/landing_page_screen.dart';
-import '../../features/auth/login_screen.dart';
 import '../../features/auth/signup_screen.dart';
 import '../../features/dashboard/user_dashboard_screen.dart';
 import '../../features/profile/profile_screen.dart';
@@ -171,7 +170,13 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/login',
-      builder: (context, state) => const LoginScreen(),
+      builder: (context, state) => LandingPageScreen(
+        isLoginRoute: true,
+        onStartPracticing: () => context.go('/practice'),
+        onExploreTests: () => context.go('/mock-tests'),
+        onSignUp: () => context.go('/signup'),
+        onLogIn: () => context.go('/login'),
+      ),
     ),
     GoRoute(
       path: '/signup',
