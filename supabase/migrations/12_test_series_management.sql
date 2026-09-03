@@ -34,7 +34,11 @@ CREATE TABLE IF NOT EXISTS public.test_series (
   syllabus_url TEXT DEFAULT '',
   attempt_status TEXT DEFAULT 'Not Attempted', -- 'Not Attempted', 'In Progress', 'Completed'
   status TEXT DEFAULT 'Published', -- 'Draft', 'Published', 'Archived'
+  long_description TEXT DEFAULT '',
   features JSONB DEFAULT '["100+ High Quality Tests", "Detailed Solutions & Explanations", "All India Ranking"]'::jsonb,
+  tests JSONB DEFAULT '[]'::jsonb,
+  reviews JSONB DEFAULT '[]'::jsonb,
+  top_scores JSONB DEFAULT '{}'::jsonb,
   
   -- Associated Paper / Metadata
   paper_id TEXT DEFAULT '',
@@ -43,6 +47,12 @@ CREATE TABLE IF NOT EXISTS public.test_series (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Extended column migrations for existing tables
+ALTER TABLE public.test_series ADD COLUMN IF NOT EXISTS long_description TEXT DEFAULT '';
+ALTER TABLE public.test_series ADD COLUMN IF NOT EXISTS tests JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.test_series ADD COLUMN IF NOT EXISTS reviews JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.test_series ADD COLUMN IF NOT EXISTS top_scores JSONB DEFAULT '{}'::jsonb;
 
 -- Enable RLS
 ALTER TABLE public.test_series ENABLE ROW LEVEL SECURITY;

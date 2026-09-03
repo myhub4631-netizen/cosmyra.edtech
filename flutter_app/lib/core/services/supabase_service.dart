@@ -4003,11 +4003,15 @@ class SupabaseService {
       'purchase_link': seriesData['purchase_link'] ?? seriesData['purchaseLink'] ?? 'https://neet-jee.in/test-series',
       'purchase_button_text': seriesData['purchase_button_text'] ?? seriesData['purchaseButtonText'] ?? 'Enroll Now',
       'show_purchase_button': seriesData['show_purchase_button'] != false && seriesData['showPurchaseButton'] != false,
+      'long_description': seriesData['long_description'] ?? seriesData['longDescription'] ?? '',
       'features': seriesData['features'] ?? [
         '100+ High Quality Tests',
         'Detailed Solutions & Explanations',
         'All India Ranking',
       ],
+      'tests': seriesData['tests'] ?? [],
+      'reviews': seriesData['reviews'] ?? [],
+      'top_scores': seriesData['top_scores'] ?? seriesData['topScores'] ?? {},
       'test_count': (seriesData['test_count'] is num) ? (seriesData['test_count'] as num).toInt() : (seriesData['testCount'] ?? 1),
       'question_count': (seriesData['question_count'] is num) ? (seriesData['question_count'] as num).toInt() : (seriesData['questionCount'] ?? (seriesData['exam']?.toString().contains('JEE') == true ? 90 : 200)),
       'total_marks': (seriesData['total_marks'] is num) ? (seriesData['total_marks'] as num).toDouble() : (seriesData['totalMarks'] != null ? double.tryParse(seriesData['totalMarks'].toString()) : (seriesData['exam']?.toString().contains('JEE') == true ? 300.0 : 720.0)),
@@ -4032,6 +4036,7 @@ class SupabaseService {
         'id': seriesId,
         'title': title,
         'description': fullData['description'],
+        'long_description': fullData['long_description'],
         'exam': fullData['exam'],
         'year': fullData['year'],
         'category': fullData['category'],
@@ -4043,6 +4048,10 @@ class SupabaseService {
         'purchase_link': fullData['purchase_link'],
         'purchase_button_text': fullData['purchase_button_text'],
         'show_purchase_button': fullData['show_purchase_button'],
+        'features': fullData['features'],
+        'tests': fullData['tests'],
+        'reviews': fullData['reviews'],
+        'top_scores': fullData['top_scores'],
         'test_count': fullData['test_count'],
         'question_count': fullData['question_count'],
         'total_marks': fullData['total_marks'],
@@ -4060,7 +4069,42 @@ class SupabaseService {
       });
       savedToSupabase = true;
     } catch (e) {
-      debugPrint('Supabase test_series upsert note (will fallback to tests table): $e');
+      debugPrint('Supabase test_series upsert note (trying standard schema): $e');
+      try {
+        await client.from('test_series').upsert({
+          'id': seriesId,
+          'title': title,
+          'description': fullData['description'],
+          'exam': fullData['exam'],
+          'year': fullData['year'],
+          'category': fullData['category'],
+          'banner_image_url': fullData['banner_image_url'],
+          'is_free': fullData['is_free'],
+          'price': fullData['price'],
+          'original_price': fullData['original_price'],
+          'currency': fullData['currency'],
+          'purchase_link': fullData['purchase_link'],
+          'purchase_button_text': fullData['purchase_button_text'],
+          'show_purchase_button': fullData['show_purchase_button'],
+          'test_count': fullData['test_count'],
+          'question_count': fullData['question_count'],
+          'total_marks': fullData['total_marks'],
+          'duration_minutes': fullData['duration_minutes'],
+          'conducting_body': fullData['conducting_body'],
+          'difficulty': fullData['difficulty'],
+          'test_type': fullData['test_type'],
+          'validity': fullData['validity'],
+          'syllabus_url': fullData['syllabus_url'],
+          'attempt_status': fullData['attempt_status'],
+          'status': fullData['status'],
+          'paper_id': fullData['paper_id'],
+          'paper_name': fullData['paper_name'],
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+        savedToSupabase = true;
+      } catch (e2) {
+        debugPrint('Supabase test_series standard schema note: $e2');
+      }
     }
 
     // 2. Secondary fallback to tests table

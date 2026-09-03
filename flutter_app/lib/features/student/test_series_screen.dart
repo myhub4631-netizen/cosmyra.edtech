@@ -64,6 +64,11 @@ class TestSeriesCardData {
   final String purchaseButtonText;
   final bool showPurchaseButton;
   final String syllabusUrl;
+  final String longDescription;
+  final List<dynamic> features;
+  final List<Map<String, dynamic>> tests;
+  final List<Map<String, dynamic>> reviews;
+  final Map<String, dynamic> topScores;
 
   TestSeriesCardData({
     required this.id,
@@ -72,6 +77,11 @@ class TestSeriesCardData {
     this.targetYear = '2027',
     required this.subtitle,
     this.description = '',
+    this.longDescription = '',
+    this.features = const [],
+    this.tests = const [],
+    this.reviews = const [],
+    this.topScores = const {},
     required this.testCount,
     required this.durationMinutes,
     this.difficulty = 'Moderate',
@@ -227,6 +237,17 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             description: (cs['description'] ?? '').toString().trim().isNotEmpty
                 ? cs['description'].toString().trim()
                 : 'Comprehensive mock tests covering full syllabus with step-by-step solutions.',
+            longDescription: (cs['long_description'] ?? cs['longDescription'] ?? '').toString(),
+            features: (cs['features'] is List) ? List<dynamic>.from(cs['features']) : const [],
+            tests: (cs['tests'] is List)
+                ? (cs['tests'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+                : const [],
+            reviews: (cs['reviews'] is List)
+                ? (cs['reviews'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+                : const [],
+            topScores: (cs['top_scores'] is Map)
+                ? Map<String, dynamic>.from(cs['top_scores'])
+                : ((cs['topScores'] is Map) ? Map<String, dynamic>.from(cs['topScores']) : const {}),
             testCount: testCount,
             durationMinutes: duration,
             difficulty: difficulty,
@@ -1829,8 +1850,24 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
   }
 
   List<Map<String, dynamic>> _resolveSeriesTests() {
-    final List<Map<String, dynamic>> tests = [];
     final item = widget.item;
+
+    // 0. If real tests are explicitly defined by admin, return them
+    if (item.tests.isNotEmpty) {
+      return item.tests.map((t) {
+        final m = Map<String, dynamic>.from(t);
+        m['id'] = (m['id'] ?? 'test_${item.id}_${m['title']}').toString();
+        m['title'] = (m['title'] ?? 'Mock Test').toString();
+        m['type'] = (m['type'] ?? item.testType).toString();
+        m['questions'] = m['questions'] ?? (item.exam.contains('JEE') ? 90 : 200);
+        m['marks'] = m['marks'] ?? (item.exam.contains('JEE') ? 300 : 720);
+        m['duration'] = m['duration'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180);
+        m['status'] = (m['status'] ?? 'Not Attempted').toString();
+        return m;
+      }).toList();
+    }
+
+    final List<Map<String, dynamic>> tests = [];
 
     // 1. Check for real tests in dbPapers matching this series
     for (var p in widget.dbPapers) {
@@ -2110,9 +2147,11 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
           ),
           const SizedBox(height: 8),
           Text(
-            item.description.isNotEmpty
-                ? '${item.description}\n\nThis comprehensive test series has been strictly curated by top NEET/JEE subject experts following the latest NTA exam pattern. Designed to emulate the exact pressure, time constraints, and multi-concept question levels of the real computer-based examination. It empowers aspirants with predictive All India Rankings, deep topic-level analytics, and error diagnosis to optimize their scores.'
-                : 'Experience the ultimate examination readiness with curated full-syllabus and high-yield tests designed to replicate the real NTA test environment with precision.',
+            item.longDescription.isNotEmpty
+                ? item.longDescription
+                : (item.description.isNotEmpty
+                    ? '${item.description}\n\nThis comprehensive test series has been strictly curated by top NEET/JEE subject experts following the latest NTA exam pattern. Designed to emulate the exact pressure, time constraints, and multi-concept question levels of the real computer-based examination. It empowers aspirants with predictive All India Rankings, deep topic-level analytics, and error diagnosis to optimize their scores.'
+                    : 'Experience the ultimate examination readiness with curated full-syllabus and high-yield tests designed to replicate the real NTA test environment with precision.'),
             style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF334155), height: 1.55),
           ),
           const SizedBox(height: 24),
@@ -2126,32 +2165,49 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
           Wrap(
             spacing: 12,
             runSpacing: 12,
-            children: [
-              _buildFeatureCard(
-                Icons.verified_outlined,
-                '100% NTA Exam Pattern',
-                'Matches exact weightage, question difficulty, and sectional division (Section A & Section B).',
-                const Color(0xFF2563EB),
-              ),
-              _buildFeatureCard(
-                Icons.leaderboard_outlined,
-                'All India Rank Prediction',
-                'Real-time percentile benchmarking and national rank estimation against 14,000+ active aspirants.',
-                const Color(0xFF059669),
-              ),
-              _buildFeatureCard(
-                Icons.menu_book_outlined,
-                'Step-by-Step Solutions',
-                'Detailed conceptual explanations and shortcut techniques for every single problem.',
-                const Color(0xFFD97706),
-              ),
-              _buildFeatureCard(
-                Icons.analytics_outlined,
-                'Deep Performance Analytics',
-                'Identify weak chapters, wasted time on unattempted questions, and negative mark traps.',
-                const Color(0xFF7C3AED),
-              ),
-            ],
+            children: item.features.isNotEmpty
+                ? item.features.map((f) {
+                    if (f is Map) {
+                      return _buildFeatureCard(
+                        Icons.verified_outlined,
+                        (f['title'] ?? 'Feature').toString(),
+                        (f['description'] ?? 'Comprehensive coverage for high exam scores.').toString(),
+                        const Color(0xFF2563EB),
+                      );
+                    }
+                    return _buildFeatureCard(
+                      Icons.verified_outlined,
+                      f.toString(),
+                      'Key examination preparation inclusion.',
+                      const Color(0xFF2563EB),
+                    );
+                  }).toList()
+                : [
+                    _buildFeatureCard(
+                      Icons.verified_outlined,
+                      '100% NTA Exam Pattern',
+                      'Matches exact weightage, question difficulty, and sectional division (Section A & Section B).',
+                      const Color(0xFF2563EB),
+                    ),
+                    _buildFeatureCard(
+                      Icons.leaderboard_outlined,
+                      'All India Rank Prediction',
+                      'Real-time percentile benchmarking and national rank estimation against 14,000+ active aspirants.',
+                      const Color(0xFF059669),
+                    ),
+                    _buildFeatureCard(
+                      Icons.menu_book_outlined,
+                      'Step-by-Step Solutions',
+                      'Detailed conceptual explanations and shortcut techniques for every single problem.',
+                      const Color(0xFFD97706),
+                    ),
+                    _buildFeatureCard(
+                      Icons.analytics_outlined,
+                      'Deep Performance Analytics',
+                      'Identify weak chapters, wasted time on unattempted questions, and negative mark traps.',
+                      const Color(0xFF7C3AED),
+                    ),
+                  ],
           ),
           const SizedBox(height: 24),
 
@@ -2429,6 +2485,51 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
   // TAB 3: REVIEWS & RATINGS
   // ==========================================
   Widget _buildReviewsTab(TestSeriesCardData item) {
+    final List<Map<String, dynamic>> reviewsList = item.reviews.isNotEmpty
+        ? List<Map<String, dynamic>>.from(item.reviews)
+        : [
+            {
+              'name': 'Aarav Sharma',
+              'credential': 'AIR 142 • NEET Qualified',
+              'rating': 5,
+              'date': 'August 2026',
+              'comment': 'The question framing in this test series matches the actual NTA paper level with extreme accuracy. The multi-statement Biology questions and Organic Chemistry mechanism problems helped me eliminate silly mistakes and improve my time management.',
+              'is_verified': true,
+            },
+            {
+              'name': 'Sneha Patel',
+              'credential': 'Score: 685/720 • Target NEET 2027',
+              'rating': 5,
+              'date': 'July 2026',
+              'comment': 'Part tests and Full syllabus mocks gave me immense confidence. The time management insights and chapter-wise breakdown helped me pinpoint my weak areas in Physics numericals.',
+              'is_verified': true,
+            },
+            {
+              'name': 'Rohan Verma',
+              'credential': 'JEE Main 99.4%ile Aspirant',
+              'rating': 5,
+              'date': 'June 2026',
+              'comment': 'The numerical value questions and difficulty curve are on par with the real JEE CBT exam. Solutions are super crisp and provide direct shortcut formulas.',
+              'is_verified': true,
+            },
+            {
+              'name': 'Priya Das',
+              'credential': 'Target NEET 2027 Aspirant',
+              'rating': 5,
+              'date': 'May 2026',
+              'comment': 'Best test series on the platform. The CBT interface is completely identical to NTA NEET, and the validity until exam makes it incredible value for money.',
+              'is_verified': true,
+            },
+          ];
+
+    double avgRating = 0;
+    if (reviewsList.isNotEmpty) {
+      final totalScore = reviewsList.fold<num>(0, (sum, r) => sum + (r['rating'] is num ? r['rating'] as num : int.tryParse(r['rating']?.toString() ?? '5') ?? 5));
+      avgRating = totalScore / reviewsList.length;
+    }
+    final displayRating = (avgRating > 0 ? avgRating : 4.9).toStringAsFixed(1);
+    final countRatings = reviewsList.length > 4 ? '${reviewsList.length} Verified Reviews' : '1,480+ Ratings';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -2447,7 +2548,7 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
                 Column(
                   children: [
                     Text(
-                      '4.9',
+                      displayRating,
                       style: GoogleFonts.inter(fontSize: 44, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A)),
                     ),
                     Row(
@@ -2458,7 +2559,7 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '1,480+ Ratings',
+                      countRatings,
                       style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
                     ),
                   ],
@@ -2484,58 +2585,40 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
           ),
           const SizedBox(height: 24),
 
-          Text(
-            'Verified Aspirant Testimonials',
-            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Verified Aspirant Testimonials (${reviewsList.length})',
+                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
 
-          // Student Review 1
-          _buildReviewCard(
-            name: 'Aarav Sharma',
-            credential: 'AIR 142 • NEET Qualified',
-            rating: 5,
-            date: 'August 2026',
-            comment:
-                'The question framing in this test series matches the actual NTA paper level with extreme accuracy. The multi-statement Biology questions and Organic Chemistry mechanism problems helped me eliminate silly mistakes and improve my time management.',
-            avatarBg: const Color(0xFF2563EB),
-          ),
-          const SizedBox(height: 12),
-
-          // Student Review 2
-          _buildReviewCard(
-            name: 'Sneha Patel',
-            credential: 'Score: 685/720 • Target NEET 2027',
-            rating: 5,
-            date: 'July 2026',
-            comment:
-                'Part tests and Full syllabus mocks gave me immense confidence. The time management insights and chapter-wise breakdown helped me pinpoint my weak areas in Physics numericals.',
-            avatarBg: const Color(0xFF059669),
-          ),
-          const SizedBox(height: 12),
-
-          // Student Review 3
-          _buildReviewCard(
-            name: 'Rohan Verma',
-            credential: 'JEE Main 99.4%ile Aspirant',
-            rating: 5,
-            date: 'June 2026',
-            comment:
-                'The numerical value questions and difficulty curve are on par with the real JEE CBT exam. Solutions are super crisp and provide direct shortcut formulas.',
-            avatarBg: const Color(0xFFD97706),
-          ),
-          const SizedBox(height: 12),
-
-          // Student Review 4
-          _buildReviewCard(
-            name: 'Priya Das',
-            credential: 'Target NEET 2027 Aspirant',
-            rating: 5,
-            date: 'May 2026',
-            comment:
-                'Best test series on the platform. The CBT interface is completely identical to NTA NEET, and the validity until exam makes it incredible value for money.',
-            avatarBg: const Color(0xFF7C3AED),
-          ),
+          ...reviewsList.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final r = entry.value;
+            final colors = [
+              const Color(0xFF2563EB),
+              const Color(0xFF059669),
+              const Color(0xFFD97706),
+              const Color(0xFF7C3AED),
+              const Color(0xFFEC4899),
+            ];
+            final color = colors[idx % colors.length];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildReviewCard(
+                name: (r['name'] ?? 'Aspirant').toString(),
+                credential: (r['credential'] ?? 'Verified Aspirant').toString(),
+                rating: (r['rating'] is num) ? (r['rating'] as num).toInt() : (int.tryParse(r['rating']?.toString() ?? '5') ?? 5),
+                date: (r['date'] ?? 'Recent').toString(),
+                comment: (r['comment'] ?? '').toString(),
+                avatarBg: color,
+              ),
+            );
+          }).toList(),
         ],
       ),
     );
@@ -2655,8 +2738,24 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
   // ==========================================
   Widget _buildTopScoresAndUsersTab(TestSeriesCardData item) {
     final maxScore = item.exam.contains('JEE') ? 300 : 720;
-    final topScore = item.exam.contains('JEE') ? 296 : 712;
-    final avgScore = item.exam.contains('JEE') ? 210 : 584;
+    final topScoresMap = item.topScores;
+    final topScore = (topScoresMap['highest_score'] is num)
+        ? (topScoresMap['highest_score'] as num).toInt()
+        : (int.tryParse(topScoresMap['highest_score']?.toString() ?? '') ?? (item.exam.contains('JEE') ? 296 : 712));
+    final avgScore = (topScoresMap['average_score'] is num)
+        ? (topScoresMap['average_score'] as num).toInt()
+        : (int.tryParse(topScoresMap['average_score']?.toString() ?? '') ?? (item.exam.contains('JEE') ? 210 : 584));
+    final activeStudents = (topScoresMap['active_aspirants'] ?? '14,850+').toString();
+
+    final List<Map<String, dynamic>> rankersList = (topScoresMap['rankers'] is List && (topScoresMap['rankers'] as List).isNotEmpty)
+        ? (topScoresMap['rankers'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        : [
+            {'rank': 1, 'name': 'Aayush Kulkarni', 'score': topScore, 'maxScore': maxScore, 'accuracy': '98.2%', 'percentile': '99.99%ile', 'badge': 'AIR 1', 'badgeColor': const Color(0xFFF59E0B)},
+            {'rank': 2, 'name': 'Meera Sen', 'score': topScore - 7, 'maxScore': maxScore, 'accuracy': '97.4%', 'percentile': '99.95%ile', 'badge': 'AIR 4', 'badgeColor': const Color(0xFF94A3B8)},
+            {'rank': 3, 'name': 'Devansh Mehta', 'score': topScore - 14, 'maxScore': maxScore, 'accuracy': '96.8%', 'percentile': '99.88%ile', 'badge': 'AIR 9', 'badgeColor': const Color(0xFFB45309)},
+            {'rank': 4, 'name': 'Tanvi Agarwal', 'score': topScore - 20, 'maxScore': maxScore, 'accuracy': '96.1%', 'percentile': '99.79%ile', 'badge': 'AIR 18', 'badgeColor': const Color(0xFF2563EB)},
+            {'rank': 5, 'name': 'Kabir Singhania', 'score': topScore - 24, 'maxScore': maxScore, 'accuracy': '95.5%', 'percentile': '99.71%ile', 'badge': 'AIR 27', 'badgeColor': const Color(0xFF059669)},
+          ];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -2675,7 +2774,7 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildMetricCard('Aspirants Active', '14,850+', 'Enrolled Students', const Color(0xFF7C3AED), Icons.people_alt_rounded),
+                child: _buildMetricCard('Aspirants Active', activeStudents, 'Enrolled Students', const Color(0xFF7C3AED), Icons.people_alt_rounded),
               ),
             ],
           ),
@@ -2686,7 +2785,7 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Top Rankers Leaderboard',
+                'Top Rankers Leaderboard (${rankersList.length})',
                 style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
               ),
               Text(
@@ -2705,13 +2804,28 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             child: Column(
-              children: [
-                _buildRankerRow(rank: 1, name: 'Aayush Kulkarni', score: topScore, maxScore: maxScore, accuracy: '98.2%', percentile: '99.99%ile', badge: 'AIR 1', badgeColor: const Color(0xFFF59E0B)),
-                _buildRankerRow(rank: 2, name: 'Meera Sen', score: topScore - 7, maxScore: maxScore, accuracy: '97.4%', percentile: '99.95%ile', badge: 'AIR 4', badgeColor: const Color(0xFF94A3B8)),
-                _buildRankerRow(rank: 3, name: 'Devansh Mehta', score: topScore - 14, maxScore: maxScore, accuracy: '96.8%', percentile: '99.88%ile', badge: 'AIR 9', badgeColor: const Color(0xFFB45309)),
-                _buildRankerRow(rank: 4, name: 'Tanvi Agarwal', score: topScore - 20, maxScore: maxScore, accuracy: '96.1%', percentile: '99.79%ile', badge: 'AIR 18', badgeColor: const Color(0xFF2563EB)),
-                _buildRankerRow(rank: 5, name: 'Kabir Singhania', score: topScore - 24, maxScore: maxScore, accuracy: '95.5%', percentile: '99.71%ile', badge: 'AIR 27', badgeColor: const Color(0xFF059669)),
-              ],
+              children: rankersList.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final r = entry.value;
+                final rankNum = (r['rank'] is num) ? (r['rank'] as num).toInt() : (idx + 1);
+                Color badgeColor = const Color(0xFF2563EB);
+                if (rankNum == 1) badgeColor = const Color(0xFFF59E0B);
+                else if (rankNum == 2) badgeColor = const Color(0xFF94A3B8);
+                else if (rankNum == 3) badgeColor = const Color(0xFFB45309);
+
+                final scoreVal = (r['score'] is num) ? (r['score'] as num).toInt() : (int.tryParse(r['score']?.toString() ?? '') ?? (topScore - (idx * 5)));
+
+                return _buildRankerRow(
+                  rank: rankNum,
+                  name: (r['name'] ?? 'Ranker ${idx + 1}').toString(),
+                  score: scoreVal,
+                  maxScore: maxScore,
+                  accuracy: (r['accuracy'] ?? '96.5%').toString(),
+                  percentile: (r['percentile'] ?? '99.5%ile').toString(),
+                  badge: (r['badge'] ?? 'AIR $rankNum').toString(),
+                  badgeColor: badgeColor,
+                );
+              }).toList(),
             ),
           ),
         ],
