@@ -25,7 +25,9 @@ CREATE TABLE IF NOT EXISTS public.test_series (
   -- Test Structure & Attributes
   test_count INT DEFAULT 1,
   question_count INT DEFAULT 200,
+  total_marks NUMERIC(10, 2) DEFAULT 720.00,
   duration_minutes INT DEFAULT 180,
+  conducting_body TEXT DEFAULT 'NTA',
   difficulty TEXT DEFAULT 'High',
   status TEXT DEFAULT 'Published', -- 'Draft', 'Published', 'Archived'
   features JSONB DEFAULT '["100+ High Quality Tests", "Detailed Solutions & Explanations", "All India Ranking"]'::jsonb,

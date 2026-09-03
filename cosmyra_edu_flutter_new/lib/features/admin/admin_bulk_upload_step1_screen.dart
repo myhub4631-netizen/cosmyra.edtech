@@ -52,7 +52,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
 
   // Test Series Selection State
   String _testSeriesOption = 'existing'; // 'existing' or 'new'
-  String _existingTestSeries = 'NEET 2026 Full Syllabus Test Series';
+  String _existingTestSeries = '';
   // Test Series Commercial & Metadata Controllers
   late TextEditingController _newTestSeriesCtrl;
   late TextEditingController _testSeriesDescCtrl;
@@ -64,13 +64,13 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   bool _testSeriesIsFree = false;
   bool _testSeriesShowButton = true;
   List<Map<String, dynamic>> _loadedSeriesObjects = [];
+  List<String> _availableTestSeriesList = [];
 
-  List<String> _availableTestSeriesList = [
-    'NEET 2026 Full Syllabus Test Series',
-    'NEET 2026 Chapter Wise Test Series',
-    'NEET 2026 Topic Wise Test Series',
-    'NEET 2026 Previous Year Papers',
-  ];
+  // Paper Selection State within Test Series
+  String _paperOption = 'new'; // 'existing' or 'new'
+  String _existingPaper = '';
+  List<String> _availablePapersForSelectedSeries = [];
+  List<Map<String, dynamic>> _loadedPapersList = [];
 
   // Checkboxes for subjects
   bool _subjectPhysics = true;
@@ -118,19 +118,61 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   Future<void> _loadCustomTestSeries() async {
     try {
       final list = await SupabaseService.fetchAllTestSeries();
-      if (list.isNotEmpty && mounted) {
+      final papers = await SupabaseService.fetchAllPapersAndTestSeries();
+      if (mounted) {
         setState(() {
           _loadedSeriesObjects = list;
-          for (var item in list) {
-            final String title = (item['title'] ?? item['name'] ?? '').toString().trim();
-            if (title.isNotEmpty && !_availableTestSeriesList.contains(title)) {
-              _availableTestSeriesList.insert(0, title);
-            }
+          _loadedPapersList = papers;
+          _availableTestSeriesList = list
+              .map((e) => (e['title'] ?? e['name'] ?? '').toString().trim())
+              .where((t) => t.isNotEmpty)
+              .toSet()
+              .toList();
+
+          if (_availableTestSeriesList.isNotEmpty) {
+            _testSeriesOption = 'existing';
+            _existingTestSeries = _availableTestSeriesList.first;
+            _onExistingTestSeriesSelected(_existingTestSeries);
+          } else {
+            _testSeriesOption = 'new';
+            _onNewTestSeriesOptionSelected();
           }
         });
       }
     } catch (e) {
       debugPrint('Notice loading test series: $e');
+    }
+  }
+
+  void _applyExamDefaults(String exam, {bool preserveMarks = false}) {
+    if (exam.contains('JEE')) {
+      _conductingBody = 'NTA';
+      _paperType = 'Engineering';
+      if (!preserveMarks) {
+        _questionCountCtrl.text = '90';
+        _totalMarksCtrl.text = '300';
+        _durationCtrl.text = '180';
+        _positiveMarksCtrl.text = '+4';
+        _negativeMarksCtrl.text = '-1';
+      }
+      _subjectPhysics = true;
+      _subjectChemistry = true;
+      _subjectBotany = false;
+      _subjectZoology = false;
+    } else {
+      _conductingBody = 'NTA';
+      _paperType = 'Medical (UG)';
+      if (!preserveMarks) {
+        _questionCountCtrl.text = '200';
+        _totalMarksCtrl.text = '720';
+        _durationCtrl.text = '180';
+        _positiveMarksCtrl.text = '+4';
+        _negativeMarksCtrl.text = '-4';
+      }
+      _subjectPhysics = true;
+      _subjectChemistry = true;
+      _subjectBotany = true;
+      _subjectZoology = true;
     }
   }
 
@@ -142,6 +184,12 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
         orElse: () => {},
       );
       if (found.isNotEmpty) {
+        if (found['exam'] != null && found['exam'].toString().isNotEmpty) {
+          _examName = found['exam'].toString();
+        }
+        if (found['year'] != null && found['year'].toString().isNotEmpty) {
+          _year = found['year'].toString();
+        }
         if (found['description'] != null) _testSeriesDescCtrl.text = found['description'].toString();
         if (found['banner_image_url'] != null) _testSeriesBannerCtrl.text = found['banner_image_url'].toString();
         if (found['price'] != null) _testSeriesPriceCtrl.text = found['price'].toString();
@@ -150,7 +198,163 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
         if (found['purchase_button_text'] != null) _testSeriesButtonTextCtrl.text = found['purchase_button_text'].toString();
         if (found['is_free'] != null) _testSeriesIsFree = found['is_free'] == true;
         if (found['show_purchase_button'] != null) _testSeriesShowButton = found['show_purchase_button'] != false;
+
+        if (found['question_count'] != null) {
+          _questionCountCtrl.text = found['question_count'].toString();
+        }
+        if (found['duration_minutes'] != null) {
+          _durationCtrl.text = found['duration_minutes'].toString();
+        }
+        if (found['total_marks'] != null) {
+          _totalMarksCtrl.text = found['total_marks'].toString();
+        } else {
+          _totalMarksCtrl.text = _examName.contains('JEE') ? '300' : '720';
+        }
+        if (found['conducting_body'] != null) {
+          _conductingBody = found['conducting_body'].toString();
+        } else {
+          _conductingBody = 'NTA';
+        }
+
+        _applyExamDefaults(_examName, preserveMarks: found['total_marks'] != null);
       }
+      _updateAvailablePapersForTestSeries(title);
+    });
+  }
+
+  void _onNewTestSeriesOptionSelected() {
+    setState(() {
+      _testSeriesOption = 'new';
+      _applyExamDefaults(_examName);
+      _paperOption = 'new';
+      final pTitle = _newTestSeriesCtrl.text.isNotEmpty
+          ? '${_newTestSeriesCtrl.text.trim()} - Paper 1'
+          : 'NEET 2026 Phase 1';
+      _paperNameCtrl.text = pTitle;
+      _paperCodeCtrl.text = 'N26P1';
+      _availablePapersForSelectedSeries = [];
+    });
+  }
+
+  void _updateAvailablePapersForTestSeries(String seriesTitle) {
+    final titleLower = seriesTitle.trim().toLowerCase();
+    final seriesObj = _loadedSeriesObjects.firstWhere(
+      (s) => (s['title'] ?? s['name'] ?? '').toString().trim().toLowerCase() == titleLower,
+      orElse: () => {},
+    );
+    final String seriesId = seriesObj['id']?.toString() ?? '';
+    final String seriesPaperId = seriesObj['paper_id']?.toString() ?? '';
+
+    final matched = _loadedPapersList.where((p) {
+      final pTsTitle = (p['test_series_title'] ?? p['existing_test_series'] ?? p['new_test_series_name'] ?? '').toString().trim().toLowerCase();
+      final pTsId = (p['test_series_id'] ?? '').toString().trim();
+      final pId = (p['id'] ?? '').toString().trim();
+
+      if (pTsTitle.isNotEmpty && pTsTitle == titleLower) return true;
+      if (seriesId.isNotEmpty && pTsId == seriesId) return true;
+      if (seriesPaperId.isNotEmpty && pId == seriesPaperId) return true;
+      return false;
+    }).toList();
+
+    final titles = matched
+        .map((p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim())
+        .where((t) => t.isNotEmpty)
+        .toSet()
+        .toList();
+
+    setState(() {
+      _availablePapersForSelectedSeries = titles;
+      if (titles.isNotEmpty) {
+        _paperOption = 'existing';
+        _existingPaper = titles.first;
+        _onExistingPaperSelected(_existingPaper);
+      } else {
+        _paperOption = 'new';
+        _existingPaper = '';
+        _paperNameCtrl.text = seriesTitle.isNotEmpty ? '$seriesTitle - Paper 1' : 'NEET 2026 Phase 1';
+        _paperCodeCtrl.text = 'P1';
+      }
+    });
+  }
+
+  void _onExistingPaperSelected(String paperTitle) {
+    setState(() {
+      _existingPaper = paperTitle;
+      final foundPaper = _loadedPapersList.firstWhere(
+        (p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim().toLowerCase() == paperTitle.trim().toLowerCase(),
+        orElse: () => {},
+      );
+
+      if (foundPaper.isNotEmpty) {
+        _paperNameCtrl.text = foundPaper['paper_name'] ?? foundPaper['paperName'] ?? paperTitle;
+        _paperCodeCtrl.text = foundPaper['paper_code'] ?? foundPaper['paperCode'] ?? '';
+
+        if (foundPaper['exam'] != null && foundPaper['exam'].toString().isNotEmpty) {
+          _examName = foundPaper['exam'].toString();
+        }
+        if (foundPaper['year'] != null && foundPaper['year'].toString().isNotEmpty) {
+          _year = foundPaper['year'].toString();
+        }
+        if (foundPaper['phase_session'] != null || foundPaper['phaseSession'] != null) {
+          _phaseSession = (foundPaper['phase_session'] ?? foundPaper['phaseSession']).toString();
+        }
+        if (foundPaper['paper_type'] != null || foundPaper['paperType'] != null) {
+          _paperType = (foundPaper['paper_type'] ?? foundPaper['paperType']).toString();
+        }
+        if (foundPaper['language'] != null) {
+          _language = foundPaper['language'].toString();
+        }
+        if (foundPaper['conducting_body'] != null || foundPaper['conductingBody'] != null) {
+          _conductingBody = (foundPaper['conducting_body'] ?? foundPaper['conductingBody']).toString();
+        }
+
+        if (foundPaper['total_marks'] != null || foundPaper['totalMarks'] != null) {
+          _totalMarksCtrl.text = (foundPaper['total_marks'] ?? foundPaper['totalMarks']).toString();
+        }
+        if (foundPaper['question_count'] != null || foundPaper['questionCount'] != null) {
+          _questionCountCtrl.text = (foundPaper['question_count'] ?? foundPaper['questionCount']).toString();
+        }
+        if (foundPaper['duration_minutes'] != null || foundPaper['duration'] != null) {
+          _durationCtrl.text = (foundPaper['duration_minutes'] ?? foundPaper['duration']).toString();
+        }
+        if (foundPaper['negative_marking'] != null || foundPaper['negativeMarking'] != null) {
+          _negativeMarking = (foundPaper['negative_marking'] ?? foundPaper['negativeMarking']).toString();
+        }
+        if (foundPaper['negative_marks'] != null || foundPaper['negativeMarks'] != null) {
+          _negativeMarksCtrl.text = (foundPaper['negative_marks'] ?? foundPaper['negativeMarks']).toString();
+        }
+        if (foundPaper['positive_marks'] != null || foundPaper['positiveMarks'] != null) {
+          _positiveMarksCtrl.text = (foundPaper['positive_marks'] ?? foundPaper['positiveMarks']).toString();
+        }
+        if (foundPaper['instructions'] != null) {
+          _instructionsCtrl.text = foundPaper['instructions'].toString();
+        }
+        if (foundPaper['shift'] != null) {
+          _paperShift = foundPaper['shift'].toString();
+        }
+
+        final dynamic rawSubjects = foundPaper['subjects'] ?? foundPaper['subjectList'];
+        if (rawSubjects is List) {
+          final subList = rawSubjects.map((s) => s.toString().toLowerCase()).toList();
+          _subjectPhysics = subList.contains('physics');
+          _subjectChemistry = subList.contains('chemistry');
+          _subjectBotany = subList.contains('botany') || subList.contains('biology');
+          _subjectZoology = subList.contains('zoology') || subList.contains('biology');
+        }
+      }
+    });
+  }
+
+  void _onNewPaperOptionSelected() {
+    setState(() {
+      _paperOption = 'new';
+      final int nextNum = _availablePapersForSelectedSeries.length + 1;
+      final prefix = _testSeriesOption == 'new'
+          ? (_newTestSeriesCtrl.text.isNotEmpty ? _newTestSeriesCtrl.text.trim() : 'Test Series')
+          : _existingTestSeries;
+      _paperNameCtrl.text = '$prefix - Paper $nextNum';
+      _paperCodeCtrl.text = 'P$nextNum';
+      _applyExamDefaults(_examName);
     });
   }
 
@@ -198,7 +402,18 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     }
 
     final String pName = _paperNameCtrl.text.trim().isNotEmpty ? _paperNameCtrl.text.trim() : 'NEET 2026 Phase 1';
-    final String paperId = SupabaseService.toValidUuid('paper_${_examName}_${_year}_${_phaseSession}_$pName');
+    
+    // If existing paper was selected, reuse its exact ID so Step 2 loads its existing questions
+    String paperId = SupabaseService.toValidUuid('paper_${_examName}_${_year}_${_phaseSession}_$pName');
+    if (_sourceCategory == 'Test Series' && _paperOption == 'existing' && _existingPaper.isNotEmpty) {
+      final foundExisting = _loadedPapersList.firstWhere(
+        (p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim().toLowerCase() == _existingPaper.trim().toLowerCase(),
+        orElse: () => {},
+      );
+      if (foundExisting.isNotEmpty && foundExisting['id'] != null) {
+        paperId = foundExisting['id'].toString();
+      }
+    }
 
     final String effectiveTestSeriesTitle = _sourceCategory == 'Test Series'
         ? (_testSeriesOption == 'new' && _newTestSeriesCtrl.text.trim().isNotEmpty
@@ -228,6 +443,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       'conducting_body': _conductingBody,
       'questionCount': int.tryParse(_questionCountCtrl.text) ?? 200,
       'totalMarks': int.tryParse(_totalMarksCtrl.text) ?? 720,
+      'total_marks': double.tryParse(_totalMarksCtrl.text) ?? 720.0,
       'durationMinutes': int.tryParse(_durationCtrl.text) ?? 180,
       'duration': int.tryParse(_durationCtrl.text) ?? 180,
       'negativeMarking': _negativeMarking == 'Yes',
@@ -253,6 +469,10 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       'new_test_series_name': _newTestSeriesCtrl.text.trim(),
       'testSeriesTitle': effectiveTestSeriesTitle,
       'test_series_title': effectiveTestSeriesTitle,
+      'paperOption': _paperOption,
+      'paper_option': _paperOption,
+      'existingPaper': _existingPaper,
+      'existing_paper': _existingPaper,
       'is_test_series': _sourceCategory == 'Test Series' || availableInModules.contains('test_series'),
     };
 
@@ -277,6 +497,8 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           'purchase_button_text': _testSeriesButtonTextCtrl.text.trim(),
           'show_purchase_button': _testSeriesShowButton,
           'question_count': int.tryParse(_questionCountCtrl.text) ?? 200,
+          'total_marks': double.tryParse(_totalMarksCtrl.text) ?? (_examName.contains('JEE') ? 300.0 : 720.0),
+          'conducting_body': _conductingBody,
           'duration_minutes': int.tryParse(_durationCtrl.text) ?? 180,
           'difficulty': 'High',
           'status': 'Published',
@@ -825,8 +1047,18 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                     onChanged: (val) {
                       setState(() {
                         _sourceCategory = val!;
-                        if (_sourceCategory == 'PYQ' && !['NEET', 'JEE Main', 'JEE Advanced', 'AIIMS'].contains(_examName)) {
+                        if (_sourceCategory == 'Test Series') {
+                          if (_availableTestSeriesList.isNotEmpty) {
+                            _testSeriesOption = 'existing';
+                            _existingTestSeries = _availableTestSeriesList.first;
+                            _onExistingTestSeriesSelected(_existingTestSeries);
+                          } else {
+                            _testSeriesOption = 'new';
+                            _onNewTestSeriesOptionSelected();
+                          }
+                        } else if (_sourceCategory == 'PYQ' && !['NEET', 'JEE Main', 'JEE Advanced', 'AIIMS'].contains(_examName)) {
                           _examName = 'NEET';
+                          _applyExamDefaults('NEET');
                         }
                       });
                     },
@@ -837,7 +1069,12 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                     items: _sourceCategory == 'PYQ'
                         ? ['NEET', 'JEE Main', 'JEE Advanced', 'AIIMS']
                         : ['NEET', 'JEE Main', 'JEE Advanced', 'AIIMS', 'CUET', 'CBSE 12'],
-                    onChanged: (val) => setState(() => _examName = val!),
+                    onChanged: (val) {
+                      setState(() {
+                        _examName = val!;
+                        _applyExamDefaults(_examName);
+                      });
+                    },
                   ),
                   _buildDropdownField(
                     label: 'Year *',
@@ -942,9 +1179,23 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Test Series Option *',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF3730A3)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Test Series Option *',
+                        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF3730A3)),
+                      ),
+                      if (_availableTestSeriesList.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: const Color(0xFFE0E7FF), borderRadius: BorderRadius.circular(12)),
+                          child: Text(
+                            '${_availableTestSeriesList.length} Available in DB',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF3730A3)),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   Row(
@@ -955,9 +1206,29 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                             value: 'existing',
                             groupValue: _testSeriesOption,
                             activeColor: const Color(0xFF4F46E5),
-                            onChanged: (val) => setState(() => _testSeriesOption = val!),
+                            onChanged: (val) {
+                              if (_availableTestSeriesList.isNotEmpty) {
+                                setState(() {
+                                  _testSeriesOption = val!;
+                                  if (_existingTestSeries.isEmpty || !_availableTestSeriesList.contains(_existingTestSeries)) {
+                                    _existingTestSeries = _availableTestSeriesList.first;
+                                  }
+                                  _onExistingTestSeriesSelected(_existingTestSeries);
+                                });
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('No test series created yet. Please select "Create New Test Series".'),
+                                    backgroundColor: Color(0xFF4F46E5),
+                                  ),
+                                );
+                              }
+                            },
                           ),
-                          const Text('Select Existing Test Series', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E1B4B))),
+                          Text(
+                            'Select Existing Test Series (${_availableTestSeriesList.length})',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E1B4B)),
+                          ),
                         ],
                       ),
                       const SizedBox(width: 24),
@@ -967,7 +1238,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                             value: 'new',
                             groupValue: _testSeriesOption,
                             activeColor: const Color(0xFF4F46E5),
-                            onChanged: (val) => setState(() => _testSeriesOption = val!),
+                            onChanged: (val) => _onNewTestSeriesOptionSelected(),
                           ),
                           const Text('Create New Test Series', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E1B4B))),
                         ],
@@ -975,20 +1246,44 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                     ],
                   ),
                   const SizedBox(height: 12),
-                  if (_testSeriesOption == 'existing')
-                    _buildDropdownField(
-                      label: 'Select Test Series *',
-                      value: _availableTestSeriesList.contains(_existingTestSeries)
-                          ? _existingTestSeries
-                          : _availableTestSeriesList.first,
-                      items: _availableTestSeriesList,
-                      onChanged: (val) => _onExistingTestSeriesSelected(val!),
-                    )
-                  else
+                  if (_testSeriesOption == 'existing') ...[
+                    if (_availableTestSeriesList.isNotEmpty)
+                      _buildDropdownField(
+                        label: 'Select Test Series *',
+                        value: _availableTestSeriesList.contains(_existingTestSeries)
+                            ? _existingTestSeries
+                            : _availableTestSeriesList.first,
+                        items: _availableTestSeriesList,
+                        onChanged: (val) => _onExistingTestSeriesSelected(val!),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(8)),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'No test series found in database. Please click "Create New Test Series" above to create your first series.',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF92400E), fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ] else ...[
                     _buildTextField(
                       label: 'New Test Series Title *',
                       controller: _newTestSeriesCtrl,
                     ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '✓ Standard specifications (Total Marks: ${_totalMarksCtrl.text}, Total Questions: ${_questionCountCtrl.text}, Conducting Body: $_conductingBody) are automatically filled for $_examName.',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF4F46E5), fontWeight: FontWeight.w600),
+                    ),
+                  ],
 
                   const SizedBox(height: 12),
                   // Test Series Description
@@ -1062,6 +1357,157 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                 ],
               ),
             ),
+
+            const SizedBox(height: 16),
+
+            // Card 2: Paper in this Test Series (Select Existing or Create New)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFBBF7D0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Paper in this Test Series *',
+                        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF166534)),
+                      ),
+                      if (_availablePapersForSelectedSeries.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(12)),
+                          child: Text(
+                            '${_availablePapersForSelectedSeries.length} Existing Papers',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Row(
+                        children: [
+                          Radio<String>(
+                            value: 'existing',
+                            groupValue: _paperOption,
+                            activeColor: const Color(0xFF16A34A),
+                            onChanged: (val) {
+                              if (_availablePapersForSelectedSeries.isNotEmpty) {
+                                setState(() {
+                                  _paperOption = val!;
+                                  if (_existingPaper.isEmpty || !_availablePapersForSelectedSeries.contains(_existingPaper)) {
+                                    _existingPaper = _availablePapersForSelectedSeries.first;
+                                  }
+                                  _onExistingPaperSelected(_existingPaper);
+                                });
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('No existing papers in this test series yet. Please select "Create New Paper".'),
+                                    backgroundColor: Color(0xFF16A34A),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                          Text(
+                            'Select Existing Paper (${_availablePapersForSelectedSeries.length})',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF14532D)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 24),
+                      Row(
+                        children: [
+                          Radio<String>(
+                            value: 'new',
+                            groupValue: _paperOption,
+                            activeColor: const Color(0xFF16A34A),
+                            onChanged: (val) => _onNewPaperOptionSelected(),
+                          ),
+                          const Text('Create New Paper', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF14532D))),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (_paperOption == 'existing') ...[
+                    if (_availablePapersForSelectedSeries.isNotEmpty) ...[
+                      _buildDropdownField(
+                        label: 'Select Existing Paper *',
+                        value: _availablePapersForSelectedSeries.contains(_existingPaper)
+                            ? _existingPaper
+                            : _availablePapersForSelectedSeries.first,
+                        items: _availablePapersForSelectedSeries,
+                        onChanged: (val) => _onExistingPaperSelected(val!),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A), size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '✓ Auto-fetched parameters for "$_existingPaper": Total Marks: ${_totalMarksCtrl.text} | Questions: ${_questionCountCtrl.text} | Conducting Body: $_conductingBody | Duration: ${_durationCtrl.text}m | Marking: ${_positiveMarksCtrl.text}/${_negativeMarksCtrl.text}',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF15803D), fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(8)),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'No papers recorded under "$_existingTestSeries" yet. Click "Create New Paper" above to add the first paper.',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF92400E), fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ] else ...[
+                    _buildTextField(
+                      label: 'New Paper Name *',
+                      controller: _paperNameCtrl,
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(6)),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.auto_awesome_rounded, color: Color(0xFF2563EB), size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '✓ Pre-filled standard defaults for $_examName: Total Marks (${_totalMarksCtrl.text}), Total Questions (${_questionCountCtrl.text}), Conducting Body ($_conductingBody). You can customize them in the grid below.',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF1D4ED8), fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ],
 
           const SizedBox(height: 20),
@@ -1073,14 +1519,21 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                 constraints: constraints,
                 columns: 5,
                 children: [
-                  _buildTextField(
-                    label: 'Paper Name *',
-                    controller: _paperNameCtrl,
-                  ),
-                  _buildTextField(
-                    label: 'Paper Code (Optional)',
-                    controller: _paperCodeCtrl,
-                  ),
+                  if (_sourceCategory == 'Test Series')
+                    _buildTextField(
+                      label: 'Paper Code (Optional)',
+                      controller: _paperCodeCtrl,
+                    )
+                  else
+                    _buildTextField(
+                      label: 'Paper Name *',
+                      controller: _paperNameCtrl,
+                    ),
+                  if (_sourceCategory != 'Test Series')
+                    _buildTextField(
+                      label: 'Paper Code (Optional)',
+                      controller: _paperCodeCtrl,
+                    ),
                   _buildDropdownField(
                     label: 'Language *',
                     value: _language,
@@ -1090,7 +1543,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                   _buildDropdownField(
                     label: 'Conducting Body *',
                     value: _conductingBody,
-                    items: ['NTA', 'CBSE', 'State Board', 'Cosmyra'],
+                    items: ['NTA', 'CBSE', 'IIT', 'AIIMS', 'State Board', 'Cosmyra'],
                     onChanged: (val) => setState(() => _conductingBody = val!),
                   ),
                   _buildTextField(
@@ -1098,6 +1551,13 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                     controller: _questionCountCtrl,
                     keyboardType: TextInputType.number,
                   ),
+                  if (_sourceCategory == 'Test Series')
+                    _buildDropdownField(
+                      label: 'Paper Type *',
+                      value: _paperType,
+                      items: ['Medical (UG)', 'Engineering', 'Foundation', 'Board'],
+                      onChanged: (val) => setState(() => _paperType = val!),
+                    ),
                 ],
               );
             },
