@@ -6506,6 +6506,58 @@ class SupabaseService {
     return results;
   }
 
+  /// Generate official Order ID as: CSNJ{year}{Month}{date}{userid}0001, CSNJ{year}{Month}{date}{userid}0002
+  static Future<String> generateOrderId({
+    required String userId,
+    DateTime? date,
+    int? overrideSequence,
+  }) async {
+    final d = date ?? DateTime.now();
+    final year = d.year.toString();
+    final month = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+
+    final cleanUid = userId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    final uid = cleanUid.length >= 6 ? cleanUid.substring(0, 6) : (cleanUid.isEmpty ? '000000' : cleanUid.padRight(6, '0'));
+
+    int seq = overrideSequence ?? 1;
+    if (overrideSequence == null) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final key = 'csnj_order_seq_${uid}_$year$month$day';
+        final current = prefs.getInt(key) ?? 0;
+        seq = current + 1;
+        await prefs.setInt(key, seq);
+      } catch (_) {}
+    }
+
+    final seqStr = seq.toString().padLeft(4, '0');
+    return 'CSNJ$year$month$day$uid$seqStr';
+  }
+
+  /// Format an existing or legacy order ID into the official CSNJ standard
+  static String formatOrderId({
+    required String rawId,
+    required String userId,
+    DateTime? date,
+    int index = 1,
+  }) {
+    final trimmed = rawId.trim();
+    if (trimmed.startsWith('CSNJ')) {
+      return trimmed;
+    }
+    final d = date ?? DateTime.now();
+    final year = d.year.toString();
+    final month = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+
+    final cleanUid = userId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    final uid = cleanUid.length >= 6 ? cleanUid.substring(0, 6) : (cleanUid.isEmpty ? '000000' : cleanUid.padRight(6, '0'));
+    final seqStr = index.toString().padLeft(4, '0');
+
+    return 'CSNJ$year$month$day$uid$seqStr';
+  }
+
   /// Create server-side / Supabase order
   static Future<Map<String, dynamic>> createOrder({
     required UserProfileModel user,
@@ -6513,7 +6565,8 @@ class SupabaseService {
     String? couponCode,
     required String paymentMethod,
   }) async {
-    final orderId = toValidUuid('ord_${DateTime.now().millisecondsSinceEpoch}_${user.id.substring(0, 4)}');
+    final customOrderId = await generateOrderId(userId: user.id);
+    final fallbackUuid = toValidUuid(customOrderId);
     double subtotal = 0.0;
     for (var it in items) {
       final price = (it['price'] as num?)?.toDouble() ?? 299.0;
@@ -6541,7 +6594,9 @@ class SupabaseService {
     final totalAmount = (subtotal - discount) > 0 ? (subtotal - discount) : 0.0;
 
     final orderData = {
-      'id': orderId,
+      'id': customOrderId,
+      'order_id': customOrderId,
+      'order_number': customOrderId,
       'user_id': user.id,
       'user_email': user.email,
       'user_name': user.fullName,
@@ -6564,7 +6619,7 @@ class SupabaseService {
       for (var it in items) {
         await client.from('order_items').insert({
           'id': toValidUuid('item_${DateTime.now().microsecondsSinceEpoch}_${it['id']}'),
-          'order_id': orderId,
+          'order_id': customOrderId,
           'product_id': it['id']?.toString() ?? '',
           'product_title': it['title']?.toString() ?? 'Test Series',
           'product_type': it['product_type']?.toString() ?? 'test_series',
@@ -6576,6 +6631,13 @@ class SupabaseService {
       }
     } catch (e) {
       debugPrint('Notice inserting to Supabase orders table: $e');
+      if (e.toString().contains('uuid') || e.toString().contains('syntax')) {
+        try {
+          final fallbackOrder = Map<String, dynamic>.from(orderData);
+          fallbackOrder['id'] = fallbackUuid;
+          await client.from('orders').insert(fallbackOrder);
+        } catch (_) {}
+      }
     }
 
     // 2. Persist locally to cache
@@ -6734,7 +6796,9 @@ class SupabaseService {
     if (orders.isEmpty) {
       orders.addAll([
         {
-          'id': 'ord_1001_neet',
+          'id': 'CSNJ202609039BA1290001',
+          'order_id': 'CSNJ202609039BA1290001',
+          'order_number': 'CSNJ202609039BA1290001',
           'user_email': 'aarav.sharma@example.com',
           'user_name': 'Aarav Sharma',
           'total_amount': 299.00,
@@ -6747,7 +6811,9 @@ class SupabaseService {
           'created_at': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
         },
         {
-          'id': 'ord_1002_jee',
+          'id': 'CSNJ202609021639150001',
+          'order_id': 'CSNJ202609021639150001',
+          'order_number': 'CSNJ202609021639150001',
           'user_email': 'sneha.patel@example.com',
           'user_name': 'Sneha Patel',
           'total_amount': 239.20,
@@ -6760,7 +6826,9 @@ class SupabaseService {
           'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
         },
         {
-          'id': 'ord_1003_neet',
+          'id': 'CSNJ202609010000000001',
+          'order_id': 'CSNJ202609010000000001',
+          'order_number': 'CSNJ202609010000000001',
           'user_email': 'rohan.verma@example.com',
           'user_name': 'Rohan Verma',
           'total_amount': 199.00,
@@ -6799,19 +6867,31 @@ class SupabaseService {
     // If no order history found in orders ledger, synthesize entries from user's active entitlements
     if (userOrders.isEmpty) {
       final entitlements = await fetchUserEntitlements(userId);
+      int seq = 1;
       for (var ent in entitlements) {
+        final enrolledAt = ent['enrolled_at'] != null ? DateTime.tryParse(ent['enrolled_at'].toString()) : null;
+        final d = enrolledAt ?? DateTime.now().subtract(Duration(days: 3 - seq));
+        final synId = formatOrderId(
+          rawId: '',
+          userId: userId,
+          date: d,
+          index: seq,
+        );
         userOrders.add({
-          'id': 'ORD_${ent['id'] ?? '8921'}',
-          'product_name': ent['title'] ?? 'NEET / JEE Test Package',
+          'id': synId,
+          'order_id': synId,
+          'order_number': synId,
+          'product_name': ent['title'] ?? ent['product_title'] ?? 'NEET / JEE Test Package',
           'amount': 499.0,
           'total_amount': 499.0,
           'status': 'completed',
           'payment_status': 'completed',
           'payment_method': 'Online UPI',
-          'created_at': ent['enrolled_at'] ?? DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
+          'created_at': d.toIso8601String(),
           'entitlement_granted': true,
           'notes': 'Active subscription with full access',
         });
+        seq++;
       }
     }
 

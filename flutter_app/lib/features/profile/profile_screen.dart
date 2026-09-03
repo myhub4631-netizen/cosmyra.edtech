@@ -1392,12 +1392,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (ctx, idx) {
                     final ord = orders[idx];
-                    final orderId = (ord['id'] ?? 'ORD_${idx + 1000}').toString();
+                    final rawId = (ord['order_number'] ?? ord['order_id'] ?? ord['id'] ?? '').toString();
+                    final created = ord['created_at'] != null ? DateTime.tryParse(ord['created_at'].toString()) : null;
+                    final orderId = SupabaseService.formatOrderId(
+                      rawId: rawId,
+                      userId: _currentProfile.id,
+                      date: created,
+                      index: orders.length - idx,
+                    );
                     final productName = (ord['product_name'] ?? 'Test Series Package').toString();
                     final amount = (ord['amount'] ?? ord['total_amount'] ?? 0);
                     final paymentMethod = (ord['payment_method'] ?? 'Online UPI').toString();
                     final status = (ord['payment_status'] ?? ord['status'] ?? 'completed').toString().toLowerCase();
-                    final created = ord['created_at'] != null ? DateTime.tryParse(ord['created_at'].toString()) : null;
                     final dateStr = created != null ? DateFormat('dd MMM yyyy, hh:mm a').format(created) : 'Recently';
 
                     final isPaid = status == 'completed';
@@ -1476,7 +1482,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 ),
-                                onPressed: () => _showInvoiceDialog(ord),
+                                onPressed: () => _showInvoiceDialog(ord, formattedOrderId: orderId),
                                 icon: const Icon(Icons.receipt_outlined, size: 14),
                                 label: const Text('View Invoice', style: TextStyle(fontSize: 11.5)),
                               ),
@@ -1522,21 +1528,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showInvoiceDialog(Map<String, dynamic> order) {
-    final orderId = (order['id'] ?? 'ORD').toString();
+  void _showInvoiceDialog(Map<String, dynamic> order, {String? formattedOrderId}) {
+    final rawId = (order['order_number'] ?? order['order_id'] ?? order['id'] ?? 'ORD').toString();
+    final created = order['created_at'] != null ? DateTime.tryParse(order['created_at'].toString()) : null;
+    final orderId = formattedOrderId ?? SupabaseService.formatOrderId(
+      rawId: rawId,
+      userId: _currentProfile.id,
+      date: created,
+    );
     final productName = (order['product_name'] ?? 'Test Package').toString();
     final amount = (order['amount'] ?? order['total_amount'] ?? 0);
     final paymentMethod = (order['payment_method'] ?? 'UPI').toString();
     final status = (order['payment_status'] ?? order['status'] ?? 'completed').toString().toUpperCase();
-    final created = order['created_at'] != null ? DateTime.tryParse(order['created_at'].toString()) : null;
     final dateStr = created != null ? DateFormat('dd MMM yyyy, hh:mm a').format(created) : 'Recently';
 
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         child: Container(
-          width: 460,
+          constraints: const BoxConstraints(maxWidth: 460),
+          width: double.infinity,
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,

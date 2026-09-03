@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/services/cart_service.dart';
 import '../../../core/services/supabase_service.dart';
-import '../../../models/models.dart';
 
 class EcommerceCheckoutDialog extends StatefulWidget {
   final CartItem? singleItem; // If Buy Now was clicked for a single item
@@ -138,7 +137,7 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
       );
 
       final orderData = orderRes['order'];
-      final createdOrderId = orderData['id'].toString();
+      final createdOrderId = (orderData['order_number'] ?? orderData['order_id'] ?? orderData['id']).toString();
 
       // Simulate payment gateway handshake delay (800ms)
       await Future.delayed(const Duration(milliseconds: 800));

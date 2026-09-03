@@ -212,7 +212,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
 
       final orderData = orderResult['order'] as Map<String, dynamic>?;
-      final orderId = orderData?['id']?.toString() ?? 'ORD_${DateTime.now().millisecondsSinceEpoch}';
+      final orderId = orderData?['order_number']?.toString() ??
+          orderData?['order_id']?.toString() ??
+          orderData?['id']?.toString() ??
+          await SupabaseService.generateOrderId(userId: user.id);
 
       // 2. Simulate fast payment settlement
       await Future.delayed(const Duration(milliseconds: 1400));

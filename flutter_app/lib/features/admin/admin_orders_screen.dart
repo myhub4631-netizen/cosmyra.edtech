@@ -221,7 +221,10 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   }
 
   void _showOrderDetailsDialog(Map<String, dynamic> order) {
-    final orderId = (order['id'] ?? '').toString();
+    final rawId = (order['order_number'] ?? order['order_id'] ?? order['id'] ?? '').toString();
+    final uid = (order['user_id'] ?? order['student_id'] ?? '').toString();
+    final created = order['created_at'] != null ? DateTime.tryParse(order['created_at'].toString()) : null;
+    final orderId = SupabaseService.formatOrderId(rawId: rawId, userId: uid, date: created);
     final name = (order['student_name'] ?? order['user_name'] ?? 'Student').toString();
     final email = (order['student_email'] ?? order['user_email'] ?? '-').toString();
     final phone = (order['student_phone'] ?? '-').toString();
@@ -455,7 +458,10 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                           DataColumn(label: Text('Quick Actions')),
                         ],
                         rows: filtered.map((o) {
-                          final orderId = (o['id'] ?? '').toString();
+                          final rawId = (o['order_number'] ?? o['order_id'] ?? o['id'] ?? '').toString();
+                          final uid = (o['user_id'] ?? o['student_id'] ?? '').toString();
+                          final created = o['created_at'] != null ? DateTime.tryParse(o['created_at'].toString()) : null;
+                          final orderId = SupabaseService.formatOrderId(rawId: rawId, userId: uid, date: created);
                           final name = (o['student_name'] ?? o['user_name'] ?? 'Student').toString();
                           final email = (o['student_email'] ?? o['user_email'] ?? '').toString();
                           final product = (o['product_name'] ?? 'Test Series').toString();
