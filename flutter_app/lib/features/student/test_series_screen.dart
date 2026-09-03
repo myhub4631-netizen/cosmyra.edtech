@@ -48,7 +48,8 @@ class TestSeriesCardData {
   final int testCount;
   final int durationMinutes;
   final String difficulty; // 'Easy', 'Moderate', 'Advanced', 'Mixed'
-  final String testType; // 'Full', 'Part', 'Chapter'
+  final String testType; // 'Full', 'Part', 'Chapter', 'Part + Unit + Full', 'Chapter + Part + Unit + Full'
+  final String category;
   final String validity; // 'Valid until exam'
   final String attemptStatus; // 'Not Attempted', 'In Progress', 'Completed'
   final String status;
@@ -75,6 +76,7 @@ class TestSeriesCardData {
     required this.durationMinutes,
     this.difficulty = 'Moderate',
     this.testType = 'Full',
+    this.category = 'Full Syllabus',
     this.validity = 'Valid until exam',
     this.attemptStatus = 'Not Attempted',
     required this.status,
@@ -229,6 +231,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             durationMinutes: duration,
             difficulty: difficulty,
             testType: testType,
+            category: (cs['category'] ?? 'Full Syllabus').toString(),
             validity: validity,
             attemptStatus: attemptStatus,
             syllabusUrl: syllabusUrl,
@@ -1371,6 +1374,19 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                                           style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF166534)),
                                         ),
                                       ),
+                                      if (item.category.isNotEmpty && item.category != 'Full Syllabus')
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFAF5FF),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: const Color(0xFFE9D5FF)),
+                                          ),
+                                          child: Text(
+                                            item.category,
+                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7E22CE)),
+                                          ),
+                                        ),
                                     ],
                                   ),
                                 ],

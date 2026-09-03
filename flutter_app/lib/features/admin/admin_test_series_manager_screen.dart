@@ -33,6 +33,15 @@ class _AdminTestSeriesManagerScreenState extends State<AdminTestSeriesManagerScr
     (index) => (2029 - index).toString(),
   );
 
+  static const List<String> availableCategories = [
+    'Full Syllabus',
+    'Part + Unit + Full Syllabus',
+    'Chapter + Part + Unit + Full Syllabus',
+    'Chapter Wise',
+    'Topic Wise',
+    'Mock Tests',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -362,7 +371,7 @@ class _AdminTestSeriesManagerScreenState extends State<AdminTestSeriesManagerScr
           _buildFilterDropdown(
             label: 'Category: ',
             value: _selectedCategoryFilter,
-            items: ['All', 'Full Syllabus', 'Chapter Wise', 'Topic Wise', 'Mock Tests'],
+            items: ['All', ...availableCategories],
             onChanged: (v) => setState(() => _selectedCategoryFilter = v!),
           ),
 
@@ -982,9 +991,11 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _category,
+                              value: _AdminTestSeriesManagerScreenState.availableCategories.contains(_category)
+                                  ? _category
+                                  : 'Full Syllabus',
                               decoration: const InputDecoration(labelText: 'Category *'),
-                              items: ['Full Syllabus', 'Chapter Wise', 'Topic Wise', 'Mock Tests']
+                              items: _AdminTestSeriesManagerScreenState.availableCategories
                                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                                   .toList(),
                               onChanged: (v) => setState(() => _category = v!),
@@ -1145,10 +1156,12 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: ['Full', 'Part', 'Chapter'].contains(_testType) ? _testType : 'Full',
+                              value: ['Full', 'Part + Unit + Full', 'Chapter + Part + Unit + Full', 'Part', 'Chapter'].contains(_testType) ? _testType : 'Full',
                               decoration: const InputDecoration(labelText: 'Test Type (Full / Part / Chapter) *'),
                               items: const [
                                 DropdownMenuItem(value: 'Full', child: Text('Full Syllabus')),
+                                DropdownMenuItem(value: 'Part + Unit + Full', child: Text('Part + Unit + Full Syllabus')),
+                                DropdownMenuItem(value: 'Chapter + Part + Unit + Full', child: Text('Chapter + Part + Unit + Full Syllabus')),
                                 DropdownMenuItem(value: 'Part', child: Text('Part Syllabus')),
                                 DropdownMenuItem(value: 'Chapter', child: Text('Chapter Wise')),
                               ],
