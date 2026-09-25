@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../models/models.dart';
+import '../../shared/widgets/app_avatar.dart';
 import '../../shared/utils/smooth_page_route.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_user_management_screen.dart';
@@ -333,24 +334,31 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: Color(0xFF1E293B))),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: Color(0xFF6366F1),
-                  child: Text('AU', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                AppAvatar.fromProfile(
+                  widget.userProfile,
+                  size: 28,
+                  backgroundColor: const Color(0xFF6366F1),
                 ),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Admin User', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                      Text('Super Administrator', style: TextStyle(color: Color(0xFF64748B), fontSize: 10)),
+                      Text(
+                        widget.userProfile.fullName.isNotEmpty ? widget.userProfile.fullName : 'Admin User',
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        widget.userProfile.isSuperAdmin ? 'Super Administrator' : 'Administrator',
+                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 10),
+                      ),
                     ],
                   ),
                 ),
-                Icon(Icons.more_vert_rounded, size: 16, color: Color(0xFF64748B)),
+                const Icon(Icons.more_vert_rounded, size: 16, color: Color(0xFF64748B)),
               ],
             ),
           ),
@@ -490,18 +498,24 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                 ],
               ),
               const SizedBox(width: 12),
-              const CircleAvatar(
-                radius: 16,
-                backgroundColor: Color(0xFF8B5CF6),
-                child: Text('AU', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+              AppAvatar.fromProfile(
+                widget.userProfile,
+                size: 32,
+                backgroundColor: const Color(0xFF8B5CF6),
               ),
               const SizedBox(width: 8),
-              const Column(
+              Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Admin User', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  Text('Super Administrator', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                  Text(
+                    widget.userProfile.fullName.isNotEmpty ? widget.userProfile.fullName : 'Admin User',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    widget.userProfile.isSuperAdmin ? 'Super Administrator' : 'Administrator',
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
                 ],
               ),
             ],

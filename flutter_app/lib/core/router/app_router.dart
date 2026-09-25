@@ -77,6 +77,20 @@ UserProfileModel _getEffectiveProfile() {
   if (SupabaseService.activeUserSession != null) {
     return SupabaseService.activeUserSession!;
   }
+  final user = SupabaseService.client.auth.currentUser;
+  if (user != null) {
+    final meta = user.userMetadata ?? {};
+    return UserProfileModel(
+      id: user.id,
+      email: user.email ?? 'student@cosmyra.edu',
+      fullName: (meta['full_name'] ?? meta['name'] ?? user.email?.split('@').first ?? 'Student').toString(),
+      avatarUrl: (meta['avatar_url'] ?? meta['picture'] ?? meta['photo_url'])?.toString(),
+      phoneNumber: (user.phone ?? meta['phone'] ?? meta['phone_number'])?.toString(),
+      role: 'student',
+      targetExam: 'NEET',
+      targetYear: 2026,
+    );
+  }
   return SupabaseService.getMockProfile(role: 'student');
 }
 
@@ -84,17 +98,40 @@ UserProfileModel _getEffectiveAdminProfile() {
   if (SupabaseService.activeUserSession != null) {
     return SupabaseService.activeUserSession!;
   }
-  return SupabaseService.getMockProfile(role: 'admin');
+  final user = SupabaseService.client.auth.currentUser;
+  if (user != null) {
+    final meta = user.userMetadata ?? {};
+    return UserProfileModel(
+      id: user.id,
+      email: user.email ?? '1mdollar2027@gmail.com',
+      fullName: (meta['full_name'] ?? meta['name'] ?? 'Mahboob 1md Admin').toString(),
+      avatarUrl: (meta['avatar_url'] ?? meta['picture'] ?? meta['photo_url'])?.toString(),
+      phoneNumber: (user.phone ?? meta['phone'] ?? meta['phone_number'])?.toString(),
+      role: 'superadmin',
+      targetExam: 'NEET & JEE',
+      targetYear: 2026,
+    );
+  }
+  return UserProfileModel(
+    id: 'usr-superadmin-01',
+    email: '1mdollar2027@gmail.com',
+    fullName: 'Mahboob 1md Admin',
+    role: 'superadmin',
+    targetExam: 'NEET & JEE',
+    targetYear: 2026,
+  );
 }
 
 final GoRouter appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
   initialLocation: '/',
   debugLogDiagnostics: true,
+  refreshListenable: SupabaseService.authNotifier,
   errorBuilder: (context, state) => NotFoundScreen(path: state.uri.toString()),
   redirect: (BuildContext context, GoRouterState state) {
     final session = SupabaseService.activeUserSession;
-    final bool isLoggedIn = session != null;
+    final bool hasSupabaseSession = SupabaseService.client.auth.currentSession != null;
+    final bool isLoggedIn = session != null || hasSupabaseSession;
     final String path = state.uri.path;
 
     // 1. Admin route protection: /admin and all /admin/*
@@ -103,9 +140,9 @@ final GoRouter appRouter = GoRouter(
         final dest = state.uri.toString();
         return '/login?redirect=${Uri.encodeComponent(dest)}';
       }
-      final role = session.role.toLowerCase();
-      final bool isAdmin = role == 'admin' || role == 'superadmin' || session.isAdmin || session.isSuperAdmin;
-      if (!isAdmin) {
+      final role = session?.role.toLowerCase() ?? '';
+      final bool isAdmin = role == 'admin' || role == 'superadmin' || (session?.isAdmin ?? false) || (session?.isSuperAdmin ?? false);
+      if (!isAdmin && session != null) {
         // Non-admin signed-in user is blocked from admin dashboard
         return '/dashboard';
       }
@@ -131,15 +168,15 @@ final GoRouter appRouter = GoRouter(
       }
     }
 
-    // 3. Auth routes: /login, /signup
-    if (path == '/login' || path == '/signup') {
+    // 3. Auth & Landing routes: if user logs in, auto redirect to destination or dashboard/admin
+    if (path == '/' || path == '/landing' || path == '/login' || path == '/signup') {
       if (isLoggedIn) {
         final redirectParam = state.uri.queryParameters['redirect'];
-        if (redirectParam != null && redirectParam.trim().isNotEmpty && redirectParam != '/login' && redirectParam != '/signup') {
+        if (redirectParam != null && redirectParam.trim().isNotEmpty && redirectParam != '/login' && redirectParam != '/signup' && redirectParam != '/' && redirectParam != '/landing') {
           return redirectParam;
         }
-        final role = session.role.toLowerCase();
-        final bool isAdmin = role == 'admin' || role == 'superadmin' || session.isAdmin || session.isSuperAdmin;
+        final role = session?.role.toLowerCase() ?? '';
+        final bool isAdmin = role == 'admin' || role == 'superadmin' || (session?.isAdmin ?? false) || (session?.isSuperAdmin ?? false);
         return isAdmin ? '/admin' : '/dashboard';
       }
     }

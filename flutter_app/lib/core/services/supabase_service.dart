@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/models.dart';
@@ -19,6 +20,7 @@ class SupabaseService {
   );
 
   static bool _isInitialized = false;
+  static final ValueNotifier<UserProfileModel?> authNotifier = ValueNotifier<UserProfileModel?>(null);
 
   static SupabaseClient get client => Supabase.instance.client;
 
@@ -30,29 +32,77 @@ class SupabaseService {
         anonKey: supabaseAnonKey,
       );
       _isInitialized = true;
+
+      // Handle OAuth deep link callbacks and real-time auth changes
+      client.auth.onAuthStateChange.listen((data) async {
+        final AuthChangeEvent event = data.event;
+        final Session? session = data.session;
+        debugPrint('Supabase AuthStateChange event: $event (User: ${session?.user.email})');
+
+        if (event == AuthChangeEvent.signedIn ||
+            event == AuthChangeEvent.userUpdated ||
+            event == AuthChangeEvent.tokenRefreshed ||
+            event == AuthChangeEvent.initialSession) {
+          if (session?.user != null) {
+            final profile = await getCurrentUser();
+            if (profile != null) {
+              await setActiveUserSession(profile);
+            }
+          }
+        } else if (event == AuthChangeEvent.signedOut) {
+          activeUserSession = null;
+          authNotifier.value = null;
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.remove('cosmyra_active_user_session');
+          } catch (_) {}
+        }
+      });
     } catch (e) {
       debugPrint('Supabase init warning: $e');
     }
     await _loadTaxonomyFromLocalStorage();
     try {
-      await getCurrentUser();
+      final initialProfile = await getCurrentUser();
+      if (initialProfile != null) {
+        authNotifier.value = initialProfile;
+      }
     } catch (_) {}
   }
 
   static final List<UserProfileModel> _localRegisteredUsers = [];
 
   static Future<void> addLocalUser(UserProfileModel user) async {
-    if (!_localRegisteredUsers.any((u) => u.email.toLowerCase() == user.email.toLowerCase())) {
+    final idx = _localRegisteredUsers.indexWhere((u) => u.email.toLowerCase() == user.email.toLowerCase() || u.id == user.id);
+    if (idx != -1) {
+      _localRegisteredUsers[idx] = user;
+    } else {
       _localRegisteredUsers.insert(0, user);
     }
     try {
       final prefs = await SharedPreferences.getInstance();
       final currentList = prefs.getStringList('cosmyra_registered_users_list_v2') ?? [];
-      final encoded = jsonEncode(user.toJson());
-      if (!currentList.contains(encoded)) {
-        currentList.insert(0, encoded);
-        await prefs.setStringList('cosmyra_registered_users_list_v2', currentList);
+      final updatedList = <String>[];
+      bool replaced = false;
+      for (final raw in currentList) {
+        try {
+          final decoded = jsonDecode(raw) as Map<String, dynamic>;
+          final uEmail = (decoded['email'] ?? '').toString().toLowerCase();
+          final uId = (decoded['id'] ?? '').toString();
+          if (uEmail == user.email.toLowerCase() || (uId.isNotEmpty && uId == user.id)) {
+            updatedList.add(jsonEncode(user.toJson()));
+            replaced = true;
+          } else {
+            updatedList.add(raw);
+          }
+        } catch (_) {
+          updatedList.add(raw);
+        }
       }
+      if (!replaced) {
+        updatedList.insert(0, jsonEncode(user.toJson()));
+      }
+      await prefs.setStringList('cosmyra_registered_users_list_v2', updatedList);
     } catch (e) {
       debugPrint('Error storing user to SharedPreferences: $e');
     }
@@ -201,9 +251,11 @@ class SupabaseService {
 
   static Future<void> setActiveUserSession(UserProfileModel profile) async {
     activeUserSession = profile;
+    authNotifier.value = profile;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cosmyra_active_user_session', jsonEncode(profile.toJson()));
+      await prefs.setBool('cosmyra_user_is_logged_out', false);
       debugPrint('Active user session persisted: ${profile.fullName} (${profile.email})');
     } catch (e) {
       debugPrint('Error saving active user session: $e');
@@ -211,20 +263,133 @@ class SupabaseService {
   }
 
   static Future<void> updateProfile(UserProfileModel profile) async {
-    await setActiveUserSession(profile);
+    final currentAuthUser = client.auth.currentUser;
+    final realId = (currentAuthUser != null && currentAuthUser.id.isNotEmpty)
+        ? currentAuthUser.id
+        : (profile.id.isNotEmpty ? profile.id : 'usr-${DateTime.now().millisecondsSinceEpoch}');
+
+    final cleanPhone = (profile.phoneNumber ?? '').trim();
+    final updatedProfile = profile.copyWith(
+      id: realId,
+      phoneNumber: cleanPhone.isNotEmpty ? cleanPhone : profile.phoneNumber,
+    );
+
+    await setActiveUserSession(updatedProfile);
+    await addLocalUser(updatedProfile);
+
+    // 1. Call custom Supabase RPC to synchronize auth.users phone & metadata with SECURITY DEFINER
+    if (cleanPhone.isNotEmpty || (updatedProfile.avatarUrl != null && updatedProfile.avatarUrl!.isNotEmpty)) {
+      try {
+        await client.rpc('sync_user_phone', params: {
+          'phone_input': cleanPhone,
+          'avatar_input': updatedProfile.avatarUrl ?? '',
+          'name_input': updatedProfile.fullName,
+        });
+      } catch (rpcErr) {
+        debugPrint('Supabase RPC sync_user_phone note: $rpcErr');
+      }
+    }
+
+    // 2. Update Supabase Auth User & Metadata
     try {
-      await client.from('profiles').upsert(profile.toJson());
-    } catch (e) {
-      debugPrint('Notice updating Supabase profile: $e');
+      if (client.auth.currentUser != null) {
+        try {
+          await client.auth.updateUser(
+            UserAttributes(
+              phone: cleanPhone.isNotEmpty ? cleanPhone : null,
+              data: {
+                'phone': cleanPhone,
+                'phone_number': cleanPhone,
+                'mobile': cleanPhone,
+                if (updatedProfile.avatarUrl != null && updatedProfile.avatarUrl!.isNotEmpty)
+                  'avatar_url': updatedProfile.avatarUrl,
+                if (updatedProfile.avatarUrl != null && updatedProfile.avatarUrl!.isNotEmpty)
+                  'picture': updatedProfile.avatarUrl,
+                'full_name': updatedProfile.fullName,
+                'target_exam': updatedProfile.targetExam,
+                'target_year': updatedProfile.targetYear,
+              },
+            ),
+          );
+        } catch (phoneAttrErr) {
+          debugPrint('Auth updateUser with phone attribute note: $phoneAttrErr');
+          await client.auth.updateUser(
+            UserAttributes(
+              data: {
+                'phone': cleanPhone,
+                'phone_number': cleanPhone,
+                'mobile': cleanPhone,
+                if (updatedProfile.avatarUrl != null && updatedProfile.avatarUrl!.isNotEmpty)
+                  'avatar_url': updatedProfile.avatarUrl,
+                if (updatedProfile.avatarUrl != null && updatedProfile.avatarUrl!.isNotEmpty)
+                  'picture': updatedProfile.avatarUrl,
+                'full_name': updatedProfile.fullName,
+                'target_exam': updatedProfile.targetExam,
+                'target_year': updatedProfile.targetYear,
+              },
+            ),
+          );
+        }
+      }
+    } catch (authErr) {
+      debugPrint('Notice updating Supabase auth user: $authErr');
+    }
+
+    // 2. Upsert to Supabase profiles table with column fallbacks
+    final Map<String, dynamic> fullPayload = {
+      'id': realId,
+      'email': updatedProfile.email.trim().toLowerCase(),
+      'full_name': updatedProfile.fullName,
+      'target_exam': updatedProfile.targetExam,
+      'target_year': updatedProfile.targetYear,
+      'role': updatedProfile.role,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    if (updatedProfile.avatarUrl != null && updatedProfile.avatarUrl!.isNotEmpty) {
+      fullPayload['avatar_url'] = updatedProfile.avatarUrl;
+    }
+    if (cleanPhone.isNotEmpty) {
+      fullPayload['phone_number'] = cleanPhone;
+      fullPayload['phone'] = cleanPhone;
+    }
+
+    bool upsertSuccess = false;
+    try {
+      await client.from('profiles').upsert(fullPayload, onConflict: 'id');
+      upsertSuccess = true;
+    } catch (e1) {
+      debugPrint('Profiles upsert by id note: $e1');
+      try {
+        await client.from('profiles').upsert(fullPayload, onConflict: 'email');
+        upsertSuccess = true;
+      } catch (e2) {
+        debugPrint('Profiles upsert by email note: $e2');
+      }
+    }
+
+    if (!upsertSuccess && cleanPhone.isNotEmpty) {
+      try {
+        final p1 = Map<String, dynamic>.from(fullPayload)..remove('phone');
+        await client.from('profiles').upsert(p1, onConflict: 'id');
+        upsertSuccess = true;
+      } catch (_) {
+        try {
+          final p2 = Map<String, dynamic>.from(fullPayload)..remove('phone_number');
+          await client.from('profiles').upsert(p2, onConflict: 'id');
+          upsertSuccess = true;
+        } catch (_) {}
+      }
     }
   }
 
   static Future<void> logoutUserSession() async {
     activeUserSession = null;
+    authNotifier.value = null;
     try {
       await client.auth.signOut();
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('cosmyra_active_user_session');
+      await prefs.setBool('cosmyra_user_is_logged_out', true);
       debugPrint('Active user session cleared.');
     } catch (e) {
       debugPrint('Error logging out session: $e');
@@ -313,17 +478,116 @@ class SupabaseService {
 
   static Future<bool> signInWithGoogle() async {
     try {
-      final base = kIsWeb
-          ? (Uri.base.origin.contains('localhost') ? 'https://neet-jee.in' : Uri.base.origin)
-          : 'io.supabase.cosmyra://login-callback';
-      final redirectUrl = '$base/dashboard';
-      return await client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: redirectUrl,
-        authScreenLaunchMode: LaunchMode.externalApplication,
+      if (kIsWeb) {
+        final redirectUrl = Uri.base.origin.contains('localhost')
+            ? 'https://neet-jee.in/dashboard'
+            : '${Uri.base.origin}/dashboard';
+        return await client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: redirectUrl,
+          authScreenLaunchMode: LaunchMode.platformDefault,
+        );
+      }
+
+      // 1. Native Mobile Google Sign-In (no browser window redirect)
+      const String webClientId = '672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com';
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        serverClientId: webClientId,
+        scopes: ['email', 'profile'],
       );
+
+      // Sign out first to ensure account chooser dialog appears
+      try {
+        await googleSignIn.signOut();
+      } catch (_) {}
+
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        // User cancelled account selection
+        return false;
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final String? idToken = googleAuth.idToken;
+      final String? accessToken = googleAuth.accessToken;
+
+      bool signedInWithSupabase = false;
+
+      // 2. Try Supabase cloud signInWithIdToken if token is available
+      if (idToken != null && idToken.isNotEmpty) {
+        try {
+          final authRes = await client.auth.signInWithIdToken(
+            provider: OAuthProvider.google,
+            idToken: idToken,
+            accessToken: accessToken,
+          );
+          if (authRes.user != null) {
+            signedInWithSupabase = true;
+          }
+        } catch (idTokenErr) {
+          debugPrint('Supabase signInWithIdToken note: $idTokenErr');
+        }
+      }
+
+      if (signedInWithSupabase) {
+        final profile = await getCurrentUser();
+        if (profile != null) {
+          await setActiveUserSession(profile);
+          return true;
+        }
+      }
+
+      // 3. Native verified Google user profile creation & session activation
+      final String userEmail = googleUser.email.trim().toLowerCase();
+      final String userName = (googleUser.displayName != null && googleUser.displayName!.trim().isNotEmpty)
+          ? googleUser.displayName!.trim()
+          : (userEmail.contains('@') ? userEmail.split('@').first : 'Aspirant');
+      final String? userPhoto = googleUser.photoUrl;
+      final String userId = googleUser.id.isNotEmpty
+          ? '00000000-0000-4000-a000-${googleUser.id.padLeft(12, '0').substring(0, 12)}'
+          : 'usr-g-${DateTime.now().millisecondsSinceEpoch}';
+
+      final googleProfile = UserProfileModel(
+        id: userId,
+        email: userEmail,
+        fullName: userName,
+        avatarUrl: userPhoto,
+        targetExam: 'NEET',
+        targetYear: 2026,
+        role: userEmail == '1mdollar2027@gmail.com' ? 'superadmin' : 'student',
+      );
+
+      try {
+        await client.from('profiles').upsert({
+          'id': userId,
+          'email': userEmail,
+          'full_name': userName,
+          if (userPhoto != null && userPhoto.isNotEmpty) 'avatar_url': userPhoto,
+          'target_exam': 'NEET',
+          'target_year': 2026,
+          'role': googleProfile.role,
+        }, onConflict: 'id');
+      } catch (upsertErr) {
+        debugPrint('Supabase profile sync note: $upsertErr');
+        try {
+          await client.from('profiles').upsert({
+            'id': userId,
+            'email': userEmail,
+            'full_name': userName,
+            if (userPhoto != null && userPhoto.isNotEmpty) 'avatar_url': userPhoto,
+            'target_exam': 'NEET',
+            'target_year': 2026,
+            'role': googleProfile.role,
+          }, onConflict: 'email');
+        } catch (_) {}
+      }
+
+      final ensured = _ensureSuperAdminRole(googleProfile);
+      await addLocalUser(ensured);
+      await setActiveUserSession(ensured);
+      return true;
     } catch (e) {
-      debugPrint('Google OAuth error: $e');
+      debugPrint('Native Google Sign-In error: $e');
       rethrow;
     }
   }
@@ -360,26 +624,51 @@ class SupabaseService {
       }
 
       if (user != null) {
+        final meta = user.userMetadata ?? {};
+        final googleName = (meta['full_name'] ?? meta['name'] ?? meta['user_name'] ?? user.email?.split('@').first ?? 'Aspirant').toString();
+        final googleAvatar = (meta['avatar_url'] ?? meta['picture'] ?? meta['avatar'] ?? '').toString();
+        final userPhone = (user.phone ?? meta['phone'] ?? meta['phone_number'] ?? meta['mobile'] ?? '').toString();
+        final userEmail = user.email ?? '';
+
         final res = await client.from('profiles').select('*').eq('id', user.id).maybeSingle();
         if (res != null) {
-          final profile = _ensureSuperAdminRole(UserProfileModel.fromJson(res));
-          await setActiveUserSession(profile);
-          return profile;
+          var profile = UserProfileModel.fromJson(res);
+          bool needsDbUpdate = false;
+          final updateFields = <String, dynamic>{};
+
+          if ((profile.avatarUrl == null || profile.avatarUrl!.isEmpty) && googleAvatar.isNotEmpty) {
+            profile = profile.copyWith(avatarUrl: googleAvatar);
+            updateFields['avatar_url'] = googleAvatar;
+            needsDbUpdate = true;
+          }
+          if ((profile.phoneNumber == null || profile.phoneNumber!.isEmpty) && userPhone.isNotEmpty) {
+            profile = profile.copyWith(phoneNumber: userPhone);
+            updateFields['phone_number'] = userPhone;
+            needsDbUpdate = true;
+          }
+          if (needsDbUpdate) {
+            try {
+              await client.from('profiles').update(updateFields).eq('id', user.id);
+            } catch (e) {
+              debugPrint('Notice syncing backfilled metadata to profiles table: $e');
+            }
+          }
+
+          final ensured = _ensureSuperAdminRole(profile);
+          await addLocalUser(ensured);
+          await setActiveUserSession(ensured);
+          return ensured;
         } else {
           // Newly logged in OAuth user (e.g. Google Sign-In)
-          final meta = user.userMetadata ?? {};
-          final googleName = (meta['full_name'] ?? meta['name'] ?? meta['user_name'] ?? user.email?.split('@').first ?? 'Aspirant').toString();
-          final googleAvatar = (meta['avatar_url'] ?? meta['picture'] ?? '').toString();
-          final userEmail = user.email ?? '';
-
           final newProfile = UserProfileModel(
             id: user.id,
             email: userEmail,
             fullName: googleName,
             avatarUrl: googleAvatar.isNotEmpty ? googleAvatar : null,
+            phoneNumber: userPhone.isNotEmpty ? userPhone : null,
             targetExam: 'NEET',
             targetYear: 2026,
-            role: 'student',
+            role: userEmail.toLowerCase() == '1mdollar2027@gmail.com' ? 'superadmin' : 'student',
           );
 
           try {
@@ -387,16 +676,18 @@ class SupabaseService {
               'id': user.id,
               'email': userEmail,
               'full_name': googleName,
-              'avatar_url': googleAvatar.isNotEmpty ? googleAvatar : null,
+              if (googleAvatar.isNotEmpty) 'avatar_url': googleAvatar,
+              if (userPhone.isNotEmpty) 'phone_number': userPhone,
               'target_exam': 'NEET',
               'target_year': 2026,
-              'role': 'student',
-            });
+              'role': newProfile.role,
+            }, onConflict: 'id');
           } catch (pe) {
             debugPrint('Error upserting Google OAuth profile to Supabase: $pe');
           }
 
           final ensured = _ensureSuperAdminRole(newProfile);
+          await addLocalUser(ensured);
           await setActiveUserSession(ensured);
           return ensured;
         }
@@ -470,21 +761,75 @@ class SupabaseService {
     ];
 
     final deletedIds = await getDeletedUserIds();
-    final combined = <UserProfileModel>[];
-    final seenEmails = <String>{};
+    final Map<String, UserProfileModel> profileMap = {};
 
-    for (final p in [..._localRegisteredUsers, ...persistedUsers, ...remoteProfiles, ...defaultProfiles]) {
+    // 1. Defaults
+    for (final p in defaultProfiles) {
+      final em = p.email.toLowerCase().trim();
+      if (em.isNotEmpty) profileMap[em] = p;
+    }
+
+    // 2. Persisted & Local Users
+    for (final p in [..._localRegisteredUsers, ...persistedUsers]) {
+      final em = p.email.toLowerCase().trim();
+      if (em.isNotEmpty) {
+        final existing = profileMap[em];
+        final phone = (p.phoneNumber != null && p.phoneNumber!.trim().isNotEmpty)
+            ? p.phoneNumber
+            : existing?.phoneNumber;
+        final avatar = (p.avatarUrl != null && p.avatarUrl!.trim().isNotEmpty)
+            ? p.avatarUrl
+            : existing?.avatarUrl;
+        profileMap[em] = p.copyWith(
+          phoneNumber: phone,
+          avatarUrl: avatar,
+        );
+      }
+    }
+
+    // 3. Live Supabase Database Profiles (Source of truth)
+    for (final p in remoteProfiles) {
+      final em = p.email.toLowerCase().trim();
+      if (em.isNotEmpty) {
+        final existing = profileMap[em];
+        final phone = (p.phoneNumber != null && p.phoneNumber!.trim().isNotEmpty)
+            ? p.phoneNumber
+            : existing?.phoneNumber;
+        final avatar = (p.avatarUrl != null && p.avatarUrl!.trim().isNotEmpty)
+            ? p.avatarUrl
+            : existing?.avatarUrl;
+        profileMap[em] = p.copyWith(
+          phoneNumber: phone,
+          avatarUrl: avatar,
+        );
+      }
+    }
+
+    // 4. Inject active session & auth metadata if present
+    if (activeUserSession != null && activeUserSession!.email.isNotEmpty) {
+      final em = activeUserSession!.email.toLowerCase().trim();
+      final existing = profileMap[em];
+      if (existing != null) {
+        profileMap[em] = existing.copyWith(
+          avatarUrl: (activeUserSession!.avatarUrl != null && activeUserSession!.avatarUrl!.isNotEmpty)
+              ? activeUserSession!.avatarUrl
+              : existing.avatarUrl,
+          phoneNumber: (activeUserSession!.phoneNumber != null && activeUserSession!.phoneNumber!.isNotEmpty)
+              ? activeUserSession!.phoneNumber
+              : existing.phoneNumber,
+        );
+      }
+    }
+
+    final combined = <UserProfileModel>[];
+    for (final p in profileMap.values) {
       final pid = p.id.toLowerCase().trim();
       final pemail = p.email.toLowerCase().trim();
       final pname = p.fullName.toLowerCase().trim();
-
       if (deletedIds.contains(pid) || deletedIds.contains(pemail) || deletedIds.contains(pname)) {
         continue;
       }
-      if (p.email.isNotEmpty && !seenEmails.contains(pemail)) {
-        seenEmails.add(pemail);
-        combined.add(p);
-      }
+      combined.add(p);
     }
 
     return combined;

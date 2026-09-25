@@ -26,3 +26,6 @@ flutter_app/ios/Flutter/Flutter.framework
 flutter_app/ios/Flutter/Flutter.podspec
 .github/
 *.apk
+.tmp.driveupload/
+.tmp.drivedownload/
+.tmp.*/

@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../shared/widgets/app_avatar.dart';
 import '../../shared/utils/smooth_page_route.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_user_management_screen.dart';
@@ -412,17 +413,24 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
               ),
               IconButton(icon: const Icon(Icons.help_outline_rounded, size: 20, color: Color(0xFF64748B)), onPressed: () {}),
               const SizedBox(width: 12),
-              const CircleAvatar(
-                radius: 16,
-                backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=33'),
+              AppAvatar.fromProfile(
+                widget.userProfile,
+                size: 32,
+                backgroundColor: const Color(0xFF6366F1),
               ),
               const SizedBox(width: 8),
-              const Column(
+              Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Admin', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  Text('Super Admin', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                  Text(
+                    widget.userProfile.fullName.isNotEmpty ? widget.userProfile.fullName : 'Admin User',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    widget.userProfile.isSuperAdmin ? 'Super Administrator' : 'Administrator',
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
                 ],
               ),
             ],

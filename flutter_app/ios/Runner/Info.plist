@@ -28,6 +28,17 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>io.supabase.cosmyra</string>
+			</array>
+		</dict>
+	</array>
 
 	<!-- Essential Exam App Permission Descriptions -->
 	<key>NSCameraUsageDescription</key>

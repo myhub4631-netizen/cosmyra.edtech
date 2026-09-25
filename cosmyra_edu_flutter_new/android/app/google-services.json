@@ -12,7 +12,20 @@
           "package_name": "com.cosmyra.neetjee"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "672019832931-j5sb6fhh0con0s4lgmponouu41333loi.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cosmyra.neetjee",
+            "certificate_hash": "1231063aaad4f00a4f545c27860f63322bc7fe2d"
+          }
+        },
+        {
+          "client_id": "672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAP1bSXD1ho4dLeamygyeTbLCO3FLxoxfs"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

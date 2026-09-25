@@ -1347,22 +1347,23 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       {'icon': Icons.person_outline_rounded, 'label': 'Profile'},
     ];
 
-    return SafeArea(
-      top: false,
-      bottom: true,
-      child: Container(
-        height: 64,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: const Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0F172A).withOpacity(0.06),
-              blurRadius: 10,
-              offset: const Offset(0, -3),
-            ),
-          ],
-        ),
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, -3),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.only(bottom: bottomPadding),
+      child: SizedBox(
+        height: 60,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: List.generate(navs.length, (idx) {
@@ -1395,7 +1396,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               },
               borderRadius: BorderRadius.circular(12),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: isSelected ? const Color(0xFFF3E8FF) : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
@@ -1405,14 +1406,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   children: [
                     Icon(
                       item['icon'] as IconData,
-                      size: 21,
+                      size: 20,
                       color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       item['label'] as String,
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 10,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                         color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
                       ),

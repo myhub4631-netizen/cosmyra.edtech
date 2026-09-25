@@ -352,11 +352,25 @@ class _LoginScreenState extends State<LoginScreen> {
                       iconWidget: _buildGoogleLogo(),
                       onTap: () async {
                         try {
-                          await SupabaseService.signInWithGoogle();
+                          final success = await SupabaseService.signInWithGoogle();
+                          if (success && mounted) {
+                            final profile = SupabaseService.activeUserSession;
+                            if (profile != null) {
+                              widget.onLoginSuccess?.call(profile);
+                            }
+                            if (profile != null && (profile.isAdmin || profile.isSuperAdmin)) {
+                              context.go('/admin');
+                            } else {
+                              context.go('/dashboard');
+                            }
+                          }
                         } catch (e) {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Google Sign In: $e')),
+                              SnackBar(
+                                content: Text('Google Sign In: $e'),
+                                backgroundColor: const Color(0xFFDC2626),
+                              ),
                             );
                           }
                         }

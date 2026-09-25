@@ -230,11 +230,22 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
                           borderRadius: BorderRadius.circular(12),
                           onTap: () async {
                             try {
-                              await SupabaseService.signInWithGoogle();
+                              final success = await SupabaseService.signInWithGoogle();
+                              if (success && context.mounted) {
+                                final profile = SupabaseService.activeUserSession;
+                                if (profile != null && (profile.isAdmin || profile.isSuperAdmin)) {
+                                  context.go('/admin');
+                                } else {
+                                  context.go('/dashboard');
+                                }
+                              }
                             } catch (e) {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Google Sign In: $e')),
+                                  SnackBar(
+                                    content: Text('Google Sign In: $e'),
+                                    backgroundColor: const Color(0xFFDC2626),
+                                  ),
                                 );
                               }
                             }

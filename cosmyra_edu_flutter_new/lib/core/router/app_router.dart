@@ -77,7 +77,37 @@ final GoRouter appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
   initialLocation: '/',
   debugLogDiagnostics: true,
+  refreshListenable: SupabaseService.authNotifier,
   errorBuilder: (context, state) => NotFoundScreen(path: state.uri.toString()),
+  redirect: (BuildContext context, GoRouterState state) {
+    final session = SupabaseService.activeUserSession;
+    final bool hasSupabaseSession = SupabaseService.client.auth.currentSession != null;
+    final bool isLoggedIn = session != null || hasSupabaseSession;
+    final String path = state.uri.path;
+
+    if (path == '/admin' || path.startsWith('/admin/')) {
+      if (!isLoggedIn) {
+        return '/login?redirect=${Uri.encodeComponent(state.uri.toString())}';
+      }
+      final role = session?.role.toLowerCase() ?? '';
+      final bool isAdmin = role == 'admin' || role == 'superadmin' || (session?.isAdmin ?? false) || (session?.isSuperAdmin ?? false);
+      if (!isAdmin && session != null) return '/dashboard';
+    }
+
+    if (path == '/' || path == '/landing' || path == '/login' || path == '/signup') {
+      if (isLoggedIn) {
+        final redirectParam = state.uri.queryParameters['redirect'];
+        if (redirectParam != null && redirectParam.trim().isNotEmpty && redirectParam != '/login' && redirectParam != '/signup' && redirectParam != '/' && redirectParam != '/landing') {
+          return redirectParam;
+        }
+        final role = session?.role.toLowerCase() ?? '';
+        final bool isAdmin = role == 'admin' || role == 'superadmin' || (session?.isAdmin ?? false) || (session?.isSuperAdmin ?? false);
+        return isAdmin ? '/admin' : '/dashboard';
+      }
+    }
+
+    return null;
+  },
   routes: [
     // =========================================================================
     // PUBLIC & AUTHENTICATION ROUTES

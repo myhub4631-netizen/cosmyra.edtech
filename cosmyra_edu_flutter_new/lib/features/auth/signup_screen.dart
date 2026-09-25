@@ -735,11 +735,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       try {
-                        await SupabaseService.signInWithGoogle();
+                        final success = await SupabaseService.signInWithGoogle();
+                        if (success && context.mounted) {
+                          final profile = SupabaseService.activeUserSession;
+                          if (profile != null) {
+                            widget.onSignUpSuccess?.call(profile);
+                          }
+                          if (profile != null && (profile.isAdmin || profile.isSuperAdmin)) {
+                            context.go('/admin');
+                          } else {
+                            context.go('/dashboard');
+                          }
+                        }
                       } catch (e) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Google Sign In: $e')),
+                            SnackBar(
+                              content: Text('Google Sign In: $e'),
+                              backgroundColor: const Color(0xFFDC2626),
+                            ),
                           );
                         }
                       }

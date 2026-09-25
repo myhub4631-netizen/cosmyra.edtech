@@ -7,6 +7,7 @@ import 'dart:convert';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/latex_view.dart';
+import '../../shared/widgets/app_avatar.dart';
 import 'admin_question_builder_screen.dart';
 import 'admin_pdf_import_screen.dart';
 import 'admin_bulk_upload_step1_screen.dart';
@@ -1382,23 +1383,23 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
               // Admin User Profile Avatar
               Row(
                 children: [
-                  const CircleAvatar(
-                    radius: 17,
-                    backgroundColor: Color(0xFFEEF2FF),
-                    child: Icon(Icons.person_rounded, color: Color(0xFF4F46E5), size: 20),
+                  AppAvatar.fromProfile(
+                    widget.userProfile,
+                    size: 34,
+                    backgroundColor: const Color(0xFF4F46E5),
                   ),
                   const SizedBox(width: 10),
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
-                        'Admin User',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        widget.userProfile.fullName.isNotEmpty ? widget.userProfile.fullName : 'Admin User',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                       ),
                       Text(
-                        'Super Admin',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                        widget.userProfile.isSuperAdmin ? 'Super Administrator' : 'Administrator',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                       ),
                     ],
                   ),

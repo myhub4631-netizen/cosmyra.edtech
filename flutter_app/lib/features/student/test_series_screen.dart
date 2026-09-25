@@ -1781,21 +1781,25 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   // 8. BOTTOM NAVIGATION BAR
   // ===========================================================================
   Widget _buildBottomNavBar() {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
     return Container(
-      height: 60,
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem(Icons.home_outlined, 'Home', false, 0),
-          _buildNavItem(Icons.track_changes_outlined, 'Practice', false, 1),
-          _buildNavItem(Icons.calendar_today_rounded, 'Test Series', true, 2),
-          _buildNavItem(Icons.bar_chart_rounded, 'Analytics', false, 5),
-          _buildNavItem(Icons.person_outline_rounded, 'Profile', false, 7),
-        ],
+      padding: EdgeInsets.only(bottom: bottomPadding),
+      child: SizedBox(
+        height: 60,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(Icons.home_outlined, 'Home', false, 0),
+            _buildNavItem(Icons.track_changes_outlined, 'Practice', false, 1),
+            _buildNavItem(Icons.calendar_today_rounded, 'Test Series', true, 2),
+            _buildNavItem(Icons.bar_chart_rounded, 'Analytics', false, 5),
+            _buildNavItem(Icons.person_outline_rounded, 'Profile', false, 7),
+          ],
+        ),
       ),
     );
   }

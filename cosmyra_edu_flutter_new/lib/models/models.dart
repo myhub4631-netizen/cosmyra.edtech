@@ -119,9 +119,37 @@ class UserProfileModel {
     return UserProfileModel(
       id: json['id'] ?? '',
       email: json['email'] ?? '',
-      fullName: json['full_name'] ?? json['fullName'] ?? 'Mahboob Hasan',
-      avatarUrl: json['avatar_url'],
-      phoneNumber: json['phone_number'],
+      fullName: (json['full_name'] != null && json['full_name'].toString().trim().isNotEmpty)
+          ? json['full_name'].toString().trim()
+          : (json['fullName'] != null && json['fullName'].toString().trim().isNotEmpty)
+              ? json['fullName'].toString().trim()
+              : (json['email'] != null && json['email'].toString().contains('@'))
+                  ? json['email'].toString().split('@').first
+                  : 'Student',
+      avatarUrl: (json['avatar_url'] != null && json['avatar_url'].toString().trim().isNotEmpty)
+          ? json['avatar_url'].toString().trim()
+          : (json['avatarUrl'] != null && json['avatarUrl'].toString().trim().isNotEmpty)
+              ? json['avatarUrl'].toString().trim()
+              : (json['picture'] != null && json['picture'].toString().trim().isNotEmpty)
+                  ? json['picture'].toString().trim()
+                  : (json['photo_url'] != null && json['photo_url'].toString().trim().isNotEmpty)
+                      ? json['photo_url'].toString().trim()
+                      : (json['photoUrl'] != null && json['photoUrl'].toString().trim().isNotEmpty)
+                          ? json['photoUrl'].toString().trim()
+                          : (json['avatar'] != null && json['avatar'].toString().trim().isNotEmpty)
+                              ? json['avatar'].toString().trim()
+                              : null,
+      phoneNumber: (json['phone_number'] != null && json['phone_number'].toString().trim().isNotEmpty)
+          ? json['phone_number'].toString().trim()
+          : (json['phone'] != null && json['phone'].toString().trim().isNotEmpty)
+              ? json['phone'].toString().trim()
+              : (json['phoneNumber'] != null && json['phoneNumber'].toString().trim().isNotEmpty)
+                  ? json['phoneNumber'].toString().trim()
+                  : (json['mobile'] != null && json['mobile'].toString().trim().isNotEmpty)
+                      ? json['mobile'].toString().trim()
+                      : (json['mobile_number'] != null && json['mobile_number'].toString().trim().isNotEmpty)
+                          ? json['mobile_number'].toString().trim()
+                          : null,
       targetExam: json['target_exam'] ?? 'NEET',
       targetYear: json['target_year'] ?? 2026,
       role: json['role'] ?? 'student',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../shared/widgets/app_avatar.dart';
 import '../../shared/utils/smooth_page_route.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_hierarchy_screen.dart';
@@ -31,6 +32,7 @@ class AdminUserModel {
   String adminNotes;
   final String avatarInitials;
   final Color avatarColor;
+  final String? avatarUrl;
 
   AdminUserModel({
     required this.id,
@@ -48,6 +50,7 @@ class AdminUserModel {
     this.adminNotes = '',
     required this.avatarInitials,
     required this.avatarColor,
+    this.avatarUrl,
   });
 
   AdminUserModel copyWith({
@@ -66,6 +69,7 @@ class AdminUserModel {
     String? adminNotes,
     String? avatarInitials,
     Color? avatarColor,
+    String? avatarUrl,
   }) {
     return AdminUserModel(
       id: id ?? this.id,
@@ -83,6 +87,7 @@ class AdminUserModel {
       adminNotes: adminNotes ?? this.adminNotes,
       avatarInitials: avatarInitials ?? this.avatarInitials,
       avatarColor: avatarColor ?? this.avatarColor,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
     );
   }
 }
@@ -167,15 +172,33 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
           ? finalName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
           : (finalEmail.isNotEmpty ? finalEmail[0].toUpperCase() : 'U');
 
-      final realPhone = (p.phoneNumber != null &&
-              p.phoneNumber!.trim().isNotEmpty &&
-              p.phoneNumber != '+91 98765 43210')
-          ? p.phoneNumber!.trim()
-          : '';
+      final realPhone = (edit != null && edit['phone'] != null && edit['phone']!.isNotEmpty)
+          ? edit['phone']!
+          : ((p.phoneNumber != null &&
+                  p.phoneNumber!.trim().isNotEmpty &&
+                  p.phoneNumber != '+91 98765 43210')
+              ? p.phoneNumber!.trim()
+              : '');
       final exam = p.targetExam.isNotEmpty ? p.targetExam : 'NEET';
       final year = p.targetYear > 0 ? p.targetYear : 2026;
       final classLvl = (p.classLevel.isNotEmpty && p.classLevel != 'Dropper') ? ' • ${p.classLevel}' : '';
       final realCohort = '$exam $year$classLvl';
+
+      String? userAvatar = p.avatarUrl;
+      if (userAvatar == null || userAvatar.isEmpty) {
+        if (em == SupabaseService.activeUserSession?.email.toLowerCase().trim()) {
+          userAvatar = SupabaseService.activeUserSession?.avatarUrl;
+        }
+      }
+      if (userAvatar == null || userAvatar.isEmpty) {
+        final currentAuth = SupabaseService.client.auth.currentUser;
+        if (currentAuth != null && currentAuth.email?.toLowerCase().trim() == em) {
+          final meta = currentAuth.userMetadata;
+          if (meta != null) {
+            userAvatar = (meta['avatar_url'] ?? meta['picture'] ?? meta['photo_url'] ?? meta['avatar'])?.toString();
+          }
+        }
+      }
 
       return AdminUserModel(
         id: p.id,
@@ -192,6 +215,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         regSource: 'Web Portal',
         avatarInitials: initials,
         avatarColor: finalEmail.toLowerCase().trim() == '1mdollar2027@gmail.com' ? const Color(0xFF6366F1) : const Color(0xFF3B82F6),
+        avatarUrl: userAvatar,
       );
     }).toList();
 
@@ -538,15 +562,10 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
             color: const Color(0xFF0F172A),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 18,
+                AppAvatar.fromProfile(
+                  widget.userProfile,
+                  size: 36,
                   backgroundColor: const Color(0xFF6366F1),
-                  child: Text(
-                    widget.userProfile.fullName.isNotEmpty
-                        ? widget.userProfile.fullName.substring(0, 2).toUpperCase()
-                        : 'AU',
-                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -737,18 +756,24 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
           // Admin User Profile Badge
           Row(
             children: [
-              CircleAvatar(
-                radius: 16,
+              AppAvatar.fromProfile(
+                widget.userProfile,
+                size: 32,
                 backgroundColor: const Color(0xFFC084FC),
-                child: const Text('AU', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(width: 8),
-              const Column(
+              Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Admin User', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
-                  Text('Super Administrator', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                  Text(
+                    widget.userProfile.fullName.isNotEmpty ? widget.userProfile.fullName : 'Admin User',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                  ),
+                  Text(
+                    widget.userProfile.isSuperAdmin ? 'Super Administrator' : 'Administrator',
+                    style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                  ),
                 ],
               ),
             ],
@@ -1384,11 +1409,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: u.avatarColor,
-                          child: Text(u.avatarInitials, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                        ),
+                        _buildUserAvatar(u, size: 34),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
@@ -1396,7 +1417,25 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                             children: [
                               Text(u.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
                               Text(u.email, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                              Text('ID: ${u.userIdCode}', style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                              Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 4,
+                                children: [
+                                  Text('ID: ${u.userIdCode}', style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                                  if (u.phone.trim().isNotEmpty) ...[
+                                    const Text('•', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                                    const Icon(Icons.phone_rounded, size: 10, color: Color(0xFF059669)),
+                                    Text(
+                                      u.phone,
+                                      style: const TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF059669),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ],
                           ),
                         ),
@@ -1660,6 +1699,15 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
     );
   }
 
+  Widget _buildUserAvatar(AdminUserModel u, {double size = 34}) {
+    return AppAvatar(
+      avatarUrl: u.avatarUrl,
+      name: u.name.isNotEmpty ? u.name : (u.email.isNotEmpty ? u.email : 'User'),
+      size: size,
+      backgroundColor: u.avatarColor,
+    );
+  }
+
   // ================= 8. DETAIL INSPECTOR PANEL (RIGHT SIDEOVER) =================
   Widget _buildUserDetailInspectorPanel() {
     final u = _selectedUserForDetail!;
@@ -1688,11 +1736,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
               Expanded(
                 child: Row(
                   children: [
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: u.avatarColor,
-                      child: Text(u.avatarInitials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                    ),
+                    _buildUserAvatar(u, size: 44),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(

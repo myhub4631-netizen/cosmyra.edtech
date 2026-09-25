@@ -7,6 +7,7 @@ import 'package:csv/csv.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/latex_view.dart';
+import '../../shared/widgets/app_avatar.dart';
 import '../../shared/utils/smooth_page_route.dart';
 import 'admin_user_management_screen.dart';
 import 'admin_questions_bank_dashboard.dart';
@@ -493,9 +494,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             ),
             child: Row(
               children: [
-                const CircleAvatar(
-                  radius: 16,
-                  backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=33'),
+                AppAvatar.fromProfile(
+                  widget.userProfile,
+                  size: 32,
+                  backgroundColor: const Color(0xFF6366F1),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -655,9 +657,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 ],
               ),
               const SizedBox(width: 12),
-              const CircleAvatar(
-                radius: 16,
-                backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=33'),
+              AppAvatar.fromProfile(
+                widget.userProfile,
+                size: 32,
+                backgroundColor: const Color(0xFF6366F1),
               ),
               const SizedBox(width: 8),
               Column(
