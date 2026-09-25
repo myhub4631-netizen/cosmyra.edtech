@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../shared/widgets/app_avatar.dart';
 import '../../shared/utils/smooth_page_route.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_hierarchy_screen.dart';
@@ -183,6 +184,22 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
       final classLvl = (p.classLevel.isNotEmpty && p.classLevel != 'Dropper') ? ' • ${p.classLevel}' : '';
       final realCohort = '$exam $year$classLvl';
 
+      String? userAvatar = p.avatarUrl;
+      if (userAvatar == null || userAvatar.isEmpty) {
+        if (em == SupabaseService.activeUserSession?.email.toLowerCase().trim()) {
+          userAvatar = SupabaseService.activeUserSession?.avatarUrl;
+        }
+      }
+      if (userAvatar == null || userAvatar.isEmpty) {
+        final currentAuth = SupabaseService.client.auth.currentUser;
+        if (currentAuth != null && currentAuth.email?.toLowerCase().trim() == em) {
+          final meta = currentAuth.userMetadata;
+          if (meta != null) {
+            userAvatar = (meta['avatar_url'] ?? meta['picture'] ?? meta['photo_url'] ?? meta['avatar'])?.toString();
+          }
+        }
+      }
+
       return AdminUserModel(
         id: p.id,
         name: finalName,
@@ -198,7 +215,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         regSource: 'Web Portal',
         avatarInitials: initials,
         avatarColor: finalEmail.toLowerCase().trim() == '1mdollar2027@gmail.com' ? const Color(0xFF6366F1) : const Color(0xFF3B82F6),
-        avatarUrl: p.avatarUrl,
+        avatarUrl: userAvatar,
       );
     }).toList();
 
@@ -545,15 +562,10 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
             color: const Color(0xFF0F172A),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 18,
+                AppAvatar.fromProfile(
+                  widget.userProfile,
+                  size: 36,
                   backgroundColor: const Color(0xFF6366F1),
-                  child: Text(
-                    widget.userProfile.fullName.isNotEmpty
-                        ? widget.userProfile.fullName.substring(0, 2).toUpperCase()
-                        : 'AU',
-                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -744,18 +756,24 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
           // Admin User Profile Badge
           Row(
             children: [
-              CircleAvatar(
-                radius: 16,
+              AppAvatar.fromProfile(
+                widget.userProfile,
+                size: 32,
                 backgroundColor: const Color(0xFFC084FC),
-                child: const Text('AU', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(width: 8),
-              const Column(
+              Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Admin User', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
-                  Text('Super Administrator', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                  Text(
+                    widget.userProfile.fullName.isNotEmpty ? widget.userProfile.fullName : 'Admin User',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                  ),
+                  Text(
+                    widget.userProfile.isSuperAdmin ? 'Super Administrator' : 'Administrator',
+                    style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                  ),
                 ],
               ),
             ],
@@ -1682,57 +1700,11 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   }
 
   Widget _buildUserAvatar(AdminUserModel u, {double size = 34}) {
-    final hasUrl = u.avatarUrl != null && u.avatarUrl!.trim().isNotEmpty;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: u.avatarColor,
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: hasUrl
-          ? Image.network(
-              u.avatarUrl!,
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Center(
-                  child: Text(
-                    u.avatarInitials,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: size * 0.38,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                );
-              },
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Center(
-                  child: Text(
-                    u.avatarInitials,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: size * 0.38,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                );
-              },
-            )
-          : Center(
-              child: Text(
-                u.avatarInitials,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: size * 0.38,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
+    return AppAvatar(
+      avatarUrl: u.avatarUrl,
+      name: u.name.isNotEmpty ? u.name : (u.email.isNotEmpty ? u.email : 'User'),
+      size: size,
+      backgroundColor: u.avatarColor,
     );
   }
 
@@ -1842,6 +1814,21 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
             Icons.school_outlined,
             'Target Cohort',
             u.cohort.trim().isNotEmpty ? u.cohort : 'NEET 2026',
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 38,
+            child: OutlinedButton.icon(
+              onPressed: () => _showEditUserModal(u),
+              icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFF4F46E5)),
+              label: const Text('Edit Profile, Avatar & Cohort', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFC7D2FE)),
+                backgroundColor: const Color(0xFFF5F3FF),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
           ),
           const Divider(height: 20, color: Color(0xFFF1F5F9)),
           
@@ -2242,91 +2229,494 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   void _showEditUserModal(AdminUserModel user) {
     final nameCtrl = TextEditingController(text: user.name);
     final emailCtrl = TextEditingController(text: user.email);
+    final phoneCtrl = TextEditingController(text: user.phone);
+    final avatarUrlCtrl = TextEditingController(text: user.avatarUrl ?? '');
+    final adminNotesCtrl = TextEditingController(text: user.adminNotes);
+
     String role = ['Student', 'Educator', 'Administrator', 'Super Administrator', 'Content Moderator'].contains(user.role)
         ? user.role
         : 'Student';
 
+    String status = ['Active', 'Suspended', 'Pending', 'Blocked'].contains(user.status)
+        ? user.status
+        : 'Active';
+
+    // Parse target exam, year, and class level from cohort
+    String targetExam = 'NEET';
+    final upperCohort = user.cohort.toUpperCase();
+    if (upperCohort.contains('NEET') && upperCohort.contains('JEE')) {
+      targetExam = 'NEET & JEE';
+    } else if (upperCohort.contains('JEE ADV')) {
+      targetExam = 'JEE Advanced';
+    } else if (upperCohort.contains('JEE')) {
+      targetExam = 'JEE Main';
+    } else {
+      targetExam = 'NEET';
+    }
+
+    int targetYear = 2026;
+    final yearMatch = RegExp(r'202[4-9]').firstMatch(user.cohort);
+    if (yearMatch != null) {
+      targetYear = int.tryParse(yearMatch.group(0)!) ?? 2026;
+    }
+
+    String classLevel = 'Class 12';
+    final lowerCohort = user.cohort.toLowerCase();
+    if (lowerCohort.contains('dropper') || lowerCohort.contains('repeater')) {
+      classLevel = 'Dropper';
+    } else if (lowerCohort.contains('11')) {
+      classLevel = 'Class 11';
+    } else if (lowerCohort.contains('foundation') || lowerCohort.contains('9') || lowerCohort.contains('10')) {
+      classLevel = 'Foundation';
+    } else {
+      classLevel = 'Class 12';
+    }
+
+    bool isSaving = false;
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Container(
-            width: 500,
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        builder: (ctx, setDialogState) {
+          final previewUrl = avatarUrlCtrl.text.trim();
+          final previewName = nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : user.name;
+
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Container(
+              width: 580,
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Edit User & Reassign Role: ${user.name}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                    // Modal Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEEF2FF),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.manage_accounts_rounded, color: Color(0xFF4F46E5), size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Edit User Profile & Details',
+                                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                ),
+                                Text(
+                                  'User ID: ${user.userIdCode} • ${user.email}',
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Color(0xFF94A3B8), size: 20),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 24, color: Color(0xFFF1F5F9)),
+
+                    // 1. Profile Picture & Live Preview Section
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          AppAvatar(
+                            avatarUrl: previewUrl.isNotEmpty ? previewUrl : null,
+                            name: previewName,
+                            size: 54,
+                            backgroundColor: user.avatarColor,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Profile Picture / Avatar URL',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                                ),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: avatarUrlCtrl,
+                                  onChanged: (_) => setDialogState(() {}),
+                                  style: const TextStyle(fontSize: 13),
+                                  decoration: InputDecoration(
+                                    hintText: 'https://lh3.googleusercontent.com/... or image link',
+                                    hintStyle: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    isDense: true,
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                    ),
+                                    suffixIcon: previewUrl.isNotEmpty
+                                        ? IconButton(
+                                            icon: const Icon(Icons.clear, size: 16, color: Color(0xFF94A3B8)),
+                                            onPressed: () {
+                                              avatarUrlCtrl.clear();
+                                              setDialogState(() {});
+                                            },
+                                          )
+                                        : null,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 2. Full Name & Email Address Fields
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Full Name', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: nameCtrl,
+                                onChanged: (_) => setDialogState(() {}),
+                                style: const TextStyle(fontSize: 13),
+                                decoration: InputDecoration(
+                                  prefixIcon: const Icon(Icons.person_outline, size: 18, color: Color(0xFF64748B)),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  isDense: true,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Email Address', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: emailCtrl,
+                                style: const TextStyle(fontSize: 13),
+                                decoration: InputDecoration(
+                                  prefixIcon: const Icon(Icons.mail_outline, size: 18, color: Color(0xFF64748B)),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  isDense: true,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 3. Phone Number & User Role
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Mobile Phone Number', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: phoneCtrl,
+                                style: const TextStyle(fontSize: 13),
+                                decoration: InputDecoration(
+                                  prefixIcon: const Icon(Icons.phone_outlined, size: 18, color: Color(0xFF64748B)),
+                                  hintText: '+91 98765 43210',
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  isDense: true,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('User Role', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                              const SizedBox(height: 6),
+                              DropdownButtonFormField<String>(
+                                value: role,
+                                style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                                decoration: InputDecoration(
+                                  prefixIcon: const Icon(Icons.shield_outlined, size: 18, color: Color(0xFF64748B)),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  isDense: true,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                items: ['Student', 'Educator', 'Administrator', 'Super Administrator', 'Content Moderator']
+                                    .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                                    .toList(),
+                                onChanged: (val) => setDialogState(() => role = val!),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 4. Target Cohort: Exam, Target Year & Class Level
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.school_outlined, size: 16, color: Color(0xFF4F46E5)),
+                              SizedBox(width: 6),
+                              Text('Target Cohort & Exam Access', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: DropdownButtonFormField<String>(
+                                  value: targetExam,
+                                  isExpanded: true,
+                                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                                  decoration: InputDecoration(
+                                    labelText: 'Exam',
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    isDense: true,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  items: ['NEET', 'JEE Main', 'JEE Advanced', 'NEET & JEE']
+                                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                                      .toList(),
+                                  onChanged: (val) => setDialogState(() => targetExam = val!),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 2,
+                                child: DropdownButtonFormField<int>(
+                                  value: targetYear,
+                                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                                  decoration: InputDecoration(
+                                    labelText: 'Year',
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    isDense: true,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  items: [2025, 2026, 2027, 2028, 2029]
+                                      .map((y) => DropdownMenuItem(value: y, child: Text(y.toString())))
+                                      .toList(),
+                                  onChanged: (val) => setDialogState(() => targetYear = val!),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 3,
+                                child: DropdownButtonFormField<String>(
+                                  value: classLevel,
+                                  isExpanded: true,
+                                  style: const TextStyle(fontSize: 12.5, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                                  decoration: InputDecoration(
+                                    labelText: 'Class / Target',
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    isDense: true,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  items: ['Class 11', 'Class 12', 'Dropper', 'Foundation']
+                                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                                      .toList(),
+                                  onChanged: (val) => setDialogState(() => classLevel = val!),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 5. Account Status
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Account Status', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                              const SizedBox(height: 6),
+                              DropdownButtonFormField<String>(
+                                value: status,
+                                style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.w600),
+                                decoration: InputDecoration(
+                                  prefixIcon: const Icon(Icons.toggle_on_outlined, size: 18, color: Color(0xFF64748B)),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  isDense: true,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                items: ['Active', 'Suspended', 'Pending', 'Blocked']
+                                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                                    .toList(),
+                                onChanged: (val) => setDialogState(() => status = val!),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Admin Notes (Optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: adminNotesCtrl,
+                                style: const TextStyle(fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: 'Add internal notes...',
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  isDense: true,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 6. Action Buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  setDialogState(() => isSaving = true);
+                                  final newName = nameCtrl.text.trim();
+                                  final newEmail = emailCtrl.text.trim();
+                                  final newPhone = phoneCtrl.text.trim();
+                                  final newAvatar = avatarUrlCtrl.text.trim();
+                                  final newNotes = adminNotesCtrl.text.trim();
+                                  final newCohort = '$targetExam $targetYear${classLevel != 'Dropper' ? ' • $classLevel' : ' • Dropper'}';
+
+                                  await SupabaseService.updateUserDetails(
+                                    userId: user.id,
+                                    name: newName,
+                                    email: newEmail,
+                                    role: role,
+                                    phone: newPhone,
+                                    avatarUrl: newAvatar,
+                                    targetExam: targetExam,
+                                    targetYear: targetYear,
+                                    classLevel: classLevel,
+                                    status: status,
+                                  );
+
+                                  setState(() {
+                                    final idx = _allUsers.indexWhere((u) => u.id == user.id || u.email == user.email);
+                                    if (idx != -1) {
+                                      final initials = newName.isNotEmpty
+                                          ? newName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
+                                          : user.avatarInitials;
+                                      _allUsers[idx] = _allUsers[idx].copyWith(
+                                        name: newName.isNotEmpty ? newName : user.name,
+                                        email: newEmail.isNotEmpty ? newEmail : user.email,
+                                        phone: newPhone,
+                                        role: role,
+                                        status: status,
+                                        cohort: newCohort,
+                                        avatarUrl: newAvatar.isNotEmpty ? newAvatar : null,
+                                        avatarInitials: initials,
+                                        adminNotes: newNotes,
+                                      );
+                                      if (_selectedUserForDetail?.id == user.id || _selectedUserForDetail?.email == user.email) {
+                                        _selectedUserForDetail = _allUsers[idx];
+                                      }
+                                    }
+                                  });
+
+                                  if (mounted) {
+                                    Navigator.pop(ctx);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('User ${newName.isNotEmpty ? newName : user.name} details updated successfully!'),
+                                        backgroundColor: const Color(0xFF10B981),
+                                      ),
+                                    );
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4F46E5),
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: isSaving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text(
+                                  'Save All Changes',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5),
+                                ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder())),
-                const SizedBox(height: 12),
-                TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder())),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: role,
-                  decoration: const InputDecoration(labelText: 'Reassign User Role', border: OutlineInputBorder()),
-                  items: ['Student', 'Educator', 'Administrator', 'Super Administrator', 'Content Moderator']
-                      .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                      .toList(),
-                  onChanged: (val) => setDialogState(() => role = val!),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final newName = nameCtrl.text.trim();
-                      final newEmail = emailCtrl.text.trim();
-                      await SupabaseService.updateUserDetails(
-                        userId: user.id,
-                        name: newName,
-                        email: newEmail,
-                        role: role,
-                      );
-                      setState(() {
-                        final idx = _allUsers.indexWhere((u) => u.id == user.id || u.email == user.email);
-                        if (idx != -1) {
-                          final initials = newName.isNotEmpty
-                              ? newName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase()
-                              : user.avatarInitials;
-                          _allUsers[idx] = _allUsers[idx].copyWith(
-                            name: newName.isNotEmpty ? newName : user.name,
-                            email: newEmail.isNotEmpty ? newEmail : user.email,
-                            role: role,
-                            avatarInitials: initials,
-                          );
-                          if (_selectedUserForDetail?.id == user.id || _selectedUserForDetail?.email == user.email) {
-                            _selectedUserForDetail = _allUsers[idx];
-                          }
-                        }
-                      });
-                      if (mounted) {
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('User ${nameCtrl.text} role updated to [$role]!'),
-                            backgroundColor: const Color(0xFF10B981),
-                          ),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5)),
-                    child: const Text('Save & Apply Role', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

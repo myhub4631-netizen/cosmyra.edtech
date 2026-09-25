@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -18,6 +19,24 @@ class SmartImage extends StatelessWidget {
     this.fit = BoxFit.contain,
     this.fallback,
   });
+
+  /// On Flutter Web, external image hosts (like Google CDN lh3.googleusercontent.com)
+  /// block direct XHR/fetch requests via CORS when rendered with CanvasKit/Skwasm.
+  /// We route external images on Web through the high-speed, CORS-compliant Cloudflare CDN proxy.
+  static String resolveWebSafeUrl(String rawUrl) {
+    final clean = rawUrl.trim();
+    if (clean.isEmpty || clean.startsWith('data:image/') || clean.startsWith('blob:')) {
+      return clean;
+    }
+    if (kIsWeb) {
+      if (clean.contains('googleusercontent.com') ||
+          clean.contains('googleapis.com') ||
+          (!clean.contains('wsrv.nl') && !clean.contains('images.weserv.nl') && clean.startsWith('http'))) {
+        return 'https://images.weserv.nl/?url=${Uri.encodeComponent(clean)}';
+      }
+    }
+    return clean;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,15 +109,31 @@ class SmartImage extends StatelessWidget {
       }
     }
 
-    // Standard Network Raster Image with gaplessPlayback to prevent flickering on parent rebuilds
+    // Standard Network Raster Image with web CORS safety
+    final effectiveNetworkUrl = resolveWebSafeUrl(cleanUrl);
+
     return Image.network(
-      cleanUrl,
+      effectiveNetworkUrl,
       key: widgetKey,
       height: height,
       width: width,
       fit: fit,
       gaplessPlayback: true,
-      errorBuilder: (_, __, ___) => defaultFallback,
+      errorBuilder: (context, error, stackTrace) {
+        // Fallback retry direct URL if proxy fails, or fallback widget
+        if (effectiveNetworkUrl != cleanUrl) {
+          return Image.network(
+            cleanUrl,
+            key: ValueKey('${cleanUrl}_direct'),
+            height: height,
+            width: width,
+            fit: fit,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => defaultFallback,
+          );
+        }
+        return defaultFallback;
+      },
     );
   }
 }

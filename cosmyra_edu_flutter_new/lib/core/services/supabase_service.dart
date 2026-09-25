@@ -277,7 +277,20 @@ class SupabaseService {
     await setActiveUserSession(updatedProfile);
     await addLocalUser(updatedProfile);
 
-    // 1. Update Supabase Auth User & Metadata
+    // 1. Call custom Supabase RPC to synchronize auth.users phone & metadata with SECURITY DEFINER
+    if (cleanPhone.isNotEmpty || (updatedProfile.avatarUrl != null && updatedProfile.avatarUrl!.isNotEmpty)) {
+      try {
+        await client.rpc('sync_user_phone', params: {
+          'phone_input': cleanPhone,
+          'avatar_input': updatedProfile.avatarUrl ?? '',
+          'name_input': updatedProfile.fullName,
+        });
+      } catch (rpcErr) {
+        debugPrint('Supabase RPC sync_user_phone note: $rpcErr');
+      }
+    }
+
+    // 2. Update Supabase Auth User & Metadata
     try {
       if (client.auth.currentUser != null) {
         try {
@@ -788,6 +801,22 @@ class SupabaseService {
         profileMap[em] = p.copyWith(
           phoneNumber: phone,
           avatarUrl: avatar,
+        );
+      }
+    }
+
+    // 4. Inject active session & auth metadata if present
+    if (activeUserSession != null && activeUserSession!.email.isNotEmpty) {
+      final em = activeUserSession!.email.toLowerCase().trim();
+      final existing = profileMap[em];
+      if (existing != null) {
+        profileMap[em] = existing.copyWith(
+          avatarUrl: (activeUserSession!.avatarUrl != null && activeUserSession!.avatarUrl!.isNotEmpty)
+              ? activeUserSession!.avatarUrl
+              : existing.avatarUrl,
+          phoneNumber: (activeUserSession!.phoneNumber != null && activeUserSession!.phoneNumber!.isNotEmpty)
+              ? activeUserSession!.phoneNumber
+              : existing.phoneNumber,
         );
       }
     }
@@ -3591,6 +3620,11 @@ class SupabaseService {
     required String name,
     required String email,
     required String role,
+    String? phone,
+    String? avatarUrl,
+    String? targetExam,
+    int? targetYear,
+    String? classLevel,
     String? status,
   }) async {
     try {
@@ -3605,6 +3639,11 @@ class SupabaseService {
         'role': dbRole,
       };
       if (email.isNotEmpty) updateData['email'] = email;
+      if (phone != null) updateData['phone_number'] = phone.trim();
+      if (avatarUrl != null) updateData['avatar_url'] = avatarUrl.trim();
+      if (targetExam != null && targetExam.isNotEmpty) updateData['target_exam'] = targetExam;
+      if (targetYear != null && targetYear > 0) updateData['target_year'] = targetYear;
+      if (classLevel != null && classLevel.isNotEmpty) updateData['class_level'] = classLevel;
       if (status != null && status.isNotEmpty) updateData['status'] = status.toLowerCase();
 
       try {
@@ -3616,12 +3655,29 @@ class SupabaseService {
         debugPrint('Supabase profile update notice: $e');
       }
 
+      // Sync phone to Supabase Auth user if provided
+      if (phone != null && phone.trim().isNotEmpty) {
+        try {
+          await client.rpc('sync_user_phone', params: {
+            'target_user_id': userId,
+            'new_phone': phone.trim(),
+          });
+        } catch (e) {
+          debugPrint('Notice on sync_user_phone RPC: $e');
+        }
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final currentMap = await getEditedUsersMap();
       final editObj = {
         'name': name,
         'email': email,
         'role': role,
+        if (phone != null) 'phone': phone.trim(),
+        if (avatarUrl != null) 'avatar_url': avatarUrl.trim(),
+        if (targetExam != null) 'target_exam': targetExam,
+        if (targetYear != null) 'target_year': targetYear.toString(),
+        if (classLevel != null) 'class_level': classLevel,
         if (status != null) 'status': status,
       };
       currentMap[userId] = editObj;
@@ -3636,6 +3692,11 @@ class SupabaseService {
             decoded['full_name'] = name;
             decoded['role'] = dbRole;
             if (email.isNotEmpty) decoded['email'] = email;
+            if (phone != null) decoded['phone_number'] = phone.trim();
+            if (avatarUrl != null) decoded['avatar_url'] = avatarUrl.trim();
+            if (targetExam != null) decoded['target_exam'] = targetExam;
+            if (targetYear != null) decoded['target_year'] = targetYear;
+            if (classLevel != null) decoded['class_level'] = classLevel;
             return jsonEncode(decoded);
           }
         } catch (_) {}
