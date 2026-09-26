@@ -693,11 +693,11 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
 
   void _showPaymentGatewayModal(BuildContext context) async {
     final settings = await SupabaseService.fetchPaymentSettings();
-    bool upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: false);
+    bool upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: true);
     final upiIdCtrl = TextEditingController(text: (settings['upi_id'] ?? '1mdollar2027@okicici').toString());
     final upiPayeeCtrl = TextEditingController(text: (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString());
 
-    bool cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: false);
+    bool cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: true);
     final cashfreeAppIdCtrl = TextEditingController(text: (settings['cashfree_app_id'] ?? '').toString());
     final cashfreeSecretCtrl = TextEditingController(text: (settings['cashfree_secret_key'] ?? '').toString());
     String cashfreeEnv = (settings['cashfree_environment'] ?? 'TEST').toString();

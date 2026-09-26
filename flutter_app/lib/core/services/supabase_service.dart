@@ -4474,7 +4474,7 @@ class SupabaseService {
   }
 
   // ================= PAYMENT GATEWAYS & SETTINGS =================
-  static bool parseBool(dynamic value, {bool defaultValue = false}) {
+  static bool parseBool(dynamic value, {bool defaultValue = true}) {
     if (value == null) return defaultValue;
     if (value is bool) return value;
     if (value is num) return value != 0;
@@ -4485,16 +4485,26 @@ class SupabaseService {
   }
 
   static Map<String, dynamic> defaultPaymentSettings = {
-    'upi_active': false,
+    'upi_active': true,
     'upi_id': '1mdollar2027@okicici',
     'upi_payee_name': 'Cosmyra Edu Platform',
-    'cashfree_active': false,
+    'cashfree_active': true,
     'cashfree_app_id': '',
     'cashfree_secret_key': '',
     'cashfree_environment': 'TEST',
   };
 
+  static Map<String, dynamic>? _memoryPaymentSettingsCache;
+
   static Future<Map<String, dynamic>> fetchPaymentSettings() async {
+    if (_memoryPaymentSettingsCache != null && _memoryPaymentSettingsCache!.isNotEmpty) {
+      _fetchAndCacheSettingsFromDb();
+      return _memoryPaymentSettingsCache!;
+    }
+    return await _fetchAndCacheSettingsFromDb();
+  }
+
+  static Future<Map<String, dynamic>> _fetchAndCacheSettingsFromDb() async {
     Map<String, dynamic>? data;
 
     // 1. Query payment_settings table directly
@@ -4519,30 +4529,31 @@ class SupabaseService {
       }
     }
 
-    // 3. Update local cache if data retrieved from DB
-    if (data != null && data.isNotEmpty) {
+    // 3. Fallback to local SharedPreferences
+    if (data == null || data.isEmpty) {
       try {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('cosmyra_payment_settings', jsonEncode(data));
+        final raw = prefs.getString('cosmyra_payment_settings');
+        if (raw != null && raw.isNotEmpty) {
+          data = Map<String, dynamic>.from(jsonDecode(raw));
+        }
       } catch (_) {}
-      return data;
     }
 
-    // 4. Try local SharedPreferences fallback
+    data ??= Map<String, dynamic>.from(defaultPaymentSettings);
+    _memoryPaymentSettingsCache = data;
+
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString('cosmyra_payment_settings');
-      if (raw != null && raw.isNotEmpty) {
-        return Map<String, dynamic>.from(jsonDecode(raw));
-      }
+      await prefs.setString('cosmyra_payment_settings', jsonEncode(data));
     } catch (_) {}
 
-    return Map<String, dynamic>.from(defaultPaymentSettings);
+    return data;
   }
 
   static Future<bool> savePaymentSettings(Map<String, dynamic> settings) async {
-    final bool upiActive = parseBool(settings['upi_active'], defaultValue: false);
-    final bool cashfreeActive = parseBool(settings['cashfree_active'], defaultValue: false);
+    final bool upiActive = parseBool(settings['upi_active'], defaultValue: true);
+    final bool cashfreeActive = parseBool(settings['cashfree_active'], defaultValue: true);
 
     final Map<String, dynamic> full = {
       'id': 'default',
@@ -4555,6 +4566,8 @@ class SupabaseService {
       'cashfree_environment': settings['cashfree_environment'] ?? 'TEST',
       'updated_at': DateTime.now().toIso8601String(),
     };
+
+    _memoryPaymentSettingsCache = full;
 
     // Save to SharedPreferences locally
     try {

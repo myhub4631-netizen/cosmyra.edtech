@@ -989,11 +989,11 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
 
   void _showPaymentGatewayModal(BuildContext context) async {
     final settings = await SupabaseService.fetchPaymentSettings();
-    bool upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: false);
+    bool upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: true);
     final upiIdCtrl = TextEditingController(text: (settings['upi_id'] ?? '1mdollar2027@okicici').toString());
     final upiPayeeCtrl = TextEditingController(text: (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString());
 
-    bool cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: false);
+    bool cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: true);
     final cashfreeAppIdCtrl = TextEditingController(text: (settings['cashfree_app_id'] ?? '').toString());
     final cashfreeSecretCtrl = TextEditingController(text: (settings['cashfree_secret_key'] ?? '').toString());
     String cashfreeEnv = (settings['cashfree_environment'] ?? 'TEST').toString();
@@ -1920,11 +1920,11 @@ class _PaymentGatewaysConfigCardState extends State<_PaymentGatewaysConfigCard> 
     final settings = await SupabaseService.fetchPaymentSettings();
     if (mounted) {
       setState(() {
-        _upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: false);
+        _upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: true);
         _upiIdCtrl.text = (settings['upi_id'] ?? '1mdollar2027@okicici').toString();
         _upiPayeeCtrl.text = (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString();
 
-        _cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: false);
+        _cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: true);
         _cashfreeAppIdCtrl.text = (settings['cashfree_app_id'] ?? '').toString();
         _cashfreeSecretCtrl.text = (settings['cashfree_secret_key'] ?? '').toString();
         _cashfreeEnv = (settings['cashfree_environment'] ?? 'TEST').toString();
