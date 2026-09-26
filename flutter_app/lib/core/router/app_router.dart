@@ -1006,12 +1006,28 @@ final GoRouter appRouter = GoRouter(
       path: '/admin/payment-gateways',
       builder: (context, state) => AdminPricingScreen(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        autoOpenPaymentModal: true,
+      ),
+    ),
+    GoRoute(
+      path: '/admin/payment-gateway',
+      builder: (context, state) => AdminPricingScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        autoOpenPaymentModal: true,
       ),
     ),
     GoRoute(
       path: '/admin/payment-settings',
       builder: (context, state) => AdminPricingScreen(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        autoOpenPaymentModal: true,
+      ),
+    ),
+    GoRoute(
+      path: '/admin/payments',
+      builder: (context, state) => AdminPricingScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        autoOpenPaymentModal: true,
       ),
     ),
     GoRoute(

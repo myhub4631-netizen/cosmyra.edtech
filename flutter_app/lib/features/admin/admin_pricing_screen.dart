@@ -10,8 +10,13 @@ import 'admin_user_management_screen.dart';
 
 class AdminPricingScreen extends StatefulWidget {
   final UserProfileModel userProfile;
+  final bool autoOpenPaymentModal;
 
-  const AdminPricingScreen({Key? key, required this.userProfile}) : super(key: key);
+  const AdminPricingScreen({
+    Key? key,
+    required this.userProfile,
+    this.autoOpenPaymentModal = false,
+  }) : super(key: key);
 
   @override
   State<AdminPricingScreen> createState() => _AdminPricingScreenState();
@@ -23,6 +28,16 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
   String _selectedDefaultPlan = 'Pro (8 Months)';
   bool _allowDowngrade = true;
   bool _allowUpgrade = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoOpenPaymentModal) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showPaymentGatewayModal(context);
+      });
+    }
+  }
   bool _autoRenewal = true;
 
   // Feature Toggles Matrix State
