@@ -1,7 +1,7 @@
 name: cosmyra_edu_flutter
 description: "Cosmyra Neet Jee - AI-Powered NEET & JEE Exam Prep Platform"
 publish_to: 'none'
-version: 1.1.7+7
+version: 1.1.1+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
