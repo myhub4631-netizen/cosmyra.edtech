@@ -710,7 +710,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text(
-                        'v1.1.1',
+                        'v1.1.2',
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
@@ -1747,7 +1747,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: const Text(
-                          'v1.1.1',
+                          'v1.1.2',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
