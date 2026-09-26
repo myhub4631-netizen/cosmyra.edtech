@@ -559,6 +559,10 @@ class SupabaseService {
           ? googleUser.displayName!.trim()
           : (userEmail.contains('@') ? userEmail.split('@').first : 'Aspirant');
       final String? userPhoto = googleUser.photoUrl;
+      final String? compressedPhoto = (userPhoto != null && userPhoto.isNotEmpty)
+          ? (await downloadAndCompressAvatar(userPhoto) ?? userPhoto)
+          : null;
+
       final String userId = googleUser.id.isNotEmpty
           ? '00000000-0000-4000-a000-${googleUser.id.padLeft(12, '0').substring(0, 12)}'
           : 'usr-g-${DateTime.now().millisecondsSinceEpoch}';
@@ -567,7 +571,7 @@ class SupabaseService {
         id: userId,
         email: userEmail,
         fullName: userName,
-        avatarUrl: userPhoto,
+        avatarUrl: compressedPhoto,
         targetExam: 'NEET',
         targetYear: 2026,
         role: userEmail == '1mdollar2027@gmail.com' ? 'superadmin' : 'student',
@@ -578,7 +582,7 @@ class SupabaseService {
           'id': userId,
           'email': userEmail,
           'full_name': userName,
-          if (userPhoto != null && userPhoto.isNotEmpty) 'avatar_url': userPhoto,
+          if (compressedPhoto != null && compressedPhoto.isNotEmpty) 'avatar_url': compressedPhoto,
           'target_exam': 'NEET',
           'target_year': 2026,
           'role': googleProfile.role,
@@ -590,7 +594,7 @@ class SupabaseService {
             'id': userId,
             'email': userEmail,
             'full_name': userName,
-            if (userPhoto != null && userPhoto.isNotEmpty) 'avatar_url': userPhoto,
+            if (compressedPhoto != null && compressedPhoto.isNotEmpty) 'avatar_url': compressedPhoto,
             'target_exam': 'NEET',
             'target_year': 2026,
             'role': googleProfile.role,
@@ -637,7 +641,11 @@ class SupabaseService {
       if (clean.startsWith('data:image/')) return clean;
 
       final targetUrl = clean.replaceAll(RegExp(r'=s\d+.*$'), '');
-      final response = await http.get(Uri.parse(targetUrl)).timeout(const Duration(seconds: 8));
+      final fetchUrl = kIsWeb
+          ? 'https://images.weserv.nl/?url=${Uri.encodeComponent(targetUrl)}'
+          : targetUrl;
+
+      final response = await http.get(Uri.parse(fetchUrl)).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
         final bytes = response.bodyBytes;
         final contentType = response.headers['content-type'] ?? 'image/jpeg';
@@ -715,6 +723,8 @@ class SupabaseService {
     }
     return null;
   }
+
+
 
   static Future<UserProfileModel?> getCurrentUser() async {
     try {
