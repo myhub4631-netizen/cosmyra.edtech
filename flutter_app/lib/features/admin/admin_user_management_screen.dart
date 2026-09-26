@@ -1750,7 +1750,40 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
               Expanded(
                 child: Row(
                   children: [
-                    _buildUserAvatar(u, size: 44),
+                    InkWell(
+                      onTap: () async {
+                        final newAvatar = await SupabaseService.pickAndUploadUserAvatar(userId: u.id);
+                        if (newAvatar != null && newAvatar.isNotEmpty) {
+                          setState(() {
+                            final idx = _allUsers.indexWhere((usr) => usr.id == u.id || usr.email == u.email);
+                            if (idx != -1) {
+                              _allUsers[idx] = _allUsers[idx].copyWith(avatarUrl: newAvatar);
+                              _selectedUserForDetail = _allUsers[idx];
+                            }
+                          });
+                        }
+                      },
+                      child: Tooltip(
+                        message: 'Click to upload or change profile photo',
+                        child: Stack(
+                          children: [
+                            _buildUserAvatar(u, size: 44),
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF4F46E5),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.camera_alt_rounded, size: 10, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -2370,31 +2403,54 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
                                 ),
                                 const SizedBox(height: 6),
-                                TextField(
-                                  controller: avatarUrlCtrl,
-                                  onChanged: (_) => setDialogState(() {}),
-                                  style: const TextStyle(fontSize: 13),
-                                  decoration: InputDecoration(
-                                    hintText: 'https://lh3.googleusercontent.com/... or image link',
-                                    hintStyle: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                    isDense: true,
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: avatarUrlCtrl,
+                                        onChanged: (_) => setDialogState(() {}),
+                                        style: const TextStyle(fontSize: 13),
+                                        decoration: InputDecoration(
+                                          hintText: 'https://lh3.googleusercontent.com/... or data image',
+                                          hintStyle: const TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                          isDense: true,
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                          ),
+                                          suffixIcon: previewUrl.isNotEmpty
+                                              ? IconButton(
+                                                  icon: const Icon(Icons.clear, size: 16, color: Color(0xFF94A3B8)),
+                                                  onPressed: () {
+                                                    avatarUrlCtrl.clear();
+                                                    setDialogState(() {});
+                                                  },
+                                                )
+                                              : null,
+                                        ),
+                                      ),
                                     ),
-                                    suffixIcon: previewUrl.isNotEmpty
-                                        ? IconButton(
-                                            icon: const Icon(Icons.clear, size: 16, color: Color(0xFF94A3B8)),
-                                            onPressed: () {
-                                              avatarUrlCtrl.clear();
-                                              setDialogState(() {});
-                                            },
-                                          )
-                                        : null,
-                                  ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton.icon(
+                                      onPressed: () async {
+                                        final newAvatar = await SupabaseService.pickAndUploadUserAvatar(userId: user.id);
+                                        if (newAvatar != null && newAvatar.isNotEmpty) {
+                                          avatarUrlCtrl.text = newAvatar;
+                                          setDialogState(() {});
+                                        }
+                                      },
+                                      icon: const Icon(Icons.upload_file_rounded, size: 16, color: Colors.white),
+                                      label: const Text('Upload Photo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF4F46E5),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),

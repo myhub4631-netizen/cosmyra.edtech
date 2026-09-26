@@ -2179,52 +2179,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return;
       }
 
-      // Enforce 100 KB max limit
-      const maxAllowedBytes = 100 * 1024; // 100 KB
-      if (bytes.lengthInBytes > maxAllowedBytes) {
-        final double sizeKb = bytes.lengthInBytes / 1024.0;
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Row(
-                children: const [
-                  Icon(Icons.warning_amber_rounded, color: Color(0xFFEA580C)),
-                  SizedBox(width: 8),
-                  Text('Image Too Large'),
-                ],
-              ),
-              content: Text(
-                'Selected photo is ${sizeKb.toStringAsFixed(1)} KB.\n\nMaximum allowed upload size is 100 KB. Please compress your photo or select one of the preset aspirant avatars.',
-                style: const TextStyle(fontSize: 13.5, height: 1.4),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('OK'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _showAvatarPickerModal(context);
-                  },
-                  child: const Text('Choose Preset Avatar'),
-                ),
-              ],
-            ),
-          );
-        }
-        return;
-      }
-
-      // Convert to base64 Data URL (reliable, fast, works across web and mobile)
-      final mime = file.extension?.toLowerCase() == 'png' ? 'image/png' : 'image/jpeg';
+      // Convert image bytes to compressed base64 Data URL
+      final ext = file.extension?.toLowerCase() ?? 'jpeg';
+      final mime = ext == 'png' ? 'image/png' : (ext == 'webp' ? 'image/webp' : 'image/jpeg');
       final base64String = base64Encode(bytes);
       final dataUrl = 'data:$mime;base64,$base64String';
 
-      final updated = _currentProfile.copyWith(avatarUrl: dataUrl);
+      final newAvatar = await SupabaseService.updateUserAvatar(
+        userId: _currentProfile.id,
+        avatarUrlOrData: dataUrl,
+      );
+
+      final updated = _currentProfile.copyWith(avatarUrl: newAvatar ?? dataUrl);
       await _saveProfileData(updated);
 
       if (mounted) {

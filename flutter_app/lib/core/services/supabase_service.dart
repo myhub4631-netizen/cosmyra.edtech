@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'package:file_picker/file_picker.dart';
 import '../../models/models.dart';
 import '../../models/pyq_models.dart';
 import 'supabase_question_mapper.dart';
@@ -627,6 +629,93 @@ class SupabaseService {
     return profile;
   }
 
+  /// Downloads Google/OAuth user profile pic at compressed image quality & returns compressed data URI
+  static Future<String?> downloadAndCompressAvatar(String rawUrl) async {
+    try {
+      final clean = rawUrl.trim();
+      if (clean.isEmpty) return null;
+      if (clean.startsWith('data:image/')) return clean;
+
+      final targetUrl = clean.replaceAll(RegExp(r'=s\d+.*$'), '');
+      final response = await http.get(Uri.parse(targetUrl)).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+        final bytes = response.bodyBytes;
+        final contentType = response.headers['content-type'] ?? 'image/jpeg';
+        final base64Str = base64Encode(bytes);
+        return 'data:$contentType;base64,$base64Str';
+      }
+    } catch (e) {
+      debugPrint('Notice downloading user profile avatar: $e');
+    }
+    return null;
+  }
+
+  /// Updates user profile avatar in Supabase DB, active session, and local storage
+  static Future<String?> updateUserAvatar({
+    required String userId,
+    required String avatarUrlOrData,
+  }) async {
+    try {
+      final clean = avatarUrlOrData.trim();
+      if (clean.isEmpty) return null;
+
+      String finalAvatar = clean;
+      if (clean.startsWith('http')) {
+        final compressed = await downloadAndCompressAvatar(clean);
+        if (compressed != null && compressed.isNotEmpty) {
+          finalAvatar = compressed;
+        }
+      }
+
+      await client.from('profiles').update({
+        'avatar_url': finalAvatar,
+      }).eq('id', userId);
+
+      // Update active session if it matches target userId
+      if (activeUserSession?.id == userId) {
+        final updated = activeUserSession!.copyWith(avatarUrl: finalAvatar);
+        await setActiveUserSession(updated);
+        await addLocalUser(updated);
+      }
+      return finalAvatar;
+    } catch (e) {
+      debugPrint('Error updating user avatar in Supabase: $e');
+      return null;
+    }
+  }
+
+  /// Opens file picker for user or admin, compresses selected image, and saves to Supabase DB
+  static Future<String?> pickAndUploadUserAvatar({required String userId}) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: true,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        final Uint8List? bytes = file.bytes;
+
+        if (bytes != null && bytes.isNotEmpty) {
+          final String ext = (file.extension != null && file.extension!.isNotEmpty) ? file.extension! : 'jpeg';
+          final String mimeType = ext.toLowerCase() == 'png'
+              ? 'image/png'
+              : ext.toLowerCase() == 'webp'
+                  ? 'image/webp'
+                  : 'image/jpeg';
+          final String base64Str = base64Encode(bytes);
+          final String dataUri = 'data:$mimeType;base64,$base64Str';
+
+          return await updateUserAvatar(userId: userId, avatarUrlOrData: dataUri);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking and uploading avatar: $e');
+    }
+    return null;
+  }
+
   static Future<UserProfileModel?> getCurrentUser() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -650,9 +739,11 @@ class SupabaseService {
           bool needsDbUpdate = false;
           final updateFields = <String, dynamic>{};
 
-          if ((profile.avatarUrl == null || profile.avatarUrl!.isEmpty) && googleAvatar.isNotEmpty) {
-            profile = profile.copyWith(avatarUrl: googleAvatar);
-            updateFields['avatar_url'] = googleAvatar;
+          if ((profile.avatarUrl == null || profile.avatarUrl!.isEmpty || profile.avatarUrl!.startsWith('http')) && googleAvatar.isNotEmpty) {
+            final compressed = await downloadAndCompressAvatar(googleAvatar);
+            final finalAvatar = compressed ?? googleAvatar;
+            profile = profile.copyWith(avatarUrl: finalAvatar);
+            updateFields['avatar_url'] = finalAvatar;
             needsDbUpdate = true;
           }
           if ((profile.phoneNumber == null || profile.phoneNumber!.isEmpty) && userPhone.isNotEmpty) {
@@ -674,11 +765,12 @@ class SupabaseService {
           return ensured;
         } else {
           // Newly logged in OAuth user (e.g. Google Sign-In)
+          final compressedAvatar = googleAvatar.isNotEmpty ? (await downloadAndCompressAvatar(googleAvatar) ?? googleAvatar) : null;
           final newProfile = UserProfileModel(
             id: user.id,
             email: userEmail,
             fullName: googleName,
-            avatarUrl: googleAvatar.isNotEmpty ? googleAvatar : null,
+            avatarUrl: compressedAvatar,
             phoneNumber: userPhone.isNotEmpty ? userPhone : null,
             targetExam: 'NEET',
             targetYear: 2026,
@@ -690,7 +782,7 @@ class SupabaseService {
               'id': user.id,
               'email': userEmail,
               'full_name': googleName,
-              if (googleAvatar.isNotEmpty) 'avatar_url': googleAvatar,
+              if (compressedAvatar != null && compressedAvatar.isNotEmpty) 'avatar_url': compressedAvatar,
               if (userPhone.isNotEmpty) 'phone_number': userPhone,
               'target_exam': 'NEET',
               'target_year': 2026,
