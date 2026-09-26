@@ -4495,30 +4495,48 @@ class SupabaseService {
   };
 
   static Future<Map<String, dynamic>> fetchPaymentSettings() async {
-    Map<String, dynamic> result = Map<String, dynamic>.from(defaultPaymentSettings);
+    Map<String, dynamic>? data;
 
-    // 1. Try local cache first for instant synchronous response
+    // 1. Try system_config table first (broad compatibility)
+    try {
+      final res = await client.from('system_config').select('value').eq('key', 'payment_gateway_settings').maybeSingle();
+      if (res != null && res['value'] != null) {
+        data = Map<String, dynamic>.from(res['value']);
+      }
+    } catch (e) {
+      debugPrint('Notice fetching system_config payment_gateway_settings: $e');
+    }
+
+    // 2. Try payment_settings table if system_config is empty
+    if (data == null || data.isEmpty) {
+      try {
+        final res = await client.from('payment_settings').select().eq('id', 'default').maybeSingle();
+        if (res != null) {
+          data = Map<String, dynamic>.from(res);
+        }
+      } catch (e) {
+        debugPrint('Notice fetching payment_settings table: $e');
+      }
+    }
+
+    // 3. Fallback/Cache update
+    if (data != null && data.isNotEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cosmyra_payment_settings', jsonEncode(data));
+      } catch (_) {}
+      return data;
+    }
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString('cosmyra_payment_settings');
       if (raw != null && raw.isNotEmpty) {
-        result = Map<String, dynamic>.from(jsonDecode(raw));
+        return Map<String, dynamic>.from(jsonDecode(raw));
       }
     } catch (_) {}
 
-    // 2. Fetch latest settings from Supabase database
-    try {
-      final res = await client.from('payment_settings').select().eq('id', 'default').maybeSingle();
-      if (res != null) {
-        result = Map<String, dynamic>.from(res);
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('cosmyra_payment_settings', jsonEncode(result));
-      }
-    } catch (e) {
-      debugPrint('Notice fetching Supabase payment_settings: $e');
-    }
-
-    return result;
+    return Map<String, dynamic>.from(defaultPaymentSettings);
   }
 
   static Future<bool> savePaymentSettings(Map<String, dynamic> settings) async {
@@ -4537,6 +4555,7 @@ class SupabaseService {
       'updated_at': DateTime.now().toIso8601String(),
     };
 
+    // Save to SharedPreferences
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cosmyra_payment_settings', jsonEncode(full));
@@ -4544,14 +4563,27 @@ class SupabaseService {
       debugPrint('Notice saving payment_settings to SharedPreferences: $e');
     }
 
+    // Save to system_config table (key-value)
+    try {
+      await client.from('system_config').upsert({
+        'key': 'payment_gateway_settings',
+        'value': full,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      debugPrint('Successfully saved payment_gateway_settings to system_config DB: $full');
+    } catch (e) {
+      debugPrint('Notice saving payment_gateway_settings to system_config: $e');
+    }
+
+    // Save to payment_settings table
     try {
       await client.from('payment_settings').upsert(full, onConflict: 'id');
-      debugPrint('Successfully saved payment_settings: $full');
-      return true;
+      debugPrint('Successfully saved payment_settings to payment_settings DB: $full');
     } catch (e) {
-      debugPrint('Notice saving payment_settings to Supabase: $e');
-      return true;
+      debugPrint('Notice saving payment_settings to DB: $e');
     }
+
+    return true;
   }
 
   static Future<Map<String, dynamic>> submitUpiPaymentVerification({
