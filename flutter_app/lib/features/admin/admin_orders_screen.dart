@@ -693,7 +693,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
 
   void _showPaymentGatewayModal(BuildContext context) async {
     final settings = await SupabaseService.fetchPaymentSettings();
-    bool upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: true);
+    bool upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: false);
     final upiIdCtrl = TextEditingController(text: (settings['upi_id'] ?? '1mdollar2027@okicici').toString());
     final upiPayeeCtrl = TextEditingController(text: (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString());
 

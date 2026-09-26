@@ -989,7 +989,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
 
   void _showPaymentGatewayModal(BuildContext context) async {
     final settings = await SupabaseService.fetchPaymentSettings();
-    bool upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: true);
+    bool upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: false);
     final upiIdCtrl = TextEditingController(text: (settings['upi_id'] ?? '1mdollar2027@okicici').toString());
     final upiPayeeCtrl = TextEditingController(text: (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString());
 
@@ -1920,7 +1920,7 @@ class _PaymentGatewaysConfigCardState extends State<_PaymentGatewaysConfigCard> 
     final settings = await SupabaseService.fetchPaymentSettings();
     if (mounted) {
       setState(() {
-        _upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: true);
+        _upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: false);
         _upiIdCtrl.text = (settings['upi_id'] ?? '1mdollar2027@okicici').toString();
         _upiPayeeCtrl.text = (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString();
 

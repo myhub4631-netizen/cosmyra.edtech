@@ -48,7 +48,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (mounted) {
       setState(() {
         _paymentSettings = settings;
-        final upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: true);
+        final upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: false);
         final cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: false);
         if (upiActive) {
           _selectedPaymentMethod = 'UPI';
@@ -805,7 +805,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildPaymentMethodCard() {
-    final bool upiActive = SupabaseService.parseBool(_paymentSettings['upi_active'], defaultValue: true);
+    final bool upiActive = SupabaseService.parseBool(_paymentSettings['upi_active'], defaultValue: false);
     final bool cashfreeActive = SupabaseService.parseBool(_paymentSettings['cashfree_active'], defaultValue: false);
 
     final methods = <Map<String, dynamic>>[];

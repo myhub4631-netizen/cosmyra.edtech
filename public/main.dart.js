@@ -12804,72 +12804,59 @@ case 1:return A.A(q,r)
 case 2:return A.z(o.at(-1),r)}})
 return A.B($async$y9,r)},
 pO(a,b){var s
-if(a==null)return b
+if(a==null)return!1
 if(A.vQ(a))return a
 if(typeof a=="number")return a!==0
 s=B.c.t(J.o(a)).toLowerCase()
 if(s==="false"||s==="0"||s==="off"||s==="no"||s==="disabled")return!1
 if(s==="true"||s==="1"||s==="on"||s==="yes"||s==="enabled")return!0
-return b},
-v9(){var s=0,r=A.C(t.P),q,p=2,o=[],n,m,l,k,j,i,h,g,f,e,d
+return!1},
+v9(){var s=0,r=A.C(t.P),q,p=2,o=[],n,m,l,k,j,i,h,g,f,e,d,c
 var $async$v9=A.y(function(a,b){if(a===1){o.push(b)
-s=p}while(true)switch(s){case 0:g=null
+s=p}while(true)switch(s){case 0:g=t.N
+f=t.z
+e=A.cu($.clB,g,f)
 p=4
-i=$.aL().b
-i===$&&A.b()
 s=7
-return A.n(i.al("payment_settings").eF(0).bt("id","default").nz(),$async$v9)
+return A.n(A.c9(),$async$v9)
 case 7:n=b
-if(n!=null)g=A.cu(n,t.N,t.z)
+m=A.bt(J.u(n.a,"cosmyra_payment_settings"))
+if(m!=null&&m.length!==0)e=A.cu(B.a3.cp(0,m,null),g,f)
 p=2
 s=6
 break
 case 4:p=3
-f=o.pop()
-m=A.V(f)
-A.al().$1("Notice fetching Supabase payment_settings: "+A.l(m))
+d=o.pop()
 s=6
 break
 case 3:s=2
 break
-case 6:s=g!=null&&g.a!==0?8:9
+case 6:p=9
+h=$.aL().b
+h===$&&A.b()
+s=12
+return A.n(h.al("payment_settings").eF(0).bt("id","default").nz(),$async$v9)
+case 12:l=b
+s=l!=null?13:14
 break
-case 8:p=11
-s=14
-return A.n(A.c9(),$async$v9)
-case 14:l=b
+case 13:e=A.cu(l,g,f)
 s=15
-return A.n(l.cf("String","cosmyra_payment_settings",B.a3.cL(g,null)),$async$v9)
-case 15:p=2
-s=13
-break
-case 11:p=10
-e=o.pop()
-s=13
-break
-case 10:s=2
-break
-case 13:q=g
-s=1
-break
-case 9:p=17
-s=20
 return A.n(A.c9(),$async$v9)
-case 20:k=b
-j=A.bt(J.u(k.a,"cosmyra_payment_settings"))
-if(j!=null&&j.length!==0){i=A.cu(B.a3.cp(0,j,null),t.N,t.z)
-q=i
-s=1
-break}p=2
-s=19
+case 15:k=b
+s=16
+return A.n(k.cf("String","cosmyra_payment_settings",B.a3.cL(e,null)),$async$v9)
+case 16:case 14:p=2
+s=11
 break
-case 17:p=16
-d=o.pop()
-s=19
+case 9:p=8
+c=o.pop()
+j=A.V(c)
+A.al().$1("Notice fetching Supabase payment_settings: "+A.l(j))
+s=11
 break
-case 16:s=2
+case 8:s=2
 break
-case 19:q=A.cu($.clB,t.N,t.z)
+case 11:q=e
 s=1
 break
 case 1:return A.A(q,r)
@@ -12877,7 +12864,7 @@ case 2:return A.z(o.at(-1),r)}})
 return A.B($async$v9,r)},
 CL(a0){var s=0,r=A.C(t.y),q,p=2,o=[],n,m,l,k,j,i,h,g,f,e,d,c,b,a
 var $async$CL=A.y(function(a1,a2){if(a1===1){o.push(a2)
-s=p}while(true)switch(s){case 0:e=A.pO(a0.h(0,"upi_active"),!0)
+s=p}while(true)switch(s){case 0:e=A.pO(a0.h(0,"upi_active"),!1)
 d=A.pO(a0.h(0,"cashfree_active"),!1)
 c=a0.h(0,"upi_id")
 c=B.c.t(c==null?"1mdollar2027@okicici":c)
@@ -79511,7 +79498,7 @@ s=3
 return A.n(A.v9(),$async$Di)
 case 3:i=c
 h=J.P(i)
-j.a=A.pO(h.h(i,"upi_active"),!0)
+j.a=A.pO(h.h(i,"upi_active"),!1)
 o=h.h(i,"upi_id")
 o=J.o(o==null?"1mdollar2027@okicici":o)
 n=$.ax()
@@ -80947,7 +80934,7 @@ s=3
 return A.n(A.v9(),$async$wU)
 case 3:j=c
 i=J.P(j)
-k.a=A.pO(i.h(j,"upi_active"),!0)
+k.a=A.pO(i.h(j,"upi_active"),!1)
 p=i.h(j,"upi_id")
 p=J.o(p==null?"1mdollar2027@okicici":p)
 o=$.ax()
@@ -81632,7 +81619,7 @@ j=k?B.x0:B.aZ3
 return A.j(f,A.t(A.a([p,B.al,o,B.N,n,B.al,A.aP(A.bK(j,A.c(k?"Saving Settings...":"Save Payment Settings",f,f,f,f,B.hN,f,f,f),m,l),48,1/0)],q),B.l,B.d,B.b),B.h,f,f,new A.p(B.i,f,r,s,B.bdf,f,B.j),f,f,f,f,B.az,f,f,f)}}
 A.bBO.prototype={
 $0(){var s,r,q=this.a,p=this.b,o=J.P(p)
-q.f=A.pO(o.h(p,"upi_active"),!0)
+q.f=A.pO(o.h(p,"upi_active"),!1)
 s=q.r
 s===$&&A.b()
 r=o.h(p,"upi_id")
@@ -95529,7 +95516,7 @@ return A.cP(r,B.P,A.t(A.a([A.D(A.bs(A.ba(A.j(h,A.t(o,B.l,B.d,B.b),B.h,h,B.Hi,h,h
 awD(){var s=null,r=$.ij().gMb(),q=A.e(12),p=A.K(B.v,B.m,1),o=t.p,n=A.a([B.b0I,B.y,A.c("Apply Promo Coupon",s,s,s,s,A.R().$3$color$fontSize$fontWeight(B.w,13.5,B.n),s,s,s),B.c7],o)
 if(r!=null)n.push(A.ch(!1,B.bXs,s,s,s,s,s,s,new A.bom(this),s,s))
 return A.j(s,A.t(A.a([A.k(n,B.f,B.d,B.b,0,s,s),B.ay,A.k(A.a([A.D(A.bb(s,B.R,!1,s,!0,B.r,s,A.b3(),this.d,s,s,s,s,s,2,A.bv(s,new A.b8(4,A.e(8),B.bp),s,B.cY,s,s,s,s,!0,s,s,s,s,s,s,s,s,s,s,s,s,new A.b8(4,A.e(8),B.ny),s,s,s,s,s,s,s,s,B.j3,"e.g. COSMYRA20, NEET2027",s,s,s,s,s,s,s,s,s,!0,!0,s,s,s,s,s,s,s,s,s,s,s,s,s,s),B.t,!0,s,!0,s,!1,s,B.T,s,s,s,s,s,s,s,s,1,s,s,!1,"\u2022",s,s,s,s,s,!1,s,s,!1,s,!0,s,B.D,s,s,s,s,s,s,s,s,s,s,s,s,!0,B.K,s,B.xu,s,s,s,s),1),B.a4,A.bW(!1,B.bNn,s,s,s,s,s,s,this.gaAm(),s,A.aE(s,s,B.p,s,s,s,0,s,s,B.i,s,s,B.o8,s,new A.a8(A.e(8),B.q),s,s,s,s,s))],o),B.f,B.d,B.b,0,s,s),B.at,B.bUr],o),B.l,B.d,B.b),B.h,s,s,new A.p(B.i,s,p,q,s,s,B.j),s,s,s,s,B.ak,s,s,s)},
-ay8(){var s,r,q,p=null,o=A.pO(J.u(this.y,"upi_active"),!0),n=A.pO(J.u(this.y,"cashfree_active"),!1),m=A.a([],t.Y)
+ay8(){var s,r,q,p=null,o=A.pO(J.u(this.y,"upi_active"),!1),n=A.pO(J.u(this.y,"cashfree_active"),!1),m=A.a([],t.Y)
 if(o)m.push(A.v(["id","UPI","title","1} UPI Pay (Instant App & QR Transfer)","subtitle","Google Pay, PhonePe, Paytm, BHIM \u2022 Direct Transfer & Verification","icon",B.aUE],t.N,t.z))
 if(n)m.push(A.v(["id","Cashfree","title","2} CashFree PG (Secure Gateway)","subtitle","Credit/Debit Cards, Net Banking, Wallets & Cashfree SDK","icon",B.aWb],t.N,t.z))
 if(m.length===0){s=A.e(12)
@@ -95561,7 +95548,7 @@ return A.cP(o,B.P,A.ba(A.bs(A.j(o,A.t(A.a([j,B.N,k,B.at,i,B.al,A.bK(q,A.c(r?"Go 
 awl(){var s=null,r=A.ex(s,!0,B.i,s,s,0.5,s,s,A.aC(s,s,s,B.ef,s,s,new A.boh(this),s,s,s,s),A.c("Checkout",s,s,s,s,A.R().$3$color$fontSize$fontWeight(B.w,16,B.n),s,s,s)),q=A.e(20),p=A.K(B.v,B.m,1),o=A.a([new A.aX(0,B.X,A.ad(15,B.w.m()>>>16&255,B.w.m()>>>8&255,B.w.m()&255),B.bI,16)],t.V)
 return A.cP(r,B.P,A.ba(A.bs(A.j(s,A.t(A.a([A.j(s,B.aZ_,B.h,s,s,B.nE,s,68,s,s,s,s,s,68),B.N,A.c("Sign In Required",s,s,s,s,A.R().$3$color$fontSize$fontWeight(B.w,22,B.aI),s,s,s),B.ay,A.c("Please sign in or create an account to enroll in this test series. Your account ensures your test analytics, All India Rank, and solutions are safely synced.",s,s,s,s,A.R().$3$color$fontSize$height(B.x,13.5,1.5),B.bf,s,s),B.al,A.bK(B.aX_,B.c_3,new A.boi(this),A.aE(s,s,B.p,s,s,s,s,s,s,B.i,s,B.Ec,s,s,new A.a8(A.e(10),B.q),s,s,s,s,s)),B.H,A.eC(!1,B.bXG,s,s,s,s,s,s,new A.boj(this),s,A.bR(s,s,s,s,s,s,s,s,s,B.x,s,B.a1F,s,s,new A.a8(A.e(10),B.q),B.bp,s,s,s,s))],t.p),B.f,B.d,B.Q),B.h,s,B.He,new A.p(B.i,s,p,q,o,s,B.j),s,s,s,s,B.ig,s,s,s),s,B.t,B.az,s,B.L),s,s),s,s,s)}}
 A.boz.prototype={
-$0(){var s=this.a,r=s.y=this.b,q=J.P(r),p=A.pO(q.h(r,"upi_active"),!0),o=A.pO(q.h(r,"cashfree_active"),!1)
+$0(){var s=this.a,r=s.y=this.b,q=J.P(r),p=A.pO(q.h(r,"upi_active"),!1),o=A.pO(q.h(r,"cashfree_active"),!1)
 if(p)s.e="UPI"
 else if(o)s.e="Cashfree"
 else s.e=""},

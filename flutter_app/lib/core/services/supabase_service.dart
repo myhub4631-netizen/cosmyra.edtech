@@ -4495,37 +4495,34 @@ class SupabaseService {
   };
 
   static Future<Map<String, dynamic>> fetchPaymentSettings() async {
-    Map<String, dynamic>? dbData;
+    Map<String, dynamic> result = Map<String, dynamic>.from(defaultPaymentSettings);
+
+    // 1. Try local cache first for instant synchronous response
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('cosmyra_payment_settings');
+      if (raw != null && raw.isNotEmpty) {
+        result = Map<String, dynamic>.from(jsonDecode(raw));
+      }
+    } catch (_) {}
+
+    // 2. Fetch latest settings from Supabase database
     try {
       final res = await client.from('payment_settings').select().eq('id', 'default').maybeSingle();
       if (res != null) {
-        dbData = Map<String, dynamic>.from(res);
+        result = Map<String, dynamic>.from(res);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cosmyra_payment_settings', jsonEncode(result));
       }
     } catch (e) {
       debugPrint('Notice fetching Supabase payment_settings: $e');
     }
 
-    if (dbData != null && dbData.isNotEmpty) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('cosmyra_payment_settings', jsonEncode(dbData));
-      } catch (_) {}
-      return dbData;
-    }
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString('cosmyra_payment_settings');
-      if (raw != null && raw.isNotEmpty) {
-        return Map<String, dynamic>.from(jsonDecode(raw));
-      }
-    } catch (_) {}
-
-    return Map<String, dynamic>.from(defaultPaymentSettings);
+    return result;
   }
 
   static Future<bool> savePaymentSettings(Map<String, dynamic> settings) async {
-    final bool upiActive = parseBool(settings['upi_active'], defaultValue: true);
+    final bool upiActive = parseBool(settings['upi_active'], defaultValue: false);
     final bool cashfreeActive = parseBool(settings['cashfree_active'], defaultValue: false);
 
     final Map<String, dynamic> full = {

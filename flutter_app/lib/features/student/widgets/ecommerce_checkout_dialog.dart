@@ -64,7 +64,7 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
     if (mounted) {
       setState(() {
         _paymentSettings = settings;
-        final upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: true);
+        final upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: false);
         final cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: false);
         if (upiActive) {
           _selectedPaymentMethod = 'UPI';
@@ -805,7 +805,7 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
   }
 
   Widget _buildPaymentMethodSection() {
-    final bool upiActive = SupabaseService.parseBool(_paymentSettings['upi_active'], defaultValue: true);
+    final bool upiActive = SupabaseService.parseBool(_paymentSettings['upi_active'], defaultValue: false);
     final bool cashfreeActive = SupabaseService.parseBool(_paymentSettings['cashfree_active'], defaultValue: false);
 
     final methods = <Map<String, dynamic>>[];
