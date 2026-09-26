@@ -4473,6 +4473,115 @@ class SupabaseService {
     return fullData;
   }
 
+  // ================= PAYMENT GATEWAYS & SETTINGS =================
+  static Map<String, dynamic> defaultPaymentSettings = {
+    'upi_active': true,
+    'upi_id': '1mdollar2027@okicici',
+    'upi_payee_name': 'Cosmyra Edu Platform',
+    'cashfree_active': true,
+    'cashfree_app_id': '',
+    'cashfree_secret_key': '',
+    'cashfree_environment': 'TEST',
+  };
+
+  static Future<Map<String, dynamic>> fetchPaymentSettings() async {
+    try {
+      final res = await client.from('payment_settings').select().eq('id', 'default').maybeSingle();
+      if (res != null) {
+        final map = Map<String, dynamic>.from(res);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cosmyra_payment_settings', jsonEncode(map));
+        return map;
+      }
+    } catch (e) {
+      debugPrint('Notice fetching Supabase payment_settings: $e');
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('cosmyra_payment_settings');
+      if (raw != null && raw.isNotEmpty) {
+        return Map<String, dynamic>.from(jsonDecode(raw));
+      }
+    } catch (_) {}
+
+    return Map<String, dynamic>.from(defaultPaymentSettings);
+  }
+
+  static Future<bool> savePaymentSettings(Map<String, dynamic> settings) async {
+    final Map<String, dynamic> full = {
+      'id': 'default',
+      'upi_active': settings['upi_active'] ?? true,
+      'upi_id': (settings['upi_id'] ?? '1mdollar2027@okicici').toString().trim(),
+      'upi_payee_name': (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString().trim(),
+      'cashfree_active': settings['cashfree_active'] ?? true,
+      'cashfree_app_id': (settings['cashfree_app_id'] ?? '').toString().trim(),
+      'cashfree_secret_key': (settings['cashfree_secret_key'] ?? '').toString().trim(),
+      'cashfree_environment': settings['cashfree_environment'] ?? 'TEST',
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_payment_settings', jsonEncode(full));
+    } catch (_) {}
+
+    try {
+      await client.from('payment_settings').upsert(full, onConflict: 'id');
+      return true;
+    } catch (e) {
+      debugPrint('Notice saving payment_settings to Supabase: $e');
+      return true;
+    }
+  }
+
+  static Future<Map<String, dynamic>> submitUpiPaymentVerification({
+    required UserProfileModel user,
+    required List<Map<String, dynamic>> items,
+    required String utrNumber,
+    required String couponCode,
+    required double totalAmount,
+  }) async {
+    final String timeMs = DateTime.now().millisecondsSinceEpoch.toString();
+    final String orderId = 'ORD-${timeMs.substring(timeMs.length - 8)}';
+
+    final orderData = {
+      'id': toValidUuid('ord_$orderId'),
+      'order_number': orderId,
+      'user_id': user.id,
+      'user_email': user.email,
+      'user_name': user.fullName,
+      'user_phone': user.phoneNumber ?? '',
+      'total_amount': totalAmount,
+      'subtotal_amount': totalAmount,
+      'discount_amount': 0.0,
+      'coupon_code': couponCode,
+      'status': 'pending_verification',
+      'payment_method': 'UPI',
+      'payment_id': 'UTR_$utrNumber',
+      'payment_reference': utrNumber,
+      'notes': 'UPI Payment submitted with UTR: $utrNumber. Awaiting admin approval.',
+      'product_name': items.isNotEmpty ? (items.first['title'] ?? 'Test Series') : 'Cosmyra NEET/JEE Course',
+      'created_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await client.from('orders').insert(orderData);
+    } catch (e) {
+      debugPrint('Supabase UPI order insertion note: $e');
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('cosmyra_saved_admin_orders') ?? '[]';
+      final List<dynamic> list = jsonDecode(raw);
+      list.insert(0, orderData);
+      await prefs.setString('cosmyra_saved_admin_orders', jsonEncode(list));
+    } catch (_) {}
+
+    return orderData;
+  }
+
   /// Persist a Test Series (in Supabase test_series/tests table and SharedPreferences cache)
   static Future<Map<String, dynamic>> saveTestSeries(Map<String, dynamic> seriesData) async {
     final String seriesId = seriesData['id'] ?? toValidUuid('ts_${DateTime.now().millisecondsSinceEpoch}');

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/services/supabase_service.dart';
+import '../../models/models.dart';
 
 class AdminOrdersScreen extends StatefulWidget {
   const AdminOrdersScreen({Key? key}) : super(key: key);
@@ -44,24 +45,28 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       final email = (o['student_email'] ?? o['user_email'] ?? '').toString().toLowerCase();
       final phone = (o['student_phone'] ?? '').toString().toLowerCase();
       final product = (o['product_name'] ?? '').toString().toLowerCase();
+      final ref = (o['payment_reference'] ?? o['payment_id'] ?? '').toString().toLowerCase();
 
       final matchesQuery = q.isEmpty ||
           id.contains(q) ||
           name.contains(q) ||
           email.contains(q) ||
           phone.contains(q) ||
-          product.contains(q);
+          product.contains(q) ||
+          ref.contains(q);
 
       final status = (o['payment_status'] ?? o['status'] ?? 'completed').toString().toLowerCase();
       final matchesStatus = _statusFilter == 'All' ||
-          status == _statusFilter.toLowerCase();
+          (_statusFilter == 'Pending Verification'
+              ? (status == 'pending_verification' || status == 'pending')
+              : status == _statusFilter.toLowerCase());
 
       return matchesQuery && matchesStatus;
     }).toList();
   }
 
   int get _completedCount => _orders.where((o) => (o['payment_status'] ?? o['status'] ?? '') == 'completed').length;
-  int get _pendingCount => _orders.where((o) => (o['payment_status'] ?? o['status'] ?? '') == 'pending').length;
+  int get _pendingCount => _orders.where((o) => (o['payment_status'] ?? o['status'] ?? '') == 'pending' || (o['payment_status'] ?? o['status'] ?? '') == 'pending_verification').length;
   int get _incompleteCount => _orders.where((o) => (o['payment_status'] ?? o['status'] ?? '') == 'incomplete').length;
   int get _cancelledCount => _orders.where((o) => (o['payment_status'] ?? o['status'] ?? '') == 'cancelled').length;
 
@@ -106,6 +111,33 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       );
       _loadOrders();
     }
+  }
+
+  Future<void> _approveUpiPayment(Map<String, dynamic> o) async {
+    final rawId = (o['order_number'] ?? o['order_id'] ?? o['id'] ?? '').toString();
+    final uid = (o['user_id'] ?? o['student_id'] ?? '').toString();
+    final user = UserProfileModel(
+      id: uid.isNotEmpty ? uid : 'usr_${DateTime.now().millisecondsSinceEpoch}',
+      email: (o['student_email'] ?? o['user_email'] ?? 'student@cosmyra.in').toString(),
+      fullName: (o['student_name'] ?? o['user_name'] ?? 'Student Aspirant').toString(),
+    );
+
+    final items = [
+      {
+        'id': o['product_id'] ?? 'ts_neet_all_india_2026',
+        'title': o['product_name'] ?? 'NEET Test Series',
+      }
+    ];
+
+    await SupabaseService.verifyPaymentAndGrantAccess(
+      orderId: rawId,
+      paymentId: (o['payment_id'] ?? o['payment_reference'] ?? 'UPI_VERIFIED').toString(),
+      paymentMethod: 'UPI',
+      user: user,
+      items: items,
+    );
+
+    await _updateOrderStatus(rawId, 'completed', note: 'UPI Payment verified and access granted by Admin');
   }
 
   Future<void> _showPaymentReminderDialog(Map<String, dynamic> order) async {
@@ -304,6 +336,11 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         text = const Color(0xFF15803D);
         label = 'COMPLETED / PAID';
         break;
+      case 'pending_verification':
+        bg = const Color(0xFFFEF3C7);
+        text = const Color(0xFFD97706);
+        label = '🟡 PENDING UPI VERIFICATION';
+        break;
       case 'pending':
         bg = const Color(0xFFFEF3C7);
         text = const Color(0xFFB45309);
@@ -347,6 +384,18 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
           style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
         ),
         actions: [
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => _showPaymentGatewayModal(context),
+            icon: const Icon(Icons.payment_rounded, size: 16),
+            label: const Text('Payment Gateways', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 10),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Color(0xFF4F46E5)),
             onPressed: _loadOrders,
@@ -405,9 +454,8 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                         SegmentedButton<String>(
                           segments: const [
                             ButtonSegment(value: 'All', label: Text('All')),
+                            ButtonSegment(value: 'Pending Verification', label: Text('🟡 Pending Verification')),
                             ButtonSegment(value: 'Completed', label: Text('Completed')),
-                            ButtonSegment(value: 'Pending', label: Text('Pending')),
-                            ButtonSegment(value: 'Incomplete', label: Text('Incomplete')),
                             ButtonSegment(value: 'Cancelled', label: Text('Cancelled')),
                           ],
                           selected: {_statusFilter},
@@ -506,8 +554,8 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                             DataCell(
                               PopupMenuButton<String>(
                                 onSelected: (act) {
-                                  if (act == 'confirm') {
-                                    _updateOrderStatus(orderId, 'completed', note: 'Manually verified and confirmed by Admin');
+                                  if (act == 'confirm' || act == 'approve_upi') {
+                                    _approveUpiPayment(o);
                                   } else if (act == 'cancel') {
                                     _updateOrderStatus(orderId, 'cancelled', note: 'Cancelled by Admin');
                                   } else if (act == 'incomplete') {
@@ -519,6 +567,17 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                                   }
                                 },
                                 itemBuilder: (ctx) => [
+                                  if (status == 'pending_verification' || status == 'pending')
+                                    const PopupMenuItem(
+                                      value: 'approve_upi',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.verified_rounded, size: 18, color: Color(0xFF10B981)),
+                                          SizedBox(width: 10),
+                                          Text('✓ Approve & Grant Access', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                                        ],
+                                      ),
+                                    ),
                                   const PopupMenuItem(
                                     value: 'details',
                                     child: Row(
@@ -628,6 +687,245 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showPaymentGatewayModal(BuildContext context) async {
+    final settings = await SupabaseService.fetchPaymentSettings();
+    bool upiActive = settings['upi_active'] != false;
+    final upiIdCtrl = TextEditingController(text: (settings['upi_id'] ?? '1mdollar2027@okicici').toString());
+    final upiPayeeCtrl = TextEditingController(text: (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString());
+
+    bool cashfreeActive = settings['cashfree_active'] != false;
+    final cashfreeAppIdCtrl = TextEditingController(text: (settings['cashfree_app_id'] ?? '').toString());
+    final cashfreeSecretCtrl = TextEditingController(text: (settings['cashfree_secret_key'] ?? '').toString());
+    String cashfreeEnv = (settings['cashfree_environment'] ?? 'TEST').toString();
+
+    bool isSaving = false;
+
+    if (!context.mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setModalState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Container(
+              width: 580,
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.payment_rounded, color: Color(0xFF4F46E5), size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Payment Gateways & Settings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                              Text('Control active payment options at checkout (UPI Pay, Cashfree PG)', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                      ],
+                    ),
+                    const Divider(height: 28),
+
+                    // SECTION 1: UPI PAY SETTINGS
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: upiActive ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: upiActive ? const Color(0xFF93C5FD) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF2563EB), size: 20),
+                                  SizedBox(width: 8),
+                                  Text('1} UPI Pay (GPay, PhonePe, Paytm, BHIM)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B))),
+                                ],
+                              ),
+                              Switch(
+                                value: upiActive,
+                                activeColor: const Color(0xFF2563EB),
+                                onChanged: (val) => setModalState(() => upiActive = val),
+                              ),
+                            ],
+                          ),
+                          if (upiActive) ...[
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: upiIdCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'Merchant UPI ID (VPA)',
+                                hintText: 'e.g. cosmyra@ybl or 1mdollar2027@okicici',
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: upiPayeeCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'Merchant / Payee Display Name',
+                                hintText: 'e.g. Cosmyra Edu Platform',
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text('• Mobile Users: Opens native installed UPI app automatically.\n• Web Users: Displays QR Code + Copy UPI ID + UTR entry box.', style: TextStyle(fontSize: 11, color: Color(0xFF475569))),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // SECTION 2: CASHFREE PG SETTINGS
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: cashfreeActive ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: cashfreeActive ? const Color(0xFF6EE7B7) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.shield_rounded, color: Color(0xFF059669), size: 20),
+                                  SizedBox(width: 8),
+                                  Text('2} Cashfree Payment Gateway', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B))),
+                                ],
+                              ),
+                              Switch(
+                                value: cashfreeActive,
+                                activeColor: const Color(0xFF059669),
+                                onChanged: (val) => setModalState(() => cashfreeActive = val),
+                              ),
+                            ],
+                          ),
+                          if (cashfreeActive) ...[
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: cashfreeAppIdCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'Cashfree App ID (Client ID)',
+                                hintText: 'e.g. TEST103444...',
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: cashfreeSecretCtrl,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Cashfree Secret Key',
+                                hintText: 'e.g. TEST418c39...',
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                const Text('Environment: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                ChoiceChip(
+                                  label: const Text('TEST (Sandbox)'),
+                                  selected: cashfreeEnv == 'TEST',
+                                  onSelected: (sel) {
+                                    if (sel) setModalState(() => cashfreeEnv = 'TEST');
+                                  },
+                                ),
+                                const SizedBox(width: 8),
+                                ChoiceChip(
+                                  label: const Text('PROD (Live)'),
+                                  selected: cashfreeEnv == 'PROD',
+                                  onSelected: (sel) {
+                                    if (sel) setModalState(() => cashfreeEnv = 'PROD');
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4F46E5),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  setModalState(() => isSaving = true);
+                                  await SupabaseService.savePaymentSettings({
+                                    'upi_active': upiActive,
+                                    'upi_id': upiIdCtrl.text.trim(),
+                                    'upi_payee_name': upiPayeeCtrl.text.trim(),
+                                    'cashfree_active': cashfreeActive,
+                                    'cashfree_app_id': cashfreeAppIdCtrl.text.trim(),
+                                    'cashfree_secret_key': cashfreeSecretCtrl.text.trim(),
+                                    'cashfree_environment': cashfreeEnv,
+                                  });
+                                  if (context.mounted) {
+                                    Navigator.pop(ctx);
+                                    _loadOrders();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('✓ Payment Gateway settings saved and active on website & app!'),
+                                        backgroundColor: Color(0xFF10B981),
+                                      ),
+                                    );
+                                  }
+                                },
+                          icon: isSaving
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.check_rounded, size: 18),
+                          label: const Text('Save & Update Checkout'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

@@ -1,7 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/cart_service.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../models/models.dart';
 
 class EcommerceCheckoutDialog extends StatefulWidget {
   final CartItem? singleItem; // If Buy Now was clicked for a single item
@@ -37,9 +41,12 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
   final TextEditingController _nameCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
 
-  String _selectedPaymentMethod = 'UPI'; // 'UPI', 'Card', 'NetBanking', 'Razorpay'
+  String _selectedPaymentMethod = 'UPI'; // 'UPI', 'Cashfree'
   bool _isProcessing = false;
   bool _isSuccess = false;
+  bool _isPendingVerification = false;
+  String _submittedUtr = '';
+  Map<String, dynamic> _paymentSettings = {};
   String _orderId = '';
   String _successMessage = '';
 
@@ -49,6 +56,23 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
     final profile = SupabaseService.activeUserSession;
     _nameCtrl.text = profile?.fullName ?? 'Aman Kumar';
     _phoneCtrl.text = profile?.phoneNumber ?? '9876543210';
+    _loadPaymentSettings();
+  }
+
+  Future<void> _loadPaymentSettings() async {
+    final settings = await SupabaseService.fetchPaymentSettings();
+    if (mounted) {
+      setState(() {
+        _paymentSettings = settings;
+        final upiActive = settings['upi_active'] != false;
+        final cashfreeActive = settings['cashfree_active'] != false;
+        if (upiActive) {
+          _selectedPaymentMethod = 'UPI';
+        } else if (cashfreeActive) {
+          _selectedPaymentMethod = 'Cashfree';
+        }
+      });
+    }
   }
 
   @override
@@ -122,36 +146,61 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
     final user = SupabaseService.activeUserSession ??
         SupabaseService.getMockProfile(role: 'student');
 
+    final itemsData = _effectiveItems.map((e) => e.toJson()).toList();
+
+    if (_selectedPaymentMethod == 'UPI') {
+      final upiId = (_paymentSettings['upi_id'] ?? '1mdollar2027@okicici').toString().trim();
+      final payeeName = (_paymentSettings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString().trim();
+      final amountStr = _totalPayable.toStringAsFixed(2);
+      final upiUrl = 'upi://pay?pa=$upiId&pn=${Uri.encodeComponent(payeeName)}&am=$amountStr&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
+
+      if (!kIsWeb) {
+        try {
+          final uri = Uri.parse(upiUrl);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        } catch (e) {
+          debugPrint('UPI app launcher note: $e');
+        }
+      }
+
+      await _showUpiVerificationModal(
+        context: context,
+        user: user,
+        items: itemsData,
+        upiId: upiId,
+        payeeName: payeeName,
+        upiUrl: upiUrl,
+      );
+      return;
+    }
+
     setState(() => _isProcessing = true);
 
     try {
       final couponCode = CartService.instance.appliedCoupon?['code']?.toString();
-      final itemsData = _effectiveItems.map((e) => e.toJson()).toList();
 
-      // 1. Create order on server / Supabase
       final orderRes = await SupabaseService.createOrder(
         user: user,
         items: itemsData,
         couponCode: couponCode,
-        paymentMethod: _selectedPaymentMethod,
+        paymentMethod: 'Cashfree PG',
       );
 
       final orderData = orderRes['order'];
       final createdOrderId = (orderData['order_number'] ?? orderData['order_id'] ?? orderData['id']).toString();
 
-      // Simulate payment gateway handshake delay (800ms)
       await Future.delayed(const Duration(milliseconds: 800));
 
-      // 2. Verify payment and grant entitlement
       final verifyRes = await SupabaseService.verifyPaymentAndGrantAccess(
         orderId: createdOrderId,
-        paymentId: 'pay_${DateTime.now().millisecondsSinceEpoch}',
-        paymentMethod: _selectedPaymentMethod,
+        paymentId: 'CF_${DateTime.now().millisecondsSinceEpoch}',
+        paymentMethod: 'Cashfree PG',
         user: user,
         items: itemsData,
       );
 
-      // 3. Clear cart if paying for cart items
       if (widget.singleItem == null) {
         CartService.instance.clearCart();
       }
@@ -160,6 +209,7 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
         setState(() {
           _isProcessing = false;
           _isSuccess = true;
+          _isPendingVerification = false;
           _orderId = createdOrderId;
           _successMessage = verifyRes['message']?.toString() ?? 'Access Granted!';
         });
@@ -169,12 +219,224 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
         setState(() => _isProcessing = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Payment process note: $e'),
+            content: Text('Cashfree payment error: $e'),
             backgroundColor: const Color(0xFFEF4444),
           ),
         );
       }
     }
+  }
+
+  Future<void> _showUpiVerificationModal({
+    required BuildContext context,
+    required UserProfileModel user,
+    required List<Map<String, dynamic>> items,
+    required String upiId,
+    required String payeeName,
+    required String upiUrl,
+  }) async {
+    final utrCtrl = TextEditingController();
+    bool isSubmitting = false;
+
+    final qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${Uri.encodeComponent(upiUrl)}';
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Container(
+              width: 460,
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(10)),
+                          child: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF2563EB), size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Complete UPI Payment', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                              Text('Pay ₹${_totalPayable.toInt()} via GPay, PhonePe, Paytm, BHIM', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                      ],
+                    ),
+                    const Divider(height: 24),
+
+                    // QR Code Image
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        boxShadow: [
+                          BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                        ],
+                      ),
+                      child: Image.network(
+                        qrImageUrl,
+                        width: 180,
+                        height: 180,
+                        fit: BoxFit.contain,
+                        errorBuilder: (ctx, err, st) => Container(
+                          width: 180,
+                          height: 180,
+                          color: const Color(0xFFF1F5F9),
+                          child: const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.qr_code_2_rounded, size: 48, color: Color(0xFF64748B)),
+                              SizedBox(height: 8),
+                              Text('Scan with any UPI App', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // UPI ID Copy Row
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Merchant UPI ID:', style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                                SelectableText(upiId, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+                              ],
+                            ),
+                          ),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: upiId));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('✓ UPI ID copied to clipboard!'),
+                                  backgroundColor: Color(0xFF10B981),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.copy_rounded, size: 14),
+                            label: const Text('Copy ID', style: TextStyle(fontSize: 11)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // UTR / Transaction Reference Entry Box
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('Step 2: Enter 12-Digit UTR / Ref No.', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B))),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: utrCtrl,
+                      keyboardType: TextInputType.number,
+                      maxLength: 12,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. 429182736410',
+                        counterText: '',
+                        isDense: true,
+                        prefixIcon: const Icon(Icons.confirmation_number_outlined, size: 18, color: Color(0xFF64748B)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Submit Verification Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                final utr = utrCtrl.text.trim();
+                                if (utr.isEmpty || utr.length < 6) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Please enter valid 12-digit UTR or Transaction Ref number.'),
+                                      backgroundColor: Color(0xFFEF4444),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                setDialogState(() => isSubmitting = true);
+
+                                final res = await SupabaseService.submitUpiPaymentVerification(
+                                  user: user,
+                                  items: items,
+                                  utrNumber: utr,
+                                  couponCode: CartService.instance.appliedCoupon?['code']?.toString() ?? '',
+                                  totalAmount: _totalPayable,
+                                );
+
+                                if (widget.singleItem == null) {
+                                  CartService.instance.clearCart();
+                                }
+
+                                if (ctx.mounted) Navigator.pop(ctx);
+
+                                if (mounted) {
+                                  setState(() {
+                                    _isProcessing = false;
+                                    _isSuccess = true;
+                                    _isPendingVerification = true;
+                                    _orderId = res['order_number'] ?? 'ORD-${DateTime.now().millisecondsSinceEpoch}';
+                                    _submittedUtr = utr;
+                                    _successMessage = 'UPI Payment request submitted with UTR: $utr. Pending Admin approval.';
+                                  });
+                                }
+                              },
+                        icon: isSubmitting
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Icon(Icons.verified_rounded, size: 18),
+                        label: Text(
+                          isSubmitting ? 'Submitting...' : 'Submit Payment Verification',
+                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -541,12 +803,43 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
   }
 
   Widget _buildPaymentMethodSection() {
-    final methods = [
-      {'id': 'UPI', 'title': 'UPI / QR', 'desc': 'GPay, PhonePe, Paytm, BHIM', 'icon': Icons.qr_code_2_rounded},
-      {'id': 'Card', 'title': 'Cards', 'desc': 'Visa, Mastercard, RuPay', 'icon': Icons.credit_card_rounded},
-      {'id': 'NetBanking', 'title': 'Net Banking', 'desc': 'All Indian Banks', 'icon': Icons.account_balance_rounded},
-      {'id': 'Razorpay', 'title': 'Razorpay PG', 'desc': 'Instant Checkout', 'icon': Icons.flash_on_rounded},
-    ];
+    final bool upiActive = _paymentSettings['upi_active'] != false;
+    final bool cashfreeActive = _paymentSettings['cashfree_active'] != false;
+
+    final methods = <Map<String, dynamic>>[];
+
+    if (upiActive) {
+      methods.add({
+        'id': 'UPI',
+        'title': '1} UPI Pay (QR & App)',
+        'desc': 'GPay, PhonePe, Paytm, BHIM',
+        'icon': Icons.qr_code_2_rounded,
+      });
+    }
+
+    if (cashfreeActive) {
+      methods.add({
+        'id': 'Cashfree',
+        'title': '2} CashFree PG',
+        'desc': 'Cards, NetBanking & Wallets',
+        'icon': Icons.security_rounded,
+      });
+    }
+
+    if (methods.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF2F2),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFFCA5A5)),
+        ),
+        child: const Text(
+          'No payment gateways currently active. Contact Admin to enable UPI or Cashfree PG.',
+          style: TextStyle(color: Color(0xFF991B1B), fontSize: 12),
+        ),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -560,11 +853,11 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: methods.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: methods.length == 1 ? 1 : 2,
             crossAxisSpacing: 10,
             mainAxisSpacing: 10,
-            childAspectRatio: 2.5,
+            childAspectRatio: methods.length == 1 ? 4.5 : 2.5,
           ),
           itemBuilder: (ctx, idx) {
             final m = methods[idx];

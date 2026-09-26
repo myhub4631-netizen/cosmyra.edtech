@@ -857,12 +857,251 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
         children: [
           const Text('Quick Actions', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
           const SizedBox(height: 12),
+          _buildQuickActionItem('💳 Configure Payment Gateways (UPI & Cashfree)', Icons.payment_rounded, const Color(0xFF10B981), () => _showPaymentGatewayModal(context)),
           _buildQuickActionItem('+ Add New Plan', Icons.add, const Color(0xFF4F46E5), _openCreatePlanModal),
           _buildQuickActionItem('Manage Features', Icons.tune, const Color(0xFF64748B), () {}),
           _buildQuickActionItem('Plan Comparison', Icons.bar_chart, const Color(0xFF64748B), () {}),
           _buildQuickActionItem('Bulk Update Prices', Icons.sell_outlined, const Color(0xFF64748B), () {}),
           _buildQuickActionItem('Import/Export Plans', Icons.import_export, const Color(0xFF64748B), () {}),
         ],
+      ),
+    );
+  }
+
+  void _showPaymentGatewayModal(BuildContext context) async {
+    final settings = await SupabaseService.fetchPaymentSettings();
+    bool upiActive = settings['upi_active'] != false;
+    final upiIdCtrl = TextEditingController(text: (settings['upi_id'] ?? '1mdollar2027@okicici').toString());
+    final upiPayeeCtrl = TextEditingController(text: (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString());
+
+    bool cashfreeActive = settings['cashfree_active'] != false;
+    final cashfreeAppIdCtrl = TextEditingController(text: (settings['cashfree_app_id'] ?? '').toString());
+    final cashfreeSecretCtrl = TextEditingController(text: (settings['cashfree_secret_key'] ?? '').toString());
+    String cashfreeEnv = (settings['cashfree_environment'] ?? 'TEST').toString();
+
+    bool isSaving = false;
+
+    if (!context.mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setModalState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Container(
+              width: 580,
+              padding: const EdgeInsets.all(24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(12)),
+                          child: const Icon(Icons.payment_rounded, color: Color(0xFF4F46E5), size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Payment Gateways & Settings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                              Text('Control active payment options at checkout (UPI Pay, Cashfree PG)', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                      ],
+                    ),
+                    const Divider(height: 28),
+
+                    // SECTION 1: UPI PAY SETTINGS
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: upiActive ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: upiActive ? const Color(0xFF93C5FD) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF2563EB), size: 20),
+                                  SizedBox(width: 8),
+                                  Text('1} UPI Pay (GPay, PhonePe, Paytm, BHIM)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B))),
+                                ],
+                              ),
+                              Switch(
+                                value: upiActive,
+                                activeColor: const Color(0xFF2563EB),
+                                onChanged: (val) => setModalState(() => upiActive = val),
+                              ),
+                            ],
+                          ),
+                          if (upiActive) ...[
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: upiIdCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'Merchant UPI ID (VPA)',
+                                hintText: 'e.g. cosmyra@ybl or 1mdollar2027@okicici',
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: upiPayeeCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'Merchant / Payee Display Name',
+                                hintText: 'e.g. Cosmyra Edu Platform',
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text('• Mobile Users: Opens native installed UPI app automatically.\n• Web Users: Displays QR Code + Copy UPI ID + UTR entry box.', style: TextStyle(fontSize: 11, color: Color(0xFF475569))),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // SECTION 2: CASHFREE PG SETTINGS
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: cashfreeActive ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: cashfreeActive ? const Color(0xFF6EE7B7) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.shield_rounded, color: Color(0xFF059669), size: 20),
+                                  SizedBox(width: 8),
+                                  Text('2} Cashfree Payment Gateway', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B))),
+                                ],
+                              ),
+                              Switch(
+                                value: cashfreeActive,
+                                activeColor: const Color(0xFF059669),
+                                onChanged: (val) => setModalState(() => cashfreeActive = val),
+                              ),
+                            ],
+                          ),
+                          if (cashfreeActive) ...[
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: cashfreeAppIdCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'Cashfree App ID (Client ID)',
+                                hintText: 'e.g. TEST103444...',
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: cashfreeSecretCtrl,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Cashfree Secret Key',
+                                hintText: 'e.g. TEST418c39...',
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                const Text('Environment: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                ChoiceChip(
+                                  label: const Text('TEST (Sandbox)'),
+                                  selected: cashfreeEnv == 'TEST',
+                                  onSelected: (sel) {
+                                    if (sel) setModalState(() => cashfreeEnv = 'TEST');
+                                  },
+                                ),
+                                const SizedBox(width: 8),
+                                ChoiceChip(
+                                  label: const Text('PROD (Live)'),
+                                  selected: cashfreeEnv == 'PROD',
+                                  onSelected: (sel) {
+                                    if (sel) setModalState(() => cashfreeEnv = 'PROD');
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4F46E5),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  setModalState(() => isSaving = true);
+                                  await SupabaseService.savePaymentSettings({
+                                    'upi_active': upiActive,
+                                    'upi_id': upiIdCtrl.text.trim(),
+                                    'upi_payee_name': upiPayeeCtrl.text.trim(),
+                                    'cashfree_active': cashfreeActive,
+                                    'cashfree_app_id': cashfreeAppIdCtrl.text.trim(),
+                                    'cashfree_secret_key': cashfreeSecretCtrl.text.trim(),
+                                    'cashfree_environment': cashfreeEnv,
+                                  });
+                                  if (context.mounted) {
+                                    Navigator.pop(ctx);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('✓ Payment Gateway settings saved and active on website & app!'),
+                                        backgroundColor: Color(0xFF10B981),
+                                      ),
+                                    );
+                                  }
+                                },
+                          icon: isSaving
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.check_rounded, size: 18),
+                          label: const Text('Save & Update Checkout'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
