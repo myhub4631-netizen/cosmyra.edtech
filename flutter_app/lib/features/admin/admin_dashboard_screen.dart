@@ -411,6 +411,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     ),
                   ),
                 ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.go('/admin/payment-gateways'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      elevation: 2,
+                      shadowColor: const Color(0xFF10B981).withOpacity(0.3),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.payment_rounded, size: 18, color: Colors.white),
+                    label: const Text(
+                      '💳 Payment Gateways (UPI & Cashfree)',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 6),
 
                 _buildSidebarTile('Test Series Manager', Icons.track_changes_rounded, false, onTap: () => context.go('/admin/test-series-manager')),
@@ -432,7 +452,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('SALES & AUTOMATION'),
-                _buildSidebarTile('Orders & Purchases', Icons.shopping_bag_outlined, false, onTap: () => context.go('/admin/orders')),
+                _buildSidebarTile('💳 Payment Gateways (UPI & Cashfree)', Icons.payment_rounded, false, onTap: () => context.go('/admin/payment-gateways')),
+                _buildSidebarTile('Orders & Purchases (Verify UPI)', Icons.shopping_bag_outlined, false, onTap: () => context.go('/admin/orders')),
                 _buildSidebarTile('Email & WhatsApp Automation', Icons.mark_email_read_outlined, false, onTap: () => context.go('/admin/marketing-automation')),
 
                 const SizedBox(height: 16),
@@ -1341,6 +1362,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [
+            _buildQuickActionCard('💳 Payment Gateways', 'Configure UPI ID & Cashfree API keys', Icons.payment_rounded, const Color(0xFF10B981), () {
+              context.go('/admin/payment-gateways');
+            }),
+            _buildQuickActionCard('🛒 Orders & Verification', 'Verify UPI payments & grant access', Icons.shopping_bag_outlined, const Color(0xFF2563EB), () {
+              context.go('/admin/orders');
+            }),
             _buildQuickActionCard('Questions Bank', 'Manage & organize all question modules', Icons.quiz_outlined, const Color(0xFF4F46E5), () async {
               await Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
               _loadAdminData();
