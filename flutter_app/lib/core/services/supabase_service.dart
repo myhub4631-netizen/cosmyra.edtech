@@ -141,18 +141,14 @@ class SupabaseService {
       debugPrint('Auth signup notice (continuing profile creation): $e');
     }
 
-    if (email.trim().toLowerCase() == '1mdollar2027@gmail.com') {
-      role = 'superadmin';
-    }
-
     final realProfile = UserProfileModel(
       id: userId,
       email: email,
-      fullName: email.trim().toLowerCase() == '1mdollar2027@gmail.com' ? 'Mahboob (Super Admin)' : fullName,
+      fullName: fullName,
       phoneNumber: phone,
       targetExam: targetExam,
       targetYear: targetYear,
-      role: email.trim().toLowerCase() == '1mdollar2027@gmail.com' ? 'superadmin' : role,
+      role: role,
       studyStreak: 1,
       questionsAttempted: 0,
       totalCorrect: 0,
@@ -599,23 +595,6 @@ class SupabaseService {
 
 
   static UserProfileModel _ensureSuperAdminRole(UserProfileModel profile) {
-    if (profile.email.toLowerCase().trim() == '1mdollar2027@gmail.com') {
-      return UserProfileModel(
-        id: profile.id.isEmpty ? 'usr-superadmin-01' : profile.id,
-        email: profile.email,
-        fullName: profile.fullName.isNotEmpty && !profile.fullName.contains('Student') ? profile.fullName : 'Mahboob 1md Admin',
-        avatarUrl: profile.avatarUrl,
-        phoneNumber: profile.phoneNumber,
-        targetExam: profile.targetExam,
-        targetYear: profile.targetYear,
-        role: 'superadmin',
-        studyStreak: profile.studyStreak > 0 ? profile.studyStreak : 32,
-        questionsAttempted: profile.questionsAttempted > 0 ? profile.questionsAttempted : 1248,
-        totalCorrect: profile.totalCorrect > 0 ? profile.totalCorrect : 903,
-        accuracy: profile.accuracy > 0 ? profile.accuracy : 72.4,
-        rank: profile.rank > 0 ? profile.rank : 1,
-      );
-    }
     return profile;
   }
 
@@ -770,7 +749,7 @@ class SupabaseService {
             phoneNumber: userPhone.isNotEmpty ? userPhone : null,
             targetExam: 'NEET',
             targetYear: 2026,
-            role: userEmail.toLowerCase() == '1mdollar2027@gmail.com' ? 'superadmin' : 'student',
+            role: 'student',
           );
 
           try {
@@ -7374,16 +7353,15 @@ class SupabaseService {
     final now = DateTime.now();
     final expiry = now.add(const Duration(days: 365));
 
-    // Update order status in Supabase
+    // 1. Call server-side atomic fulfillment RPC
     try {
-      await client.from('orders').update({
-        'status': 'completed',
-        'payment_id': paymentId,
-        'payment_method': paymentMethod,
-        'updated_at': now.toIso8601String(),
-      }).eq('id', orderId);
+      await client.rpc('approve_and_fulfill_order', params: {
+        'p_order_id': orderId,
+        'p_admin_id': user.isAdmin ? user.id : null,
+        'p_payment_id': paymentId,
+      });
     } catch (e) {
-      debugPrint('Notice updating order in Supabase: $e');
+      debugPrint('Notice server approve_and_fulfill_order RPC: $e');
     }
 
     final List<Map<String, dynamic>> grantedEntitlements = [];

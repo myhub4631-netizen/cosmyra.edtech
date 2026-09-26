@@ -36,8 +36,7 @@ class AppAvatar extends StatelessWidget {
     final isCurrentUserOrAdmin = profile == null ||
         currentEmail.isEmpty ||
         currentEmail == sessionEmail ||
-        currentEmail == authEmail ||
-        currentEmail == '1mdollar2027@gmail.com';
+        currentEmail == authEmail;
 
     if ((resolvedUrl == null || resolvedUrl.trim().isEmpty) && isCurrentUserOrAdmin) {
       resolvedUrl = SupabaseService.activeUserSession?.avatarUrl;

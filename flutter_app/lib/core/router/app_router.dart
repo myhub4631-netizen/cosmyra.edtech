@@ -113,24 +113,16 @@ UserProfileModel _getEffectiveAdminProfile() {
   if (user != null) {
     return UserProfileModel(
       id: user.id,
-      email: user.email ?? '1mdollar2027@gmail.com',
-      fullName: (meta?['full_name'] ?? meta?['name'] ?? 'Mahboob 1md Admin').toString(),
+      email: user.email ?? '',
+      fullName: (meta?['full_name'] ?? meta?['name'] ?? user.email ?? 'User').toString(),
       avatarUrl: googleAvatar,
       phoneNumber: (user.phone ?? meta?['phone'] ?? meta?['phone_number'])?.toString(),
-      role: 'superadmin',
+      role: (meta?['role'] ?? 'student').toString(),
       targetExam: 'NEET & JEE',
       targetYear: 2026,
     );
   }
-  return UserProfileModel(
-    id: 'usr-superadmin-01',
-    email: '1mdollar2027@gmail.com',
-    fullName: 'Mahboob 1md Admin',
-    avatarUrl: googleAvatar,
-    role: 'superadmin',
-    targetExam: 'NEET & JEE',
-    targetYear: 2026,
-  );
+  return SupabaseService.getMockProfile(role: 'student');
 }
 
 final GoRouter appRouter = GoRouter(

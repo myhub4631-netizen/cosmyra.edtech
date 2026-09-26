@@ -145,7 +145,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         .map((p) {
       final em = p.email.toLowerCase().trim();
       String userRole = 'Student';
-      if (em == '1mdollar2027@gmail.com' || p.role.toLowerCase() == 'superadmin') {
+      if (p.role.toLowerCase() == 'superadmin' || p.role.toLowerCase() == 'super_admin') {
         userRole = 'Super Administrator';
       } else if (p.role.toLowerCase() == 'admin' || p.role.toLowerCase() == 'administrator') {
         userRole = 'Administrator';
@@ -331,13 +331,11 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
   // Permission guards
   bool get _isCurrentSuperAdmin {
-    final em = widget.userProfile.email.toLowerCase().trim();
-    return widget.userProfile.isSuperAdmin || em == '1mdollar2027@gmail.com';
+    return widget.userProfile.isSuperAdmin;
   }
 
   bool _isUserSuperAdmin(AdminUserModel u) {
-    final em = u.email.toLowerCase().trim();
-    return em == '1mdollar2027@gmail.com' || u.role.toLowerCase().contains('super');
+    return u.role.toLowerCase().contains('super');
   }
 
   bool _canManageUser(AdminUserModel targetUser) {

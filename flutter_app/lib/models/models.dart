@@ -55,15 +55,13 @@ class UserProfileModel {
   });
 
   bool get isAdmin =>
-      role == 'admin' ||
-      role == 'superadmin' ||
-      role == 'super_admin' ||
-      email.toLowerCase().trim() == '1mdollar2027@gmail.com';
+      role.toLowerCase() == 'admin' ||
+      role.toLowerCase() == 'superadmin' ||
+      role.toLowerCase() == 'super_admin';
 
   bool get isSuperAdmin =>
-      role == 'superadmin' ||
-      role == 'super_admin' ||
-      email.toLowerCase().trim() == '1mdollar2027@gmail.com';
+      role.toLowerCase() == 'superadmin' ||
+      role.toLowerCase() == 'super_admin';
 
   UserProfileModel copyWith({
     String? id,

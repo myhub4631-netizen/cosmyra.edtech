@@ -12,16 +12,32 @@ serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: req.headers.get("Authorization")! } } }
+      { global: { headers: { Authorization: authHeader } } }
     );
+
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized caller" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const body = await req.json();
     const {
-      channel, // 'brevo_email' | 'whatsapp' | 'both'
-      type,    // 'account_creation' | 'order_placed' | 'payment_due' | 'password_reset' | 'add_to_cart' | 'cart_recovery' | 'marketing'
+      channel,
+      type,
       recipient_email,
       recipient_phone,
       subject,
@@ -40,7 +56,7 @@ serve(async (req) => {
 
     const results: Record<string, any> = {};
 
-    // 1. SEND BREVO EMAIL
+    // 1. SEND BREVO EMAIL WITH RETRY LOGIC FOR HTTP 429
     if ((channel === "brevo_email" || channel === "both") && recipient_email) {
       if (!brevoApiKey) {
         results.email = { success: false, message: "BREVO_API_KEY environment variable missing" };
@@ -52,32 +68,45 @@ serve(async (req) => {
           htmlContent: html_content || "<p>Hello from Cosmyra Edu!</p>",
         };
 
-        const emailRes = await fetch("https://api.brevo.com/v3/smtp/email", {
-          method: "POST",
-          headers: {
-            "accept": "application/json",
-            "api-key": brevoApiKey,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify(emailPayload),
-        });
+        let attempts = 0;
+        let emailRes: Response | null = null;
+        let resData: any = null;
 
-        const resData = await emailRes.json();
+        while (attempts < 3) {
+          attempts++;
+          emailRes = await fetch("https://api.brevo.com/v3/smtp/email", {
+            method: "POST",
+            headers: {
+              "accept": "application/json",
+              "api-key": brevoApiKey,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(emailPayload),
+          });
+
+          resData = await emailRes.json();
+          if (emailRes.status !== 429) {
+            break;
+          }
+          // Backoff delay for 429 rate limits
+          await new Promise((r) => setTimeout(r, 1000 * attempts));
+        }
+
         results.email = {
-          status: emailRes.status,
-          success: emailRes.ok,
+          status: emailRes?.status,
+          success: emailRes?.ok ?? false,
           data: resData,
         };
 
         // Log notification to database
         try {
           await supabaseClient.from("notification_logs").insert({
-            user_id: user_id || null,
+            user_id: user_id || user.id,
             recipient_email,
             recipient_phone: recipient_phone || "",
             type: type || "general",
             channel: "brevo_email",
-            status: emailRes.ok ? "sent" : "failed",
+            status: emailRes?.ok ? "sent" : "failed",
             subject: subject || "",
             message_body: html_content || "",
             provider_response: resData,
@@ -94,7 +123,6 @@ serve(async (req) => {
       const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
 
       if (!whatsappToken || !whatsappPhoneId) {
-        // Fallback simulated delivery status when direct Meta Cloud API keys are in setup mode
         results.whatsapp = {
           success: true,
           mode: "simulated_verification",
@@ -129,10 +157,9 @@ serve(async (req) => {
         };
       }
 
-      // Log WhatsApp notification to database
       try {
         await supabaseClient.from("notification_logs").insert({
-          user_id: user_id || null,
+          user_id: user_id || user.id,
           recipient_email: recipient_email || "",
           recipient_phone: formattedPhone,
           type: type || "general",
