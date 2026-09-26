@@ -490,18 +490,19 @@ class SupabaseService {
 
   static Future<bool> signInWithGoogle() async {
     try {
-      // 1. Android Native OAuth Client ID matching google-services.json project (672019832931)
-      const String androidFirebaseWebClientId = '672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com';
-      // 2. Secondary Web Client ID (852782340906)
+      // Primary Web Client ID used by Supabase Auth & Web index.html
       const String supabaseWebClientId = '852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com';
+      // Secondary Web Client ID from Firebase google-services.json
+      const String androidFirebaseWebClientId = '672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com';
 
-      final List<String> clientIdsToTry = [androidFirebaseWebClientId, supabaseWebClientId];
+      final List<String> clientIdsToTry = [supabaseWebClientId, androidFirebaseWebClientId];
 
       for (final clientId in clientIdsToTry) {
         try {
           final GoogleSignIn googleSignIn = GoogleSignIn(
             clientId: kIsWeb ? clientId : null,
             serverClientId: clientId,
+            scopes: ['email', 'profile'],
           );
 
           try {
@@ -534,11 +535,11 @@ class SupabaseService {
             }
           }
         } catch (nativeErr) {
-          debugPrint('Native Google Sign-In ($clientId) error: $nativeErr');
+          debugPrint('Native Google Sign-In ($clientId) notice: $nativeErr');
         }
       }
 
-      // 3. Fallback to Supabase OAuth (In-App WebView for Mobile to intercept deep link)
+      // Fallback to Supabase OAuth (System browser / External Application to avoid Google disallowed_useragent error)
       final String redirectUrl = kIsWeb
           ? (Uri.base.origin.contains('localhost')
               ? 'https://neet-jee.in/dashboard'
@@ -548,7 +549,7 @@ class SupabaseService {
       final bool res = await client.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: redirectUrl,
-        authScreenLaunchMode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.inAppWebView,
+        authScreenLaunchMode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
       );
       return res;
     } catch (e) {

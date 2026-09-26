@@ -9571,17 +9571,19 @@ break
 case 1:return A.A(q,r)
 case 2:return A.z(o.at(-1),r)}})
 return A.B($async$pU,r)},
-pV(){var s=0,r=A.C(t.y),q,p=2,o=[],n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1
-var $async$pV=A.y(function(b2,b3){if(b2===1){o.push(b3)
+pV(){var s=0,r=A.C(t.y),q,p=2,o=[],n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2
+var $async$pV=A.y(function(b3,b4){if(b3===1){o.push(b4)
 s=p}while(true)switch(s){case 0:p=4
-n=A.a(["672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com","852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com"],t.s)
-a0=n,a1=a0.length,a2=t.io,a3=0
-case 7:if(!(a3<a0.length)){s=9
-break}m=a0[a3]
+a0=t.s
+n=A.a(["852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com","672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com"],a0)
+a1=n,a2=a1.length,a3=t.io,a4=0
+case 7:if(!(a4<a1.length)){s=9
+break}m=a1[a4]
 p=11
-a4=new A.a4O(m,m,new A.iN(null,null,a2))
-a4.Jn()
-l=a4
+a5=A.a(["email","profile"],a0)
+a6=new A.a4O(a5,m,m,new A.iN(null,null,a3))
+a6.Jn()
+l=a6
 p=15
 s=18
 return A.m(l.auZ($.a0j().ga1z()),$async$pV)
@@ -9589,34 +9591,34 @@ case 18:p=11
 s=17
 break
 case 15:p=14
-a8=o.pop()
+a9=o.pop()
 s=17
 break
 case 14:s=11
 break
 case 17:s=19
 return A.m(l.la(),$async$pV)
-case 19:k=b3
+case 19:k=b4
 s=k!=null?20:21
 break
 case 20:s=22
 return A.m(k.gMu(),$async$pV)
-case 22:j=b3
+case 22:j=b4
 i=j.a.a
 h=j.a.b
 s=i!=null&&i.length!==0?23:24
 break
 case 23:p=26
-a6=$.aK().b
-a6===$&&A.b()
+a5=$.aK().b
+a5===$&&A.b()
 s=29
-return A.m(a6.ger().HN(h,i,B.yX),$async$pV)
-case 29:g=b3
+return A.m(a5.ger().HN(h,i,B.yX),$async$pV)
+case 29:g=b4
 s=g.b!=null?30:31
 break
 case 30:s=32
 return A.m(A.k8(),$async$pV)
-case 32:f=b3
+case 32:f=b4
 s=f!=null?33:34
 break
 case 33:s=35
@@ -9628,8 +9630,8 @@ case 34:case 31:p=11
 s=28
 break
 case 26:p=25
-a9=o.pop()
-e=A.T(a9)
+b0=o.pop()
+e=A.T(b0)
 A.ak().$1("Supabase signInWithIdToken ("+A.l(m)+") error: "+A.l(e))
 s=28
 break
@@ -9639,25 +9641,25 @@ case 28:case 24:case 21:p=4
 s=13
 break
 case 11:p=10
-b0=o.pop()
-d=A.T(b0)
-A.ak().$1("Native Google Sign-In ("+A.l(m)+") error: "+A.l(d))
+b1=o.pop()
+d=A.T(b1)
+A.ak().$1("Native Google Sign-In ("+A.l(m)+") notice: "+A.l(d))
 s=13
 break
 case 10:s=4
 break
-case 13:case 8:a0.length===a1||(0,A.a4)(a0),++a3
+case 13:case 8:a1.length===a2||(0,A.a4)(a1),++a4
 s=7
 break
 case 9:a0=A.U_()
-if(B.c.k(a0.gvP(a0),"localhost"))a7="https://neet-jee.in/dashboard"
+if(B.c.k(a0.gvP(a0),"localhost"))a8="https://neet-jee.in/dashboard"
 else{a0=A.U_()
-a7=a0.gvP(a0)+"/dashboard"}c=a7
+a8=a0.gvP(a0)+"/dashboard"}c=a8
 a0=$.aK().b
 a0===$&&A.b()
 s=36
 return A.m(A.aAT(a0.ger(),B.yX,B.Qn,c),$async$pV)
-case 36:b=b3
+case 36:b=b4
 q=b
 s=1
 break
@@ -9665,8 +9667,8 @@ p=2
 s=6
 break
 case 4:p=3
-b1=o.pop()
-a=A.T(b1)
+b2=o.pop()
+a=A.T(b2)
 A.ak().$1("Google Sign-In overall error: "+A.l(a))
 q=!1
 s=1
@@ -48955,10 +48957,11 @@ _.d=d
 _.e=e
 _.f=f
 _.r=g},
-a4O:function a4O(a,b,c){var _=this
-_.d=a
-_.e=b
-_.w=c
+a4O:function a4O(a,b,c,d){var _=this
+_.b=a
+_.d=b
+_.e=c
+_.w=d
 _.z=_.y=_.x=null},
 aBa:function aBa(a){this.a=a},
 aB9:function aB9(a){this.a=a},
@@ -162412,7 +162415,7 @@ return A.B($async$Jn,r)},
 Jd(){var s=0,r=A.C(t.H),q=this,p
 var $async$Jd=A.y(function(a,b){if(a===1)return A.z(b,r)
 while(true)switch(s){case 0:s=2
-return A.m($.a0j().Fy(new A.aRt(B.P,B.bvm,null,q.d,q.e,!1)),$async$Jd)
+return A.m($.a0j().Fy(new A.aRt(q.b,B.bvm,null,q.d,q.e,!1)),$async$Jd)
 case 2:p=$.a0j().galK()
 if(p!=null)new A.vI(new A.aB9(q),p,p.$ti.i("vI<eF.T,l4?>")).aC(0,q.gaS2())
 return A.A(null,r)}})
