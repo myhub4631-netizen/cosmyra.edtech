@@ -490,12 +490,12 @@ class SupabaseService {
 
   static Future<bool> signInWithGoogle() async {
     try {
-      // Primary Web Client ID used by Supabase Auth & Web index.html
-      const String supabaseWebClientId = '852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com';
-      // Secondary Web Client ID from Firebase google-services.json
+      // Primary Web Client ID matching google-services.json (project 672019832931)
       const String androidFirebaseWebClientId = '672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com';
+      // Secondary Web Client ID (project 852782340906)
+      const String supabaseWebClientId = '852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com';
 
-      final List<String> clientIdsToTry = [supabaseWebClientId, androidFirebaseWebClientId];
+      final List<String> clientIdsToTry = [androidFirebaseWebClientId, supabaseWebClientId];
 
       for (final clientId in clientIdsToTry) {
         try {
