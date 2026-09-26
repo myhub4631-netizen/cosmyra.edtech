@@ -185,6 +185,9 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
       final realCohort = '$exam $year$classLvl';
 
       String? userAvatar = p.avatarUrl;
+      if (edit != null && edit['avatarUrl'] != null && edit['avatarUrl'].toString().trim().isNotEmpty) {
+        userAvatar = edit['avatarUrl'].toString().trim();
+      }
       if (userAvatar == null || userAvatar.isEmpty) {
         if (em == SupabaseService.activeUserSession?.email.toLowerCase().trim()) {
           userAvatar = SupabaseService.activeUserSession?.avatarUrl;
@@ -259,6 +262,14 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   }
 
   List<AdminUserModel> _getInitialSystemUsers() {
+    final activeAvatar = SupabaseService.activeUserSession?.avatarUrl ??
+        (SupabaseService.client.auth.currentUser?.userMetadata != null
+            ? (SupabaseService.client.auth.currentUser?.userMetadata!['avatar_url'] ??
+                    SupabaseService.client.auth.currentUser?.userMetadata!['picture'] ??
+                    SupabaseService.client.auth.currentUser?.userMetadata!['photo_url'])
+                ?.toString()
+            : null);
+
     return [
       AdminUserModel(
         id: 'usr-superadmin-01',
@@ -275,6 +286,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         regSource: 'System Master Admin',
         avatarInitials: 'M1',
         avatarColor: const Color(0xFF6366F1),
+        avatarUrl: activeAvatar,
       ),
       AdminUserModel(
         id: 'usr-student-02',
@@ -291,6 +303,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         regSource: 'Web Portal',
         avatarInitials: 'M2',
         avatarColor: const Color(0xFF3B82F6),
+        avatarUrl: SupabaseService.activeUserSession?.email.toLowerCase() == 'myhub4632@gmail.com' ? activeAvatar : null,
       ),
       AdminUserModel(
         id: 'usr-student-03',
@@ -307,6 +320,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         regSource: 'Web Portal',
         avatarInitials: 'M1',
         avatarColor: const Color(0xFF3B82F6),
+        avatarUrl: SupabaseService.activeUserSession?.email.toLowerCase() == 'myhub4631@gmail.com' ? activeAvatar : null,
       ),
     ];
   }

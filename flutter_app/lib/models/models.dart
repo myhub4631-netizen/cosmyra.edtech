@@ -116,6 +116,42 @@ class UserProfileModel {
   }
 
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
+    Map<String, dynamic>? meta;
+    if (json['raw_user_meta_data'] is Map<String, dynamic>) {
+      meta = json['raw_user_meta_data'] as Map<String, dynamic>;
+    } else if (json['user_metadata'] is Map<String, dynamic>) {
+      meta = json['user_metadata'] as Map<String, dynamic>;
+    } else if (json['metadata'] is Map<String, dynamic>) {
+      meta = json['metadata'] as Map<String, dynamic>;
+    }
+
+    String? resolvedAvatar = (json['avatar_url'] != null && json['avatar_url'].toString().trim().isNotEmpty)
+        ? json['avatar_url'].toString().trim()
+        : (json['avatarUrl'] != null && json['avatarUrl'].toString().trim().isNotEmpty)
+            ? json['avatarUrl'].toString().trim()
+            : (json['picture'] != null && json['picture'].toString().trim().isNotEmpty)
+                ? json['picture'].toString().trim()
+                : (json['photo_url'] != null && json['photo_url'].toString().trim().isNotEmpty)
+                    ? json['photo_url'].toString().trim()
+                    : (json['photoUrl'] != null && json['photoUrl'].toString().trim().isNotEmpty)
+                        ? json['photoUrl'].toString().trim()
+                        : (json['avatar'] != null && json['avatar'].toString().trim().isNotEmpty)
+                            ? json['avatar'].toString().trim()
+                            : (json['picture_url'] != null && json['picture_url'].toString().trim().isNotEmpty)
+                                ? json['picture_url'].toString().trim()
+                                : null;
+
+    if ((resolvedAvatar == null || resolvedAvatar.isEmpty) && meta != null) {
+      resolvedAvatar = (meta['avatar_url'] ??
+              meta['picture'] ??
+              meta['photo_url'] ??
+              meta['photoUrl'] ??
+              meta['avatar'] ??
+              meta['picture_url'])
+          ?.toString()
+          .trim();
+    }
+
     return UserProfileModel(
       id: json['id'] ?? '',
       email: json['email'] ?? '',
@@ -126,19 +162,7 @@ class UserProfileModel {
               : (json['email'] != null && json['email'].toString().contains('@'))
                   ? json['email'].toString().split('@').first
                   : 'Student',
-      avatarUrl: (json['avatar_url'] != null && json['avatar_url'].toString().trim().isNotEmpty)
-          ? json['avatar_url'].toString().trim()
-          : (json['avatarUrl'] != null && json['avatarUrl'].toString().trim().isNotEmpty)
-              ? json['avatarUrl'].toString().trim()
-              : (json['picture'] != null && json['picture'].toString().trim().isNotEmpty)
-                  ? json['picture'].toString().trim()
-                  : (json['photo_url'] != null && json['photo_url'].toString().trim().isNotEmpty)
-                      ? json['photo_url'].toString().trim()
-                      : (json['photoUrl'] != null && json['photoUrl'].toString().trim().isNotEmpty)
-                          ? json['photoUrl'].toString().trim()
-                          : (json['avatar'] != null && json['avatar'].toString().trim().isNotEmpty)
-                              ? json['avatar'].toString().trim()
-                              : null,
+      avatarUrl: (resolvedAvatar != null && resolvedAvatar.isNotEmpty) ? resolvedAvatar : null,
       phoneNumber: (json['phone_number'] != null && json['phone_number'].toString().trim().isNotEmpty)
           ? json['phone_number'].toString().trim()
           : (json['phone'] != null && json['phone'].toString().trim().isNotEmpty)

@@ -96,18 +96,27 @@ UserProfileModel _getEffectiveProfile() {
 }
 
 UserProfileModel _getEffectiveAdminProfile() {
-  if (SupabaseService.activeUserSession != null) {
-    return SupabaseService.activeUserSession!;
-  }
   final user = SupabaseService.client.auth.currentUser;
+  final meta = user?.userMetadata;
+  final googleAvatar = meta != null
+      ? (meta['avatar_url'] ?? meta['picture'] ?? meta['photo_url'] ?? meta['avatar'] ?? meta['picture_url'])?.toString()
+      : null;
+
+  if (SupabaseService.activeUserSession != null) {
+    var session = SupabaseService.activeUserSession!;
+    if ((session.avatarUrl == null || session.avatarUrl!.trim().isEmpty) && googleAvatar != null && googleAvatar.trim().isNotEmpty) {
+      session = session.copyWith(avatarUrl: googleAvatar.trim());
+    }
+    return session;
+  }
+
   if (user != null) {
-    final meta = user.userMetadata ?? {};
     return UserProfileModel(
       id: user.id,
       email: user.email ?? '1mdollar2027@gmail.com',
-      fullName: (meta['full_name'] ?? meta['name'] ?? 'Mahboob 1md Admin').toString(),
-      avatarUrl: (meta['avatar_url'] ?? meta['picture'] ?? meta['photo_url'])?.toString(),
-      phoneNumber: (user.phone ?? meta['phone'] ?? meta['phone_number'])?.toString(),
+      fullName: (meta?['full_name'] ?? meta?['name'] ?? 'Mahboob 1md Admin').toString(),
+      avatarUrl: googleAvatar,
+      phoneNumber: (user.phone ?? meta?['phone'] ?? meta?['phone_number'])?.toString(),
       role: 'superadmin',
       targetExam: 'NEET & JEE',
       targetYear: 2026,
@@ -117,6 +126,7 @@ UserProfileModel _getEffectiveAdminProfile() {
     id: 'usr-superadmin-01',
     email: '1mdollar2027@gmail.com',
     fullName: 'Mahboob 1md Admin',
+    avatarUrl: googleAvatar,
     role: 'superadmin',
     targetExam: 'NEET & JEE',
     targetYear: 2026,

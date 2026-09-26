@@ -20,9 +20,9 @@ class SmartImage extends StatelessWidget {
     this.fallback,
   });
 
-  /// On Flutter Web, external image hosts (like Google CDN lh3.googleusercontent.com)
-  /// block direct XHR/fetch requests via CORS when rendered with CanvasKit/Skwasm.
-  /// We route external images on Web through the high-speed, CORS-compliant Cloudflare CDN proxy.
+  /// On Flutter Web, external image hosts block direct XHR/fetch requests via CORS when rendered with CanvasKit/Skwasm.
+  /// Google avatar CDN URLs (lh3.googleusercontent.com, etc.) serve images directly to browser `<img src="...">`.
+  /// Proxying Google CDN through weserv.nl gets blocked by Google's anti-bot system with HTTP 403 Forbidden.
   static String resolveWebSafeUrl(String rawUrl) {
     final clean = rawUrl.trim();
     if (clean.isEmpty || clean.startsWith('data:image/') || clean.startsWith('blob:')) {
@@ -30,8 +30,11 @@ class SmartImage extends StatelessWidget {
     }
     if (kIsWeb) {
       if (clean.contains('googleusercontent.com') ||
-          clean.contains('googleapis.com') ||
-          (!clean.contains('wsrv.nl') && !clean.contains('images.weserv.nl') && clean.startsWith('http'))) {
+          clean.contains('ggpht.com') ||
+          clean.contains('google.com')) {
+        return clean;
+      }
+      if (!clean.contains('wsrv.nl') && !clean.contains('images.weserv.nl') && clean.startsWith('http')) {
         return 'https://images.weserv.nl/?url=${Uri.encodeComponent(clean)}';
       }
     }

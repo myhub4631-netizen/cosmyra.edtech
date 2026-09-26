@@ -29,13 +29,26 @@ class AppAvatar extends StatelessWidget {
     BoxBorder? border,
   }) {
     String? resolvedUrl = profile?.avatarUrl;
-    if (resolvedUrl == null || resolvedUrl.trim().isEmpty) {
+    final currentEmail = profile?.email.toLowerCase().trim() ?? '';
+    final sessionEmail = SupabaseService.activeUserSession?.email.toLowerCase().trim() ?? '';
+    final authEmail = SupabaseService.client.auth.currentUser?.email?.toLowerCase().trim() ?? '';
+
+    final isCurrentUserOrAdmin = profile == null ||
+        currentEmail.isEmpty ||
+        currentEmail == sessionEmail ||
+        currentEmail == authEmail ||
+        currentEmail == '1mdollar2027@gmail.com';
+
+    if ((resolvedUrl == null || resolvedUrl.trim().isEmpty) && isCurrentUserOrAdmin) {
       resolvedUrl = SupabaseService.activeUserSession?.avatarUrl;
     }
-    if (resolvedUrl == null || resolvedUrl.trim().isEmpty) {
-      final meta = SupabaseService.client.auth.currentUser?.userMetadata;
-      if (meta != null) {
-        resolvedUrl = (meta['avatar_url'] ?? meta['picture'] ?? meta['photo_url'] ?? meta['avatar'])?.toString();
+    if ((resolvedUrl == null || resolvedUrl.trim().isEmpty) && isCurrentUserOrAdmin) {
+      final user = SupabaseService.client.auth.currentUser;
+      if (user != null) {
+        final meta = user.userMetadata;
+        if (meta != null) {
+          resolvedUrl = (meta['avatar_url'] ?? meta['picture'] ?? meta['photo_url'] ?? meta['avatar'] ?? meta['picture_url'])?.toString();
+        }
       }
     }
 
