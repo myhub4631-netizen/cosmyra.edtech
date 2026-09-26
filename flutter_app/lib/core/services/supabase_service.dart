@@ -490,53 +490,47 @@ class SupabaseService {
 
   static Future<bool> signInWithGoogle() async {
     try {
-      // Primary Web Client ID (matches Supabase Auth Provider & Google Cloud 852782340906)
-      const String supabaseWebClientId = '852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com';
-      // Secondary Web Client ID (from Firebase google-services.json project 672019832931)
-      const String androidFirebaseWebClientId = '672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com';
+      // Web Client ID (from Firebase project 672019832931)
+      const String webClientId = '672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com';
 
-      final List<String> clientIdsToTry = [supabaseWebClientId, androidFirebaseWebClientId];
+      try {
+        final GoogleSignIn googleSignIn = GoogleSignIn(
+          clientId: kIsWeb ? webClientId : null,
+          serverClientId: webClientId,
+          scopes: ['email', 'profile'],
+        );
 
-      for (final clientId in clientIdsToTry) {
         try {
-          final GoogleSignIn googleSignIn = GoogleSignIn(
-            clientId: kIsWeb ? clientId : null,
-            serverClientId: clientId,
-            scopes: ['email', 'profile'],
-          );
+          await googleSignIn.signOut();
+        } catch (_) {}
 
-          try {
-            await googleSignIn.signOut();
-          } catch (_) {}
+        final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+        if (googleUser != null) {
+          final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+          final String? idToken = googleAuth.idToken;
+          final String? accessToken = googleAuth.accessToken;
 
-          final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-          if (googleUser != null) {
-            final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-            final String? idToken = googleAuth.idToken;
-            final String? accessToken = googleAuth.accessToken;
-
-            if (idToken != null && idToken.isNotEmpty) {
-              try {
-                final authRes = await client.auth.signInWithIdToken(
-                  provider: OAuthProvider.google,
-                  idToken: idToken,
-                  accessToken: accessToken,
-                );
-                if (authRes.user != null) {
-                  final profile = await getCurrentUser();
-                  if (profile != null) {
-                    await setActiveUserSession(profile);
-                    return true;
-                  }
+          if (idToken != null && idToken.isNotEmpty) {
+            try {
+              final authRes = await client.auth.signInWithIdToken(
+                provider: OAuthProvider.google,
+                idToken: idToken,
+                accessToken: accessToken,
+              );
+              if (authRes.user != null) {
+                final profile = await getCurrentUser();
+                if (profile != null) {
+                  await setActiveUserSession(profile);
+                  return true;
                 }
-              } catch (idTokenErr) {
-                debugPrint('Supabase signInWithIdToken ($clientId) error: $idTokenErr');
               }
+            } catch (idTokenErr) {
+              debugPrint('Supabase signInWithIdToken error: $idTokenErr');
             }
           }
-        } catch (nativeErr) {
-          debugPrint('Native Google Sign-In ($clientId) notice: $nativeErr');
         }
+      } catch (nativeErr) {
+        debugPrint('Native Google Sign-In notice: $nativeErr');
       }
 
       // Fallback to Supabase OAuth
