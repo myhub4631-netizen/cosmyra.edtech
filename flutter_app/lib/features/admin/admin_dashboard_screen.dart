@@ -65,16 +65,45 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   }
 
   Future<void> _loadAdminData() async {
-    setState(() => _isLoading = true);
-    final questions = await SupabaseService.fetchQuestions(limit: 100);
-    final reports = await SupabaseService.getReportedQuestions();
-    final profiles = await SupabaseService.fetchAllProfiles();
-    setState(() {
-      _questionBank = questions;
-      _reports = reports;
-      _totalRealUsers = profiles.length;
-      _isLoading = false;
-    });
+    if (_questionBank.isEmpty) {
+      setState(() => _isLoading = true);
+    }
+
+    try {
+      // Execute all 3 data fetches concurrently in parallel instead of sequentially
+      final results = await Future.wait([
+        SupabaseService.fetchQuestions(limit: 50).timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => <QuestionModel>[],
+        ),
+        SupabaseService.getReportedQuestions().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => <ReportModel>[],
+        ),
+        SupabaseService.fetchAllProfiles().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => <UserProfileModel>[],
+        ),
+      ]);
+
+      final questions = results[0] as List<QuestionModel>;
+      final reports = results[1] as List<ReportModel>;
+      final profiles = results[2] as List<UserProfileModel>;
+
+      if (mounted) {
+        setState(() {
+          if (questions.isNotEmpty) _questionBank = questions;
+          _reports = reports;
+          if (profiles.isNotEmpty) _totalRealUsers = profiles.length;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Admin data load notice: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _openQuestionEditor({QuestionModel? questionToEdit}) {
@@ -402,8 +431,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 _buildSidebarTile('Bookmarks', Icons.bookmark_outline_rounded, false, onTap: () => context.go('/bookmarks')),
 
                 const SizedBox(height: 16),
-                _buildSidebarSectionLabel('SALES & ORDERS'),
+                _buildSidebarSectionLabel('SALES & AUTOMATION'),
                 _buildSidebarTile('Orders & Purchases', Icons.shopping_bag_outlined, false, onTap: () => context.go('/admin/orders')),
+                _buildSidebarTile('Email & WhatsApp Automation', Icons.mark_email_read_outlined, false, onTap: () => context.go('/admin/marketing-automation')),
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('USERS & ROLES'),

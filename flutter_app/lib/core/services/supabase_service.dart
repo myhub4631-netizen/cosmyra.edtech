@@ -7,6 +7,7 @@ import '../../models/models.dart';
 import '../../models/pyq_models.dart';
 import 'supabase_question_mapper.dart';
 import '../../shared/widgets/latex_view.dart';
+import 'ecommerce_automation_service.dart';
 
 class SupabaseService {
   // Supports dynamic injection via --dart-define=SUPABASE_URL=... and --dart-define=SUPABASE_ANON_KEY=...
@@ -187,6 +188,19 @@ class SupabaseService {
     }
 
     await setActiveUserSession(realProfile);
+
+    // Trigger Brevo Welcome Email & WhatsApp Account Check + Message
+    try {
+      EcommerceAutomationService.instance.triggerAccountCreationFlow(
+        email: email,
+        fullName: fullName,
+        phone: phone,
+        targetExam: targetExam,
+      );
+    } catch (e) {
+      debugPrint('Notice executing account creation automation: $e');
+    }
+
     return realProfile;
   }
 
@@ -7031,6 +7045,23 @@ class SupabaseService {
       debugPrint('Notice caching user order: $e');
     }
 
+    // Trigger Payment Due notification if order is pending
+    if (orderData['status'] == 'pending' && totalAmount > 0) {
+      try {
+        final firstTitle = items.isNotEmpty ? (items[0]['title'] ?? 'Test Series Package') : 'Test Series Package';
+        EcommerceAutomationService.instance.triggerPaymentDueFlow(
+          orderId: customOrderId,
+          recipientEmail: user.email,
+          userName: user.fullName,
+          phone: user.phoneNumber ?? '',
+          amountDue: totalAmount,
+          itemTitle: firstTitle.toString(),
+        );
+      } catch (e) {
+        debugPrint('Notice executing payment due automation: $e');
+      }
+    }
+
     return {
       'order': orderData,
       'items': items,
@@ -7128,6 +7159,26 @@ class SupabaseService {
       await prefs.setString('cosmyra_user_entitlements', jsonEncode(list));
     } catch (e) {
       debugPrint('Notice caching granted entitlements: $e');
+    }
+
+    // Trigger Order Placed automation (Brevo Order Confirmation Email + WhatsApp Confirmation)
+    try {
+      double totalSum = 0.0;
+      for (var it in items) {
+        totalSum += (it['price'] as num?)?.toDouble() ?? 299.0;
+      }
+
+      EcommerceAutomationService.instance.triggerOrderPlacedFlow(
+        orderId: orderId,
+        recipientEmail: user.email,
+        userName: user.fullName,
+        phone: user.phoneNumber ?? '',
+        totalAmount: totalSum,
+        paymentMethod: paymentMethod,
+        items: items,
+      );
+    } catch (e) {
+      debugPrint('Notice executing order placed automation: $e');
     }
 
     return {

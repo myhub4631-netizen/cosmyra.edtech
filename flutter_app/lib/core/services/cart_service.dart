@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'supabase_service.dart';
+import 'ecommerce_automation_service.dart';
 
 class CartItem {
   final String id;
@@ -134,8 +135,35 @@ class CartService extends ChangeNotifier {
       _items.add(item);
       _saveToCache();
       notifyListeners();
+
+      // Trigger Add-to-Cart event notification in automation engine
+      if (user != null) {
+        EcommerceAutomationService.instance.triggerCartRecoveryFlow(
+          recipientEmail: user.email,
+          userName: user.fullName,
+          phone: user.phoneNumber ?? '',
+          cartItems: _items,
+        );
+      }
     }
     return true;
+  }
+
+  /// Manually or automatically trigger cart recovery email & WhatsApp notification
+  Future<AutomationResult?> triggerCartRecovery({String couponCode = 'COSMYRA20'}) async {
+    if (_items.isEmpty) return null;
+    final user = SupabaseService.activeUserSession;
+    final email = user?.email ?? 'student@cosmyra.edu';
+    final name = user?.fullName ?? 'Student';
+    final phone = user?.phoneNumber ?? '9876543210';
+
+    return await EcommerceAutomationService.instance.triggerCartRecoveryFlow(
+      recipientEmail: email,
+      userName: name,
+      phone: phone,
+      cartItems: _items,
+      couponCode: couponCode,
+    );
   }
 
   void removeFromCart(String productId) {
