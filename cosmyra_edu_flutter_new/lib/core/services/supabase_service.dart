@@ -490,7 +490,7 @@ class SupabaseService {
       }
 
       // 1. Native Mobile Google Sign-In (no browser window redirect)
-      const String webClientId = '672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com';
+      const String webClientId = '852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com';
       final GoogleSignIn googleSignIn = GoogleSignIn(
         serverClientId: webClientId,
         scopes: ['email', 'profile'],

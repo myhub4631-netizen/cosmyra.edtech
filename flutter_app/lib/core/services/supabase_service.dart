@@ -494,6 +494,90 @@ class SupabaseService {
 
   static Future<bool> signInWithGoogle() async {
     try {
+      const String webClientId = '852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com';
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        clientId: kIsWeb ? webClientId : null,
+        serverClientId: webClientId,
+        scopes: ['email', 'profile'],
+      );
+
+      // Try Google Sign-In via popup / ID token (works on both Web & Mobile without redirect)
+      try {
+        try {
+          await googleSignIn.signOut();
+        } catch (_) {}
+
+        final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+        if (googleUser != null) {
+          final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+          final String? idToken = googleAuth.idToken;
+          final String? accessToken = googleAuth.accessToken;
+
+          if (idToken != null && idToken.isNotEmpty) {
+            try {
+              final authRes = await client.auth.signInWithIdToken(
+                provider: OAuthProvider.google,
+                idToken: idToken,
+                accessToken: accessToken,
+              );
+              if (authRes.user != null) {
+                final profile = await getCurrentUser();
+                if (profile != null) {
+                  await setActiveUserSession(profile);
+                  return true;
+                }
+              }
+            } catch (idTokenErr) {
+              debugPrint('Supabase signInWithIdToken note: $idTokenErr');
+            }
+          }
+
+          // Fallback to local profile creation if Supabase ID token sync note
+          final String userEmail = googleUser.email.trim().toLowerCase();
+          final String userName = (googleUser.displayName != null && googleUser.displayName!.trim().isNotEmpty)
+              ? googleUser.displayName!.trim()
+              : (userEmail.contains('@') ? userEmail.split('@').first : 'Aspirant');
+          final String? userPhoto = googleUser.photoUrl;
+          final String? compressedPhoto = (userPhoto != null && userPhoto.isNotEmpty)
+              ? (await downloadAndCompressAvatar(userPhoto) ?? userPhoto)
+              : null;
+
+          final String userId = googleUser.id.isNotEmpty
+              ? '00000000-0000-4000-a000-${googleUser.id.padLeft(12, '0').substring(0, 12)}'
+              : 'usr-g-${DateTime.now().millisecondsSinceEpoch}';
+
+          final googleProfile = UserProfileModel(
+            id: userId,
+            email: userEmail,
+            fullName: userName,
+            avatarUrl: compressedPhoto,
+            targetExam: 'NEET',
+            targetYear: 2026,
+            role: userEmail == '1mdollar2027@gmail.com' ? 'superadmin' : 'student',
+          );
+
+          try {
+            await client.from('profiles').upsert({
+              'id': userId,
+              'email': userEmail,
+              'full_name': userName,
+              if (compressedPhoto != null && compressedPhoto.isNotEmpty) 'avatar_url': compressedPhoto,
+              'target_exam': 'NEET',
+              'target_year': 2026,
+              'role': googleProfile.role,
+            }, onConflict: 'id');
+          } catch (_) {}
+
+          final ensured = _ensureSuperAdminRole(googleProfile);
+          await addLocalUser(ensured);
+          await setActiveUserSession(ensured);
+          return true;
+        }
+      } catch (gisErr) {
+        debugPrint('GIS Google Sign-In notice: $gisErr');
+      }
+
+      // Fallback for Web if popup sign-in wasn't successful
       if (kIsWeb) {
         final redirectUrl = Uri.base.origin.contains('localhost')
             ? 'https://neet-jee.in/dashboard'
@@ -505,112 +589,14 @@ class SupabaseService {
         );
       }
 
-      // 1. Native Mobile Google Sign-In (no browser window redirect)
-      const String webClientId = '672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com';
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        serverClientId: webClientId,
-        scopes: ['email', 'profile'],
-      );
-
-      // Sign out first to ensure account chooser dialog appears
-      try {
-        await googleSignIn.signOut();
-      } catch (_) {}
-
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
-        // User cancelled account selection
-        return false;
-      }
-
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final String? idToken = googleAuth.idToken;
-      final String? accessToken = googleAuth.accessToken;
-
-      bool signedInWithSupabase = false;
-
-      // 2. Try Supabase cloud signInWithIdToken if token is available
-      if (idToken != null && idToken.isNotEmpty) {
-        try {
-          final authRes = await client.auth.signInWithIdToken(
-            provider: OAuthProvider.google,
-            idToken: idToken,
-            accessToken: accessToken,
-          );
-          if (authRes.user != null) {
-            signedInWithSupabase = true;
-          }
-        } catch (idTokenErr) {
-          debugPrint('Supabase signInWithIdToken note: $idTokenErr');
-        }
-      }
-
-      if (signedInWithSupabase) {
-        final profile = await getCurrentUser();
-        if (profile != null) {
-          await setActiveUserSession(profile);
-          return true;
-        }
-      }
-
-      // 3. Native verified Google user profile creation & session activation
-      final String userEmail = googleUser.email.trim().toLowerCase();
-      final String userName = (googleUser.displayName != null && googleUser.displayName!.trim().isNotEmpty)
-          ? googleUser.displayName!.trim()
-          : (userEmail.contains('@') ? userEmail.split('@').first : 'Aspirant');
-      final String? userPhoto = googleUser.photoUrl;
-      final String? compressedPhoto = (userPhoto != null && userPhoto.isNotEmpty)
-          ? (await downloadAndCompressAvatar(userPhoto) ?? userPhoto)
-          : null;
-
-      final String userId = googleUser.id.isNotEmpty
-          ? '00000000-0000-4000-a000-${googleUser.id.padLeft(12, '0').substring(0, 12)}'
-          : 'usr-g-${DateTime.now().millisecondsSinceEpoch}';
-
-      final googleProfile = UserProfileModel(
-        id: userId,
-        email: userEmail,
-        fullName: userName,
-        avatarUrl: compressedPhoto,
-        targetExam: 'NEET',
-        targetYear: 2026,
-        role: userEmail == '1mdollar2027@gmail.com' ? 'superadmin' : 'student',
-      );
-
-      try {
-        await client.from('profiles').upsert({
-          'id': userId,
-          'email': userEmail,
-          'full_name': userName,
-          if (compressedPhoto != null && compressedPhoto.isNotEmpty) 'avatar_url': compressedPhoto,
-          'target_exam': 'NEET',
-          'target_year': 2026,
-          'role': googleProfile.role,
-        }, onConflict: 'id');
-      } catch (upsertErr) {
-        debugPrint('Supabase profile sync note: $upsertErr');
-        try {
-          await client.from('profiles').upsert({
-            'id': userId,
-            'email': userEmail,
-            'full_name': userName,
-            if (compressedPhoto != null && compressedPhoto.isNotEmpty) 'avatar_url': compressedPhoto,
-            'target_exam': 'NEET',
-            'target_year': 2026,
-            'role': googleProfile.role,
-          }, onConflict: 'email');
-        } catch (_) {}
-      }
-
-      final ensured = _ensureSuperAdminRole(googleProfile);
-      await addLocalUser(ensured);
-      await setActiveUserSession(ensured);
-      return true;
+      return false;
     } catch (e) {
-      debugPrint('Native Google Sign-In error: $e');
-      rethrow;
+      debugPrint('Google Sign-In error: $e');
+      return false;
     }
   }
+
+
 
   static UserProfileModel _ensureSuperAdminRole(UserProfileModel profile) {
     if (profile.email.toLowerCase().trim() == '1mdollar2027@gmail.com') {
