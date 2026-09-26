@@ -4630,6 +4630,13 @@ class SupabaseService {
         list.insert(0, fullData);
       }
       await prefs.setString('cosmyra_saved_test_series', jsonEncode(list));
+
+      // Remove from deleted list if restoring / editing
+      final deletedList = prefs.getStringList('cosmyra_deleted_test_series') ?? [];
+      if (deletedList.contains(seriesId)) {
+        deletedList.remove(seriesId);
+        await prefs.setStringList('cosmyra_deleted_test_series', deletedList);
+      }
     } catch (e) {
       debugPrint('Error persisting test series to SharedPreferences: $e');
     }
@@ -4656,16 +4663,22 @@ class SupabaseService {
       debugPrint('Notice deleting from tests: $e');
     }
 
-    // 3. Delete from local cache
+    // 3. Delete from local cache and add to deleted blacklist
     try {
       final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList('cosmyra_deleted_test_series') ?? [];
+      if (!deletedList.contains(seriesId)) {
+        deletedList.add(seriesId);
+        await prefs.setStringList('cosmyra_deleted_test_series', deletedList);
+      }
+
       final raw = prefs.getString('cosmyra_saved_test_series');
       if (raw != null && raw.isNotEmpty) {
         final List<dynamic> list = jsonDecode(raw);
         list.removeWhere((item) => item['id'] == seriesId);
         await prefs.setString('cosmyra_saved_test_series', jsonEncode(list));
-        ok = true;
       }
+      ok = true;
     } catch (e) {
       debugPrint('Notice deleting from local test series: $e');
     }
@@ -4990,6 +5003,12 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> fetchAllTestSeries() async {
     final List<Map<String, dynamic>> list = [];
     final Set<String> seenIds = {};
+    Set<String> deletedIds = {};
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      deletedIds = (prefs.getStringList('cosmyra_deleted_test_series') ?? []).toSet();
+    } catch (_) {}
 
     // 1. Fetch from Supabase test_series table
     try {
@@ -4998,7 +5017,7 @@ class SupabaseService {
         for (var row in res) {
           final map = Map<String, dynamic>.from(row as Map);
           final sId = map['id']?.toString() ?? '';
-          if (sId.isNotEmpty && !seenIds.contains(sId)) {
+          if (sId.isNotEmpty && !seenIds.contains(sId) && !deletedIds.contains(sId)) {
             seenIds.add(sId);
             list.add(map);
           }
@@ -5015,7 +5034,7 @@ class SupabaseService {
         for (var row in res) {
           final map = Map<String, dynamic>.from(row as Map);
           final String sId = map['id']?.toString() ?? '';
-          if (sId.isNotEmpty && !seenIds.contains(sId)) {
+          if (sId.isNotEmpty && !seenIds.contains(sId) && !deletedIds.contains(sId)) {
             seenIds.add(sId);
             list.add({
               'id': sId,
@@ -5055,7 +5074,7 @@ class SupabaseService {
         for (var item in decoded) {
           final map = Map<String, dynamic>.from(item as Map);
           final sId = map['id']?.toString() ?? '';
-          if (sId.isNotEmpty) {
+          if (sId.isNotEmpty && !deletedIds.contains(sId)) {
             final idx = list.indexWhere((i) => i['id'] == sId);
             if (idx != -1) {
               list[idx] = map; // overwrite with rich local cache data
@@ -5074,10 +5093,15 @@ class SupabaseService {
     for (var def in defaultCuratedTestSeries) {
       final sId = def['id']?.toString() ?? '';
       final title = (def['title'] ?? '').toString().toLowerCase();
-      if (!seenIds.contains(sId) && !list.any((item) => (item['title'] ?? '').toString().toLowerCase() == title)) {
+      if (!seenIds.contains(sId) && !deletedIds.contains(sId) && !list.any((item) => (item['title'] ?? '').toString().toLowerCase() == title)) {
         list.add(def);
         seenIds.add(sId);
       }
+    }
+
+    // Final filter pass to guarantee deleted IDs are excluded
+    if (deletedIds.isNotEmpty) {
+      list.removeWhere((item) => deletedIds.contains(item['id']?.toString()));
     }
 
     // 5. Cache list in SharedPreferences for instantaneous offline availability

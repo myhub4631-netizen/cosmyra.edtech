@@ -963,7 +963,7 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     final isEdit = widget.initialData != null && widget.initialData!['id'] != null;
     final seriesId = isEdit
         ? widget.initialData!['id'].toString()
-        : SupabaseService.toValidUuid('ts_${_exam}_${_year}_${_titleCtrl.text.trim()}');
+        : SupabaseService.toValidUuid('ts_${DateTime.now().microsecondsSinceEpoch}_${_titleCtrl.text.trim()}');
 
     final data = {
       'id': seriesId,
