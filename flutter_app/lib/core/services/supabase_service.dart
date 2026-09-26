@@ -490,50 +490,54 @@ class SupabaseService {
 
   static Future<bool> signInWithGoogle() async {
     try {
-      // 1. Web Client ID from google-services.json
-      const String webClientId = '672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com';
+      // Client IDs: primary is 852782340906 (matches Supabase Auth Provider & website config)
+      const String primaryWebClientId = '852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com';
+      const String secondaryWebClientId = '672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com';
 
-      // 2. Try Native Google Sign-In
-      try {
-        final GoogleSignIn googleSignIn = GoogleSignIn(
-          clientId: kIsWeb ? webClientId : null,
-          serverClientId: webClientId,
-        );
+      final List<String> clientIdsToTry = [primaryWebClientId, secondaryWebClientId];
 
+      for (final clientId in clientIdsToTry) {
         try {
-          await googleSignIn.signOut();
-        } catch (_) {}
+          final GoogleSignIn googleSignIn = GoogleSignIn(
+            clientId: kIsWeb ? clientId : null,
+            serverClientId: clientId,
+          );
 
-        final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-        if (googleUser != null) {
-          final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-          final String? idToken = googleAuth.idToken;
-          final String? accessToken = googleAuth.accessToken;
+          try {
+            await googleSignIn.signOut();
+          } catch (_) {}
 
-          if (idToken != null && idToken.isNotEmpty) {
-            try {
-              final authRes = await client.auth.signInWithIdToken(
-                provider: OAuthProvider.google,
-                idToken: idToken,
-                accessToken: accessToken,
-              );
-              if (authRes.user != null) {
-                final profile = await getCurrentUser();
-                if (profile != null) {
-                  await setActiveUserSession(profile);
-                  return true;
+          final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+          if (googleUser != null) {
+            final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+            final String? idToken = googleAuth.idToken;
+            final String? accessToken = googleAuth.accessToken;
+
+            if (idToken != null && idToken.isNotEmpty) {
+              try {
+                final authRes = await client.auth.signInWithIdToken(
+                  provider: OAuthProvider.google,
+                  idToken: idToken,
+                  accessToken: accessToken,
+                );
+                if (authRes.user != null) {
+                  final profile = await getCurrentUser();
+                  if (profile != null) {
+                    await setActiveUserSession(profile);
+                    return true;
+                  }
                 }
+              } catch (idTokenErr) {
+                debugPrint('Supabase signInWithIdToken ($clientId) error: $idTokenErr');
               }
-            } catch (idTokenErr) {
-              debugPrint('Supabase signInWithIdToken error: $idTokenErr');
             }
           }
+        } catch (nativeErr) {
+          debugPrint('Native Google Sign-In ($clientId) error: $nativeErr');
         }
-      } catch (nativeErr) {
-        debugPrint('Native Google Sign-In notice: $nativeErr');
       }
 
-      // 3. Fallback to Supabase OAuth (Web Redirect / Mobile Deep Link)
+      // Fallback to Supabase OAuth (Web Redirect / Mobile Deep Link)
       final String redirectUrl = kIsWeb
           ? (Uri.base.origin.contains('localhost')
               ? 'https://neet-jee.in/dashboard'
