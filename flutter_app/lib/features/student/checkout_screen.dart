@@ -233,16 +233,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       final amountStr = _finalTotal.toStringAsFixed(2);
       final upiUrl = 'upi://pay?pa=$upiId&pn=${Uri.encodeComponent(payeeName)}&am=$amountStr&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
 
-      if (!kIsWeb) {
-        try {
-          final uri = Uri.parse(upiUrl);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          }
-        } catch (e) {
-          debugPrint('UPI app launcher note: $e');
-        }
-      }
+      // Automatically launch UPI app chooser (GPay, PhonePe, Paytm, BHIM) on all devices
+      _launchUpiApp(upiUrl);
 
       await _showUpiVerificationModal(
         context: context,
@@ -307,6 +299,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  Future<void> _launchUpiApp(String upiUrl) async {
+    try {
+      final uri = Uri.parse(upiUrl);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('UPI app launcher note: $e');
+    }
+  }
+
   Future<void> _showUpiVerificationModal({
     required BuildContext context,
     required UserProfileModel user,
@@ -354,7 +355,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
                       ],
                     ),
-                    const Divider(height: 24),
+                    const Divider(height: 20),
+
+                    // Open App Direct Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () => _launchUpiApp(upiUrl),
+                        icon: const Icon(Icons.touch_app_rounded, size: 20),
+                        label: const Text('Open UPI App (GPay, PhonePe, Paytm)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
 
                     // QR Code Image
                     Container(
@@ -369,12 +388,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                       child: Image.network(
                         qrImageUrl,
-                        width: 180,
-                        height: 180,
+                        width: 170,
+                        height: 170,
                         fit: BoxFit.contain,
                         errorBuilder: (ctx, err, st) => Container(
-                          width: 180,
-                          height: 180,
+                          width: 170,
+                          height: 170,
                           color: const Color(0xFFF1F5F9),
                           child: const Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -428,12 +447,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // UTR / Transaction Reference Entry Box
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text('Step 2: Enter 12-Digit UTR / Ref No.', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B))),
+                    // Step 2 Instructions & UTR Entry
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFFCD34D)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.check_circle_outline_rounded, color: Color(0xFFD97706), size: 18),
+                              const SizedBox(width: 6),
+                              Text('Step 2: Enter 12-Digit UTR Number', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF92400E))),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'After completing payment in GPay / PhonePe / Paytm, copy the 12-digit UTR/Ref No. from payment details and paste below.',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF78350F), height: 1.3),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 10),
                     TextField(
                       controller: utrCtrl,
                       keyboardType: TextInputType.number,
