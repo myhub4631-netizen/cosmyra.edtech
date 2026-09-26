@@ -41,7 +41,7 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
   final TextEditingController _nameCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
 
-  String _selectedPaymentMethod = 'UPI'; // 'UPI', 'Cashfree'
+  String _selectedPaymentMethod = ''; // 'UPI', 'Cashfree'
   bool _isProcessing = false;
   bool _isSuccess = false;
   bool _isPendingVerification = false;
@@ -66,7 +66,9 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
         _paymentSettings = settings;
         final upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: false);
         final cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: false);
-        if (upiActive) {
+        if (cashfreeActive && !upiActive) {
+          _selectedPaymentMethod = 'Cashfree';
+        } else if (upiActive) {
           _selectedPaymentMethod = 'UPI';
         } else if (cashfreeActive) {
           _selectedPaymentMethod = 'Cashfree';

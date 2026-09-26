@@ -24,7 +24,7 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController _couponController = TextEditingController();
-  String _selectedPaymentMethod = 'UPI';
+  String _selectedPaymentMethod = '';
   bool _isProcessingPayment = false;
   bool _isOrderSuccess = false;
   bool _isPendingVerification = false;
@@ -50,7 +50,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _paymentSettings = settings;
         final upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: false);
         final cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: false);
-        if (upiActive) {
+        if (cashfreeActive && !upiActive) {
+          _selectedPaymentMethod = 'Cashfree';
+        } else if (upiActive) {
           _selectedPaymentMethod = 'UPI';
         } else if (cashfreeActive) {
           _selectedPaymentMethod = 'Cashfree';

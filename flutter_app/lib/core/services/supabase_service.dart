@@ -4485,7 +4485,7 @@ class SupabaseService {
   }
 
   static Map<String, dynamic> defaultPaymentSettings = {
-    'upi_active': true,
+    'upi_active': false,
     'upi_id': '1mdollar2027@okicici',
     'upi_payee_name': 'Cosmyra Edu Platform',
     'cashfree_active': false,
@@ -4497,29 +4497,29 @@ class SupabaseService {
   static Future<Map<String, dynamic>> fetchPaymentSettings() async {
     Map<String, dynamic>? data;
 
-    // 1. Try system_config table first (broad compatibility)
+    // 1. Query payment_settings table directly
     try {
-      final res = await client.from('system_config').select('value').eq('key', 'payment_gateway_settings').maybeSingle();
-      if (res != null && res['value'] != null) {
-        data = Map<String, dynamic>.from(res['value']);
+      final res = await client.from('payment_settings').select().eq('id', 'default').maybeSingle();
+      if (res != null) {
+        data = Map<String, dynamic>.from(res);
       }
     } catch (e) {
-      debugPrint('Notice fetching system_config payment_gateway_settings: $e');
+      debugPrint('Notice fetching payment_settings table: $e');
     }
 
-    // 2. Try payment_settings table if system_config is empty
+    // 2. Try system_config if payment_settings table is empty
     if (data == null || data.isEmpty) {
       try {
-        final res = await client.from('payment_settings').select().eq('id', 'default').maybeSingle();
-        if (res != null) {
-          data = Map<String, dynamic>.from(res);
+        final res = await client.from('system_config').select('value').eq('key', 'payment_gateway_settings').maybeSingle();
+        if (res != null && res['value'] != null) {
+          data = Map<String, dynamic>.from(res['value']);
         }
       } catch (e) {
-        debugPrint('Notice fetching payment_settings table: $e');
+        debugPrint('Notice fetching system_config payment_gateway_settings: $e');
       }
     }
 
-    // 3. Fallback/Cache update
+    // 3. Update local cache if data retrieved from DB
     if (data != null && data.isNotEmpty) {
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -4528,6 +4528,7 @@ class SupabaseService {
       return data;
     }
 
+    // 4. Try local SharedPreferences fallback
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString('cosmyra_payment_settings');
@@ -4555,7 +4556,7 @@ class SupabaseService {
       'updated_at': DateTime.now().toIso8601String(),
     };
 
-    // Save to SharedPreferences
+    // Save to SharedPreferences locally
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cosmyra_payment_settings', jsonEncode(full));
@@ -4563,25 +4564,34 @@ class SupabaseService {
       debugPrint('Notice saving payment_settings to SharedPreferences: $e');
     }
 
-    // Save to system_config table (key-value)
+    // Save to payment_settings table (UPDATE first, then INSERT/UPSERT)
+    bool savedToDb = false;
+    try {
+      final updated = await client.from('payment_settings').update(full).eq('id', 'default').select();
+      if (updated.isNotEmpty) {
+        savedToDb = true;
+      }
+    } catch (e) {
+      debugPrint('Notice updating payment_settings table: $e');
+    }
+
+    if (!savedToDb) {
+      try {
+        await client.from('payment_settings').upsert(full);
+        savedToDb = true;
+      } catch (e) {
+        debugPrint('Notice upserting payment_settings table: $e');
+      }
+    }
+
+    // Backup save to system_config table
     try {
       await client.from('system_config').upsert({
         'key': 'payment_gateway_settings',
         'value': full,
         'updated_at': DateTime.now().toIso8601String(),
       });
-      debugPrint('Successfully saved payment_gateway_settings to system_config DB: $full');
-    } catch (e) {
-      debugPrint('Notice saving payment_gateway_settings to system_config: $e');
-    }
-
-    // Save to payment_settings table
-    try {
-      await client.from('payment_settings').upsert(full, onConflict: 'id');
-      debugPrint('Successfully saved payment_settings to payment_settings DB: $full');
-    } catch (e) {
-      debugPrint('Notice saving payment_settings to DB: $e');
-    }
+    } catch (_) {}
 
     return true;
   }
