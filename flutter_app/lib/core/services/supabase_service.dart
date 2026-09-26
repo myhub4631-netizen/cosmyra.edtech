@@ -490,11 +490,12 @@ class SupabaseService {
 
   static Future<bool> signInWithGoogle() async {
     try {
-      // Client IDs: primary is 852782340906 (matches Supabase Auth Provider & website config)
-      const String primaryWebClientId = '852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com';
-      const String secondaryWebClientId = '672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com';
+      // 1. Android Native OAuth Client ID matching google-services.json project (672019832931)
+      const String androidFirebaseWebClientId = '672019832931-1fcsb99mgla13fn838o5n392iunbija1.apps.googleusercontent.com';
+      // 2. Secondary Web Client ID (852782340906)
+      const String supabaseWebClientId = '852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com';
 
-      final List<String> clientIdsToTry = [primaryWebClientId, secondaryWebClientId];
+      final List<String> clientIdsToTry = [androidFirebaseWebClientId, supabaseWebClientId];
 
       for (final clientId in clientIdsToTry) {
         try {
@@ -537,7 +538,7 @@ class SupabaseService {
         }
       }
 
-      // Fallback to Supabase OAuth (Web Redirect / Mobile Deep Link)
+      // 3. Fallback to Supabase OAuth (In-App WebView for Mobile to intercept deep link)
       final String redirectUrl = kIsWeb
           ? (Uri.base.origin.contains('localhost')
               ? 'https://neet-jee.in/dashboard'
@@ -547,7 +548,7 @@ class SupabaseService {
       final bool res = await client.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: redirectUrl,
-        authScreenLaunchMode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
+        authScreenLaunchMode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.inAppWebView,
       );
       return res;
     } catch (e) {
