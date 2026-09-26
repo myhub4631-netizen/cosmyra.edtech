@@ -21,9 +21,11 @@ ALTER TABLE public.payment_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read payment_settings" ON public.payment_settings
 FOR SELECT USING (true);
 
--- Admins can update payment settings
-CREATE POLICY "Admin write payment_settings" ON public.payment_settings
-FOR ALL USING (auth.role() = 'authenticated');
+-- Allow write access (insert/update/upsert) to payment_settings
+DROP POLICY IF EXISTS "Admin write payment_settings" ON public.payment_settings;
+DROP POLICY IF EXISTS "Public write payment_settings" ON public.payment_settings;
+CREATE POLICY "Public write payment_settings" ON public.payment_settings
+FOR ALL USING (true) WITH CHECK (true);
 
 -- Insert default payment settings
 INSERT INTO public.payment_settings (id, upi_active, upi_id, upi_payee_name, cashfree_active, cashfree_app_id, cashfree_secret_key, cashfree_environment)

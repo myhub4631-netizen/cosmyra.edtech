@@ -4474,27 +4474,43 @@ class SupabaseService {
   }
 
   // ================= PAYMENT GATEWAYS & SETTINGS =================
+  static bool parseBool(dynamic value, {bool defaultValue = false}) {
+    if (value == null) return defaultValue;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final str = value.toString().trim().toLowerCase();
+    if (str == 'false' || str == '0' || str == 'off' || str == 'no' || str == 'disabled') return false;
+    if (str == 'true' || str == '1' || str == 'on' || str == 'yes' || str == 'enabled') return true;
+    return defaultValue;
+  }
+
   static Map<String, dynamic> defaultPaymentSettings = {
     'upi_active': true,
     'upi_id': '1mdollar2027@okicici',
     'upi_payee_name': 'Cosmyra Edu Platform',
-    'cashfree_active': true,
+    'cashfree_active': false,
     'cashfree_app_id': '',
     'cashfree_secret_key': '',
     'cashfree_environment': 'TEST',
   };
 
   static Future<Map<String, dynamic>> fetchPaymentSettings() async {
+    Map<String, dynamic>? dbData;
     try {
       final res = await client.from('payment_settings').select().eq('id', 'default').maybeSingle();
       if (res != null) {
-        final map = Map<String, dynamic>.from(res);
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('cosmyra_payment_settings', jsonEncode(map));
-        return map;
+        dbData = Map<String, dynamic>.from(res);
       }
     } catch (e) {
       debugPrint('Notice fetching Supabase payment_settings: $e');
+    }
+
+    if (dbData != null && dbData.isNotEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cosmyra_payment_settings', jsonEncode(dbData));
+      } catch (_) {}
+      return dbData;
     }
 
     try {
@@ -4509,12 +4525,15 @@ class SupabaseService {
   }
 
   static Future<bool> savePaymentSettings(Map<String, dynamic> settings) async {
+    final bool upiActive = parseBool(settings['upi_active'], defaultValue: true);
+    final bool cashfreeActive = parseBool(settings['cashfree_active'], defaultValue: false);
+
     final Map<String, dynamic> full = {
       'id': 'default',
-      'upi_active': settings['upi_active'] ?? true,
+      'upi_active': upiActive,
       'upi_id': (settings['upi_id'] ?? '1mdollar2027@okicici').toString().trim(),
       'upi_payee_name': (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString().trim(),
-      'cashfree_active': settings['cashfree_active'] ?? true,
+      'cashfree_active': cashfreeActive,
       'cashfree_app_id': (settings['cashfree_app_id'] ?? '').toString().trim(),
       'cashfree_secret_key': (settings['cashfree_secret_key'] ?? '').toString().trim(),
       'cashfree_environment': settings['cashfree_environment'] ?? 'TEST',
@@ -4524,10 +4543,13 @@ class SupabaseService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cosmyra_payment_settings', jsonEncode(full));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Notice saving payment_settings to SharedPreferences: $e');
+    }
 
     try {
       await client.from('payment_settings').upsert(full, onConflict: 'id');
+      debugPrint('Successfully saved payment_settings: $full');
       return true;
     } catch (e) {
       debugPrint('Notice saving payment_settings to Supabase: $e');
