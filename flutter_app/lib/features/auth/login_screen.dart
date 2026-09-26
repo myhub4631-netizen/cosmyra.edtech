@@ -32,10 +32,32 @@ class _LoginScreenState extends State<LoginScreen> {
   UserProfileModel? _loggedInProfile;
 
   @override
+  void initState() {
+    super.initState();
+    SupabaseService.authNotifier.addListener(_onAuthNotifierChanged);
+  }
+
+  @override
   void dispose() {
+    SupabaseService.authNotifier.removeListener(_onAuthNotifierChanged);
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _onAuthNotifierChanged() {
+    final profile = SupabaseService.authNotifier.value;
+    if (profile != null && mounted) {
+      widget.onLoginSuccess?.call(profile);
+      final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
+      if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
+        context.go(redirect);
+      } else if (profile.isAdmin || profile.isSuperAdmin) {
+        context.go('/admin');
+      } else {
+        context.go('/dashboard');
+      }
+    }
   }
 
   Future<void> _handleLogin() async {

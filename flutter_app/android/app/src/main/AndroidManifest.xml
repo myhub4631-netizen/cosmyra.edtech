@@ -37,9 +37,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="io.supabase.cosmyra"
-                    android:host="login-callback" />
+                <data android:scheme="io.supabase.cosmyra" />
             </intent-filter>
         </activity>
         <meta-data

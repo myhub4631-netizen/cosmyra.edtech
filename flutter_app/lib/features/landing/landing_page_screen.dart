@@ -33,15 +33,9 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
   String? _loginError;
 
   @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  @override
   void initState() {
     super.initState();
+    SupabaseService.authNotifier.addListener(_onLandingAuthChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         final user = await SupabaseService.getCurrentUser();
@@ -52,6 +46,20 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
         debugPrint('Session check error: $e');
       }
     });
+  }
+  @override
+  void dispose() {
+    SupabaseService.authNotifier.removeListener(_onLandingAuthChanged);
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _onLandingAuthChanged() {
+    final user = SupabaseService.authNotifier.value;
+    if (user != null && mounted) {
+      context.go('/dashboard');
+    }
   }
 
   @override
