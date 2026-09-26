@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/models.dart';
@@ -1435,13 +1436,371 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
   // ORDERS & TRANSACTIONS TAB
   // ===========================================================================
   String _ordersStatusFilter = 'All';
+  String _ordersSearchQuery = '';
+
+  Future<void> _approveOrderPricing(Map<String, dynamic> ord) async {
+    final rawId = (ord['order_number'] ?? ord['order_id'] ?? ord['id'] ?? '').toString();
+    final uid = (ord['user_id'] ?? ord['student_id'] ?? '').toString();
+    final user = UserProfileModel(
+      id: uid.isNotEmpty ? uid : 'usr_${DateTime.now().millisecondsSinceEpoch}',
+      email: (ord['user_email'] ?? ord['student_email'] ?? 'student@cosmyra.in').toString(),
+      fullName: (ord['user_name'] ?? ord['student_name'] ?? 'Student Aspirant').toString(),
+    );
+
+    final items = [
+      {
+        'id': ord['product_id'] ?? 'ts_all_access',
+        'title': ord['product_name'] ?? 'NEET/JEE Test Series',
+      }
+    ];
+
+    await SupabaseService.verifyPaymentAndGrantAccess(
+      orderId: rawId,
+      paymentId: (ord['payment_id'] ?? ord['payment_reference'] ?? 'UPI_VERIFIED').toString(),
+      paymentMethod: (ord['payment_method'] ?? 'UPI').toString(),
+      user: user,
+      items: items,
+    );
+
+    await SupabaseService.updateAdminOrderStatus(
+      orderId: rawId,
+      newStatus: 'completed',
+      adminNote: 'UPI Payment UTR verified and access granted by Admin',
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✓ Order #$rawId Approved & Access Granted!'),
+          backgroundColor: const Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      setState(() {});
+    }
+  }
+
+  Future<void> _deleteOrderPricing(String orderId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Order?'),
+        content: Text('Are you sure you want to permanently delete order #$orderId from database?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await SupabaseService.deleteAdminOrder(orderId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✓ Order #$orderId deleted.'),
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        setState(() {});
+      }
+    }
+  }
+
+  void _showCreateManualOrderDialog() {
+    final nameCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final productCtrl = TextEditingController(text: 'NEET 2026 Full Test Series');
+    final amountCtrl = TextEditingController(text: '499');
+    final utrCtrl = TextEditingController();
+    String method = 'UPI';
+    String status = 'completed';
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            width: 520,
+            padding: const EdgeInsets.all(24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Create Manual Order / Grant Access', style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                      IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
+                    ],
+                  ),
+                  const Divider(height: 20),
+                  const Text('Student Name *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  TextField(controller: nameCtrl, decoration: InputDecoration(hintText: 'e.g. Rahul Sharma', isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)))),
+                  const SizedBox(height: 12),
+                  const Text('Student Email *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  TextField(controller: emailCtrl, decoration: InputDecoration(hintText: 'e.g. rahul@gmail.com', isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)))),
+                  const SizedBox(height: 12),
+                  const Text('Student Phone', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  TextField(controller: phoneCtrl, decoration: InputDecoration(hintText: 'e.g. 9876543210', isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)))),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Product Title', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            TextField(controller: productCtrl, decoration: InputDecoration(isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)))),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 120,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Amount (₹)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            TextField(controller: amountCtrl, keyboardType: TextInputType.number, decoration: InputDecoration(isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)))),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Payment Method', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            DropdownButtonFormField<String>(
+                              value: method,
+                              decoration: InputDecoration(isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+                              items: const [
+                                DropdownMenuItem(value: 'UPI', child: Text('UPI')),
+                                DropdownMenuItem(value: 'Cashfree PG', child: Text('Cashfree PG')),
+                                DropdownMenuItem(value: 'Bank Transfer', child: Text('Bank Transfer')),
+                                DropdownMenuItem(value: 'Cash / Offline', child: Text('Cash / Offline')),
+                              ],
+                              onChanged: (v) => setDialogState(() => method = v!),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Status', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            DropdownButtonFormField<String>(
+                              value: status,
+                              decoration: InputDecoration(isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+                              items: const [
+                                DropdownMenuItem(value: 'completed', child: Text('Completed (Grant Access)')),
+                                DropdownMenuItem(value: 'pending_verification', child: Text('Pending Verification')),
+                                DropdownMenuItem(value: 'pending', child: Text('Pending Payment')),
+                              ],
+                              onChanged: (v) => setDialogState(() => status = v!),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('UTR / Reference / Notes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  TextField(controller: utrCtrl, decoration: InputDecoration(hintText: 'e.g. 12-digit UTR 429182736410 or Admin grant note', isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)))),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                      onPressed: isSaving
+                          ? null
+                          : () async {
+                              final name = nameCtrl.text.trim();
+                              final email = emailCtrl.text.trim();
+                              if (name.isEmpty || email.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter Student Name and Email.'), backgroundColor: Color(0xFFEF4444)));
+                                return;
+                              }
+                              setDialogState(() => isSaving = true);
+                              final amt = double.tryParse(amountCtrl.text.trim()) ?? 499.0;
+                              await SupabaseService.createManualAdminOrder(
+                                studentName: name,
+                                studentEmail: email,
+                                studentPhone: phoneCtrl.text.trim(),
+                                productName: productCtrl.text.trim(),
+                                amount: amt,
+                                paymentMethod: method,
+                                status: status,
+                                utrOrNotes: utrCtrl.text.trim(),
+                              );
+                              if (ctx.mounted) Navigator.pop(ctx);
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✓ Manual Order Created successfully!'), backgroundColor: Color(0xFF10B981)));
+                                setState(() {});
+                              }
+                            },
+                      icon: isSaving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.add_task_rounded, size: 18),
+                      label: Text(isSaving ? 'Creating Order...' : 'Create Order & Save'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPricingOrderDetailsDialog(Map<String, dynamic> ord) {
+    final id = (ord['order_number'] ?? ord['order_id'] ?? ord['id'] ?? '').toString();
+    final name = (ord['user_name'] ?? ord['student_name'] ?? 'Student').toString();
+    final email = (ord['user_email'] ?? ord['student_email'] ?? '-').toString();
+    final phone = (ord['user_phone'] ?? ord['student_phone'] ?? '-').toString();
+    final product = (ord['product_name'] ?? 'NEET/JEE Test Series').toString();
+    final amount = (ord['total_amount'] ?? ord['subtotal_amount'] ?? 0).toString();
+    final method = (ord['payment_method'] ?? 'UPI').toString();
+    final ref = (ord['payment_reference'] ?? ord['payment_id'] ?? '-').toString();
+    final status = (ord['status'] ?? ord['payment_status'] ?? 'completed').toString();
+    final date = (ord['created_at'] ?? '').toString();
+    final notes = (ord['notes'] ?? 'Order placed via portal').toString();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: 520,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Order #$id', style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: status == 'completed' ? const Color(0xFFECFDF5) : const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(status.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: status == 'completed' ? const Color(0xFF059669) : const Color(0xFFD97706))),
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              _buildDetailItem('Student Name', name),
+              _buildDetailItem('Student Email', email),
+              _buildDetailItem('Mobile Phone', phone),
+              _buildDetailItem('Product Purchased', product),
+              _buildDetailItem('Total Amount', '₹$amount'),
+              _buildDetailItem('Payment Gateway', method),
+              _buildDetailItem('UTR / Reference ID', ref),
+              _buildDetailItem('Order Date', date),
+              _buildDetailItem('Audit / System Notes', notes),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (status == 'pending_verification' || status == 'pending')
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _approveOrderPricing(ord);
+                      },
+                      icon: const Icon(Icons.check_circle_rounded, size: 16),
+                      label: const Text('Approve & Grant Access'),
+                    )
+                  else
+                    const SizedBox.shrink(),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444)),
+                        tooltip: 'Delete Order',
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _deleteOrderPricing(id);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 140, child: Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)))),
+          Expanded(child: SelectableText(value, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)))),
+        ],
+      ),
+    );
+  }
 
   Widget _buildOrdersTabContent() {
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: SupabaseService.fetchAdminOrders(statusFilter: _ordersStatusFilter),
       builder: (context, snapshot) {
-        final orders = snapshot.data ?? [];
-        final filterOptions = ['All', 'Completed', 'Pending', 'Failed'];
+        final allOrders = snapshot.data ?? [];
+
+        // Apply client search query
+        final orders = allOrders.where((ord) {
+          if (_ordersSearchQuery.trim().isEmpty) return true;
+          final q = _ordersSearchQuery.trim().toLowerCase();
+          final id = (ord['id'] ?? ord['order_number'] ?? '').toString().toLowerCase();
+          final name = (ord['user_name'] ?? ord['student_name'] ?? '').toString().toLowerCase();
+          final email = (ord['user_email'] ?? ord['student_email'] ?? '').toString().toLowerCase();
+          final phone = (ord['user_phone'] ?? ord['student_phone'] ?? '').toString().toLowerCase();
+          final ref = (ord['payment_reference'] ?? ord['payment_id'] ?? '').toString().toLowerCase();
+          final product = (ord['product_name'] ?? '').toString().toLowerCase();
+          return id.contains(q) || name.contains(q) || email.contains(q) || phone.contains(q) || ref.contains(q) || product.contains(q);
+        }).toList();
+
+        final filterOptions = ['All', 'Completed', 'Pending Verification', 'Pending', 'Failed'];
 
         return Container(
           padding: const EdgeInsets.all(24),
@@ -1461,32 +1820,83 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                     children: [
                       Text('Customer Orders & Payments', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
                       const SizedBox(height: 4),
-                      Text('Real-time ledger of student test series purchases and subscription activations.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      Text('Real-time ledger of student test series purchases and subscription activations.', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                     ],
                   ),
                   Row(
-                    children: filterOptions.map((opt) {
-                      final isSel = _ordersStatusFilter == opt;
-                      return Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: ChoiceChip(
-                          label: Text(opt),
-                          selected: isSel,
-                          onSelected: (_) => setState(() => _ordersStatusFilter = opt),
-                          selectedColor: const Color(0xFF4F46E5),
-                          labelStyle: TextStyle(color: isSel ? Colors.white : const Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.bold),
+                    children: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                      );
-                    }).toList(),
+                        onPressed: _showCreateManualOrderDialog,
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('Create Manual Order', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.refresh_rounded, color: Color(0xFF4F46E5)),
+                        tooltip: 'Refresh Orders',
+                        onPressed: () => setState(() {}),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Search & Filter Row
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      onChanged: (v) => setState(() => _ordersSearchQuery = v),
+                      decoration: InputDecoration(
+                        hintText: 'Search by Order ID, Student Name, Email, UTR number...',
+                        prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: filterOptions.map((opt) {
+                        final isSel = _ordersStatusFilter == opt;
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: ChoiceChip(
+                            label: Text(opt),
+                            selected: isSel,
+                            onSelected: (_) => setState(() => _ordersStatusFilter = opt),
+                            selectedColor: const Color(0xFF4F46E5),
+                            labelStyle: TextStyle(color: isSel ? Colors.white : const Color(0xFF475569), fontSize: 11.5, fontWeight: FontWeight.bold),
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 20),
+
               if (orders.isEmpty)
                 Container(
-                  padding: const EdgeInsets.all(36),
+                  padding: const EdgeInsets.all(40),
                   alignment: Alignment.center,
-                  child: const Text('No orders matching the selected filter.', style: TextStyle(color: Color(0xFF64748B))),
+                  child: const Column(
+                    children: [
+                      Icon(Icons.inbox_outlined, size: 48, color: Color(0xFF94A3B8)),
+                      SizedBox(height: 12),
+                      Text('No orders matching the selected query or filter.', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                    ],
+                  ),
                 )
               else
                 ClipRRect(
@@ -1494,70 +1904,118 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                   child: Table(
                     border: TableBorder.all(color: const Color(0xFFE2E8F0)),
                     columnWidths: const {
-                      0: FlexColumnWidth(2.5),
-                      1: FlexColumnWidth(3),
-                      2: FlexColumnWidth(2),
-                      3: FlexColumnWidth(1.8),
-                      4: FlexColumnWidth(1.8),
+                      0: FlexColumnWidth(2.2),
+                      1: FlexColumnWidth(2.8),
+                      2: FlexColumnWidth(2.2),
+                      3: FlexColumnWidth(2.2),
+                      4: FlexColumnWidth(1.4),
                       5: FlexColumnWidth(2.2),
+                      6: FlexColumnWidth(1.6),
+                      7: FlexColumnWidth(1.8),
                     },
                     children: [
                       TableRow(
                         decoration: const BoxDecoration(color: Color(0xFFF8FAFC)),
                         children: const [
-                          Padding(padding: EdgeInsets.all(12), child: Text('Order ID', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                          Padding(padding: EdgeInsets.all(12), child: Text('Student / Email', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                          Padding(padding: EdgeInsets.all(12), child: Text('Payment Method', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                          Padding(padding: EdgeInsets.all(12), child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                          Padding(padding: EdgeInsets.all(12), child: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                          Padding(padding: EdgeInsets.all(12), child: Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                          Padding(padding: EdgeInsets.all(10), child: Text('Order ID', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                          Padding(padding: EdgeInsets.all(10), child: Text('Student / Email', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                          Padding(padding: EdgeInsets.all(10), child: Text('Product', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                          Padding(padding: EdgeInsets.all(10), child: Text('Payment / UTR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                          Padding(padding: EdgeInsets.all(10), child: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                          Padding(padding: EdgeInsets.all(10), child: Text('Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                          Padding(padding: EdgeInsets.all(10), child: Text('Date', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
+                          Padding(padding: EdgeInsets.all(10), child: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5))),
                         ],
                       ),
                       ...orders.map((ord) {
-                        final id = ord['id']?.toString() ?? '';
-                        final shortId = id.length > 14 ? '${id.substring(0, 14)}...' : id;
-                        final name = ord['user_name']?.toString() ?? 'Student';
-                        final email = ord['user_email']?.toString() ?? '';
+                        final rawId = (ord['order_number'] ?? ord['order_id'] ?? ord['id'] ?? '').toString();
+                        final shortId = rawId.length > 14 ? '${rawId.substring(0, 14)}...' : rawId;
+                        final name = ord['user_name']?.toString() ?? ord['student_name']?.toString() ?? 'Student';
+                        final email = ord['user_email']?.toString() ?? ord['student_email']?.toString() ?? '';
+                        final product = ord['product_name']?.toString() ?? 'NEET Test Series';
                         final method = ord['payment_method']?.toString() ?? 'UPI';
-                        final total = (ord['total_amount'] as num?)?.toDouble() ?? 0.0;
-                        final status = (ord['status']?.toString() ?? 'completed').toLowerCase();
+                        final ref = (ord['payment_reference'] ?? ord['payment_id'] ?? '').toString();
+                        final total = (ord['total_amount'] as num?)?.toDouble() ?? (ord['amount'] as num?)?.toDouble() ?? 0.0;
+                        final status = (ord['status']?.toString() ?? ord['payment_status']?.toString() ?? 'completed').toLowerCase();
                         final dateStr = ord['created_at']?.toString() ?? '';
                         final shortDate = dateStr.length >= 10 ? dateStr.substring(0, 10) : '';
 
                         return TableRow(
                           children: [
-                            Padding(padding: const EdgeInsets.all(12), child: Text(shortId, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold))),
                             Padding(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(10),
+                              child: InkWell(
+                                onTap: () {
+                                  Clipboard.setData(ClipboardData(text: rawId));
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Copied Order ID to clipboard!'), duration: Duration(seconds: 1)));
+                                },
+                                child: Text(shortId, style: const TextStyle(fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(10),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                  Text(email, style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                                  Text(name, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                  Text(email, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
                                 ],
                               ),
                             ),
-                            Padding(padding: const EdgeInsets.all(12), child: Text(method, style: const TextStyle(fontSize: 12))),
-                            Padding(padding: const EdgeInsets.all(12), child: Text('₹${total.toInt()}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)))),
+                            Padding(padding: const EdgeInsets.all(10), child: Text(product, style: const TextStyle(fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis)),
                             Padding(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(10),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(method, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                                  if (ref.isNotEmpty) SelectableText(ref, style: const TextStyle(fontSize: 9.5, color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                            Padding(padding: const EdgeInsets.all(10), child: Text('₹${total.toInt()}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)))),
+                            Padding(
+                              padding: const EdgeInsets.all(10),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: status == 'completed' ? const Color(0xFFECFDF5) : const Color(0xFFFEF3C7),
+                                  color: status == 'completed' ? const Color(0xFFECFDF5) : (status == 'pending_verification' ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
-                                  status.toUpperCase(),
+                                  status == 'pending_verification' ? 'PENDING UTR' : status.toUpperCase(),
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 9.5,
                                     fontWeight: FontWeight.bold,
-                                    color: status == 'completed' ? const Color(0xFF059669) : const Color(0xFFD97706),
+                                    color: status == 'completed' ? const Color(0xFF059669) : (status == 'pending_verification' ? const Color(0xFFD97706) : const Color(0xFFDC2626)),
                                   ),
                                 ),
                               ),
                             ),
-                            Padding(padding: const EdgeInsets.all(12), child: Text(shortDate, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)))),
+                            Padding(padding: const EdgeInsets.all(10), child: Text(shortDate, style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)))),
+                            Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: Row(
+                                children: [
+                                  if (status == 'pending_verification' || status == 'pending')
+                                    IconButton(
+                                      icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 20),
+                                      tooltip: 'Approve & Grant Access',
+                                      onPressed: () => _approveOrderPricing(ord),
+                                    ),
+                                  IconButton(
+                                    icon: const Icon(Icons.visibility_rounded, color: Color(0xFF4F46E5), size: 18),
+                                    tooltip: 'View Order Details',
+                                    onPressed: () => _showPricingOrderDetailsDialog(ord),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                                    tooltip: 'Delete Order',
+                                    onPressed: () => _deleteOrderPricing(rawId),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         );
                       }).toList(),

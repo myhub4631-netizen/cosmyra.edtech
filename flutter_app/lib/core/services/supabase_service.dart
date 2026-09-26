@@ -8159,39 +8159,155 @@ class SupabaseService {
     String? adminNote,
   }) async {
     try {
-      final orders = await fetchAdminOrders();
-      final idx = orders.indexWhere((o) => o['id'] == orderId);
-      if (idx >= 0) {
-        orders[idx]['payment_status'] = newStatus;
-        if (newStatus == 'completed') {
-          orders[idx]['entitlement_granted'] = true;
-        } else if (newStatus == 'cancelled') {
-          orders[idx]['entitlement_granted'] = false;
-        }
-        if (adminNote != null && adminNote.isNotEmpty) {
-          orders[idx]['notes'] = adminNote;
-        }
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_ordersCacheKey, jsonEncode(orders));
-
-        try {
-          await client.from('orders').update({
-            'status': newStatus,
-            'payment_status': newStatus,
-            'notes': orders[idx]['notes'],
-          }).eq('id', orderId);
-        } catch (e) {
-          debugPrint('Notice updating Supabase order status: $e');
-        }
-
-        return true;
+      // 1. Update directly in Supabase orders table
+      try {
+        await client.from('orders').update({
+          'status': newStatus,
+          'notes': adminNote ?? 'Updated by Admin',
+          'updated_at': DateTime.now().toIso8601String(),
+        }).or('id.eq.$orderId,order_number.eq.$orderId');
+      } catch (e) {
+        debugPrint('Notice updating Supabase order status: $e');
       }
-      return false;
+
+      // If completed, ensure entitlement access is granted to student in entitlements table
+      if (newStatus == 'completed') {
+        try {
+          final res = await client.from('orders').select().or('id.eq.$orderId,order_number.eq.$orderId').maybeSingle();
+          if (res != null) {
+            final uId = (res['user_id'] ?? '').toString();
+            final uEmail = (res['user_email'] ?? '').toString();
+            final pName = (res['product_name'] ?? 'NEET/JEE Test Series').toString();
+            if (uEmail.isNotEmpty) {
+              final now = DateTime.now();
+              await client.from('entitlements').upsert({
+                'id': toValidUuid('ent_${now.millisecondsSinceEpoch}_$orderId'),
+                'user_id': uId.isNotEmpty ? uId : 'usr_guest',
+                'user_email': uEmail,
+                'product_id': 'ts_all_access',
+                'product_title': pName,
+                'product_type': 'test_series',
+                'order_id': orderId,
+                'access_type': 'full',
+                'is_active': true,
+                'created_at': now.toIso8601String(),
+                'updated_at': now.toIso8601String(),
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Notice granting entitlement on completion: $e');
+        }
+      }
+
+      // 2. Update local SharedPreferences cache
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString(_ordersCacheKey);
+      if (str != null && str.isNotEmpty) {
+        List list = jsonDecode(str);
+        for (var o in list) {
+          if (o['id'] == orderId || o['order_number'] == orderId || o['order_id'] == orderId) {
+            o['status'] = newStatus;
+            o['payment_status'] = newStatus;
+            if (adminNote != null) o['notes'] = adminNote;
+          }
+        }
+        await prefs.setString(_ordersCacheKey, jsonEncode(list));
+      }
+      return true;
     } catch (e) {
       debugPrint('Error updating order status: $e');
       return false;
     }
+  }
+
+  static Future<bool> deleteAdminOrder(String orderId) async {
+    try {
+      await client.from('orders').delete().or('id.eq.$orderId,order_number.eq.$orderId');
+    } catch (e) {
+      debugPrint('Notice deleting order from Supabase: $e');
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString(_ordersCacheKey);
+      if (str != null && str.isNotEmpty) {
+        List list = jsonDecode(str);
+        list.removeWhere((o) => o['id'] == orderId || o['order_number'] == orderId || o['order_id'] == orderId);
+        await prefs.setString(_ordersCacheKey, jsonEncode(list));
+      }
+    } catch (_) {}
+    return true;
+  }
+
+  static Future<Map<String, dynamic>> createManualAdminOrder({
+    required String studentName,
+    required String studentEmail,
+    required String studentPhone,
+    required String productName,
+    required double amount,
+    required String paymentMethod,
+    required String status,
+    String? utrOrNotes,
+  }) async {
+    final String timeMs = DateTime.now().millisecondsSinceEpoch.toString();
+    final String orderId = 'ORD-${timeMs.substring(timeMs.length - 8)}';
+
+    final orderData = {
+      'id': toValidUuid('ord_$orderId'),
+      'order_number': orderId,
+      'user_id': toValidUuid('usr_${timeMs.substring(timeMs.length - 8)}'),
+      'user_email': studentEmail.trim().toLowerCase(),
+      'user_name': studentName.trim(),
+      'user_phone': studentPhone.trim(),
+      'total_amount': amount,
+      'subtotal_amount': amount,
+      'discount_amount': 0.0,
+      'coupon_code': '',
+      'status': status,
+      'payment_method': paymentMethod,
+      'payment_id': utrOrNotes?.isNotEmpty == true ? 'MANUAL_$utrOrNotes' : 'MANUAL_$timeMs',
+      'payment_reference': utrOrNotes ?? 'Manual Entry by Admin',
+      'notes': utrOrNotes ?? 'Manual Order created by Admin',
+      'product_name': productName,
+      'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await client.from('orders').insert(orderData);
+    } catch (e) {
+      debugPrint('Notice inserting manual admin order: $e');
+    }
+
+    if (status == 'completed') {
+      try {
+        await client.from('entitlements').insert({
+          'id': toValidUuid('ent_${timeMs}_$orderId'),
+          'user_id': orderData['user_id'],
+          'user_email': studentEmail.trim().toLowerCase(),
+          'product_id': 'ts_all_access',
+          'product_title': productName,
+          'product_type': 'test_series',
+          'order_id': orderId,
+          'access_type': 'full',
+          'is_active': true,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint('Notice granting manual entitlement: $e');
+      }
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString(_ordersCacheKey);
+      List list = str != null && str.isNotEmpty ? jsonDecode(str) : [];
+      list.insert(0, orderData);
+      await prefs.setString(_ordersCacheKey, jsonEncode(list));
+    } catch (_) {}
+
+    return orderData;
   }
 
   static Future<Map<String, dynamic>> sendOrderPaymentReminder(String orderId) async {
