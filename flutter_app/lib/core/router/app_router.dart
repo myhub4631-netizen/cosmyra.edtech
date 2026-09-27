@@ -7,6 +7,7 @@ import '../../models/pyq_models.dart';
 import '../../shared/widgets/not_found_screen.dart';
 import '../../features/landing/landing_page_screen.dart';
 import '../../features/auth/signup_screen.dart';
+import '../../features/auth/oauth_callback_screen.dart';
 import '../../features/dashboard/user_dashboard_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/pyq_nta/pyq_nta_screen.dart';
@@ -184,6 +185,16 @@ final GoRouter appRouter = GoRouter(
       }
     }
 
+    // 4. OAuth Callback deep link handler route
+    if (path == '/login-callback') {
+      if (isLoggedIn) {
+        final role = session?.role.toLowerCase() ?? '';
+        final bool isAdmin = role == 'admin' || role == 'superadmin' || (session?.isAdmin ?? false) || (session?.isSuperAdmin ?? false);
+        return isAdmin ? '/admin' : '/dashboard';
+      }
+      return null;
+    }
+
     return null; // Public routes allowed
   },
   routes: [
@@ -231,6 +242,12 @@ final GoRouter appRouter = GoRouter(
             context.go('/dashboard');
           }
         },
+      ),
+    ),
+    GoRoute(
+      path: '/login-callback',
+      builder: (context, state) => OAuthCallbackScreen(
+        rawUri: state.uri,
       ),
     ),
     GoRoute(

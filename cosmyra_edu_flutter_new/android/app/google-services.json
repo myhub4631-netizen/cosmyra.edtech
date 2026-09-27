@@ -1,7 +1,7 @@
 {
   "project_info": {
     "project_number": "852782340906",
-    "project_id": "cosmyra-edu",
+    "project_id": "cosmyra-neet-jee",
     "storage_bucket": "cosmyra-edu.firebasestorage.app"
   },
   "client": [
@@ -16,6 +16,14 @@
         {
           "client_id": "852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com",
           "client_type": 3
+        },
+        {
+          "client_id": "852782340906-android.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cosmyra.neetjee",
+            "certificate_hash": "1231063aaad4f00a4f545c27860f63322bc7fe2d"
+          }
         }
       ],
       "api_key": [

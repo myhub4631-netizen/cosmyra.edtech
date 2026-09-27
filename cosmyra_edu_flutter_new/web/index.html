@@ -55,6 +55,24 @@
       });
     }
   </script>
+  <script>
+    // Intermediate Web-to-Mobile OAuth Bounceback
+    // If a mobile browser receives an OAuth callback, instantly hand over to the native app
+    (function() {
+      try {
+        var hash = window.location.hash || '';
+        var search = window.location.search || '';
+        var hasAuth = hash.indexOf('access_token=') !== -1 || hash.indexOf('error=') !== -1 || search.indexOf('code=') !== -1;
+        var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        var isOAuthPath = window.location.pathname.indexOf('login-callback') !== -1 || (isMobile && hasAuth);
+        
+        if (hasAuth && isOAuthPath) {
+          var payload = hash ? hash : search;
+          window.location.replace('cosmyraneetjee://login-callback' + payload);
+        }
+      } catch (e) {}
+    })();
+  </script>
   <script src="/seo_injector.js" defer></script>
 </head>
 <body>

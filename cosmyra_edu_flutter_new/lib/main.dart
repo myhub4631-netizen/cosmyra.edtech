@@ -6,6 +6,8 @@ import 'core/services/crash_analytics_service.dart';
 import 'core/router/app_router.dart';
 import 'firebase_options.dart';
 
+import 'core/router/safe_route_parser.dart';
+import 'core/router/app_back_button_handler.dart';
 import 'core/services/seo_tracking_service.dart';
 
 void main() async {
@@ -19,6 +21,7 @@ void main() async {
 
   await SupabaseService.initialize();
   await SeoTrackingService.initialize();
+  AppBackButtonHandler.initialize();
   runApp(const CosmyraApp());
 }
 
@@ -29,14 +32,20 @@ class CosmyraApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Cosmyra Neet Jee',
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
-      routerConfig: appRouter,
+      routeInformationParser: SafeRouteInformationParser(appRouter.routeInformationParser),
+      routeInformationProvider: appRouter.routeInformationProvider,
+      routerDelegate: appRouter.routerDelegate,
+      backButtonDispatcher: SafeBackButtonDispatcher(appRouter.backButtonDispatcher),
       builder: (context, child) {
-        return SelectionArea(
-          child: child ?? const SizedBox.shrink(),
+        return AppBackButtonHandler(
+          child: SelectionArea(
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
     );

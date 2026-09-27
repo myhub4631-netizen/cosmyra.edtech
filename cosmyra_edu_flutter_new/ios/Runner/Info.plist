@@ -35,7 +35,9 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>cosmyraneetjee</string>
 				<string>io.supabase.cosmyra</string>
+				<string>com.cosmyra.neetjee</string>
 			</array>
 		</dict>
 	</array>

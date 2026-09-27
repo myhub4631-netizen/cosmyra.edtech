@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -5,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
+import 'package:app_links/app_links.dart';
 import '../../models/models.dart';
 import '../../models/pyq_models.dart';
 import 'supabase_question_mapper.dart';
@@ -31,6 +33,10 @@ class SupabaseService {
 
   static SupabaseClient get client => Supabase.instance.client;
 
+  static final AppLinks _appLinks = AppLinks();
+  static StreamSubscription<Uri>? _subDeepLink;
+  static bool _isHandlingDeepLink = false;
+
   static Future<void> initialize() async {
     if (_isInitialized) return;
     try {
@@ -39,6 +45,7 @@ class SupabaseService {
         anonKey: supabaseAnonKey,
       );
       _isInitialized = true;
+      _setupDeepLinkListener();
 
       // Handle OAuth deep link callbacks and real-time auth changes
       client.auth.onAuthStateChange.listen((data) async {
@@ -492,6 +499,103 @@ class SupabaseService {
     return newProfile;
   }
 
+  static void _setupDeepLinkListener() {
+    if (kIsWeb) return;
+    _subDeepLink?.cancel();
+
+    // 1. Cold-start deep link (when app is opened from closed state by OAuth redirect)
+    _appLinks.getInitialLink().then((uri) {
+      if (uri != null) {
+        handleDeepLink(uri);
+      }
+    }).catchError((err) {
+      debugPrint('Initial deep link error: $err');
+    });
+
+    // 2. Stream for deep link while app is running in background or foreground
+    _subDeepLink = _appLinks.uriLinkStream.listen((uri) {
+      handleDeepLink(uri);
+    }, onError: (err) {
+      debugPrint('Deep link stream error: $err');
+    });
+  }
+
+  static Future<void> handleDeepLink(Uri uri) async {
+    debugPrint('Received Deep Link Callback: $uri');
+    final host = uri.host;
+    final scheme = uri.scheme;
+    final path = uri.path;
+
+    final bool isCallback = host == 'login-callback' ||
+        path.contains('login-callback') ||
+        scheme == 'cosmyraneetjee' ||
+        scheme == 'io.supabase.cosmyra' ||
+        scheme == 'com.cosmyra.neetjee';
+
+    final hasCode = uri.queryParameters.containsKey('code') || uri.fragment.contains('code=');
+    final hasError = uri.queryParameters.containsKey('error') || uri.fragment.contains('error=');
+    debugPrint('DEEPLINK_RECEIVED: true');
+    debugPrint('URI_SCHEME: $scheme');
+    debugPrint('URI_HOST: $host');
+    debugPrint('URI_PATH: $path');
+    debugPrint('HAS_CODE: $hasCode');
+    debugPrint('HAS_ERROR: $hasError');
+
+    if (isCallback) {
+      if (_isHandlingDeepLink) return;
+      _isHandlingDeepLink = true;
+      try {
+        try {
+          await client.auth.getSessionFromUrl(uri);
+        } catch (e) {
+          debugPrint('Notice parsing session from deep link URL: $e');
+        }
+
+        // Wait for session to settle
+        Session? session = client.auth.currentSession;
+        for (int i = 0; i < 15; i++) {
+          if (session != null) break;
+          await Future.delayed(const Duration(milliseconds: 200));
+          session = client.auth.currentSession;
+        }
+
+        debugPrint('SESSION_CREATED: ${session != null}');
+        final userId = session?.user.id;
+        final safeUserId = userId != null ? (userId.length > 8 ? '${userId.substring(0, 8)}...' : 'present') : 'none';
+        debugPrint('USER_ID_HASHED_OR_REDACTED: $safeUserId');
+        debugPrint('NAVIGATION_TARGET: /dashboard');
+
+        if (session?.user != null) {
+          final profile = await getCurrentUser();
+          if (profile != null) {
+            await setActiveUserSession(profile);
+            authNotifier.value = profile;
+          }
+        }
+      } finally {
+        _isHandlingDeepLink = false;
+      }
+    }
+  }
+
+  static Future<UserProfileModel?> waitForSession({Duration timeout = const Duration(seconds: 10)}) async {
+    final stopwatch = Stopwatch()..start();
+    while (stopwatch.elapsed < timeout) {
+      if (activeUserSession != null) return activeUserSession;
+      final session = client.auth.currentSession;
+      if (session?.user != null) {
+        final profile = await getCurrentUser();
+        if (profile != null) {
+          await setActiveUserSession(profile);
+          authNotifier.value = profile;
+          return profile;
+        }
+      }
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+    return activeUserSession;
+  }
+
   static Future<bool> signInWithGoogle() async {
     try {
       if (kIsWeb) {
@@ -501,92 +605,29 @@ class SupabaseService {
         return await client.auth.signInWithOAuth(
           OAuthProvider.google,
           redirectTo: redirectUrl,
+          queryParams: {
+            'prompt': 'select_account',
+          },
           authScreenLaunchMode: LaunchMode.platformDefault,
         );
       }
 
-      // 100% Pure Native In-App Google Sign-In (No Browser / No Chrome Redirect)
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        scopes: ['email', 'profile'],
+      // Mobile OAuth with Dedicated Deep-Link Callback
+      // Scheme: cosmyraneetjee://login-callback
+      // prompt: select_account forces Google account chooser so user explicitly selects account
+      debugPrint('OAUTH_REDIRECT_URI: cosmyraneetjee://login-callback (prompt=select_account)');
+      final bool initiated = await client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'cosmyraneetjee://login-callback',
+        queryParams: {
+          'prompt': 'select_account',
+        },
+        authScreenLaunchMode: LaunchMode.externalApplication,
       );
 
-      try {
-        await googleSignIn.signOut();
-      } catch (_) {}
-
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
-        // User cancelled native account selection
-        return false;
-      }
-
-      final String userEmail = googleUser.email.trim().toLowerCase();
-      final String userName = (googleUser.displayName != null && googleUser.displayName!.trim().isNotEmpty)
-          ? googleUser.displayName!.trim()
-          : (userEmail.contains('@') ? userEmail.split('@').first : 'Aspirant');
-      final String? rawPhoto = googleUser.photoUrl;
-      final String? avatarUri = rawPhoto != null ? (await downloadAndCompressAvatar(rawPhoto) ?? rawPhoto) : null;
-
-      final String rawGId = googleUser.id.replaceAll(RegExp(r'[^0-9a-fA-F]'), '');
-      final String userId = rawGId.length >= 12
-          ? '00000000-0000-4000-a000-${rawGId.substring(rawGId.length - 12)}'
-          : toValidUuid('usr_g_${googleUser.id}');
-
-      // 1. Attempt Supabase cloud Auth ID token exchange if token is present
-      try {
-        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-        if (googleAuth.idToken != null && googleAuth.idToken!.isNotEmpty) {
-          final authRes = await client.auth.signInWithIdToken(
-            provider: OAuthProvider.google,
-            idToken: googleAuth.idToken!,
-            accessToken: googleAuth.accessToken,
-          );
-          if (authRes.user != null) {
-            final cloudProfile = await getCurrentUser();
-            if (cloudProfile != null) {
-              await setActiveUserSession(cloudProfile);
-              authNotifier.value = cloudProfile;
-              return true;
-            }
-          }
-        }
-      } catch (idErr) {
-        debugPrint('Supabase cloud idToken verification note: $idErr');
-      }
-
-      // 2. Native Verified User Activation inside Mobile App
-      final mobileProfile = UserProfileModel(
-        id: userId,
-        email: userEmail,
-        fullName: userName,
-        avatarUrl: avatarUri,
-        targetExam: 'NEET',
-        targetYear: 2026,
-        role: userEmail == '1mdollar2027@gmail.com' ? 'superadmin' : 'student',
-        studyStreak: 1,
-      );
-
-      try {
-        await client.from('profiles').upsert({
-          'id': userId,
-          'email': userEmail,
-          'full_name': userName,
-          if (avatarUri != null && avatarUri.isNotEmpty) 'avatar_url': avatarUri,
-          'target_exam': 'NEET',
-          'target_year': 2026,
-          'role': mobileProfile.role,
-          'updated_at': DateTime.now().toIso8601String(),
-        }, onConflict: 'email');
-      } catch (e) {
-        debugPrint('Notice syncing mobile native profile to Supabase: $e');
-      }
-
-      await addLocalUser(mobileProfile);
-      await setActiveUserSession(mobileProfile);
-      authNotifier.value = mobileProfile;
-      return true;
+      return initiated;
     } catch (e) {
-      debugPrint('Mobile Native Google Sign-In error: $e');
+      debugPrint('Mobile Google Sign-In error: $e');
       return false;
     }
   }
@@ -5426,130 +5467,102 @@ class SupabaseService {
   }
 
   // =========================================================================
-  // HOME SCREEN RECOMMENDATIONS (Managed by Admin Dashboard)
   // =========================================================================
-  static List<Map<String, dynamic>> get defaultCuratedRecommendations => [
-    {
-      'id': 'rec_neet_master',
-      'test_series_id': 'ts_neet_all_india_2026',
-      'badge': 'BESTSELLER',
-      'badge_color': 0xFF2563EB, // Royal Blue
-      'icon_type': 'cap',
-      'title': 'NEET MASTER',
-      'subtitle': 'Full Syllabus Test Series',
-      'tests_count': 20,
-      'questions_count': 3600,
-      'validity': 'Till NEET 2026',
-      'price': 499.0,
-      'original_price': 999.0,
-      'is_active': true,
-      'order_index': 0,
-    },
-    {
-      'id': 'rec_neet_sprint',
-      'test_series_id': 'ts_neet_chapter_wise_2026',
-      'badge': 'POPULAR',
-      'badge_color': 0xFFEA580C, // Vibrant Orange
-      'icon_type': 'bolt',
-      'title': 'NEET SPRINT',
-      'subtitle': 'Chapter-wise Test Series',
-      'tests_count': 40,
-      'questions_count': 2000,
-      'validity': 'Till NEET 2026',
-      'price': 399.0,
-      'original_price': 799.0,
-      'is_active': true,
-      'order_index': 1,
-    },
-    {
-      'id': 'rec_nta_pyq',
-      'test_series_id': 'ts_neet_pyq_2024_2025',
-      'badge': 'TRENDING',
-      'badge_color': 0xFF9333EA, // Purple
-      'icon_type': 'cube',
-      'title': 'NTA PYQ',
-      'subtitle': '2023-2025 + Solutions',
-      'tests_count': 150,
-      'questions_count': 4500,
-      'validity': 'Lifetime',
-      'price': 299.0,
-      'original_price': 599.0,
-      'is_active': true,
-      'order_index': 2,
-    },
-    {
-      'id': 'rec_neet_topic_booster',
-      'test_series_id': 'ts_neet_high_yield_topics_2026',
-      'badge': 'HIGH YIELD',
-      'badge_color': 0xFF10B981, // Emerald Green
-      'icon_type': 'target',
-      'title': 'NEET TOPIC BOOSTER',
-      'subtitle': 'High-Yield Topic-wise Tests',
-      'tests_count': 10,
-      'questions_count': 1800,
-      'validity': 'Till NEET 2026',
-      'price': 199.0,
-      'original_price': 499.0,
-      'is_active': true,
-      'order_index': 3,
-    },
-  ];
+  // HOME SCREEN RECOMMENDATIONS (Dynamic Curation: Test Series, Plans, etc.)
+  // =========================================================================
 
+  /// Legacy demo recommendation IDs to ignore and purge
+  static const Set<String> legacyDemoRecommendationIds = {
+    'rec_neet_master',
+    'rec_neet_sprint',
+    'rec_nta_pyq',
+    'rec_neet_topic_booster',
+  };
+
+  /// Fetch all real home screen recommendations without hardcoded demo data
   static Future<List<Map<String, dynamic>>> fetchHomeRecommendations() async {
     final List<Map<String, dynamic>> list = [];
     final Set<String> seenIds = {};
 
-    // 1. Fetch from Supabase recommendations table if present
+    // 1. Fetch from Supabase app_settings table ('home_recommendations')
     try {
-      final res = await client.from('home_recommendations').select().order('order_index', ascending: true);
-      if (res != null && (res as List).isNotEmpty) {
-        for (var item in res) {
-          final map = Map<String, dynamic>.from(item as Map);
-          final id = map['id']?.toString() ?? '';
-          if (id.isNotEmpty && !seenIds.contains(id)) {
-            seenIds.add(id);
-            list.add(map);
+      final res = await client
+          .from('app_settings')
+          .select('value')
+          .eq('key', 'home_recommendations')
+          .maybeSingle();
+      if (res != null && res['value'] != null) {
+        final raw = res['value'];
+        List<dynamic> items = [];
+        if (raw is List) {
+          items = raw;
+        } else if (raw is String && raw.trim().isNotEmpty) {
+          try {
+            items = jsonDecode(raw) as List;
+          } catch (_) {}
+        }
+        for (var item in items) {
+          if (item is Map) {
+            final map = Map<String, dynamic>.from(item);
+            final id = map['id']?.toString() ?? '';
+            // Omit legacy demo data
+            if (id.isNotEmpty && !seenIds.contains(id) && !legacyDemoRecommendationIds.contains(id)) {
+              seenIds.add(id);
+              list.add(map);
+            }
           }
         }
       }
     } catch (e) {
-      debugPrint('Notice querying home_recommendations from Supabase: $e');
+      debugPrint('Notice reading home_recommendations from app_settings: $e');
     }
 
-    // 2. Fetch locally stored recommendations from admin edits
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final str = prefs.getString('cosmyra_home_recommendations');
-      if (str != null && str.isNotEmpty) {
-        final decoded = jsonDecode(str) as List<dynamic>;
-        for (var item in decoded) {
-          final map = Map<String, dynamic>.from(item as Map);
-          final id = map['id']?.toString() ?? '';
-          if (id.isNotEmpty && !seenIds.contains(id)) {
-            seenIds.add(id);
-            list.add(map);
+    // 2. Fetch from home_recommendations table if available
+    if (list.isEmpty) {
+      try {
+        final res = await client
+            .from('home_recommendations')
+            .select()
+            .order('order_index', ascending: true);
+        if (res != null && (res as List).isNotEmpty) {
+          for (var item in res) {
+            final map = Map<String, dynamic>.from(item as Map);
+            final id = map['id']?.toString() ?? '';
+            if (id.isNotEmpty && !seenIds.contains(id) && !legacyDemoRecommendationIds.contains(id)) {
+              seenIds.add(id);
+              list.add(map);
+            }
           }
         }
-      }
-    } catch (e) {
-      debugPrint('Notice reading local home recommendations: $e');
-    }
-
-    // 3. Fallback to defaultCuratedRecommendations to ensure 100% reliability
-    for (var def in defaultCuratedRecommendations) {
-      final id = def['id']?.toString() ?? '';
-      if (!seenIds.contains(id)) {
-        seenIds.add(id);
-        list.add(def);
+      } catch (e) {
+        debugPrint('Notice reading home_recommendations table: $e');
       }
     }
 
-    // Cache locally for offline/fast load
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('cosmyra_home_recommendations', jsonEncode(list));
-    } catch (_) {}
+    // 3. Fetch from local cache if remote had no data or was offline
+    if (list.isEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final str = prefs.getString('cosmyra_home_recommendations');
+        if (str != null && str.isNotEmpty) {
+          final decoded = jsonDecode(str) as List<dynamic>;
+          for (var item in decoded) {
+            if (item is Map) {
+              final map = Map<String, dynamic>.from(item);
+              final id = map['id']?.toString() ?? '';
+              if (id.isNotEmpty && !seenIds.contains(id) && !legacyDemoRecommendationIds.contains(id)) {
+                seenIds.add(id);
+                list.add(map);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Notice reading local home recommendations: $e');
+      }
+    }
 
+    // Clean sort by order_index
     list.sort((a, b) {
       final int orderA = (a['order_index'] as num?)?.toInt() ?? 0;
       final int orderB = (b['order_index'] as num?)?.toInt() ?? 0;
@@ -5559,6 +5572,42 @@ class SupabaseService {
     return list;
   }
 
+  /// Save entire list of home recommendations to Supabase and local cache
+  static Future<bool> saveAllHomeRecommendations(List<Map<String, dynamic>> list) async {
+    // 1. Save to local storage for instant responsiveness
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_home_recommendations', jsonEncode(list));
+    } catch (e) {
+      debugPrint('Error caching recommendations locally: $e');
+    }
+
+    bool success = false;
+
+    // 2. Save to Supabase app_settings
+    try {
+      await client.from('app_settings').upsert({
+        'key': 'home_recommendations',
+        'value': list,
+        'description': 'Curated home screen recommended test series and subscription plans',
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      success = true;
+    } catch (e) {
+      debugPrint('Notice saving home_recommendations to app_settings: $e');
+    }
+
+    // 3. Also try syncing to dedicated home_recommendations table if it exists
+    try {
+      for (final item in list) {
+        await client.from('home_recommendations').upsert(item);
+      }
+    } catch (_) {}
+
+    return success;
+  }
+
+  /// Create or update a single recommendation
   static Future<void> saveHomeRecommendation(Map<String, dynamic> item) async {
     final list = await fetchHomeRecommendations();
     final String id = item['id']?.toString() ?? 'rec_${DateTime.now().millisecondsSinceEpoch}';
@@ -5568,50 +5617,64 @@ class SupabaseService {
     if (index >= 0) {
       list[index] = item;
     } else {
+      item['order_index'] = list.length;
       list.add(item);
     }
 
-    // Save to local storage
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('cosmyra_home_recommendations', jsonEncode(list));
-    } catch (e) {
-      debugPrint('Error saving home recommendation locally: $e');
-    }
-
-    // Attempt remote save to Supabase
-    try {
-      await client.from('home_recommendations').upsert(item);
-    } catch (e) {
-      debugPrint('Notice syncing home recommendation to Supabase: $e');
-    }
+    await saveAllHomeRecommendations(list);
   }
 
+  /// Delete a recommendation by id
   static Future<void> deleteHomeRecommendation(String id) async {
     final list = await fetchHomeRecommendations();
     list.removeWhere((e) => e['id']?.toString() == id);
 
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('cosmyra_home_recommendations', jsonEncode(list));
-    } catch (e) {
-      debugPrint('Error deleting local recommendation: $e');
-    }
+    await saveAllHomeRecommendations(list);
 
     try {
       await client.from('home_recommendations').delete().eq('id', id);
-    } catch (e) {
-      debugPrint('Notice deleting recommendation in Supabase: $e');
-    }
+    } catch (_) {}
   }
 
+  /// Toggle active/hidden status of a recommendation
   static Future<void> toggleRecommendationStatus(String id, bool isActive) async {
     final list = await fetchHomeRecommendations();
     final item = list.firstWhere((e) => e['id']?.toString() == id, orElse: () => {});
     if (item.isNotEmpty) {
       item['is_active'] = isActive;
-      await saveHomeRecommendation(item);
+      await saveAllHomeRecommendations(list);
     }
+  }
+
+  /// Reorder recommendations list
+  static Future<void> reorderHomeRecommendations(int oldIndex, int newIndex) async {
+    final list = await fetchHomeRecommendations();
+    if (oldIndex < 0 || oldIndex >= list.length || newIndex < 0 || newIndex >= list.length) {
+      return;
+    }
+    final item = list.removeAt(oldIndex);
+    list.insert(newIndex, item);
+    for (int i = 0; i < list.length; i++) {
+      list[i]['order_index'] = i;
+    }
+    await saveAllHomeRecommendations(list);
+  }
+
+  /// Purge all legacy demo recommendations completely
+  static Future<void> purgeDemoRecommendations() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('cosmyra_home_recommendations');
+    } catch (_) {}
+
+    try {
+      await client.from('app_settings').upsert({
+        'key': 'home_recommendations',
+        'value': [],
+        'description': 'Curated home screen recommended test series and subscription plans',
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {}
   }
 
   /// Fetch questions linked to a specific Test Series or Paper for editing

@@ -126,7 +126,6 @@ class _AdminRecommendationsScreenState extends State<AdminRecommendationsScreen>
             'order_index': _recommendations.length,
           };
 
-    // If adding a new test series and series exist, prefill with first series
     if (!isEdit && productType == 'test_series' && _allTestSeries.isNotEmpty) {
       final firstSeries = _allTestSeries.first;
       item['title'] = (firstSeries['title'] ?? firstSeries['name'] ?? 'NEET Test Series').toString();
@@ -832,20 +831,17 @@ class _AdminRecommendationsScreenState extends State<AdminRecommendationsScreen>
           ],
         ),
         actions: [
-          // Refresh Button
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Color(0xFF475569)),
             tooltip: 'Refresh',
             onPressed: _loadData,
           ),
-          // Clear Demo Data (if demo items or user wants clean slate)
           TextButton.icon(
             icon: const Icon(Icons.cleaning_services_rounded, size: 16, color: Color(0xFFEF4444)),
             label: const Text('Clear Demo Data', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
             onPressed: _confirmPurgeDemoData,
           ),
           const SizedBox(width: 8),
-          // + Add Recommendation Button
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF2563EB),
@@ -1126,7 +1122,6 @@ class _AdminRecommendationsScreenState extends State<AdminRecommendationsScreen>
                                     children: [
                                       Row(
                                         children: [
-                                          // Product Type Pill
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
@@ -1140,7 +1135,6 @@ class _AdminRecommendationsScreenState extends State<AdminRecommendationsScreen>
                                             ),
                                           ),
                                           const SizedBox(width: 6),
-                                          // Badge
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                             decoration: BoxDecoration(color: themeColor, borderRadius: BorderRadius.circular(4)),
@@ -1208,7 +1202,7 @@ class _AdminRecommendationsScreenState extends State<AdminRecommendationsScreen>
                                 ),
                                 const SizedBox(width: 8),
 
-                                // Action Buttons (Edit & Delete)
+                                // Action Buttons
                                 IconButton(
                                   icon: const Icon(Icons.edit_outlined, color: Color(0xFF2563EB), size: 20),
                                   tooltip: 'Edit Card',
