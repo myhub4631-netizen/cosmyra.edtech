@@ -2,8 +2,12 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/cart_service.dart';
+import 'widgets/ecommerce_checkout_dialog.dart';
+import 'widgets/ecommerce_cart_modal.dart';
 import '../tests/test_screen.dart';
 
 class TestSeriesScreen extends StatefulWidget {
@@ -124,7 +128,7 @@ class TestSeriesCardData {
 
 class _TestSeriesScreenState extends State<TestSeriesScreen> {
   String _selectedCategory = 'All Series';
-  String _selectedExamFilter = 'NEET 2026';
+  String _selectedExamFilter = 'All Exams';
   bool _isLoading = false;
   List<Map<String, dynamic>> _dbPapers = [];
   List<Map<String, dynamic>> _customSeriesList = [];
@@ -149,6 +153,40 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   }
 
   Future<void> _startTestSeries(String paperId, String title, int durationMins) async {
+    // 1. Check if test belongs to a paid series
+    final allSeries = _getAllRealTestSeries();
+    TestSeriesCardData? matchingSeries;
+    for (var s in allSeries) {
+      if (s.id == paperId || s.tests.any((t) => (t['id']?.toString() ?? '') == paperId)) {
+        matchingSeries = s;
+        break;
+      }
+    }
+
+    if (matchingSeries != null && !matchingSeries.isFree) {
+      final user = SupabaseService.activeUserSession;
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please sign in or create an account to access "$title".'),
+              action: SnackBarAction(label: 'Sign In', textColor: Colors.white, onPressed: () => context.go('/login')),
+              backgroundColor: const Color(0xFF4F46E5),
+            ),
+          );
+        }
+        return;
+      }
+
+      final hasAccess = await SupabaseService.hasActiveEntitlement(user.id, matchingSeries.id);
+      if (!hasAccess) {
+        if (mounted) {
+          _handlePurchaseOrEnroll(matchingSeries);
+        }
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
     try {
       final questions = await SupabaseService.fetchTestSeriesQuestions(
@@ -335,6 +373,9 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       }
     }
 
+    // Filter out any legacy demo test series IDs to strictly show real dynamic test series
+    list.removeWhere((item) => SupabaseService.legacyDemoTestSeriesIds.contains(item.id));
+
     return list;
   }
 
@@ -346,9 +387,14 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
 
     for (var s in seriesList) {
       allCount += s.testCount;
-      if (s.testType == 'Chapter' || s.title.toLowerCase().contains('chapter')) {
+      final cat = s.category.toLowerCase();
+      final type = s.testType.toLowerCase();
+      final title = s.title.toLowerCase();
+      final sub = s.subtitle.toLowerCase();
+
+      if (type.contains('chapter') || cat.contains('chapter') || title.contains('chapter') || sub.contains('chapter')) {
         chapterCount += s.testCount;
-      } else if (s.testType == 'Part' || s.title.toLowerCase().contains('part') || s.title.toLowerCase().contains('topic')) {
+      } else if (type.contains('part') || type.contains('topic') || cat.contains('topic') || cat.contains('part') || title.contains('topic') || title.contains('part') || sub.contains('topic') || sub.contains('part')) {
         topicCount += s.testCount;
       } else {
         fullCount += s.testCount;
@@ -508,8 +554,14 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   }
 
   void _handlePurchaseOrEnroll(TestSeriesCardData item) async {
+    if (item.isFree) {
+      _startTestSeries(item.id, item.title, item.durationMinutes);
+      return;
+    }
+
     if (item.purchaseLink.trim().isNotEmpty &&
-        (item.purchaseLink.startsWith('http://') || item.purchaseLink.startsWith('https://'))) {
+        (item.purchaseLink.startsWith('http://') || item.purchaseLink.startsWith('https://')) &&
+        !item.purchaseLink.contains('neet-jee.in')) {
       final uri = Uri.tryParse(item.purchaseLink.trim());
       if (uri != null) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -517,138 +569,25 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       }
     }
 
-    // Otherwise show rich enrollment & checkout dialog
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFECFDF5),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Enroll in Test Series',
-                style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              item.title,
-              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B)),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              item.description,
-              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Test Type', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                      Text('${item.testType} Syllabus', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Estimated Tests', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                      Text('${item.testCount} Tests', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Duration', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                      Text(item.durationFormatted, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Validity', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                      Text(item.validity, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const Divider(height: 16, color: Color(0xFFE2E8F0)),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Total Amount', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
-                      Text(
-                        item.isFree ? 'FREE' : '₹${item.price.toInt()}',
-                        style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF10B981)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _startTestSeries(item.id, item.title, item.durationMinutes);
-            },
-            icon: const Icon(Icons.lock_open_rounded, size: 16, color: Colors.white),
-            label: Text(item.isFree ? 'Start Free Test' : 'Confirm & Access Tests', style: const TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
+    // Navigate to dedicated full page checkout
+    final cartItem = CartItem(
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      price: item.price,
+      originalPrice: item.originalPrice,
+      bannerImageUrl: item.bannerImageUrl ?? '',
+      exam: item.exam,
+      validity: item.validity,
+      testCount: item.testCount,
     );
+
+    context.push('/checkout', extra: cartItem);
   }
 
   void _showProductDetailsModal(TestSeriesCardData item) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => _TestSeriesProductDetailDialog(
-        item: item,
-        dbPapers: _dbPapers,
-        onStartTest: (testId, title, duration) {
-          _startTestSeries(testId, title, duration);
-        },
-        onDownloadSyllabus: (it) => _handleDownloadSyllabus(it),
-        onPurchase: (it) => _handlePurchaseOrEnroll(it),
-      ),
-    );
+    // Navigate directly to dedicated full-page product description
+    context.push('/product/${item.id}');
   }
 
   @override
@@ -682,7 +621,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                         const SizedBox(height: 20),
 
                         // Your Progress Card
-                        _buildYourProgressCard(),
+                        _buildYourProgressCard(allRealSeries),
                         const SizedBox(height: 24),
 
                         // Test Series Categories Row
@@ -734,13 +673,19 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
               ),
               const SizedBox(width: 4),
               Container(
-                width: 32,
-                height: 32,
+                padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
-                child: const Icon(Icons.school_rounded, color: Colors.white, size: 18),
+                child: Image.asset(
+                  'assets/images/cosmyra_logo.png',
+                  height: 30,
+                  width: 30,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, color: Color(0xFF4F46E5), size: 20),
+                ),
               ),
               const SizedBox(width: 10),
               Column(
@@ -748,7 +693,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'ExamPrep',
+                    'Cosmyra NEET | JEE',
                     style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
                   ),
                   Row(
@@ -765,9 +710,29 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             ],
           ),
 
-          // Right: Notification Bell & Profile Avatar
+          // Right: Cart Icon, Notification Bell & Profile Avatar
           Row(
             children: [
+              // 1. Interactive Cart Button with Dynamic Badge
+              AnimatedBuilder(
+                animation: CartService.instance,
+                builder: (ctx, _) => IconButton(
+                  tooltip: 'Shopping Cart',
+                  onPressed: () => context.push('/cart'),
+                  icon: Badge(
+                    isLabelVisible: CartService.instance.isNotEmpty,
+                    label: Text(
+                      '${CartService.instance.itemCount}',
+                      style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    backgroundColor: const Color(0xFFEF4444),
+                    child: const Icon(Icons.shopping_cart_outlined, color: Color(0xFF334155), size: 22),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+
+              // 2. Notification Bell
               Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -939,7 +904,14 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   // ===========================================================================
   // 4. YOUR PROGRESS CARD (Donut Chart & Analytics Link)
   // ===========================================================================
-  Widget _buildYourProgressCard() {
+  Widget _buildYourProgressCard(List<TestSeriesCardData> seriesList) {
+    final int totalTests = seriesList.fold(0, (sum, i) => sum + i.testCount);
+    final int completedTests = seriesList.where((i) => i.attemptStatus == 'Completed').length;
+    final int inProgressTests = seriesList.where((i) => i.attemptStatus == 'In Progress').length;
+    final int attempted = completedTests + inProgressTests;
+    final double progress = totalTests > 0 ? (completedTests / totalTests).clamp(0.0, 1.0) : 0.0;
+    final int pct = (progress * 100).toInt();
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -977,7 +949,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
           // Content Row (Donut Chart + Stats Progress Bar)
           Row(
             children: [
-              // Circular Donut Progress Ring (65%)
+              // Circular Donut Progress Ring
               SizedBox(
                 width: 72,
                 height: 72,
@@ -986,9 +958,9 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                   children: [
                     CustomPaint(
                       size: const Size(72, 72),
-                      painter: RingChartPainter(progress: 0.65, ringColor: const Color(0xFF10B981)),
+                      painter: RingChartPainter(progress: progress > 0 ? progress : 0.001, ringColor: const Color(0xFF10B981)),
                     ),
-                    Text('65%', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
+                    Text('$pct%', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
                   ],
                 ),
               ),
@@ -1003,17 +975,17 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Tests Completed', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-                        Text('8 of 24', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B))),
+                        Text('$completedTests of $totalTests', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B))),
                       ],
                     ),
                     const SizedBox(height: 6),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
-                      child: const LinearProgressIndicator(
-                        value: 8 / 24,
+                      child: LinearProgressIndicator(
+                        value: progress,
                         minHeight: 6,
-                        backgroundColor: Color(0xFFF1F5F9),
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1026,15 +998,21 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                           children: [
                             Text('Avg Accuracy', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
                             const SizedBox(height: 2),
-                            Text('76.4%', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                            Text(
+                              attempted > 0 ? '${((completedTests / (attempted > 0 ? attempted : 1)) * 100).toInt()}%' : 'N/A',
+                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                            ),
                           ],
                         ),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Avg Score', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                            Text('Attempted', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
                             const SizedBox(height: 2),
-                            Text('142 / 180', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                            Text(
+                              attempted > 0 ? '$attempted tests' : '0 tests',
+                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                            ),
                           ],
                         ),
                       ],
@@ -1140,23 +1118,57 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   Widget _buildAllTestSeriesSection(List<TestSeriesCardData> allRealSeries) {
     // Filter by Category tab if applicable
     final filteredList = allRealSeries.where((item) {
-      if (_selectedCategory == 'Full Syllabus' && !item.title.toLowerCase().contains('full') && !item.subtitle.toLowerCase().contains('full')) {
+      final cat = item.category.toLowerCase();
+      final type = item.testType.toLowerCase();
+      final title = item.title.toLowerCase();
+      final sub = item.subtitle.toLowerCase();
+
+      if (_selectedCategory == 'Full Syllabus' &&
+          !cat.contains('full') &&
+          !type.contains('full') &&
+          !title.contains('full') &&
+          !sub.contains('full')) {
         return false;
       }
-      if (_selectedCategory == 'Chapter Wise' && !item.title.toLowerCase().contains('chapter') && !item.subtitle.toLowerCase().contains('chapter')) {
+      if (_selectedCategory == 'Chapter Wise' &&
+          !cat.contains('chapter') &&
+          !type.contains('chapter') &&
+          !title.contains('chapter') &&
+          !sub.contains('chapter')) {
         return false;
       }
-      if (_selectedCategory == 'Topic Wise' && !item.title.toLowerCase().contains('topic') && !item.subtitle.toLowerCase().contains('topic')) {
+      if (_selectedCategory == 'Topic Wise' &&
+          !cat.contains('topic') &&
+          !cat.contains('part') &&
+          !type.contains('topic') &&
+          !type.contains('part') &&
+          !title.contains('topic') &&
+          !title.contains('part') &&
+          !sub.contains('topic') &&
+          !sub.contains('part')) {
         return false;
       }
       // Exam Filter
       if (_selectedExamFilter != 'All Exams') {
         final f = _selectedExamFilter.toLowerCase();
-        final match = item.title.toLowerCase().contains(f) ||
-            item.formattedTargetYear.toLowerCase().contains(f) ||
-            '${item.exam} ${item.targetYear}'.toLowerCase().contains(f);
-        if (!match && (f.contains('neet') && !item.exam.toLowerCase().contains('neet'))) return false;
-        if (!match && (f.contains('jee') && !item.exam.toLowerCase().contains('jee'))) return false;
+        final isNeet = f.contains('neet');
+        final isJee = f.contains('jee');
+
+        if (isNeet && !item.exam.toLowerCase().contains('neet')) return false;
+        if (isJee && !item.exam.toLowerCase().contains('jee')) return false;
+
+        // Check if filter specifies a particular year (e.g. 2025, 2024)
+        final yearMatch = RegExp(r'\b(19|20)\d{2}\b').firstMatch(f);
+        if (yearMatch != null) {
+          final filterYear = yearMatch.group(0)!;
+          final itemYear = item.targetYear.trim();
+          if (itemYear.isNotEmpty &&
+              itemYear != filterYear &&
+              item.title.contains(RegExp(r'\b(19|20)\d{2}\b')) &&
+              !item.title.contains(filterYear)) {
+            return false;
+          }
+        }
       }
       return true;
     }).toList();
@@ -1235,6 +1247,21 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                   'Real test series published by the admin in Admin Test Series Manager will appear here.',
                   style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                   textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF2563EB),
+                    side: const BorderSide(color: Color(0xFF2563EB)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () => setState(() {
+                    _selectedCategory = 'All Series';
+                    _selectedExamFilter = 'All Exams';
+                  }),
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Show All Available Series', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
@@ -1721,21 +1748,25 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   // 8. BOTTOM NAVIGATION BAR
   // ===========================================================================
   Widget _buildBottomNavBar() {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
     return Container(
-      height: 60,
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem(Icons.home_outlined, 'Home', false, 0),
-          _buildNavItem(Icons.track_changes_outlined, 'Practice', false, 1),
-          _buildNavItem(Icons.calendar_today_rounded, 'Test Series', true, 2),
-          _buildNavItem(Icons.bar_chart_rounded, 'Analytics', false, 5),
-          _buildNavItem(Icons.person_outline_rounded, 'Profile', false, 7),
-        ],
+      padding: EdgeInsets.only(bottom: bottomPadding),
+      child: SizedBox(
+        height: 60,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(Icons.home_outlined, 'Home', false, 0),
+            _buildNavItem(Icons.track_changes_outlined, 'Practice', false, 1),
+            _buildNavItem(Icons.calendar_today_rounded, 'Test Series', true, 2),
+            _buildNavItem(Icons.bar_chart_rounded, 'Analytics', false, 5),
+            _buildNavItem(Icons.person_outline_rounded, 'Profile', false, 7),
+          ],
+        ),
       ),
     );
   }
@@ -1836,11 +1867,34 @@ class _TestSeriesProductDetailDialog extends StatefulWidget {
 class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetailDialog>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _hasPurchased = false;
+  bool _isLoadingAccess = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _checkEntitlementStatus();
+  }
+
+  Future<void> _checkEntitlementStatus() async {
+    final user = SupabaseService.activeUserSession;
+    if (user != null) {
+      final owns = await SupabaseService.hasActiveEntitlement(user.id, widget.item.id);
+      if (mounted) {
+        setState(() {
+          _hasPurchased = owns;
+          _isLoadingAccess = false;
+        });
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _hasPurchased = false;
+          _isLoadingAccess = false;
+        });
+      }
+    }
   }
 
   @override
@@ -2978,7 +3032,7 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
                   ],
                 ),
               Text(
-                'Instant Access • ${item.validity}',
+                _hasPurchased ? 'Unlocked • ${item.validity}' : 'Instant Access • ${item.validity}',
                 style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
               ),
             ],
@@ -2999,55 +3053,113 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
           ),
           const SizedBox(width: 10),
 
-          // Purchase Button (near Download Syllabus)
-          if (item.showPurchaseButton) ...[
+          // DYNAMIC CTAs BASED ON EXACT SPECIFICATIONS:
+          // 1. NOT LOGGED IN -> Sign In / Create Account
+          if (SupabaseService.activeUserSession == null) ...[
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                context.go('/login');
+              },
+              icon: const Icon(Icons.login_rounded, size: 16),
+              label: const Text('Sign In / Create Account', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ),
+          ]
+          // 2. LOGGED IN + ALREADY PURCHASED (OR FREE) -> Open Product / Start Learning
+          else if (_hasPurchased || item.isFree) ...[
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF10B981),
                 foregroundColor: Colors.white,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              onPressed: () => widget.onPurchase(item),
-              icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 16, color: Colors.white),
-              label: Text(
-                item.isFree
-                    ? 'Enroll Free'
-                    : (item.purchaseButtonText.trim().isNotEmpty && item.purchaseButtonText.trim() != 'Join'
-                        ? item.purchaseButtonText.trim()
-                        : 'Join - ₹${item.price.toInt()}'),
-                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+              onPressed: () {
+                Navigator.pop(context);
+                widget.onStartTest(item.id, item.title, item.durationMinutes);
+              },
+              icon: const Icon(Icons.play_arrow_rounded, size: 18),
+              label: const Text('Open Product / Start Learning', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+            ),
+          ]
+          // 3. LOGGED IN + NOT PURCHASED -> Add to Cart + Buy Now
+          else ...[
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF4F46E5),
+                side: const BorderSide(color: Color(0xFF4F46E5)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
+              onPressed: () async {
+                final cartItem = CartItem(
+                  id: item.id,
+                  title: item.title,
+                  description: item.description,
+                  price: item.price,
+                  originalPrice: item.originalPrice,
+                  bannerImageUrl: item.bannerImageUrl ?? '',
+                  exam: item.exam,
+                  validity: item.validity,
+                  testCount: item.testCount,
+                );
+                final added = await CartService.instance.addToCart(cartItem);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(added ? '✓ Added "${item.title}" to Cart!' : 'Product already in your cart or library.'),
+                      backgroundColor: added ? const Color(0xFF4F46E5) : const Color(0xFFF59E0B),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.add_shopping_cart_rounded, size: 16),
+              label: const Text('Add to Cart', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(width: 10),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                Navigator.pop(context);
+                final cartItem = CartItem(
+                  id: item.id,
+                  title: item.title,
+                  description: item.description,
+                  price: item.price,
+                  originalPrice: item.originalPrice,
+                  bannerImageUrl: item.bannerImageUrl ?? '',
+                  exam: item.exam,
+                  validity: item.validity,
+                  testCount: item.testCount,
+                );
+                EcommerceCheckoutDialog.show(
+                  context,
+                  singleItem: cartItem,
+                  onStartTest: (testId, title, duration) => widget.onStartTest(testId, title, duration),
+                );
+              },
+              icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 16),
+              label: Text(
+                'Buy Now - ₹${item.price.toInt()}',
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
-
-          // Primary Start Test Button
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2563EB),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              widget.onStartTest(item.id, item.title, item.durationMinutes);
-            },
-            icon: Icon(
-              item.attemptStatus == 'In Progress' ? Icons.play_arrow_rounded : Icons.arrow_forward_rounded,
-              size: 16,
-              color: Colors.white,
-            ),
-            label: Text(
-              item.attemptStatus == 'In Progress'
-                  ? 'Resume Test'
-                  : (item.attemptStatus == 'Completed' ? 'Retake Test' : 'Start First Test'),
-              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-            ),
-          ),
         ],
       ),
     );

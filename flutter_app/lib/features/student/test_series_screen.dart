@@ -373,54 +373,8 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       }
     }
 
-    // 3. Fallback to SupabaseService.defaultCuratedTestSeries so test series are ALWAYS visible on mobile & web
-    for (var def in SupabaseService.defaultCuratedTestSeries) {
-      final String title = (def['title'] ?? def['name'] ?? '').toString().trim();
-      final String sId = (def['id'] ?? 'ts_${title.hashCode}').toString();
-      if (title.isNotEmpty && !seenTitles.contains(title.toLowerCase())) {
-        seenTitles.add(title.toLowerCase());
-        list.add(
-          TestSeriesCardData(
-            id: sId,
-            title: title,
-            exam: (def['exam'] ?? 'NEET').toString(),
-            targetYear: (def['year'] ?? '2026').toString(),
-            subtitle: '${def['exam'] ?? 'NEET'} ${def['year'] ?? '2026'} Series (${def['question_count'] ?? 200} Qs)',
-            description: (def['description'] ?? '').toString(),
-            longDescription: (def['long_description'] ?? '').toString(),
-            features: (def['features'] is List) ? List<dynamic>.from(def['features']) : const [],
-            tests: (def['tests'] is List)
-                ? (def['tests'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
-                : const [],
-            reviews: (def['reviews'] is List)
-                ? (def['reviews'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
-                : const [],
-            topScores: (def['top_scores'] is Map)
-                ? Map<String, dynamic>.from(def['top_scores'])
-                : const {},
-            testCount: (def['test_count'] is num) ? (def['test_count'] as num).toInt() : 10,
-            durationMinutes: (def['duration_minutes'] is num) ? (def['duration_minutes'] as num).toInt() : 180,
-            difficulty: (def['difficulty'] ?? 'Moderate').toString(),
-            testType: (def['test_type'] ?? 'Full').toString(),
-            category: (def['category'] ?? 'Full Syllabus').toString(),
-            validity: (def['validity'] ?? 'Valid until exam').toString(),
-            attemptStatus: (def['attempt_status'] ?? 'Not Attempted').toString(),
-            syllabusUrl: (def['syllabus_url'] ?? '').toString(),
-            status: def['status'] ?? 'Published',
-            nextTestName: 'Mock Test 01',
-            iconBgColor: const Color(0xFF4F46E5),
-            icon: Icons.track_changes_rounded,
-            bannerImageUrl: def['banner_image_url'],
-            isFree: def['is_free'] == true,
-            price: (def['price'] is num) ? (def['price'] as num).toDouble() : 499.0,
-            originalPrice: (def['original_price'] is num) ? (def['original_price'] as num).toDouble() : 1999.0,
-            purchaseLink: (def['purchase_link'] ?? '').toString(),
-            purchaseButtonText: (def['purchase_button_text'] ?? 'Join').toString(),
-            showPurchaseButton: def['show_purchase_button'] != false,
-          ),
-        );
-      }
-    }
+    // Filter out any legacy demo test series IDs to strictly show real dynamic test series
+    list.removeWhere((item) => SupabaseService.legacyDemoTestSeriesIds.contains(item.id));
 
     return list;
   }
@@ -667,7 +621,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                         const SizedBox(height: 20),
 
                         // Your Progress Card
-                        _buildYourProgressCard(),
+                        _buildYourProgressCard(allRealSeries),
                         const SizedBox(height: 24),
 
                         // Test Series Categories Row
@@ -950,7 +904,14 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   // ===========================================================================
   // 4. YOUR PROGRESS CARD (Donut Chart & Analytics Link)
   // ===========================================================================
-  Widget _buildYourProgressCard() {
+  Widget _buildYourProgressCard(List<TestSeriesCardData> seriesList) {
+    final int totalTests = seriesList.fold(0, (sum, i) => sum + i.testCount);
+    final int completedTests = seriesList.where((i) => i.attemptStatus == 'Completed').length;
+    final int inProgressTests = seriesList.where((i) => i.attemptStatus == 'In Progress').length;
+    final int attempted = completedTests + inProgressTests;
+    final double progress = totalTests > 0 ? (completedTests / totalTests).clamp(0.0, 1.0) : 0.0;
+    final int pct = (progress * 100).toInt();
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -988,7 +949,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
           // Content Row (Donut Chart + Stats Progress Bar)
           Row(
             children: [
-              // Circular Donut Progress Ring (65%)
+              // Circular Donut Progress Ring
               SizedBox(
                 width: 72,
                 height: 72,
@@ -997,9 +958,9 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                   children: [
                     CustomPaint(
                       size: const Size(72, 72),
-                      painter: RingChartPainter(progress: 0.65, ringColor: const Color(0xFF10B981)),
+                      painter: RingChartPainter(progress: progress > 0 ? progress : 0.001, ringColor: const Color(0xFF10B981)),
                     ),
-                    Text('65%', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
+                    Text('$pct%', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
                   ],
                 ),
               ),
@@ -1014,17 +975,17 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Tests Completed', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-                        Text('8 of 24', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B))),
+                        Text('$completedTests of $totalTests', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B))),
                       ],
                     ),
                     const SizedBox(height: 6),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
-                      child: const LinearProgressIndicator(
-                        value: 8 / 24,
+                      child: LinearProgressIndicator(
+                        value: progress,
                         minHeight: 6,
-                        backgroundColor: Color(0xFFF1F5F9),
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1037,15 +998,21 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                           children: [
                             Text('Avg Accuracy', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
                             const SizedBox(height: 2),
-                            Text('76.4%', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                            Text(
+                              attempted > 0 ? '${((completedTests / (attempted > 0 ? attempted : 1)) * 100).toInt()}%' : 'N/A',
+                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                            ),
                           ],
                         ),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Avg Score', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                            Text('Attempted', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
                             const SizedBox(height: 2),
-                            Text('142 / 180', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                            Text(
+                              attempted > 0 ? '$attempted tests' : '0 tests',
+                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                            ),
                           ],
                         ),
                       ],

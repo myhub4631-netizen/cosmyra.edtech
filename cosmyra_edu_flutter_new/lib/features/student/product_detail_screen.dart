@@ -62,20 +62,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       }
     }
 
-    if (match == null) {
-      for (var def in SupabaseService.defaultCuratedTestSeries) {
-        final mid = (def['id']?.toString() ?? '').toLowerCase().trim();
-        final mslug = (def['slug']?.toString() ?? '').toLowerCase().trim();
-        final mtitle = (def['title'] ?? def['name'] ?? '').toString().toLowerCase().trim();
-        if (mid == targetId || mslug == targetId || mtitle == targetId) {
-          match = def;
+    if (match == null && allSeriesMaps.isNotEmpty) {
+      // If requested by title or partial match, try fuzzy title search
+      for (var m in allSeriesMaps) {
+        final mtitle = (m['title'] ?? m['name'] ?? '').toString().toLowerCase();
+        if (mtitle.contains(targetId) || targetId.contains(mtitle)) {
+          match = m;
           break;
         }
       }
     }
 
-    // If still null, check default fallback
-    match ??= SupabaseService.defaultCuratedTestSeries.first;
+    if (match == null) {
+      if (mounted) {
+        setState(() {
+          _product = null;
+          _isLoading = false;
+        });
+      }
+      return;
+    }
 
     final String title = (match['title'] ?? match['name'] ?? 'Test Series').toString().trim();
     final exam = (match['exam'] ?? 'NEET').toString();
@@ -187,7 +193,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading || _product == null) {
+    if (_isLoading) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
         appBar: AppBar(
@@ -201,6 +207,47 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         ),
         body: const Center(
           child: CircularProgressIndicator(color: Color(0xFF4F46E5)),
+        ),
+      );
+    }
+
+    if (_product == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0.5,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
+            onPressed: () => context.canPop() ? context.pop() : context.go('/test-series'),
+          ),
+          title: Text('Product Not Found', style: GoogleFonts.inter(color: const Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(color: Color(0xFFEEF2FF), shape: BoxShape.circle),
+                  child: const Icon(Icons.inventory_2_outlined, size: 36, color: Color(0xFF4F46E5)),
+                ),
+                const SizedBox(height: 16),
+                Text('Test Series Product Not Found', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                const SizedBox(height: 8),
+                const Text('This product may have been removed or is not available.', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                  onPressed: () => context.go('/test-series'),
+                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                  label: const Text('Back to Test Series'),
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }
