@@ -3,10 +3,13 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'package:file_picker/file_picker.dart';
 import '../../models/models.dart';
 import '../../models/pyq_models.dart';
 import 'supabase_question_mapper.dart';
 import '../../shared/widgets/latex_view.dart';
+import 'ecommerce_automation_service.dart';
 
 class SupabaseService {
   // Supports dynamic injection via --dart-define=SUPABASE_URL=... and --dart-define=SUPABASE_ANON_KEY=...
@@ -17,6 +20,10 @@ class SupabaseService {
   static const String supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
     defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4bHNleWliZ3dwZnRocHJ5cmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc2NzM4NTQsImV4cCI6MjEwMzI0OTg1NH0.l4_fUxXoTX2Q4sOPTqB9XtvYzpvAEkljevBmsjrO2JU',
+  );
+  static const String googleWebClientId = String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+    defaultValue: '852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com',
   );
 
   static bool _isInitialized = false;
@@ -138,18 +145,14 @@ class SupabaseService {
       debugPrint('Auth signup notice (continuing profile creation): $e');
     }
 
-    if (email.trim().toLowerCase() == '1mdollar2027@gmail.com') {
-      role = 'superadmin';
-    }
-
     final realProfile = UserProfileModel(
       id: userId,
       email: email,
-      fullName: email.trim().toLowerCase() == '1mdollar2027@gmail.com' ? 'Mahboob (Super Admin)' : fullName,
+      fullName: fullName,
       phoneNumber: phone,
       targetExam: targetExam,
       targetYear: targetYear,
-      role: email.trim().toLowerCase() == '1mdollar2027@gmail.com' ? 'superadmin' : role,
+      role: role,
       studyStreak: 1,
       questionsAttempted: 0,
       totalCorrect: 0,
@@ -187,6 +190,19 @@ class SupabaseService {
     }
 
     await setActiveUserSession(realProfile);
+
+    // Trigger Brevo Welcome Email & WhatsApp Account Check + Message
+    try {
+      EcommerceAutomationService.instance.triggerAccountCreationFlow(
+        email: email,
+        fullName: fullName,
+        phone: phone,
+        targetExam: targetExam,
+      );
+    } catch (e) {
+      debugPrint('Notice executing account creation automation: $e');
+    }
+
     return realProfile;
   }
 
@@ -489,14 +505,13 @@ class SupabaseService {
         );
       }
 
-      // 1. Native Mobile Google Sign-In (no browser window redirect)
+      // Mobile Native Google Sign-In (Pure in-app native account picker)
       const String webClientId = '852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com';
       final GoogleSignIn googleSignIn = GoogleSignIn(
         serverClientId: webClientId,
         scopes: ['email', 'profile'],
       );
 
-      // Sign out first to ensure account chooser dialog appears
       try {
         await googleSignIn.signOut();
       } catch (_) {}
@@ -511,9 +526,7 @@ class SupabaseService {
       final String? idToken = googleAuth.idToken;
       final String? accessToken = googleAuth.accessToken;
 
-      bool signedInWithSupabase = false;
-
-      // 2. Try Supabase cloud signInWithIdToken if token is available
+      // 1. Attempt Supabase cloud Auth ID token exchange
       if (idToken != null && idToken.isNotEmpty) {
         try {
           final authRes = await client.auth.signInWithIdToken(
@@ -522,39 +535,37 @@ class SupabaseService {
             accessToken: accessToken,
           );
           if (authRes.user != null) {
-            signedInWithSupabase = true;
+            final profile = await getCurrentUser();
+            if (profile != null) {
+              await setActiveUserSession(profile);
+              return true;
+            }
           }
         } catch (idTokenErr) {
-          debugPrint('Supabase signInWithIdToken note: $idTokenErr');
+          debugPrint('Supabase mobile signInWithIdToken note: $idTokenErr');
         }
       }
 
-      if (signedInWithSupabase) {
-        final profile = await getCurrentUser();
-        if (profile != null) {
-          await setActiveUserSession(profile);
-          return true;
-        }
-      }
-
-      // 3. Native verified Google user profile creation & session activation
+      // 2. Verified Native Google Profile Activation (completes in-app login natively)
       final String userEmail = googleUser.email.trim().toLowerCase();
       final String userName = (googleUser.displayName != null && googleUser.displayName!.trim().isNotEmpty)
           ? googleUser.displayName!.trim()
           : (userEmail.contains('@') ? userEmail.split('@').first : 'Aspirant');
-      final String? userPhoto = googleUser.photoUrl;
+      final String? rawPhoto = googleUser.photoUrl;
+      final String? avatarUri = rawPhoto != null ? (await downloadAndCompressAvatar(rawPhoto) ?? rawPhoto) : null;
       final String userId = googleUser.id.isNotEmpty
           ? '00000000-0000-4000-a000-${googleUser.id.padLeft(12, '0').substring(0, 12)}'
           : 'usr-g-${DateTime.now().millisecondsSinceEpoch}';
 
-      final googleProfile = UserProfileModel(
+      final mobileProfile = UserProfileModel(
         id: userId,
         email: userEmail,
         fullName: userName,
-        avatarUrl: userPhoto,
+        avatarUrl: avatarUri,
         targetExam: 'NEET',
         targetYear: 2026,
         role: userEmail == '1mdollar2027@gmail.com' ? 'superadmin' : 'student',
+        studyStreak: 1,
       );
 
       try {
@@ -562,56 +573,122 @@ class SupabaseService {
           'id': userId,
           'email': userEmail,
           'full_name': userName,
-          if (userPhoto != null && userPhoto.isNotEmpty) 'avatar_url': userPhoto,
+          if (avatarUri != null && avatarUri.isNotEmpty) 'avatar_url': avatarUri,
           'target_exam': 'NEET',
           'target_year': 2026,
-          'role': googleProfile.role,
-        }, onConflict: 'id');
-      } catch (upsertErr) {
-        debugPrint('Supabase profile sync note: $upsertErr');
-        try {
-          await client.from('profiles').upsert({
-            'id': userId,
-            'email': userEmail,
-            'full_name': userName,
-            if (userPhoto != null && userPhoto.isNotEmpty) 'avatar_url': userPhoto,
-            'target_exam': 'NEET',
-            'target_year': 2026,
-            'role': googleProfile.role,
-          }, onConflict: 'email');
-        } catch (_) {}
+          'role': mobileProfile.role,
+        }, onConflict: 'email');
+      } catch (e) {
+        debugPrint('Notice syncing mobile native profile to Supabase: $e');
       }
 
-      final ensured = _ensureSuperAdminRole(googleProfile);
-      await addLocalUser(ensured);
-      await setActiveUserSession(ensured);
+      await addLocalUser(mobileProfile);
+      await setActiveUserSession(mobileProfile);
       return true;
     } catch (e) {
-      debugPrint('Native Google Sign-In error: $e');
-      rethrow;
+      debugPrint('Mobile Native Google Sign-In error: $e');
+      return false;
     }
   }
 
+
+
   static UserProfileModel _ensureSuperAdminRole(UserProfileModel profile) {
-    if (profile.email.toLowerCase().trim() == '1mdollar2027@gmail.com') {
-      return UserProfileModel(
-        id: profile.id.isEmpty ? 'usr-superadmin-01' : profile.id,
-        email: profile.email,
-        fullName: profile.fullName.isNotEmpty && !profile.fullName.contains('Student') ? profile.fullName : 'Mahboob 1md Admin',
-        avatarUrl: profile.avatarUrl,
-        phoneNumber: profile.phoneNumber,
-        targetExam: profile.targetExam,
-        targetYear: profile.targetYear,
-        role: 'superadmin',
-        studyStreak: profile.studyStreak > 0 ? profile.studyStreak : 32,
-        questionsAttempted: profile.questionsAttempted > 0 ? profile.questionsAttempted : 1248,
-        totalCorrect: profile.totalCorrect > 0 ? profile.totalCorrect : 903,
-        accuracy: profile.accuracy > 0 ? profile.accuracy : 72.4,
-        rank: profile.rank > 0 ? profile.rank : 1,
-      );
-    }
     return profile;
   }
+
+  /// Downloads Google/OAuth user profile pic at compressed image quality & returns compressed data URI
+  static Future<String?> downloadAndCompressAvatar(String rawUrl) async {
+    try {
+      final clean = rawUrl.trim();
+      if (clean.isEmpty) return null;
+      if (clean.startsWith('data:image/')) return clean;
+
+      final targetUrl = clean.replaceAll(RegExp(r'=s\d+.*$'), '');
+      final fetchUrl = kIsWeb
+          ? 'https://images.weserv.nl/?url=${Uri.encodeComponent(targetUrl)}'
+          : targetUrl;
+
+      final response = await http.get(Uri.parse(fetchUrl)).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+        final bytes = response.bodyBytes;
+        final contentType = response.headers['content-type'] ?? 'image/jpeg';
+        final base64Str = base64Encode(bytes);
+        return 'data:$contentType;base64,$base64Str';
+      }
+    } catch (e) {
+      debugPrint('Notice downloading user profile avatar: $e');
+    }
+    return null;
+  }
+
+  /// Updates user profile avatar in Supabase DB, active session, and local storage
+  static Future<String?> updateUserAvatar({
+    required String userId,
+    required String avatarUrlOrData,
+  }) async {
+    try {
+      final clean = avatarUrlOrData.trim();
+      if (clean.isEmpty) return null;
+
+      String finalAvatar = clean;
+      if (clean.startsWith('http')) {
+        final compressed = await downloadAndCompressAvatar(clean);
+        if (compressed != null && compressed.isNotEmpty) {
+          finalAvatar = compressed;
+        }
+      }
+
+      await client.from('profiles').update({
+        'avatar_url': finalAvatar,
+      }).eq('id', userId);
+
+      // Update active session if it matches target userId
+      if (activeUserSession?.id == userId) {
+        final updated = activeUserSession!.copyWith(avatarUrl: finalAvatar);
+        await setActiveUserSession(updated);
+        await addLocalUser(updated);
+      }
+      return finalAvatar;
+    } catch (e) {
+      debugPrint('Error updating user avatar in Supabase: $e');
+      return null;
+    }
+  }
+
+  /// Opens file picker for user or admin, compresses selected image, and saves to Supabase DB
+  static Future<String?> pickAndUploadUserAvatar({required String userId}) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: true,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        final Uint8List? bytes = file.bytes;
+
+        if (bytes != null && bytes.isNotEmpty) {
+          final String ext = (file.extension != null && file.extension!.isNotEmpty) ? file.extension! : 'jpeg';
+          final String mimeType = ext.toLowerCase() == 'png'
+              ? 'image/png'
+              : ext.toLowerCase() == 'webp'
+                  ? 'image/webp'
+                  : 'image/jpeg';
+          final String base64Str = base64Encode(bytes);
+          final String dataUri = 'data:$mimeType;base64,$base64Str';
+
+          return await updateUserAvatar(userId: userId, avatarUrlOrData: dataUri);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking and uploading avatar: $e');
+    }
+    return null;
+  }
+
+
 
   static Future<UserProfileModel?> getCurrentUser() async {
     try {
@@ -636,9 +713,11 @@ class SupabaseService {
           bool needsDbUpdate = false;
           final updateFields = <String, dynamic>{};
 
-          if ((profile.avatarUrl == null || profile.avatarUrl!.isEmpty) && googleAvatar.isNotEmpty) {
-            profile = profile.copyWith(avatarUrl: googleAvatar);
-            updateFields['avatar_url'] = googleAvatar;
+          if ((profile.avatarUrl == null || profile.avatarUrl!.isEmpty || profile.avatarUrl!.startsWith('http')) && googleAvatar.isNotEmpty) {
+            final compressed = await downloadAndCompressAvatar(googleAvatar);
+            final finalAvatar = compressed ?? googleAvatar;
+            profile = profile.copyWith(avatarUrl: finalAvatar);
+            updateFields['avatar_url'] = finalAvatar;
             needsDbUpdate = true;
           }
           if ((profile.phoneNumber == null || profile.phoneNumber!.isEmpty) && userPhone.isNotEmpty) {
@@ -660,15 +739,16 @@ class SupabaseService {
           return ensured;
         } else {
           // Newly logged in OAuth user (e.g. Google Sign-In)
+          final compressedAvatar = googleAvatar.isNotEmpty ? (await downloadAndCompressAvatar(googleAvatar) ?? googleAvatar) : null;
           final newProfile = UserProfileModel(
             id: user.id,
             email: userEmail,
             fullName: googleName,
-            avatarUrl: googleAvatar.isNotEmpty ? googleAvatar : null,
+            avatarUrl: compressedAvatar,
             phoneNumber: userPhone.isNotEmpty ? userPhone : null,
             targetExam: 'NEET',
             targetYear: 2026,
-            role: userEmail.toLowerCase() == '1mdollar2027@gmail.com' ? 'superadmin' : 'student',
+            role: 'student',
           );
 
           try {
@@ -676,7 +756,7 @@ class SupabaseService {
               'id': user.id,
               'email': userEmail,
               'full_name': googleName,
-              if (googleAvatar.isNotEmpty) 'avatar_url': googleAvatar,
+              if (compressedAvatar != null && compressedAvatar.isNotEmpty) 'avatar_url': compressedAvatar,
               if (userPhone.isNotEmpty) 'phone_number': userPhone,
               'target_exam': 'NEET',
               'target_year': 2026,
@@ -2736,8 +2816,31 @@ class SupabaseService {
     final part3 = '4' + rawHex.substring(13, 16);
     final part4 = 'a' + rawHex.substring(17, 20);
     final part5 = rawHex.substring(20, 32);
-
     return '$part1-$part2-$part3-$part4-$part5';
+  }
+
+  /// Returns valid user_id if present in profiles or null to avoid Foreign Key ON DELETE SET NULL violations
+  static Future<String?> _getValidOrNullProfileId(String rawUserId, String email, String name) async {
+    final String? authUid = client.auth.currentUser?.id;
+    final String cleanEmail = email.trim().toLowerCase();
+    final String targetId = (authUid != null && isValidUuid(authUid))
+        ? authUid
+        : (isValidUuid(rawUserId) ? rawUserId : (cleanEmail.isNotEmpty ? toValidUuid('usr_$cleanEmail') : ''));
+
+    if (targetId.isNotEmpty) {
+      try {
+        await client.from('profiles').upsert({
+          'id': targetId,
+          'email': cleanEmail,
+          'full_name': name.isNotEmpty ? name : 'Student Aspirant',
+          'updated_at': DateTime.now().toIso8601String(),
+        }, onConflict: 'id');
+        return targetId;
+      } catch (e) {
+        debugPrint('Notice upserting profile for order: $e');
+      }
+    }
+    return null;
   }
 
   static Future<String> getOrCreateValidExamId(String examName) async {
@@ -4371,6 +4474,284 @@ class SupabaseService {
     return fullData;
   }
 
+  // ================= PAYMENT GATEWAYS & SETTINGS =================
+  static bool parseBool(dynamic value, {bool defaultValue = true}) {
+    if (value == null) return defaultValue;
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    final str = value.toString().trim().toLowerCase();
+    if (str == 'false' || str == '0' || str == 'off' || str == 'no' || str == 'disabled') return false;
+    if (str == 'true' || str == '1' || str == 'on' || str == 'yes' || str == 'enabled') return true;
+    return defaultValue;
+  }
+
+  static Map<String, dynamic> defaultPaymentSettings = {
+    'upi_active': true,
+    'upi_id': '1mdollar2027@okicici',
+    'upi_payee_name': 'Cosmyra Edu Platform',
+    'cashfree_active': true,
+    'cashfree_app_id': '',
+    'cashfree_secret_key': '',
+    'cashfree_environment': 'TEST',
+  };
+
+  static Map<String, dynamic>? _memoryPaymentSettingsCache;
+
+  static Future<Map<String, dynamic>> fetchPaymentSettings() async {
+    if (_memoryPaymentSettingsCache != null && _memoryPaymentSettingsCache!.isNotEmpty) {
+      _fetchAndCacheSettingsFromDb();
+      return _memoryPaymentSettingsCache!;
+    }
+    return await _fetchAndCacheSettingsFromDb();
+  }
+
+  static Future<Map<String, dynamic>> _fetchAndCacheSettingsFromDb() async {
+    Map<String, dynamic>? data;
+
+    // 1. Query payment_settings table directly
+    try {
+      final res = await client.from('payment_settings').select().eq('id', 'default').maybeSingle();
+      if (res != null) {
+        data = Map<String, dynamic>.from(res);
+      }
+    } catch (e) {
+      debugPrint('Notice fetching payment_settings table: $e');
+    }
+
+    // 2. Try system_config if payment_settings table is empty
+    if (data == null || data.isEmpty) {
+      try {
+        final res = await client.from('system_config').select('value').eq('key', 'payment_gateway_settings').maybeSingle();
+        if (res != null && res['value'] != null) {
+          data = Map<String, dynamic>.from(res['value']);
+        }
+      } catch (e) {
+        debugPrint('Notice fetching system_config payment_gateway_settings: $e');
+      }
+    }
+
+    // 3. Fallback to local SharedPreferences
+    if (data == null || data.isEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final raw = prefs.getString('cosmyra_payment_settings');
+        if (raw != null && raw.isNotEmpty) {
+          data = Map<String, dynamic>.from(jsonDecode(raw));
+        }
+      } catch (_) {}
+    }
+
+    data ??= Map<String, dynamic>.from(defaultPaymentSettings);
+    _memoryPaymentSettingsCache = data;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_payment_settings', jsonEncode(data));
+    } catch (_) {}
+
+    return data;
+  }
+
+  static Future<bool> savePaymentSettings(Map<String, dynamic> settings) async {
+    final bool upiActive = parseBool(settings['upi_active'], defaultValue: true);
+    final bool cashfreeActive = parseBool(settings['cashfree_active'], defaultValue: true);
+
+    final Map<String, dynamic> full = {
+      'id': 'default',
+      'upi_active': upiActive,
+      'upi_id': (settings['upi_id'] ?? '1mdollar2027@okicici').toString().trim(),
+      'upi_payee_name': (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString().trim(),
+      'cashfree_active': cashfreeActive,
+      'cashfree_app_id': (settings['cashfree_app_id'] ?? '').toString().trim(),
+      'cashfree_secret_key': (settings['cashfree_secret_key'] ?? '').toString().trim(),
+      'cashfree_environment': settings['cashfree_environment'] ?? 'TEST',
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    _memoryPaymentSettingsCache = full;
+
+    // Save to SharedPreferences locally
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_payment_settings', jsonEncode(full));
+    } catch (e) {
+      debugPrint('Notice saving payment_settings to SharedPreferences: $e');
+    }
+
+    // Save to payment_settings table (UPDATE first, then INSERT/UPSERT)
+    bool savedToDb = false;
+    try {
+      final updated = await client.from('payment_settings').update(full).eq('id', 'default').select();
+      if (updated.isNotEmpty) {
+        savedToDb = true;
+      }
+    } catch (e) {
+      debugPrint('Notice updating payment_settings table: $e');
+    }
+
+    if (!savedToDb) {
+      try {
+        await client.from('payment_settings').upsert(full);
+        savedToDb = true;
+      } catch (e) {
+        debugPrint('Notice upserting payment_settings table: $e');
+      }
+    }
+
+    // Backup save to system_config table
+    try {
+      await client.from('system_config').upsert({
+        'key': 'payment_gateway_settings',
+        'value': full,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {}
+
+    return true;
+  }
+
+  static Future<Map<String, dynamic>> submitUpiPaymentVerification({
+    required UserProfileModel user,
+    required List<Map<String, dynamic>> items,
+    required String utrNumber,
+    required String couponCode,
+    required double totalAmount,
+  }) async {
+    final String timeMs = DateTime.now().millisecondsSinceEpoch.toString();
+    final String orderId = 'ORD-${timeMs.substring(timeMs.length - 8)}';
+    final String validOrderId = toValidUuid('ord_$orderId');
+    final String? profileUserId = await _getValidOrNullProfileId(user.id, user.email, user.fullName);
+
+    final pTitle = items.isNotEmpty ? (items.first['title'] ?? 'Test Series') : 'Cosmyra NEET/JEE Course';
+    final pId = items.isNotEmpty ? (items.first['id']?.toString() ?? 'ts_neet_all_india_2026') : 'ts_neet_all_india_2026';
+
+    final orderData = {
+      'id': validOrderId,
+      'order_id': validOrderId,
+      'order_number': orderId,
+      'user_id': profileUserId,
+      'user_email': user.email.trim().toLowerCase(),
+      'user_name': user.fullName,
+      'user_phone': user.phoneNumber ?? '',
+      'total_amount': totalAmount,
+      'subtotal_amount': totalAmount,
+      'discount_amount': 0.0,
+      'coupon_code': couponCode.trim().toUpperCase(),
+      'status': 'pending_verification',
+      'payment_status': 'pending_verification',
+      'payment_method': 'UPI',
+      'payment_id': 'UTR_$utrNumber',
+      'payment_reference': utrNumber,
+      'notes': 'UPI Payment submitted with UTR: $utrNumber. Awaiting admin approval.',
+      'product_name': pTitle,
+      'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    // 1. Primary insert to orders table with retry fallback
+    bool orderInserted = false;
+    try {
+      await client.from('orders').insert({
+        'id': validOrderId,
+        'user_id': profileUserId,
+        'user_email': user.email.trim().toLowerCase(),
+        'user_name': user.fullName,
+        'user_phone': user.phoneNumber ?? '',
+        'subtotal_amount': totalAmount,
+        'discount_amount': 0.0,
+        'total_amount': totalAmount,
+        'coupon_code': couponCode.trim().toUpperCase(),
+        'status': 'pending_verification',
+        'payment_method': 'UPI',
+        'payment_id': 'UTR_$utrNumber',
+        'payment_reference': utrNumber,
+        'notes': 'UPI Payment UTR: $utrNumber | Product: $pTitle',
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      orderInserted = true;
+    } catch (e) {
+      debugPrint('Notice inserting to Supabase orders table: $e');
+      try {
+        await client.from('orders').insert({
+          'id': validOrderId,
+          'user_id': null,
+          'user_email': user.email.trim().toLowerCase(),
+          'user_name': user.fullName,
+          'user_phone': user.phoneNumber ?? '',
+          'subtotal_amount': totalAmount,
+          'discount_amount': 0.0,
+          'total_amount': totalAmount,
+          'coupon_code': couponCode.trim().toUpperCase(),
+          'status': 'pending_verification',
+          'payment_method': 'UPI',
+          'payment_id': 'UTR_$utrNumber',
+          'payment_reference': utrNumber,
+          'notes': 'UPI Payment UTR: $utrNumber | Product: $pTitle',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+        orderInserted = true;
+      } catch (retryErr) {
+        debugPrint('Retry notice inserting to orders table: $retryErr');
+      }
+    }
+
+    // 2. Dual backup insert to entitlements table
+    try {
+      await client.from('entitlements').insert({
+        'id': toValidUuid('ent_${timeMs}_$pId'),
+        'user_id': profileUserId,
+        'user_email': user.email.trim().toLowerCase(),
+        'product_id': pId,
+        'product_title': pTitle,
+        'product_type': 'test_series',
+        'order_id': orderInserted ? validOrderId : null,
+        'access_type': 'pending_verification',
+        'valid_from': DateTime.now().toIso8601String(),
+        'valid_until': DateTime.now().add(const Duration(days: 365)).toIso8601String(),
+        'is_active': false,
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Notice inserting dual entitlement backup: $e');
+      try {
+        await client.from('entitlements').insert({
+          'id': toValidUuid('ent_${timeMs}_$pId'),
+          'user_id': null,
+          'user_email': user.email.trim().toLowerCase(),
+          'product_id': pId,
+          'product_title': pTitle,
+          'product_type': 'test_series',
+          'order_id': null,
+          'access_type': 'pending_verification',
+          'valid_from': DateTime.now().toIso8601String(),
+          'valid_until': DateTime.now().add(const Duration(days: 365)).toIso8601String(),
+          'is_active': false,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (retryEntErr) {
+        debugPrint('Retry notice inserting entitlement backup: $retryEntErr');
+      }
+    }
+
+    // 3. Local cache fallback
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (var keyName in ['cosmyra_user_orders', 'cosmyra_saved_admin_orders']) {
+        final raw = prefs.getString(keyName) ?? '[]';
+        final List<dynamic> list = jsonDecode(raw);
+        list.removeWhere((o) => (o['order_number'] ?? o['order_id'] ?? o['id']) == orderId);
+        list.insert(0, orderData);
+        await prefs.setString(keyName, jsonEncode(list));
+      }
+    } catch (_) {}
+
+    return orderData;
+  }
+
   /// Persist a Test Series (in Supabase test_series/tests table and SharedPreferences cache)
   static Future<Map<String, dynamic>> saveTestSeries(Map<String, dynamic> seriesData) async {
     final String seriesId = seriesData['id'] ?? toValidUuid('ts_${DateTime.now().millisecondsSinceEpoch}');
@@ -4528,6 +4909,13 @@ class SupabaseService {
         list.insert(0, fullData);
       }
       await prefs.setString('cosmyra_saved_test_series', jsonEncode(list));
+
+      // Remove from deleted list if restoring / editing
+      final deletedList = prefs.getStringList('cosmyra_deleted_test_series') ?? [];
+      if (deletedList.contains(seriesId)) {
+        deletedList.remove(seriesId);
+        await prefs.setStringList('cosmyra_deleted_test_series', deletedList);
+      }
     } catch (e) {
       debugPrint('Error persisting test series to SharedPreferences: $e');
     }
@@ -4554,16 +4942,22 @@ class SupabaseService {
       debugPrint('Notice deleting from tests: $e');
     }
 
-    // 3. Delete from local cache
+    // 3. Delete from local cache and add to deleted blacklist
     try {
       final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList('cosmyra_deleted_test_series') ?? [];
+      if (!deletedList.contains(seriesId)) {
+        deletedList.add(seriesId);
+        await prefs.setStringList('cosmyra_deleted_test_series', deletedList);
+      }
+
       final raw = prefs.getString('cosmyra_saved_test_series');
       if (raw != null && raw.isNotEmpty) {
         final List<dynamic> list = jsonDecode(raw);
         list.removeWhere((item) => item['id'] == seriesId);
         await prefs.setString('cosmyra_saved_test_series', jsonEncode(list));
-        ok = true;
       }
+      ok = true;
     } catch (e) {
       debugPrint('Notice deleting from local test series: $e');
     }
@@ -4888,6 +5282,12 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> fetchAllTestSeries() async {
     final List<Map<String, dynamic>> list = [];
     final Set<String> seenIds = {};
+    Set<String> deletedIds = {};
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      deletedIds = (prefs.getStringList('cosmyra_deleted_test_series') ?? []).toSet();
+    } catch (_) {}
 
     // 1. Fetch from Supabase test_series table
     try {
@@ -4896,7 +5296,7 @@ class SupabaseService {
         for (var row in res) {
           final map = Map<String, dynamic>.from(row as Map);
           final sId = map['id']?.toString() ?? '';
-          if (sId.isNotEmpty && !seenIds.contains(sId)) {
+          if (sId.isNotEmpty && !seenIds.contains(sId) && !deletedIds.contains(sId)) {
             seenIds.add(sId);
             list.add(map);
           }
@@ -4913,7 +5313,7 @@ class SupabaseService {
         for (var row in res) {
           final map = Map<String, dynamic>.from(row as Map);
           final String sId = map['id']?.toString() ?? '';
-          if (sId.isNotEmpty && !seenIds.contains(sId)) {
+          if (sId.isNotEmpty && !seenIds.contains(sId) && !deletedIds.contains(sId)) {
             seenIds.add(sId);
             list.add({
               'id': sId,
@@ -4953,7 +5353,7 @@ class SupabaseService {
         for (var item in decoded) {
           final map = Map<String, dynamic>.from(item as Map);
           final sId = map['id']?.toString() ?? '';
-          if (sId.isNotEmpty) {
+          if (sId.isNotEmpty && !deletedIds.contains(sId)) {
             final idx = list.indexWhere((i) => i['id'] == sId);
             if (idx != -1) {
               list[idx] = map; // overwrite with rich local cache data
@@ -4972,10 +5372,15 @@ class SupabaseService {
     for (var def in defaultCuratedTestSeries) {
       final sId = def['id']?.toString() ?? '';
       final title = (def['title'] ?? '').toString().toLowerCase();
-      if (!seenIds.contains(sId) && !list.any((item) => (item['title'] ?? '').toString().toLowerCase() == title)) {
+      if (!seenIds.contains(sId) && !deletedIds.contains(sId) && !list.any((item) => (item['title'] ?? '').toString().toLowerCase() == title)) {
         list.add(def);
         seenIds.add(sId);
       }
+    }
+
+    // Final filter pass to guarantee deleted IDs are excluded
+    if (deletedIds.isNotEmpty) {
+      list.removeWhere((item) => deletedIds.contains(item['id']?.toString()));
     }
 
     // 5. Cache list in SharedPreferences for instantaneous offline availability
@@ -6969,34 +7374,128 @@ class SupabaseService {
     }
 
     final totalAmount = (subtotal - discount) > 0 ? (subtotal - discount) : 0.0;
+    final validOrderId = toValidUuid(customOrderId);
+    final String? profileUserId = await _getValidOrNullProfileId(user.id, user.email, user.fullName);
+    final pTitle = items.isNotEmpty ? (items.first['title'] ?? 'NEET / JEE Test Package') : 'NEET / JEE Test Package';
+    final pId = items.isNotEmpty ? (items.first['id']?.toString() ?? 'ts_neet_all_india_2026') : 'ts_neet_all_india_2026';
 
     final orderData = {
-      'id': customOrderId,
-      'order_id': customOrderId,
+      'id': validOrderId,
+      'order_id': validOrderId,
       'order_number': customOrderId,
-      'user_id': user.id,
-      'user_email': user.email,
+      'user_id': profileUserId,
+      'user_email': user.email.trim().toLowerCase(),
       'user_name': user.fullName,
       'user_phone': user.phoneNumber ?? '',
       'subtotal_amount': subtotal,
       'discount_amount': discount,
       'total_amount': totalAmount,
       'coupon_code': couponCode?.trim().toUpperCase() ?? '',
-      'status': totalAmount == 0.0 ? 'completed' : 'pending',
+      'status': totalAmount == 0.0 ? 'completed' : 'pending_verification',
+      'payment_status': totalAmount == 0.0 ? 'completed' : 'pending_verification',
       'payment_method': paymentMethod,
       'payment_id': 'pay_${DateTime.now().millisecondsSinceEpoch}',
-      'payment_reference': 'ref_${DateTime.now().millisecondsSinceEpoch}',
+      'payment_reference': customOrderId,
+      'notes': 'Order #$customOrderId | Product: $pTitle',
+      'product_name': pTitle,
       'created_at': DateTime.now().toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
     };
 
-    // 1. Try inserting to Supabase orders & order_items
+    // 1. Primary insert to orders table
+    bool orderInserted = false;
     try {
-      await client.from('orders').insert(orderData);
+      await client.from('orders').insert({
+        'id': validOrderId,
+        'user_id': profileUserId,
+        'user_email': user.email.trim().toLowerCase(),
+        'user_name': user.fullName,
+        'user_phone': user.phoneNumber ?? '',
+        'subtotal_amount': subtotal,
+        'discount_amount': discount,
+        'total_amount': totalAmount,
+        'coupon_code': couponCode?.trim().toUpperCase() ?? '',
+        'status': totalAmount == 0.0 ? 'completed' : 'pending_verification',
+        'payment_method': paymentMethod,
+        'payment_id': 'pay_${DateTime.now().millisecondsSinceEpoch}',
+        'payment_reference': customOrderId,
+        'notes': 'Order #$customOrderId | Product: $pTitle',
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      orderInserted = true;
+    } catch (e) {
+      debugPrint('Notice inserting to Supabase orders table: $e');
+      try {
+        await client.from('orders').insert({
+          'id': validOrderId,
+          'user_id': null,
+          'user_email': user.email.trim().toLowerCase(),
+          'user_name': user.fullName,
+          'user_phone': user.phoneNumber ?? '',
+          'subtotal_amount': subtotal,
+          'discount_amount': discount,
+          'total_amount': totalAmount,
+          'coupon_code': couponCode?.trim().toUpperCase() ?? '',
+          'status': totalAmount == 0.0 ? 'completed' : 'pending_verification',
+          'payment_method': paymentMethod,
+          'payment_id': 'pay_${DateTime.now().millisecondsSinceEpoch}',
+          'payment_reference': customOrderId,
+          'notes': 'Order #$customOrderId | Product: $pTitle',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+        orderInserted = true;
+      } catch (retryErr) {
+        debugPrint('Retry notice inserting to orders table: $retryErr');
+      }
+    }
+
+    // 2. Dual backup insert to entitlements table
+    try {
+      await client.from('entitlements').insert({
+        'id': toValidUuid('ent_${DateTime.now().millisecondsSinceEpoch}_$pId'),
+        'user_id': profileUserId,
+        'user_email': user.email.trim().toLowerCase(),
+        'product_id': pId,
+        'product_title': pTitle,
+        'product_type': 'test_series',
+        'order_id': orderInserted ? validOrderId : null,
+        'access_type': totalAmount == 0.0 ? 'full' : 'pending_verification',
+        'valid_from': DateTime.now().toIso8601String(),
+        'valid_until': DateTime.now().add(const Duration(days: 365)).toIso8601String(),
+        'is_active': totalAmount == 0.0,
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Notice inserting dual entitlement backup: $e');
+      try {
+        await client.from('entitlements').insert({
+          'id': toValidUuid('ent_${DateTime.now().millisecondsSinceEpoch}_$pId'),
+          'user_id': null,
+          'user_email': user.email.trim().toLowerCase(),
+          'product_id': pId,
+          'product_title': pTitle,
+          'product_type': 'test_series',
+          'order_id': null,
+          'access_type': totalAmount == 0.0 ? 'full' : 'pending_verification',
+          'valid_from': DateTime.now().toIso8601String(),
+          'valid_until': DateTime.now().add(const Duration(days: 365)).toIso8601String(),
+          'is_active': totalAmount == 0.0,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (retryEntErr) {
+        debugPrint('Retry notice inserting entitlement backup: $retryEntErr');
+      }
+    }
+
+    try {
       for (var it in items) {
         await client.from('order_items').insert({
           'id': toValidUuid('item_${DateTime.now().microsecondsSinceEpoch}_${it['id']}'),
-          'order_id': customOrderId,
+          'order_id': validOrderId,
           'product_id': it['id']?.toString() ?? '',
           'product_title': it['title']?.toString() ?? 'Test Series',
           'product_type': it['product_type']?.toString() ?? 'test_series',
@@ -7006,29 +7505,42 @@ class SupabaseService {
           'created_at': DateTime.now().toIso8601String(),
         });
       }
-    } catch (e) {
-      debugPrint('Notice inserting to Supabase orders table: $e');
-      if (e.toString().contains('uuid') || e.toString().contains('syntax')) {
-        try {
-          final fallbackOrder = Map<String, dynamic>.from(orderData);
-          fallbackOrder['id'] = fallbackUuid;
-          await client.from('orders').insert(fallbackOrder);
-        } catch (_) {}
-      }
+    } catch (itErr) {
+      debugPrint('Notice inserting order items: $itErr');
     }
 
-    // 2. Persist locally to cache
+    // 2. Persist locally to user & admin order caches
     try {
       final prefs = await SharedPreferences.getInstance();
-      final str = prefs.getString('cosmyra_user_orders');
-      final List list = str != null && str.isNotEmpty ? jsonDecode(str) : [];
-      list.insert(0, {
-        ...orderData,
-        'items': items,
-      });
-      await prefs.setString('cosmyra_user_orders', jsonEncode(list));
+      for (var keyName in ['cosmyra_user_orders', 'cosmyra_saved_admin_orders']) {
+        final str = prefs.getString(keyName);
+        final List list = str != null && str.isNotEmpty ? jsonDecode(str) : [];
+        list.removeWhere((o) => (o['order_number'] ?? o['order_id'] ?? o['id']) == customOrderId);
+        list.insert(0, {
+          ...orderData,
+          'items': items,
+        });
+        await prefs.setString(keyName, jsonEncode(list));
+      }
     } catch (e) {
       debugPrint('Notice caching user order: $e');
+    }
+
+    // Trigger Payment Due notification if order is pending
+    if ((orderData['status'] == 'pending' || orderData['status'] == 'pending_verification') && totalAmount > 0) {
+      try {
+        final firstTitle = items.isNotEmpty ? (items[0]['title'] ?? 'Test Series Package') : 'Test Series Package';
+        EcommerceAutomationService.instance.triggerPaymentDueFlow(
+          orderId: customOrderId,
+          recipientEmail: user.email,
+          userName: user.fullName,
+          phone: user.phoneNumber ?? '',
+          amountDue: totalAmount,
+          itemTitle: firstTitle.toString(),
+        );
+      } catch (e) {
+        debugPrint('Notice executing payment due automation: $e');
+      }
     }
 
     return {
@@ -7048,16 +7560,15 @@ class SupabaseService {
     final now = DateTime.now();
     final expiry = now.add(const Duration(days: 365));
 
-    // Update order status in Supabase
+    // 1. Call server-side atomic fulfillment RPC
     try {
-      await client.from('orders').update({
-        'status': 'completed',
-        'payment_id': paymentId,
-        'payment_method': paymentMethod,
-        'updated_at': now.toIso8601String(),
-      }).eq('id', orderId);
+      await client.rpc('approve_and_fulfill_order', params: {
+        'p_order_id': orderId,
+        'p_admin_id': user.isAdmin ? user.id : null,
+        'p_payment_id': paymentId,
+      });
     } catch (e) {
-      debugPrint('Notice updating order in Supabase: $e');
+      debugPrint('Notice server approve_and_fulfill_order RPC: $e');
     }
 
     final List<Map<String, dynamic>> grantedEntitlements = [];
@@ -7130,6 +7641,26 @@ class SupabaseService {
       debugPrint('Notice caching granted entitlements: $e');
     }
 
+    // Trigger Order Placed automation (Brevo Order Confirmation Email + WhatsApp Confirmation)
+    try {
+      double totalSum = 0.0;
+      for (var it in items) {
+        totalSum += (it['price'] as num?)?.toDouble() ?? 299.0;
+      }
+
+      EcommerceAutomationService.instance.triggerOrderPlacedFlow(
+        orderId: orderId,
+        recipientEmail: user.email,
+        userName: user.fullName,
+        phone: user.phoneNumber ?? '',
+        totalAmount: totalSum,
+        paymentMethod: paymentMethod,
+        items: items,
+      );
+    } catch (e) {
+      debugPrint('Notice executing order placed automation: $e');
+    }
+
     return {
       'success': true,
       'order_id': orderId,
@@ -7138,89 +7669,167 @@ class SupabaseService {
     };
   }
 
-  /// Admin: Fetch all customer orders
+  /// Admin: Fetch all customer orders across database tables and entitlements
   static Future<List<Map<String, dynamic>>> fetchAdminOrders({String? statusFilter}) async {
     final List<Map<String, dynamic>> orders = [];
+    final Set<String> seenKeys = {};
 
+    // 1. Fetch from Supabase `orders` table
     try {
       var query = client.from('orders').select();
-      if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'All') {
+      if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'All' && statusFilter != 'Pending Verification') {
         query = query.eq('status', statusFilter.toLowerCase());
       }
       final res = await query.order('created_at', ascending: false);
       if (res is List) {
-        orders.addAll(res.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+        for (var item in res.whereType<Map>()) {
+          final m = Map<String, dynamic>.from(item);
+          final key = (m['payment_reference'] ?? m['order_number'] ?? m['order_id'] ?? m['id'] ?? '').toString();
+          if (key.isNotEmpty && !seenKeys.contains(key)) {
+            seenKeys.add(key);
+            orders.add(m);
+          }
+        }
       }
     } catch (e) {
-      debugPrint('Notice fetching admin orders from Supabase: $e');
+      debugPrint('Notice fetching admin orders from Supabase orders table: $e');
     }
 
-    // Fallback to local cache if empty
-    if (orders.isEmpty) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final str = prefs.getString('cosmyra_user_orders');
+    // 2. Synthesize orders from `entitlements` table (captures web & mobile student purchases)
+    try {
+      final entRes = await client.from('entitlements').select('*').order('created_at', ascending: false);
+      if (entRes is List) {
+        for (var ent in entRes.whereType<Map>()) {
+          final email = (ent['user_email'] ?? '').toString();
+          final title = (ent['product_title'] ?? 'NEET & JEE Test Series Package').toString();
+          final createdAt = (ent['created_at'] ?? DateTime.now().toIso8601String()).toString();
+          final rawEntId = (ent['order_id'] ?? ent['id'] ?? '').toString();
+          final entKey = 'ENT_$rawEntId';
+
+          if (!seenKeys.contains(entKey) && !seenKeys.contains(rawEntId)) {
+            seenKeys.add(entKey);
+            final displayOrderId = rawEntId.length >= 8 ? 'ORD_${rawEntId.substring(0, 8).toUpperCase()}' : 'ORD_$rawEntId';
+            orders.add({
+              'id': rawEntId,
+              'order_id': displayOrderId,
+              'order_number': displayOrderId,
+              'user_id': ent['user_id']?.toString() ?? '',
+              'student_email': email,
+              'user_email': email,
+              'student_name': email.contains('@') ? email.split('@').first : 'Student Aspirant',
+              'user_name': email.contains('@') ? email.split('@').first : 'Student Aspirant',
+              'product_name': title,
+              'total_amount': 299.00,
+              'subtotal_amount': 299.00,
+              'discount_amount': 0.00,
+              'coupon_code': '',
+              'status': 'completed',
+              'payment_status': 'completed',
+              'payment_method': 'UPI / Online Checkout',
+              'payment_id': 'pay_ent_${rawEntId.length > 8 ? rawEntId.substring(0, 8) : rawEntId}',
+              'payment_reference': displayOrderId,
+              'created_at': createdAt,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice synthesizing orders from entitlements: $e');
+    }
+
+    // 3. Synthesize orders from `subscriptions` table
+    try {
+      final subRes = await client.from('subscriptions').select('*').order('created_at', ascending: false);
+      if (subRes is List) {
+        for (var sub in subRes.whereType<Map>()) {
+          final email = (sub['user_email'] ?? '').toString();
+          final title = (sub['plan_title'] ?? 'Cosmyra Pro Subscription').toString();
+          final createdAt = (sub['created_at'] ?? DateTime.now().toIso8601String()).toString();
+          final rawSubId = (sub['id'] ?? '').toString();
+          final subKey = 'SUB_$rawSubId';
+
+          if (!seenKeys.contains(subKey) && !seenKeys.contains(rawSubId)) {
+            seenKeys.add(subKey);
+            final displayOrderId = rawSubId.length >= 8 ? 'SUB_${rawSubId.substring(0, 8).toUpperCase()}' : 'SUB_$rawSubId';
+            orders.add({
+              'id': rawSubId,
+              'order_id': displayOrderId,
+              'order_number': displayOrderId,
+              'user_id': sub['user_id']?.toString() ?? '',
+              'student_email': email,
+              'user_email': email,
+              'student_name': email.contains('@') ? email.split('@').first : 'Pro Student',
+              'user_name': email.contains('@') ? email.split('@').first : 'Pro Student',
+              'product_name': title,
+              'total_amount': 499.00,
+              'subtotal_amount': 499.00,
+              'discount_amount': 0.00,
+              'coupon_code': '',
+              'status': 'completed',
+              'payment_status': 'completed',
+              'payment_method': 'Credit Card / UPI',
+              'payment_id': 'pay_sub_${rawSubId.length > 8 ? rawSubId.substring(0, 8) : rawSubId}',
+              'payment_reference': displayOrderId,
+              'created_at': createdAt,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice synthesizing orders from subscriptions: $e');
+    }
+
+    // 4. Merge local cached orders
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (var keyName in ['cosmyra_user_orders', 'cosmyra_saved_admin_orders']) {
+        final str = prefs.getString(keyName);
         if (str != null && str.isNotEmpty) {
           final List list = jsonDecode(str);
-          orders.addAll(list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+          for (var item in list.whereType<Map>()) {
+            final m = Map<String, dynamic>.from(item);
+            final key = (m['payment_reference'] ?? m['order_number'] ?? m['order_id'] ?? m['id'] ?? '').toString();
+            if (key.isNotEmpty && !seenKeys.contains(key)) {
+              seenKeys.add(key);
+              orders.add(m);
+            }
+          }
         }
-      } catch (e) {
-        debugPrint('Notice reading cached orders: $e');
       }
+    } catch (e) {
+      debugPrint('Notice reading cached orders: $e');
     }
 
-    // Fallback seed orders if still empty
-    if (orders.isEmpty) {
-      orders.addAll([
-        {
-          'id': 'CSNJ202609039BA1290001',
-          'order_id': 'CSNJ202609039BA1290001',
-          'order_number': 'CSNJ202609039BA1290001',
-          'user_email': 'aarav.sharma@example.com',
-          'user_name': 'Aarav Sharma',
-          'total_amount': 299.00,
-          'subtotal_amount': 299.00,
-          'discount_amount': 0.00,
-          'coupon_code': '',
-          'status': 'completed',
-          'payment_method': 'UPI (GPay)',
-          'payment_id': 'pay_gpay_982143',
-          'created_at': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
-        },
-        {
-          'id': 'CSNJ202609021639150001',
-          'order_id': 'CSNJ202609021639150001',
-          'order_number': 'CSNJ202609021639150001',
-          'user_email': 'sneha.patel@example.com',
-          'user_name': 'Sneha Patel',
-          'total_amount': 239.20,
-          'subtotal_amount': 299.00,
-          'discount_amount': 59.80,
-          'coupon_code': 'COSMYRA20',
-          'status': 'completed',
-          'payment_method': 'Credit Card',
-          'payment_id': 'pay_card_482910',
-          'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-        },
-        {
-          'id': 'CSNJ202609010000000001',
-          'order_id': 'CSNJ202609010000000001',
-          'order_number': 'CSNJ202609010000000001',
-          'user_email': 'rohan.verma@example.com',
-          'user_name': 'Rohan Verma',
-          'total_amount': 199.00,
-          'subtotal_amount': 299.00,
-          'discount_amount': 100.00,
-          'coupon_code': 'WELCOME100',
-          'status': 'completed',
-          'payment_method': 'UPI (PhonePe)',
-          'payment_id': 'pay_phonepe_77192',
-          'created_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
-        },
-      ]);
+    // Always filter out old demo placeholder orders (USRDEM0001 / student@cosmyra.edu)
+    final finalOrders = orders.where((o) {
+      final ordNo = (o['order_number'] ?? o['order_id'] ?? o['id'] ?? '').toString();
+      final email = (o['user_email'] ?? o['student_email'] ?? '').toString();
+      return !ordNo.contains('USRDEM0001') && !email.contains('student@cosmyra.edu');
+    }).toList();
+
+    // Sort all aggregated orders by created_at descending
+    finalOrders.sort((a, b) {
+      final da = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime(2020);
+      final db = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime(2020);
+      return db.compareTo(da);
+    });
+
+    // Apply status filtering if requested
+    if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'All') {
+      final lowerFilter = statusFilter.trim().toLowerCase();
+      if (lowerFilter == 'pending verification') {
+        return finalOrders.where((o) {
+          final st = (o['payment_status'] ?? o['status'] ?? '').toString().toLowerCase();
+          return st == 'pending' || st == 'pending_verification';
+        }).toList();
+      }
+      return finalOrders.where((o) {
+        final st = (o['payment_status'] ?? o['status'] ?? '').toString().toLowerCase();
+        return st == lowerFilter;
+      }).toList();
     }
 
-    return orders;
+    return finalOrders;
   }
 
   /// Student: Fetch personal order history for the active user
@@ -7813,39 +8422,207 @@ class SupabaseService {
     String? adminNote,
   }) async {
     try {
-      final orders = await fetchAdminOrders();
-      final idx = orders.indexWhere((o) => o['id'] == orderId);
-      if (idx >= 0) {
-        orders[idx]['payment_status'] = newStatus;
-        if (newStatus == 'completed') {
-          orders[idx]['entitlement_granted'] = true;
-        } else if (newStatus == 'cancelled') {
-          orders[idx]['entitlement_granted'] = false;
-        }
-        if (adminNote != null && adminNote.isNotEmpty) {
-          orders[idx]['notes'] = adminNote;
-        }
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_ordersCacheKey, jsonEncode(orders));
-
-        try {
-          await client.from('orders').update({
-            'status': newStatus,
-            'payment_status': newStatus,
-            'notes': orders[idx]['notes'],
-          }).eq('id', orderId);
-        } catch (e) {
-          debugPrint('Notice updating Supabase order status: $e');
-        }
-
-        return true;
+      // 1. Update directly in Supabase orders table
+      try {
+        await client.from('orders').update({
+          'status': newStatus,
+          'notes': adminNote ?? 'Updated by Admin',
+          'updated_at': DateTime.now().toIso8601String(),
+        }).or('id.eq.$orderId,order_number.eq.$orderId');
+      } catch (e) {
+        debugPrint('Notice updating Supabase order status: $e');
       }
-      return false;
+
+      // If completed, ensure entitlement access is granted to student in entitlements table
+      if (newStatus == 'completed') {
+        try {
+          final res = await client.from('orders').select().or('id.eq.$orderId,order_number.eq.$orderId').maybeSingle();
+          if (res != null) {
+            final uId = (res['user_id'] ?? '').toString();
+            final uEmail = (res['user_email'] ?? '').toString();
+            final pName = (res['product_name'] ?? 'NEET/JEE Test Series').toString();
+            if (uEmail.isNotEmpty) {
+              final now = DateTime.now();
+              await client.from('entitlements').upsert({
+                'id': toValidUuid('ent_${now.millisecondsSinceEpoch}_$orderId'),
+                'user_id': uId.isNotEmpty ? uId : 'usr_guest',
+                'user_email': uEmail,
+                'product_id': 'ts_all_access',
+                'product_title': pName,
+                'product_type': 'test_series',
+                'order_id': orderId,
+                'access_type': 'full',
+                'is_active': true,
+                'created_at': now.toIso8601String(),
+                'updated_at': now.toIso8601String(),
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('Notice granting entitlement on completion: $e');
+        }
+      }
+
+      // 2. Update local SharedPreferences cache
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString(_ordersCacheKey);
+      if (str != null && str.isNotEmpty) {
+        List list = jsonDecode(str);
+        for (var o in list) {
+          if (o['id'] == orderId || o['order_number'] == orderId || o['order_id'] == orderId) {
+            o['status'] = newStatus;
+            o['payment_status'] = newStatus;
+            if (adminNote != null) o['notes'] = adminNote;
+          }
+        }
+        await prefs.setString(_ordersCacheKey, jsonEncode(list));
+      }
+      return true;
     } catch (e) {
       debugPrint('Error updating order status: $e');
       return false;
     }
+  }
+
+  static Future<bool> deleteAdminOrder(String orderId) async {
+    try {
+      await client.from('orders').delete().or('id.eq.$orderId,order_number.eq.$orderId');
+    } catch (e) {
+      debugPrint('Notice deleting order from Supabase: $e');
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString(_ordersCacheKey);
+      if (str != null && str.isNotEmpty) {
+        List list = jsonDecode(str);
+        list.removeWhere((o) => o['id'] == orderId || o['order_number'] == orderId || o['order_id'] == orderId);
+        await prefs.setString(_ordersCacheKey, jsonEncode(list));
+      }
+    } catch (_) {}
+    return true;
+  }
+
+  static Future<Map<String, dynamic>> createManualAdminOrder({
+    required String studentName,
+    required String studentEmail,
+    required String studentPhone,
+    required String productName,
+    required double amount,
+    required String paymentMethod,
+    required String status,
+    String? utrOrNotes,
+  }) async {
+    final String timeMs = DateTime.now().millisecondsSinceEpoch.toString();
+    final String orderId = 'ORD-${timeMs.substring(timeMs.length - 8)}';
+
+    final orderData = {
+      'id': toValidUuid('ord_$orderId'),
+      'order_number': orderId,
+      'user_id': toValidUuid('usr_${timeMs.substring(timeMs.length - 8)}'),
+      'user_email': studentEmail.trim().toLowerCase(),
+      'user_name': studentName.trim(),
+      'user_phone': studentPhone.trim(),
+      'total_amount': amount,
+      'subtotal_amount': amount,
+      'discount_amount': 0.0,
+      'coupon_code': '',
+      'status': status,
+      'payment_method': paymentMethod,
+      'payment_id': utrOrNotes?.isNotEmpty == true ? 'MANUAL_$utrOrNotes' : 'MANUAL_$timeMs',
+      'payment_reference': utrOrNotes ?? 'Manual Entry by Admin',
+      'notes': utrOrNotes ?? 'Manual Order created by Admin',
+      'product_name': productName,
+      'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await client.from('orders').insert(orderData);
+    } catch (e) {
+      debugPrint('Notice inserting manual admin order: $e');
+    }
+
+    if (status == 'completed') {
+      try {
+        await client.from('entitlements').insert({
+          'id': toValidUuid('ent_${timeMs}_$orderId'),
+          'user_id': orderData['user_id'],
+          'user_email': studentEmail.trim().toLowerCase(),
+          'product_id': 'ts_all_access',
+          'product_title': productName,
+          'product_type': 'test_series',
+          'order_id': orderId,
+          'access_type': 'full',
+          'is_active': true,
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint('Notice granting manual entitlement: $e');
+      }
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString(_ordersCacheKey);
+      List list = str != null && str.isNotEmpty ? jsonDecode(str) : [];
+      list.insert(0, orderData);
+      await prefs.setString(_ordersCacheKey, jsonEncode(list));
+    } catch (_) {}
+
+    return orderData;
+  }
+
+  static Future<bool> updateAdminOrderDetails(Map<String, dynamic> updatedOrder) async {
+    final rawId = (updatedOrder['order_number'] ?? updatedOrder['order_id'] ?? updatedOrder['id'] ?? '').toString();
+    final validUuid = toValidUuid(rawId);
+
+    final updatePayload = {
+      'user_name': updatedOrder['user_name'] ?? updatedOrder['student_name'] ?? '',
+      'user_email': (updatedOrder['user_email'] ?? updatedOrder['student_email'] ?? '').toString().trim().toLowerCase(),
+      'user_phone': updatedOrder['user_phone'] ?? updatedOrder['student_phone'] ?? '',
+      'total_amount': (updatedOrder['total_amount'] as num?)?.toDouble() ?? (updatedOrder['amount'] as num?)?.toDouble() ?? 0.0,
+      'status': updatedOrder['status'] ?? 'pending_verification',
+      'payment_status': updatedOrder['status'] ?? 'pending_verification',
+      'notes': updatedOrder['notes'] ?? '',
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await client.from('orders').update(updatePayload).or('id.eq.$validUuid,order_number.eq.$rawId');
+    } catch (e) {
+      debugPrint('Notice updating order details in Supabase: $e');
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (var keyName in ['cosmyra_saved_admin_orders', 'cosmyra_user_orders']) {
+        final str = prefs.getString(keyName);
+        if (str != null && str.isNotEmpty) {
+          final List list = jsonDecode(str);
+          for (var item in list) {
+            final key = (item['order_number'] ?? item['order_id'] ?? item['id'] ?? '').toString();
+            if (key == rawId || key == validUuid) {
+              item['user_name'] = updatePayload['user_name'];
+              item['student_name'] = updatePayload['user_name'];
+              item['user_email'] = updatePayload['user_email'];
+              item['student_email'] = updatePayload['user_email'];
+              item['user_phone'] = updatePayload['user_phone'];
+              item['student_phone'] = updatePayload['user_phone'];
+              item['total_amount'] = updatePayload['total_amount'];
+              item['status'] = updatePayload['status'];
+              item['payment_status'] = updatePayload['status'];
+              item['notes'] = updatePayload['notes'];
+            }
+          }
+          await prefs.setString(keyName, jsonEncode(list));
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice updating local order cache: $e');
+    }
+
+    return true;
   }
 
   static Future<Map<String, dynamic>> sendOrderPaymentReminder(String orderId) async {

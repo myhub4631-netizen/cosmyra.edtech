@@ -42,6 +42,14 @@
   ],
   "rewrites": [
     {
+      "source": "/admin/order",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin/orders",
+      "destination": "/index.html"
+    },
+    {
       "source": "/privacy-policy",
       "destination": "/privacy-policy.html"
     },
@@ -58,11 +66,7 @@
       "destination": "/terms.html"
     },
     {
-      "source": "/((?!privacy-policy|privacy|terms|terms-of-service|assets|icons|favicon|manifest|flutter).*)/",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/(.*)",
+      "source": "/:path*",
       "destination": "/index.html"
     }
   ]

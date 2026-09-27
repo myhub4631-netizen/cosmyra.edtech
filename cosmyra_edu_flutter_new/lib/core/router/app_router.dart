@@ -6,7 +6,6 @@ import '../../models/models.dart';
 import '../../models/pyq_models.dart';
 import '../../shared/widgets/not_found_screen.dart';
 import '../../features/landing/landing_page_screen.dart';
-import '../../features/auth/login_screen.dart';
 import '../../features/auth/signup_screen.dart';
 import '../../features/dashboard/user_dashboard_screen.dart';
 import '../../features/profile/profile_screen.dart';
@@ -20,6 +19,10 @@ import '../../features/mistakes_bookmarks/mistakes_bookmarks_screen.dart';
 import '../../features/analytics/analytics_screen.dart';
 import '../../features/leaderboard/leaderboard_screen.dart';
 import '../../features/student/test_series_screen.dart';
+import '../../features/student/product_detail_screen.dart';
+import '../../features/student/checkout_screen.dart';
+import '../../features/student/cart_screen.dart';
+import '../services/cart_service.dart';
 import '../../features/tests/mock_tests_screen.dart';
 import '../../features/tests/test_screen.dart';
 import '../../features/tests/test_result_screen.dart';
@@ -50,6 +53,11 @@ import '../../features/admin/cms/admin_blog_editor_screen.dart';
 import '../../features/admin/cms/admin_navigation_manager_screen.dart';
 import '../../features/admin/seo/admin_seo_screen.dart';
 import '../../features/admin/admin_test_series_manager_screen.dart';
+import '../../features/admin/admin_recommendations_screen.dart';
+import '../../features/admin/admin_coupons_screen.dart';
+import '../../features/admin/admin_media_screen.dart';
+import '../../features/admin/admin_orders_screen.dart';
+import '../../features/admin/admin_marketing_automation_screen.dart';
 import '../../features/cms/dynamic_page_screen.dart';
 import '../../features/blog/blog_list_screen.dart';
 import '../../features/blog/blog_post_screen.dart';
@@ -70,6 +78,50 @@ UserProfileModel _getEffectiveProfile() {
   if (SupabaseService.activeUserSession != null) {
     return SupabaseService.activeUserSession!;
   }
+  final user = SupabaseService.client.auth.currentUser;
+  if (user != null) {
+    final meta = user.userMetadata ?? {};
+    return UserProfileModel(
+      id: user.id,
+      email: user.email ?? 'student@cosmyra.edu',
+      fullName: (meta['full_name'] ?? meta['name'] ?? user.email?.split('@').first ?? 'Student').toString(),
+      avatarUrl: (meta['avatar_url'] ?? meta['picture'] ?? meta['photo_url'])?.toString(),
+      phoneNumber: (user.phone ?? meta['phone'] ?? meta['phone_number'])?.toString(),
+      role: 'student',
+      targetExam: 'NEET',
+      targetYear: 2026,
+    );
+  }
+  return SupabaseService.getMockProfile(role: 'student');
+}
+
+UserProfileModel _getEffectiveAdminProfile() {
+  final user = SupabaseService.client.auth.currentUser;
+  final meta = user?.userMetadata;
+  final googleAvatar = meta != null
+      ? (meta['avatar_url'] ?? meta['picture'] ?? meta['photo_url'] ?? meta['avatar'] ?? meta['picture_url'])?.toString()
+      : null;
+
+  if (SupabaseService.activeUserSession != null) {
+    var session = SupabaseService.activeUserSession!;
+    if ((session.avatarUrl == null || session.avatarUrl!.trim().isEmpty) && googleAvatar != null && googleAvatar.trim().isNotEmpty) {
+      session = session.copyWith(avatarUrl: googleAvatar.trim());
+    }
+    return session;
+  }
+
+  if (user != null) {
+    return UserProfileModel(
+      id: user.id,
+      email: user.email ?? '',
+      fullName: (meta?['full_name'] ?? meta?['name'] ?? user.email ?? 'User').toString(),
+      avatarUrl: googleAvatar,
+      phoneNumber: (user.phone ?? meta?['phone'] ?? meta?['phone_number'])?.toString(),
+      role: (meta?['role'] ?? 'student').toString(),
+      targetExam: 'NEET & JEE',
+      targetYear: 2026,
+    );
+  }
   return SupabaseService.getMockProfile(role: 'student');
 }
 
@@ -85,15 +137,41 @@ final GoRouter appRouter = GoRouter(
     final bool isLoggedIn = session != null || hasSupabaseSession;
     final String path = state.uri.path;
 
+    // 1. Admin route protection: /admin and all /admin/*
     if (path == '/admin' || path.startsWith('/admin/')) {
       if (!isLoggedIn) {
-        return '/login?redirect=${Uri.encodeComponent(state.uri.toString())}';
+        final dest = state.uri.toString();
+        return '/login?redirect=${Uri.encodeComponent(dest)}';
       }
       final role = session?.role.toLowerCase() ?? '';
       final bool isAdmin = role == 'admin' || role == 'superadmin' || (session?.isAdmin ?? false) || (session?.isSuperAdmin ?? false);
-      if (!isAdmin && session != null) return '/dashboard';
+      if (!isAdmin && session != null) {
+        // Non-admin signed-in user is blocked from admin dashboard
+        return '/dashboard';
+      }
     }
 
+    // 2. Protected student routes: strictly require user to be signed in
+    final protectedStudentPaths = [
+      '/dashboard',
+      '/user/dashboard',
+      '/checkout',
+      '/profile',
+      '/my-tests',
+      '/mistakes',
+      '/mistakes-bookmarks',
+      '/analytics',
+    ];
+    final bool requiresAuth = protectedStudentPaths.any((p) => path == p || path.startsWith('$p/'));
+
+    if (requiresAuth) {
+      if (!isLoggedIn) {
+        final dest = state.uri.toString();
+        return '/login?redirect=${Uri.encodeComponent(dest)}';
+      }
+    }
+
+    // 3. Auth & Landing routes: if user logs in, auto redirect to destination or dashboard/admin
     if (path == '/' || path == '/landing' || path == '/login' || path == '/signup') {
       if (isLoggedIn) {
         final redirectParam = state.uri.queryParameters['redirect'];
@@ -106,7 +184,7 @@ final GoRouter appRouter = GoRouter(
       }
     }
 
-    return null;
+    return null; // Public routes allowed
   },
   routes: [
     // =========================================================================
@@ -132,11 +210,28 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/login',
-      builder: (context, state) => const LoginScreen(),
+      builder: (context, state) => LandingPageScreen(
+        isLoginRoute: true,
+        onStartPracticing: () => context.go('/practice'),
+        onExploreTests: () => context.go('/mock-tests'),
+        onSignUp: () => context.go('/signup'),
+        onLogIn: () => context.go('/login'),
+      ),
     ),
     GoRoute(
       path: '/signup',
-      builder: (context, state) => const SignUpScreen(),
+      builder: (context, state) => SignUpScreen(
+        onSignUpSuccess: (userProfile) {
+          final redirect = state.uri.queryParameters['redirect'];
+          if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
+            context.go(redirect);
+          } else if (userProfile.isAdmin || userProfile.isSuperAdmin) {
+            context.go('/admin');
+          } else {
+            context.go('/dashboard');
+          }
+        },
+      ),
     ),
     GoRoute(
       path: '/privacy-policy',
@@ -222,7 +317,12 @@ final GoRouter appRouter = GoRouter(
         onOpenTestSeries: () => context.go('/test-series'),
         onOpenPyqs: () => context.go('/pyq'),
         onOpenMistakes: () => context.go('/mistakes'),
-        onLogout: () => context.go('/login'),
+        onLogout: () async {
+          await SupabaseService.logoutUserSession();
+          if (context.mounted) {
+            context.go('/login');
+          }
+        },
       ),
     ),
     GoRoute(
@@ -237,7 +337,12 @@ final GoRouter appRouter = GoRouter(
         onOpenTestSeries: () => context.go('/test-series'),
         onOpenPyqs: () => context.go('/pyq'),
         onOpenMistakes: () => context.go('/mistakes'),
-        onLogout: () => context.go('/login'),
+        onLogout: () async {
+          await SupabaseService.logoutUserSession();
+          if (context.mounted) {
+            context.go('/login');
+          }
+        },
       ),
     ),
     GoRoute(
@@ -329,6 +434,50 @@ final GoRouter appRouter = GoRouter(
         onBackToDashboard: () => context.go('/dashboard'),
         onNavigateTab: (idx) {},
       ),
+    ),
+    GoRoute(
+      path: '/store',
+      builder: (context, state) => TestSeriesScreen(
+        onBackToDashboard: () => context.go('/dashboard'),
+        onNavigateTab: (idx) {},
+      ),
+    ),
+    GoRoute(
+      path: '/products',
+      builder: (context, state) => TestSeriesScreen(
+        onBackToDashboard: () => context.go('/dashboard'),
+        onNavigateTab: (idx) {},
+      ),
+    ),
+    GoRoute(
+      path: '/products/:id',
+      builder: (context, state) => ProductDetailScreen(
+        productId: state.pathParameters['id'] ?? 'ts_neet_all_india_2026',
+      ),
+    ),
+    GoRoute(
+      path: '/product/:id',
+      builder: (context, state) => ProductDetailScreen(
+        productId: state.pathParameters['id'] ?? 'ts_neet_all_india_2026',
+      ),
+    ),
+    GoRoute(
+      path: '/cart',
+      builder: (context, state) => const CartScreen(),
+    ),
+    GoRoute(
+      path: '/checkout',
+      builder: (context, state) {
+        CartItem? item;
+        if (state.extra is CartItem) {
+          item = state.extra as CartItem;
+        }
+        final productId = state.uri.queryParameters['id'] ?? state.uri.queryParameters['productId'];
+        return CheckoutScreen(
+          singleItem: item,
+          productId: productId,
+        );
+      },
     ),
     GoRoute(
       path: '/test/:testId/start',
@@ -726,13 +875,13 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/admin',
       builder: (context, state) => AdminDashboardScreen(
-        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        userProfile: _getEffectiveAdminProfile(),
       ),
     ),
     GoRoute(
       path: '/admin/dashboard',
       builder: (context, state) => AdminDashboardScreen(
-        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        userProfile: _getEffectiveAdminProfile(),
       ),
     ),
     GoRoute(
@@ -843,6 +992,34 @@ final GoRouter appRouter = GoRouter(
       path: '/admin/pricing',
       builder: (context, state) => AdminPricingScreen(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/payment-gateways',
+      builder: (context, state) => AdminPricingScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        autoOpenPaymentModal: true,
+      ),
+    ),
+    GoRoute(
+      path: '/admin/payment-gateway',
+      builder: (context, state) => AdminPricingScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        autoOpenPaymentModal: true,
+      ),
+    ),
+    GoRoute(
+      path: '/admin/payment-settings',
+      builder: (context, state) => AdminPricingScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        autoOpenPaymentModal: true,
+      ),
+    ),
+    GoRoute(
+      path: '/admin/payments',
+      builder: (context, state) => AdminPricingScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        autoOpenPaymentModal: true,
       ),
     ),
     GoRoute(
@@ -957,6 +1134,54 @@ final GoRouter appRouter = GoRouter(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
         onBack: () => context.go('/admin'),
       ),
+    ),
+    GoRoute(
+      path: '/admin/recommendations',
+      builder: (context, state) => const AdminRecommendationsScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/recommendations',
+      builder: (context, state) => const AdminRecommendationsScreen(),
+    ),
+    GoRoute(
+      path: '/admin/coupons',
+      builder: (context, state) => const AdminCouponManagerScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/coupons',
+      builder: (context, state) => const AdminCouponManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/media',
+      builder: (context, state) => const AdminMediaScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/media',
+      builder: (context, state) => const AdminMediaScreen(),
+    ),
+    GoRoute(
+      path: '/admin/orders',
+      builder: (context, state) => const AdminOrdersScreen(),
+    ),
+    GoRoute(
+      path: '/admin/order',
+      builder: (context, state) => const AdminOrdersScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/orders',
+      builder: (context, state) => const AdminOrdersScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/order',
+      builder: (context, state) => const AdminOrdersScreen(),
+    ),
+    GoRoute(
+      path: '/admin/marketing-automation',
+      builder: (context, state) => const AdminMarketingAutomationScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/marketing-automation',
+      builder: (context, state) => const AdminMarketingAutomationScreen(),
     ),
 
     // Super Admin CMS & SEO shortcuts

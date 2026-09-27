@@ -187,16 +187,6 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
       final orderData = orderRes['order'];
       final createdOrderId = (orderData['order_number'] ?? orderData['order_id'] ?? orderData['id']).toString();
 
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      final verifyRes = await SupabaseService.verifyPaymentAndGrantAccess(
-        orderId: createdOrderId,
-        paymentId: 'CF_${DateTime.now().millisecondsSinceEpoch}',
-        paymentMethod: 'Cashfree PG',
-        user: user,
-        items: itemsData,
-      );
-
       if (widget.singleItem == null) {
         CartService.instance.clearCart();
       }
@@ -205,9 +195,9 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
         setState(() {
           _isProcessing = false;
           _isSuccess = true;
-          _isPendingVerification = false;
+          _isPendingVerification = true;
           _orderId = createdOrderId;
-          _successMessage = verifyRes['message']?.toString() ?? 'Access Granted!';
+          _successMessage = 'Order Submitted! Pending Admin Verification.';
         });
       }
     } catch (e) {

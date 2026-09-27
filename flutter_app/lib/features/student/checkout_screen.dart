@@ -263,16 +263,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           orderData?['id']?.toString() ??
           await SupabaseService.generateOrderId(userId: user.id);
 
-      await Future.delayed(const Duration(milliseconds: 1200));
-
-      await SupabaseService.verifyPaymentAndGrantAccess(
-        orderId: orderId,
-        paymentId: 'CF_${DateTime.now().millisecondsSinceEpoch}',
-        paymentMethod: 'Cashfree PG',
-        user: user,
-        items: itemsJson,
-      );
-
       if (_activeItem == null) {
         CartService.instance.clearCart();
       }
@@ -280,7 +270,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (mounted) {
         setState(() {
           _isProcessingPayment = false;
-          _isPendingVerification = false;
+          _isPendingVerification = true;
           _isOrderSuccess = true;
           _createdOrderId = orderId;
         });

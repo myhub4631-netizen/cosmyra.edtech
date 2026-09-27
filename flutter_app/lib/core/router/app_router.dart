@@ -1164,7 +1164,15 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const AdminOrdersScreen(),
     ),
     GoRoute(
+      path: '/admin/order',
+      builder: (context, state) => const AdminOrdersScreen(),
+    ),
+    GoRoute(
       path: '/superadmin/orders',
+      builder: (context, state) => const AdminOrdersScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/order',
       builder: (context, state) => const AdminOrdersScreen(),
     ),
     GoRoute(

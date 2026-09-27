@@ -415,6 +415,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                   width: double.infinity,
                   child: ElevatedButton.icon(
+                    onPressed: () => context.go('/admin/order'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      elevation: 2,
+                      shadowColor: const Color(0xFF2563EB).withOpacity(0.3),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.shopping_bag_rounded, size: 18, color: Colors.white),
+                    label: const Text(
+                      '🛒 Manage Orders & Verification',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
                     onPressed: () => context.go('/admin/payment-gateways'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF10B981),
@@ -452,8 +472,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('SALES & AUTOMATION'),
+                _buildSidebarTile('🛒 Orders & Purchases (Verify UPI)', Icons.shopping_bag_outlined, false, onTap: () => context.go('/admin/order')),
                 _buildSidebarTile('💳 Payment Gateways (UPI & Cashfree)', Icons.payment_rounded, false, onTap: () => context.go('/admin/payment-gateways')),
-                _buildSidebarTile('Orders & Purchases (Verify UPI)', Icons.shopping_bag_outlined, false, onTap: () => context.go('/admin/orders')),
                 _buildSidebarTile('Email & WhatsApp Automation', Icons.mark_email_read_outlined, false, onTap: () => context.go('/admin/marketing-automation')),
 
                 const SizedBox(height: 16),

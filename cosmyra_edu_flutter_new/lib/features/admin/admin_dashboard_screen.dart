@@ -7,6 +7,7 @@ import 'package:csv/csv.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/latex_view.dart';
+import '../../shared/widgets/app_avatar.dart';
 import '../../shared/utils/smooth_page_route.dart';
 import 'admin_user_management_screen.dart';
 import 'admin_questions_bank_dashboard.dart';
@@ -64,16 +65,45 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
   }
 
   Future<void> _loadAdminData() async {
-    setState(() => _isLoading = true);
-    final questions = await SupabaseService.fetchQuestions(limit: 100);
-    final reports = await SupabaseService.getReportedQuestions();
-    final profiles = await SupabaseService.fetchAllProfiles();
-    setState(() {
-      _questionBank = questions;
-      _reports = reports;
-      _totalRealUsers = profiles.length;
-      _isLoading = false;
-    });
+    if (_questionBank.isEmpty) {
+      setState(() => _isLoading = true);
+    }
+
+    try {
+      // Execute all 3 data fetches concurrently in parallel instead of sequentially
+      final results = await Future.wait([
+        SupabaseService.fetchQuestions(limit: 50).timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => <QuestionModel>[],
+        ),
+        SupabaseService.getReportedQuestions().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => <ReportModel>[],
+        ),
+        SupabaseService.fetchAllProfiles().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => <UserProfileModel>[],
+        ),
+      ]);
+
+      final questions = results[0] as List<QuestionModel>;
+      final reports = results[1] as List<ReportModel>;
+      final profiles = results[2] as List<UserProfileModel>;
+
+      if (mounted) {
+        setState(() {
+          if (questions.isNotEmpty) _questionBank = questions;
+          _reports = reports;
+          if (profiles.isNotEmpty) _totalRealUsers = profiles.length;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Admin data load notice: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _openQuestionEditor({QuestionModel? questionToEdit}) {
@@ -381,21 +411,70 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                     ),
                   ),
                 ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.go('/admin/order'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      elevation: 2,
+                      shadowColor: const Color(0xFF2563EB).withOpacity(0.3),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.shopping_bag_rounded, size: 18, color: Colors.white),
+                    label: const Text(
+                      '🛒 Manage Orders & Verification',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.go('/admin/payment-gateways'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      elevation: 2,
+                      shadowColor: const Color(0xFF10B981).withOpacity(0.3),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.payment_rounded, size: 18, color: Colors.white),
+                    label: const Text(
+                      '💳 Payment Gateways (UPI & Cashfree)',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 6),
 
                 _buildSidebarTile('Test Series Manager', Icons.track_changes_rounded, false, onTap: () => context.go('/admin/test-series-manager')),
+                _buildSidebarTile('Recommendation Manager', Icons.recommend_rounded, false, onTap: () => context.go('/admin/recommendations')),
                 _buildSidebarTile('Paper Predictions', Icons.note_alt_outlined, false, onTap: () => context.go('/admin/predictions')),
                 _buildSidebarTile('Question & Paper Bank', Icons.quiz_outlined, false, onTap: () => context.go('/admin/questions')),
                 _buildSidebarTile('Upload Questions (Step 1)', Icons.cloud_upload_outlined, false, onTap: () => context.go('/admin/questions/upload')),
                 _buildSidebarTile('CSV Bulk Import', Icons.upload_file_outlined, false, onTap: () => context.go('/admin/questions/upload')),
                 _buildSidebarTile('Exam Hierarchy', Icons.account_tree_outlined, false, onTap: () => context.go('/admin/hierarchy')),
                 _buildSidebarTile('Pricing & Plans', Icons.sell_outlined, false, onTap: () => context.go('/admin/pricing')),
+                _buildSidebarTile('Coupon Management', Icons.discount_outlined, false, onTap: () => context.go('/admin/coupons')),
                 _buildSidebarTile('Banner Management', Icons.view_carousel_rounded, false, onTap: () => context.go('/admin/banners')),
+                _buildSidebarTile('Media & Asset Manager', Icons.perm_media_outlined, false, onTap: () => context.go('/admin/media')),
                 _buildSidebarTile('Chapters & Topics', Icons.auto_stories_rounded, false, onTap: () => context.go('/admin/chapters')),
                 _buildSidebarTile('Tags & Topics', Icons.label_outline_rounded, false, onTap: () => context.go('/admin/topics')),
                 _buildSidebarTile('PYQs & Papers', Icons.description_outlined, false, onTap: () => context.go('/admin/papers')),
                 _buildSidebarTile('Mistake Book', Icons.history_edu_outlined, false, onTap: () => context.go('/mistakes')),
                 _buildSidebarTile('Bookmarks', Icons.bookmark_outline_rounded, false, onTap: () => context.go('/bookmarks')),
+
+                const SizedBox(height: 16),
+                _buildSidebarSectionLabel('SALES & AUTOMATION'),
+                _buildSidebarTile('🛒 Orders & Purchases (Verify UPI)', Icons.shopping_bag_outlined, false, onTap: () => context.go('/admin/order')),
+                _buildSidebarTile('💳 Payment Gateways (UPI & Cashfree)', Icons.payment_rounded, false, onTap: () => context.go('/admin/payment-gateways')),
+                _buildSidebarTile('Email & WhatsApp Automation', Icons.mark_email_read_outlined, false, onTap: () => context.go('/admin/marketing-automation')),
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('USERS & ROLES'),
@@ -486,9 +565,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             ),
             child: Row(
               children: [
-                const CircleAvatar(
-                  radius: 16,
-                  backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=33'),
+                AppAvatar.fromProfile(
+                  widget.userProfile,
+                  size: 32,
+                  backgroundColor: const Color(0xFF6366F1),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -648,9 +728,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 ],
               ),
               const SizedBox(width: 12),
-              const CircleAvatar(
-                radius: 16,
-                backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=33'),
+              AppAvatar.fromProfile(
+                widget.userProfile,
+                size: 32,
+                backgroundColor: const Color(0xFF6366F1),
               ),
               const SizedBox(width: 8),
               Column(
@@ -1301,6 +1382,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [
+            _buildQuickActionCard('💳 Payment Gateways', 'Configure UPI ID & Cashfree API keys', Icons.payment_rounded, const Color(0xFF10B981), () {
+              context.go('/admin/payment-gateways');
+            }),
+            _buildQuickActionCard('🛒 Orders & Verification', 'Verify UPI payments & grant access', Icons.shopping_bag_outlined, const Color(0xFF2563EB), () {
+              context.go('/admin/orders');
+            }),
             _buildQuickActionCard('Questions Bank', 'Manage & organize all question modules', Icons.quiz_outlined, const Color(0xFF4F46E5), () async {
               await Navigator.of(context).push(SmoothPageRoute(child: AdminQuestionsBankDashboard(userProfile: widget.userProfile)));
               _loadAdminData();

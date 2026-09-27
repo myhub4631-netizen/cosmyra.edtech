@@ -43,36 +43,36 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAP1bSXD1ho4dLeamygyeTbLCO3FLxoxfs',
-    appId: '1:672019832931:android:f306b7e0c88a9c9aaf9856',
-    messagingSenderId: '672019832931',
-    projectId: 'cosmyra-edu',
-    storageBucket: 'cosmyra-edu.firebasestorage.app',
+    apiKey: 'YOUR_NEW_API_KEY',
+    appId: '1:YOUR_NEW_PROJECT_NUMBER:android:placeholder',
+    messagingSenderId: 'YOUR_NEW_PROJECT_NUMBER',
+    projectId: 'YOUR_NEW_PROJECT_ID',
+    storageBucket: 'YOUR_NEW_PROJECT.appspot.com',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAP1bSXD1ho4dLeamygyeTbLCO3FLxoxfs',
-    appId: '1:672019832931:ios:f306b7e0c88a9c9aaf9856',
-    messagingSenderId: '672019832931',
-    projectId: 'cosmyra-edu',
-    storageBucket: 'cosmyra-edu.firebasestorage.app',
+    apiKey: 'YOUR_NEW_API_KEY',
+    appId: '1:YOUR_NEW_PROJECT_NUMBER:ios:placeholder',
+    messagingSenderId: 'YOUR_NEW_PROJECT_NUMBER',
+    projectId: 'YOUR_NEW_PROJECT_ID',
+    storageBucket: 'YOUR_NEW_PROJECT.appspot.com',
     iosBundleId: 'com.cosmyra.neetjee',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyAP1bSXD1ho4dLeamygyeTbLCO3FLxoxfs',
-    appId: '1:672019832931:ios:f306b7e0c88a9c9aaf9856',
-    messagingSenderId: '672019832931',
-    projectId: 'cosmyra-edu',
-    storageBucket: 'cosmyra-edu.firebasestorage.app',
+    apiKey: 'YOUR_NEW_API_KEY',
+    appId: '1:YOUR_NEW_PROJECT_NUMBER:ios:placeholder',
+    messagingSenderId: 'YOUR_NEW_PROJECT_NUMBER',
+    projectId: 'YOUR_NEW_PROJECT_ID',
+    storageBucket: 'YOUR_NEW_PROJECT.appspot.com',
     iosBundleId: 'com.cosmyra.neetjee',
   );
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAP1bSXD1ho4dLeamygyeTbLCO3FLxoxfs',
-    appId: '1:672019832931:web:f306b7e0c88a9c9aaf9856',
-    messagingSenderId: '672019832931',
-    projectId: 'cosmyra-edu',
-    storageBucket: 'cosmyra-edu.firebasestorage.app',
+    apiKey: 'YOUR_NEW_API_KEY',
+    appId: '1:YOUR_NEW_PROJECT_NUMBER:web:placeholder',
+    messagingSenderId: 'YOUR_NEW_PROJECT_NUMBER',
+    projectId: 'YOUR_NEW_PROJECT_ID',
+    storageBucket: 'YOUR_NEW_PROJECT.appspot.com',
   );
 }
