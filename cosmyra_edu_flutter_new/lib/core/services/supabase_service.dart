@@ -5474,10 +5474,10 @@ class SupabaseService {
     final List<Map<String, dynamic>> list = [];
     final Set<String> seenIds = {};
 
-    // 1. Fetch from Supabase app_settings table ('home_recommendations')
+    // 1. Fetch from Supabase system_config table ('home_recommendations')
     try {
       final res = await client
-          .from('app_settings')
+          .from('system_config')
           .select('value')
           .eq('key', 'home_recommendations')
           .maybeSingle();
@@ -5504,10 +5504,44 @@ class SupabaseService {
         }
       }
     } catch (e) {
-      debugPrint('Notice reading home_recommendations from app_settings: $e');
+      debugPrint('Notice reading home_recommendations from system_config: $e');
     }
 
-    // 2. Fetch from home_recommendations table if available
+    // 2. Fallback to app_settings if system_config had nothing
+    if (list.isEmpty) {
+      try {
+        final res = await client
+            .from('app_settings')
+            .select('value')
+            .eq('key', 'home_recommendations')
+            .maybeSingle();
+        if (res != null && res['value'] != null) {
+          final raw = res['value'];
+          List<dynamic> items = [];
+          if (raw is List) {
+            items = raw;
+          } else if (raw is String && raw.trim().isNotEmpty) {
+            try {
+              items = jsonDecode(raw) as List;
+            } catch (_) {}
+          }
+          for (var item in items) {
+            if (item is Map) {
+              final map = Map<String, dynamic>.from(item);
+              final id = map['id']?.toString() ?? '';
+              if (id.isNotEmpty && !seenIds.contains(id) && !legacyDemoRecommendationIds.contains(id)) {
+                seenIds.add(id);
+                list.add(map);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Notice reading home_recommendations from app_settings: $e');
+      }
+    }
+
+    // 3. Fallback to home_recommendations table if available
     if (list.isEmpty) {
       try {
         final res = await client
@@ -5529,7 +5563,7 @@ class SupabaseService {
       }
     }
 
-    // 3. Fetch from local cache if remote had no data or was offline
+    // 4. Fetch from local cache if remote was offline
     if (list.isEmpty) {
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -5574,7 +5608,19 @@ class SupabaseService {
 
     bool success = false;
 
-    // 2. Save to Supabase app_settings
+    // 2. Save to Supabase system_config
+    try {
+      await client.from('system_config').upsert({
+        'key': 'home_recommendations',
+        'value': list,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'key');
+      success = true;
+    } catch (e) {
+      debugPrint('Notice saving home_recommendations to system_config: $e');
+    }
+
+    // 3. Fallback save to app_settings if possible
     try {
       await client.from('app_settings').upsert({
         'key': 'home_recommendations',
@@ -5583,11 +5629,9 @@ class SupabaseService {
         'updated_at': DateTime.now().toIso8601String(),
       });
       success = true;
-    } catch (e) {
-      debugPrint('Notice saving home_recommendations to app_settings: $e');
-    }
+    } catch (_) {}
 
-    // 3. Also try syncing to dedicated home_recommendations table if it exists
+    // 4. Also try syncing to dedicated home_recommendations table if it exists
     try {
       for (final item in list) {
         await client.from('home_recommendations').upsert(item);
@@ -5655,6 +5699,14 @@ class SupabaseService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('cosmyra_home_recommendations');
+    } catch (_) {}
+
+    try {
+      await client.from('system_config').upsert({
+        'key': 'home_recommendations',
+        'value': [],
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'key');
     } catch (_) {}
 
     try {
