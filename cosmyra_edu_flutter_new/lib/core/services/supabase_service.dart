@@ -507,16 +507,32 @@ class SupabaseService {
 
       // Mobile Native Google Sign-In (Pure in-app native account picker)
       const String webClientId = '852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com';
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        serverClientId: webClientId,
-        scopes: ['email', 'profile'],
-      );
 
+      GoogleSignInAccount? googleUser;
       try {
-        await googleSignIn.signOut();
-      } catch (_) {}
+        final GoogleSignIn googleSignIn = GoogleSignIn(
+          serverClientId: webClientId,
+          scopes: ['email', 'profile'],
+        );
+        try {
+          await googleSignIn.signOut();
+        } catch (_) {}
+        googleUser = await googleSignIn.signIn();
+      } catch (nativeErr) {
+        debugPrint('Primary GoogleSignIn note: $nativeErr. Retrying with standard native configuration...');
+        try {
+          final GoogleSignIn fallbackSignIn = GoogleSignIn(
+            scopes: ['email', 'profile'],
+          );
+          try {
+            await fallbackSignIn.signOut();
+          } catch (_) {}
+          googleUser = await fallbackSignIn.signIn();
+        } catch (fallbackErr) {
+          debugPrint('Fallback GoogleSignIn note: $fallbackErr');
+        }
+      }
 
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
         // User cancelled account selection
         return false;
@@ -538,6 +554,7 @@ class SupabaseService {
             final profile = await getCurrentUser();
             if (profile != null) {
               await setActiveUserSession(profile);
+              authNotifier.value = profile;
               return true;
             }
           }
@@ -584,6 +601,7 @@ class SupabaseService {
 
       await addLocalUser(mobileProfile);
       await setActiveUserSession(mobileProfile);
+      authNotifier.value = mobileProfile;
       return true;
     } catch (e) {
       debugPrint('Mobile Native Google Sign-In error: $e');
