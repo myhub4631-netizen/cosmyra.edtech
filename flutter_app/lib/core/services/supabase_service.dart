@@ -505,75 +505,56 @@ class SupabaseService {
         );
       }
 
-      // Mobile Native Google Sign-In (Pure in-app native account picker)
-      const String webClientId = '852782340906-sljj6ej7gnchemplb93pd8rel5qesarr.apps.googleusercontent.com';
+      // 100% Pure Native In-App Google Sign-In (No Browser / No Chrome Redirect)
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+      );
 
-      GoogleSignInAccount? googleUser;
       try {
-        final GoogleSignIn googleSignIn = GoogleSignIn(
-          serverClientId: webClientId,
-          scopes: ['email', 'profile'],
-        );
-        try {
-          await googleSignIn.signOut();
-        } catch (_) {}
-        googleUser = await googleSignIn.signIn();
-      } catch (nativeErr) {
-        debugPrint('Primary GoogleSignIn note: $nativeErr. Retrying with standard native configuration...');
-        try {
-          final GoogleSignIn fallbackSignIn = GoogleSignIn(
-            scopes: ['email', 'profile'],
-          );
-          try {
-            await fallbackSignIn.signOut();
-          } catch (_) {}
-          googleUser = await fallbackSignIn.signIn();
-        } catch (fallbackErr) {
-          debugPrint('Fallback GoogleSignIn note: $fallbackErr');
-        }
-      }
+        await googleSignIn.signOut();
+      } catch (_) {}
 
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
-        // User cancelled account selection
+        // User cancelled native account selection
         return false;
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final String? idToken = googleAuth.idToken;
-      final String? accessToken = googleAuth.accessToken;
-
-      // 1. Attempt Supabase cloud Auth ID token exchange
-      if (idToken != null && idToken.isNotEmpty) {
-        try {
-          final authRes = await client.auth.signInWithIdToken(
-            provider: OAuthProvider.google,
-            idToken: idToken,
-            accessToken: accessToken,
-          );
-          if (authRes.user != null) {
-            final profile = await getCurrentUser();
-            if (profile != null) {
-              await setActiveUserSession(profile);
-              authNotifier.value = profile;
-              return true;
-            }
-          }
-        } catch (idTokenErr) {
-          debugPrint('Supabase mobile signInWithIdToken note: $idTokenErr');
-        }
-      }
-
-      // 2. Verified Native Google Profile Activation (completes in-app login natively)
       final String userEmail = googleUser.email.trim().toLowerCase();
       final String userName = (googleUser.displayName != null && googleUser.displayName!.trim().isNotEmpty)
           ? googleUser.displayName!.trim()
           : (userEmail.contains('@') ? userEmail.split('@').first : 'Aspirant');
       final String? rawPhoto = googleUser.photoUrl;
       final String? avatarUri = rawPhoto != null ? (await downloadAndCompressAvatar(rawPhoto) ?? rawPhoto) : null;
-      final String userId = googleUser.id.isNotEmpty
-          ? '00000000-0000-4000-a000-${googleUser.id.padLeft(12, '0').substring(0, 12)}'
-          : 'usr-g-${DateTime.now().millisecondsSinceEpoch}';
 
+      final String rawGId = googleUser.id.replaceAll(RegExp(r'[^0-9a-fA-F]'), '');
+      final String userId = rawGId.length >= 12
+          ? '00000000-0000-4000-a000-${rawGId.substring(rawGId.length - 12)}'
+          : toValidUuid('usr_g_${googleUser.id}');
+
+      // 1. Attempt Supabase cloud Auth ID token exchange if token is present
+      try {
+        final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+        if (googleAuth.idToken != null && googleAuth.idToken!.isNotEmpty) {
+          final authRes = await client.auth.signInWithIdToken(
+            provider: OAuthProvider.google,
+            idToken: googleAuth.idToken!,
+            accessToken: googleAuth.accessToken,
+          );
+          if (authRes.user != null) {
+            final cloudProfile = await getCurrentUser();
+            if (cloudProfile != null) {
+              await setActiveUserSession(cloudProfile);
+              authNotifier.value = cloudProfile;
+              return true;
+            }
+          }
+        }
+      } catch (idErr) {
+        debugPrint('Supabase cloud idToken verification note: $idErr');
+      }
+
+      // 2. Native Verified User Activation inside Mobile App
       final mobileProfile = UserProfileModel(
         id: userId,
         email: userEmail,
@@ -594,6 +575,7 @@ class SupabaseService {
           'target_exam': 'NEET',
           'target_year': 2026,
           'role': mobileProfile.role,
+          'updated_at': DateTime.now().toIso8601String(),
         }, onConflict: 'email');
       } catch (e) {
         debugPrint('Notice syncing mobile native profile to Supabase: $e');
