@@ -7626,7 +7626,20 @@ class SupabaseService {
     final now = DateTime.now();
     final expiry = now.add(const Duration(days: 365));
 
-    // 1. Call server-side atomic fulfillment RPC
+    // 1. Primary update orders table
+    try {
+      await client.from('orders').update({
+        'status': 'completed',
+        'payment_status': 'completed',
+        'payment_id': paymentId,
+        'payment_method': paymentMethod,
+        'updated_at': now.toIso8601String(),
+      }).or('id.eq.$orderId,order_number.eq.$orderId,payment_reference.eq.$orderId');
+    } catch (e) {
+      debugPrint('Notice updating orders table status: $e');
+    }
+
+    // 2. Call server-side atomic fulfillment RPC if available
     try {
       await client.rpc('approve_and_fulfill_order', params: {
         'p_order_id': orderId,
@@ -7635,6 +7648,62 @@ class SupabaseService {
       });
     } catch (e) {
       debugPrint('Notice server approve_and_fulfill_order RPC: $e');
+    }
+
+    // 3. Multi-channel status update in notification_logs (updates JSON message_body status)
+    try {
+      final logsRes = await client.from('notification_logs').select('*').eq('type', 'order_placed');
+      if (logsRes is List) {
+        for (var log in logsRes.whereType<Map>()) {
+          final bodyStr = (log['message_body'] ?? '').toString();
+          if (bodyStr.contains(orderId) || log['subject']?.toString().contains(orderId) == true) {
+            try {
+              final Map<String, dynamic> m = Map<String, dynamic>.from(jsonDecode(bodyStr));
+              m['status'] = 'completed';
+              m['payment_status'] = 'completed';
+              await client.from('notification_logs').update({
+                'status': 'completed',
+                'message_body': jsonEncode(m),
+              }).eq('id', log['id']);
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice updating notification_logs: $e');
+    }
+
+    // 4. Update abandoned_carts table status
+    try {
+      if (user.email.isNotEmpty) {
+        await client.from('abandoned_carts').update({
+          'recovery_status': 'completed',
+          'updated_at': now.toIso8601String(),
+        }).eq('user_email', user.email.trim().toLowerCase());
+      }
+    } catch (e) {
+      debugPrint('Notice updating abandoned_carts: $e');
+    }
+
+    // 5. Multi-channel local cache update
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (var keyName in ['cosmyra_saved_admin_orders', 'cosmyra_user_orders']) {
+        final str = prefs.getString(keyName);
+        if (str != null && str.isNotEmpty) {
+          final List list = jsonDecode(str);
+          for (var item in list.whereType<Map>()) {
+            final ordId = (item['order_number'] ?? item['order_id'] ?? item['id'] ?? '').toString();
+            if (ordId == orderId || ordId.contains(orderId) || orderId.contains(ordId)) {
+              item['status'] = 'completed';
+              item['payment_status'] = 'completed';
+            }
+          }
+          await prefs.setString(keyName, jsonEncode(list));
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice updating local order caches: $e');
     }
 
     final List<Map<String, dynamic>> grantedEntitlements = [];
@@ -8558,14 +8627,38 @@ class SupabaseService {
       try {
         await client.from('orders').update({
           'status': newStatus,
+          'payment_status': newStatus,
           'notes': adminNote ?? 'Updated by Admin',
           'updated_at': DateTime.now().toIso8601String(),
-        }).or('id.eq.$orderId,order_number.eq.$orderId');
+        }).or('id.eq.$orderId,order_number.eq.$orderId,payment_reference.eq.$orderId');
       } catch (e) {
         debugPrint('Notice updating Supabase order status: $e');
       }
 
-      // If completed, ensure entitlement access is granted to student in entitlements table
+      // 2. Update status in notification_logs table (updates JSON message_body status)
+      try {
+        final logsRes = await client.from('notification_logs').select('*').eq('type', 'order_placed');
+        if (logsRes is List) {
+          for (var log in logsRes.whereType<Map>()) {
+            final bodyStr = (log['message_body'] ?? '').toString();
+            if (bodyStr.contains(orderId) || log['subject']?.toString().contains(orderId) == true) {
+              try {
+                final Map<String, dynamic> m = Map<String, dynamic>.from(jsonDecode(bodyStr));
+                m['status'] = newStatus;
+                m['payment_status'] = newStatus;
+                await client.from('notification_logs').update({
+                  'status': newStatus,
+                  'message_body': jsonEncode(m),
+                }).eq('id', log['id']);
+              } catch (_) {}
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Notice updating notification_logs status: $e');
+      }
+
+      // 3. If completed, ensure entitlement access is granted to student in entitlements table
       if (newStatus == 'completed') {
         try {
           final res = await client.from('orders').select().or('id.eq.$orderId,order_number.eq.$orderId').maybeSingle();
@@ -8595,19 +8688,22 @@ class SupabaseService {
         }
       }
 
-      // 2. Update local SharedPreferences cache
+      // 4. Update local SharedPreferences caches
       final prefs = await SharedPreferences.getInstance();
-      final str = prefs.getString(_ordersCacheKey);
-      if (str != null && str.isNotEmpty) {
-        List list = jsonDecode(str);
-        for (var o in list) {
-          if (o['id'] == orderId || o['order_number'] == orderId || o['order_id'] == orderId) {
-            o['status'] = newStatus;
-            o['payment_status'] = newStatus;
-            if (adminNote != null) o['notes'] = adminNote;
+      for (var keyName in ['cosmyra_user_orders', 'cosmyra_saved_admin_orders']) {
+        final str = prefs.getString(keyName);
+        if (str != null && str.isNotEmpty) {
+          List list = jsonDecode(str);
+          for (var o in list) {
+            final ordId = (o['order_number'] ?? o['order_id'] ?? o['id'] ?? '').toString();
+            if (ordId == orderId || ordId.contains(orderId) || orderId.contains(ordId)) {
+              o['status'] = newStatus;
+              o['payment_status'] = newStatus;
+              if (adminNote != null) o['notes'] = adminNote;
+            }
           }
+          await prefs.setString(keyName, jsonEncode(list));
         }
-        await prefs.setString(_ordersCacheKey, jsonEncode(list));
       }
       return true;
     } catch (e) {
@@ -8618,17 +8714,33 @@ class SupabaseService {
 
   static Future<bool> deleteAdminOrder(String orderId) async {
     try {
-      await client.from('orders').delete().or('id.eq.$orderId,order_number.eq.$orderId');
+      await client.from('orders').delete().or('id.eq.$orderId,order_number.eq.$orderId,payment_reference.eq.$orderId');
     } catch (e) {
       debugPrint('Notice deleting order from Supabase: $e');
     }
     try {
+      final logsRes = await client.from('notification_logs').select('*').eq('type', 'order_placed');
+      if (logsRes is List) {
+        for (var log in logsRes.whereType<Map>()) {
+          final bodyStr = (log['message_body'] ?? '').toString();
+          if (bodyStr.contains(orderId) || log['subject']?.toString().contains(orderId) == true) {
+            await client.from('notification_logs').delete().eq('id', log['id']);
+          }
+        }
+      }
+    } catch (_) {}
+    try {
       final prefs = await SharedPreferences.getInstance();
-      final str = prefs.getString(_ordersCacheKey);
-      if (str != null && str.isNotEmpty) {
-        List list = jsonDecode(str);
-        list.removeWhere((o) => o['id'] == orderId || o['order_number'] == orderId || o['order_id'] == orderId);
-        await prefs.setString(_ordersCacheKey, jsonEncode(list));
+      for (var keyName in ['cosmyra_user_orders', 'cosmyra_saved_admin_orders']) {
+        final str = prefs.getString(keyName);
+        if (str != null && str.isNotEmpty) {
+          List list = jsonDecode(str);
+          list.removeWhere((o) {
+            final ordId = (o['order_number'] ?? o['order_id'] ?? o['id'] ?? '').toString();
+            return ordId == orderId || ordId.contains(orderId) || orderId.contains(ordId);
+          });
+          await prefs.setString(keyName, jsonEncode(list));
+        }
       }
     } catch (_) {}
     return true;
