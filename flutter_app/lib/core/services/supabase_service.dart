@@ -7964,10 +7964,14 @@ class SupabaseService {
       if (cartRes is List) {
         for (var cart in cartRes.whereType<Map>()) {
           final email = (cart['user_email'] ?? '').toString();
-          final phone = (cart['user_phone'] ?? '').toString();
+          final phone = (cart['user_phone'] ?? cart['student_phone'] ?? '').toString();
+          final name = (cart['user_name'] ?? cart['student_name'] ?? (email.contains('@') ? email.split('@').first : 'Student Aspirant')).toString();
+          final address = (cart['address'] ?? cart['shipping_address'] ?? cart['notes'] ?? '').toString();
           final createdAt = (cart['created_at'] ?? DateTime.now().toIso8601String()).toString();
           final rawCartId = (cart['id'] ?? '').toString();
           final recStatus = (cart['recovery_status'] ?? '').toString().toLowerCase();
+          final cartItems = cart['cart_items'] is List ? (cart['cart_items'] as List) : [];
+          final productTitle = cartItems.isNotEmpty ? (cartItems[0]['title'] ?? cartItems[0]['product_name'] ?? 'NEET / JEE Test Package') : (cart['product_name'] ?? 'NEET / JEE Test Package');
 
           String effectiveStatus = 'pending_verification';
           if (recStatus == 'completed' || recStatus == 'verified' || recStatus == 'approved' || recStatus == 'paid') {
@@ -7988,9 +7992,12 @@ class SupabaseService {
               'user_email': email,
               'student_phone': phone,
               'user_phone': phone,
-              'student_name': email.contains('@') ? email.split('@').first : 'Student Aspirant',
-              'user_name': email.contains('@') ? email.split('@').first : 'Student Aspirant',
-              'product_name': 'NEET / JEE Test Package',
+              'student_name': name,
+              'user_name': name,
+              'address': address,
+              'shipping_address': address,
+              'product_name': productTitle,
+              'items': cartItems,
               'total_amount': (cart['subtotal'] as num?)?.toDouble() ?? 299.00,
               'subtotal_amount': (cart['subtotal'] as num?)?.toDouble() ?? 299.00,
               'discount_amount': 0.00,
