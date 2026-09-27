@@ -7809,6 +7809,30 @@ class SupabaseService {
     final List<Map<String, dynamic>> orders = [];
     final Set<String> seenKeys = {};
 
+    void addOrderKeys(String rawKey) {
+      final k = rawKey.trim();
+      if (k.isEmpty) return;
+      seenKeys.add(k);
+      seenKeys.add(k.toLowerCase());
+      final stripped = k.replaceAll(RegExp(r'^(ORD_|ENT_|SUB_|CART_|ord_|ent_|sub_|cart_)', caseSensitive: false), '');
+      if (stripped.isNotEmpty) {
+        seenKeys.add(stripped);
+        seenKeys.add(stripped.toLowerCase());
+        seenKeys.add('ORD_$stripped');
+        seenKeys.add('ENT_$stripped');
+        seenKeys.add('SUB_$stripped');
+        seenKeys.add('CART_$stripped');
+      }
+    }
+
+    bool hasSeenKey(String rawKey) {
+      final k = rawKey.trim();
+      if (k.isEmpty) return false;
+      if (seenKeys.contains(k) || seenKeys.contains(k.toLowerCase())) return true;
+      final stripped = k.replaceAll(RegExp(r'^(ORD_|ENT_|SUB_|CART_|ord_|ent_|sub_|cart_)', caseSensitive: false), '');
+      return seenKeys.contains(stripped) || seenKeys.contains(stripped.toLowerCase());
+    }
+
     // 1. Fetch from Supabase `orders` table
     try {
       var query = client.from('orders').select();
@@ -7820,8 +7844,8 @@ class SupabaseService {
         for (var item in res.whereType<Map>()) {
           final m = Map<String, dynamic>.from(item);
           final key = (m['payment_reference'] ?? m['order_number'] ?? m['order_id'] ?? m['id'] ?? '').toString();
-          if (key.isNotEmpty && !seenKeys.contains(key)) {
-            seenKeys.add(key);
+          if (key.isNotEmpty && !hasSeenKey(key)) {
+            addOrderKeys(key);
             orders.add(m);
           }
         }
@@ -7839,10 +7863,9 @@ class SupabaseService {
           final title = (ent['product_title'] ?? 'NEET & JEE Test Series Package').toString();
           final createdAt = (ent['created_at'] ?? DateTime.now().toIso8601String()).toString();
           final rawEntId = (ent['order_id'] ?? ent['id'] ?? '').toString();
-          final entKey = 'ENT_$rawEntId';
 
-          if (!seenKeys.contains(entKey) && !seenKeys.contains(rawEntId)) {
-            seenKeys.add(entKey);
+          if (rawEntId.isNotEmpty && !hasSeenKey(rawEntId)) {
+            addOrderKeys(rawEntId);
             final displayOrderId = rawEntId.length >= 8 ? 'ORD_${rawEntId.substring(0, 8).toUpperCase()}' : 'ORD_$rawEntId';
             orders.add({
               'id': rawEntId,
@@ -7881,10 +7904,9 @@ class SupabaseService {
           final title = (sub['plan_title'] ?? 'Cosmyra Pro Subscription').toString();
           final createdAt = (sub['created_at'] ?? DateTime.now().toIso8601String()).toString();
           final rawSubId = (sub['id'] ?? '').toString();
-          final subKey = 'SUB_$rawSubId';
 
-          if (!seenKeys.contains(subKey) && !seenKeys.contains(rawSubId)) {
-            seenKeys.add(subKey);
+          if (rawSubId.isNotEmpty && !hasSeenKey(rawSubId)) {
+            addOrderKeys(rawSubId);
             final displayOrderId = rawSubId.length >= 8 ? 'SUB_${rawSubId.substring(0, 8).toUpperCase()}' : 'SUB_$rawSubId';
             orders.add({
               'id': rawSubId,
@@ -7924,8 +7946,8 @@ class SupabaseService {
             try {
               final Map<String, dynamic> parsedOrder = Map<String, dynamic>.from(jsonDecode(bodyStr));
               final key = (parsedOrder['payment_reference'] ?? parsedOrder['order_number'] ?? parsedOrder['order_id'] ?? parsedOrder['id'] ?? '').toString();
-              if (key.isNotEmpty && !seenKeys.contains(key)) {
-                seenKeys.add(key);
+              if (key.isNotEmpty && !hasSeenKey(key)) {
+                addOrderKeys(key);
                 orders.add(parsedOrder);
               }
             } catch (_) {}
@@ -7938,17 +7960,24 @@ class SupabaseService {
 
     // 5. Synthesize orders from `abandoned_carts` table (open FOR ALL USING (true))
     try {
-      final cartRes = await client.from('abandoned_carts').select('*').eq('recovery_status', 'order_placed').order('created_at', ascending: false);
+      final cartRes = await client.from('abandoned_carts').select('*').order('created_at', ascending: false);
       if (cartRes is List) {
         for (var cart in cartRes.whereType<Map>()) {
           final email = (cart['user_email'] ?? '').toString();
           final phone = (cart['user_phone'] ?? '').toString();
           final createdAt = (cart['created_at'] ?? DateTime.now().toIso8601String()).toString();
           final rawCartId = (cart['id'] ?? '').toString();
-          final cartKey = 'CART_$rawCartId';
+          final recStatus = (cart['recovery_status'] ?? '').toString().toLowerCase();
 
-          if (!seenKeys.contains(cartKey) && !seenKeys.contains(rawCartId)) {
-            seenKeys.add(cartKey);
+          String effectiveStatus = 'pending_verification';
+          if (recStatus == 'completed' || recStatus == 'verified' || recStatus == 'approved' || recStatus == 'paid') {
+            effectiveStatus = 'completed';
+          } else if (recStatus == 'cancelled' || recStatus == 'refunded' || recStatus == 'rejected') {
+            effectiveStatus = recStatus;
+          }
+
+          if (rawCartId.isNotEmpty && !hasSeenKey(rawCartId)) {
+            addOrderKeys(rawCartId);
             final displayOrderId = rawCartId.length >= 8 ? 'ORD_${rawCartId.substring(0, 8).toUpperCase()}' : 'ORD_$rawCartId';
             orders.add({
               'id': rawCartId,
@@ -7966,8 +7995,8 @@ class SupabaseService {
               'subtotal_amount': (cart['subtotal'] as num?)?.toDouble() ?? 299.00,
               'discount_amount': 0.00,
               'coupon_code': '',
-              'status': 'pending_verification',
-              'payment_status': 'pending_verification',
+              'status': effectiveStatus,
+              'payment_status': effectiveStatus,
               'payment_method': 'UPI',
               'payment_id': 'pay_cart_${rawCartId.length > 8 ? rawCartId.substring(0, 8) : rawCartId}',
               'payment_reference': displayOrderId,
@@ -7990,8 +8019,8 @@ class SupabaseService {
           for (var item in list.whereType<Map>()) {
             final m = Map<String, dynamic>.from(item);
             final key = (m['payment_reference'] ?? m['order_number'] ?? m['order_id'] ?? m['id'] ?? '').toString();
-            if (key.isNotEmpty && !seenKeys.contains(key)) {
-              seenKeys.add(key);
+            if (key.isNotEmpty && !hasSeenKey(key)) {
+              addOrderKeys(key);
               orders.add(m);
             }
           }
