@@ -480,6 +480,12 @@ final GoRouter appRouter = GoRouter(
       ),
     ),
     GoRoute(
+      path: '/test-series/:id',
+      builder: (context, state) => ProductDetailScreen(
+        productId: state.pathParameters['id'] ?? 'ts_neet_all_india_2026',
+      ),
+    ),
+    GoRoute(
       path: '/cart',
       builder: (context, state) => const CartScreen(),
     ),

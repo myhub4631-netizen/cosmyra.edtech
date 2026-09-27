@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -650,6 +651,46 @@ class _AdminTestSeriesManagerScreenState extends State<AdminTestSeriesManagerScr
             ),
           ),
 
+          // Product URL Badge
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF2FF),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFC7D2FE)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.shopping_bag_outlined, size: 12, color: Color(0xFF4338CA)),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    'neet-jee.in/product/$sId',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF3730A3)),
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: 'https://neet-jee.in/product/$sId'));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('✓ Copied Product Link: https://neet-jee.in/product/$sId'),
+                        backgroundColor: const Color(0xFF10B981),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4),
+                    child: Icon(Icons.copy_rounded, size: 13, color: Color(0xFF4F46E5)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           const Divider(height: 1, color: Color(0xFFF1F5F9)),
 
           // 3. Action Buttons Row
@@ -676,6 +717,12 @@ class _AdminTestSeriesManagerScreenState extends State<AdminTestSeriesManagerScr
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // View Product Page
+                    IconButton(
+                      icon: const Icon(Icons.open_in_new_rounded, size: 18, color: Color(0xFF4F46E5)),
+                      tooltip: 'View Product Page',
+                      onPressed: () => context.push('/product/$sId'),
+                    ),
                     // Edit
                     IconButton(
                       icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
@@ -758,6 +805,7 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
   late TabController _tabController;
   final _formKey = GlobalKey<FormState>();
   bool _isSaving = false;
+  late String _seriesId;
 
   // Basic & Pricing Controllers
   late TextEditingController _titleCtrl;
@@ -821,12 +869,23 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     _tabController = TabController(length: 5, vsync: this);
 
     final d = widget.initialData ?? {};
+    _seriesId = (d['id'] != null && d['id'].toString().isNotEmpty)
+        ? d['id'].toString()
+        : SupabaseService.toValidUuid('ts_${DateTime.now().microsecondsSinceEpoch}');
+
     _titleCtrl = TextEditingController(text: d['title'] ?? d['name'] ?? '');
     _descCtrl = TextEditingController(text: d['description'] ?? 'Curated test series for comprehensive exam readiness.');
     _bannerCtrl = TextEditingController(text: d['banner_image_url'] ?? _sampleBanners[0]);
     _priceCtrl = TextEditingController(text: (d['price'] ?? 299).toString());
     _origPriceCtrl = TextEditingController(text: (d['original_price'] ?? 999).toString());
-    _linkCtrl = TextEditingController(text: d['purchase_link'] ?? 'https://neet-jee.in/test-series');
+
+    final defaultProductUrl = 'https://neet-jee.in/product/$_seriesId';
+    final existingLink = (d['purchase_link'] ?? '').toString();
+    final linkText = (existingLink.isNotEmpty && existingLink != 'https://neet-jee.in/test-series')
+        ? existingLink
+        : defaultProductUrl;
+    _linkCtrl = TextEditingController(text: linkText);
+
     _buttonTextCtrl = TextEditingController(text: d['purchase_button_text'] ?? 'Join');
     _testCountCtrl = TextEditingController(text: (d['test_count'] ?? 10).toString());
     _questionCountCtrl = TextEditingController(text: (d['question_count'] ?? 200).toString());
@@ -961,9 +1020,12 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     setState(() => _isSaving = true);
 
     final isEdit = widget.initialData != null && widget.initialData!['id'] != null;
-    final seriesId = isEdit
-        ? widget.initialData!['id'].toString()
-        : SupabaseService.toValidUuid('ts_${DateTime.now().microsecondsSinceEpoch}_${_titleCtrl.text.trim()}');
+    final seriesId = isEdit ? widget.initialData!['id'].toString() : _seriesId;
+    final productUrl = 'https://neet-jee.in/product/$seriesId';
+    final checkoutUrl = 'https://neet-jee.in/checkout?productId=$seriesId';
+    final purchaseLink = (_linkCtrl.text.trim().isNotEmpty && _linkCtrl.text.trim() != 'https://neet-jee.in/test-series')
+        ? _linkCtrl.text.trim()
+        : productUrl;
 
     final data = {
       'id': seriesId,
@@ -978,7 +1040,9 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
       'is_free': _isFree,
       'price': double.tryParse(_priceCtrl.text) ?? 299.0,
       'original_price': double.tryParse(_origPriceCtrl.text) ?? 999.0,
-      'purchase_link': _linkCtrl.text.trim(),
+      'purchase_link': purchaseLink,
+      'product_url': productUrl,
+      'checkout_url': checkoutUrl,
       'purchase_button_text': _buttonTextCtrl.text.trim().isNotEmpty ? _buttonTextCtrl.text.trim() : 'Join',
       'show_purchase_button': _showPurchaseButton,
       'test_count': _tests.isNotEmpty ? _tests.length : (int.tryParse(_testCountCtrl.text) ?? 1),
@@ -1927,6 +1991,109 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
           // Section 3: Pricing & Purchase Links
           _buildSectionHeading('3. Pricing, Purchase Links & Buttons'),
           const SizedBox(height: 12),
+
+          // Dedicated Product Page & Mobile App Screen Link Banner
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF0FDF4), Color(0xFFECFDF5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFA7F3D0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(Icons.storefront_rounded, color: Color(0xFF059669), size: 18),
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Dedicated Product Page & Mobile App Screen',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF065F46)),
+                          ),
+                          Text(
+                            'Creates a dedicated public website page & native app screen with full description, syllabus, tests & reviews.',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF047857)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFD1FAE5)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.link_rounded, size: 16, color: Color(0xFF059669)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: SelectableText(
+                          'https://neet-jee.in/product/$_seriesId',
+                          style: GoogleFonts.firaCode(fontSize: 11.5, color: const Color(0xFF047857), fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: 'https://neet-jee.in/product/$_seriesId'));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('✓ Copied product page link to clipboard!'),
+                              backgroundColor: Color(0xFF10B981),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.copy_rounded, size: 14, color: Color(0xFF059669)),
+                        label: const Text('Copy Link', style: TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(width: 6),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF059669),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        onPressed: () => context.push('/product/$_seriesId'),
+                        icon: const Icon(Icons.open_in_new_rounded, size: 13, color: Colors.white),
+                        label: const Text('Preview Page', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
           SwitchListTile(
             title: const Text('Is this Test Series 100% Free?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
             subtitle: const Text('Toggle on if students can access this test series without purchasing', style: TextStyle(fontSize: 11)),

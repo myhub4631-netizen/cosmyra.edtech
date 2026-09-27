@@ -4830,9 +4830,18 @@ class SupabaseService {
   static Future<Map<String, dynamic>> saveTestSeries(Map<String, dynamic> seriesData) async {
     final String seriesId = seriesData['id'] ?? toValidUuid('ts_${DateTime.now().millisecondsSinceEpoch}');
     final String title = (seriesData['title'] ?? seriesData['name'] ?? 'NEET Test Series').toString().trim();
+    final String slug = (seriesData['slug']?.toString().trim().isNotEmpty == true)
+        ? seriesData['slug'].toString().trim()
+        : title.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-|-$'), '');
+    final String productPageUrl = 'https://neet-jee.in/product/$seriesId';
+    String purchaseLink = (seriesData['purchase_link'] ?? seriesData['purchaseLink'] ?? '').toString().trim();
+    if (purchaseLink.isEmpty || purchaseLink == 'https://neet-jee.in/test-series' || purchaseLink == '/test-series') {
+      purchaseLink = productPageUrl;
+    }
 
     final fullData = {
       'id': seriesId,
+      'slug': slug,
       'title': title,
       'name': title,
       'description': seriesData['description'] ?? 'Curated test series for comprehensive exam readiness.',
@@ -4844,7 +4853,9 @@ class SupabaseService {
       'price': (seriesData['price'] is num) ? (seriesData['price'] as num).toDouble() : (double.tryParse(seriesData['price']?.toString() ?? '299') ?? 299.0),
       'original_price': (seriesData['original_price'] is num) ? (seriesData['original_price'] as num).toDouble() : (double.tryParse(seriesData['original_price']?.toString() ?? seriesData['originalPrice']?.toString() ?? '999') ?? 999.0),
       'currency': seriesData['currency'] ?? 'INR',
-      'purchase_link': seriesData['purchase_link'] ?? seriesData['purchaseLink'] ?? 'https://neet-jee.in/test-series',
+      'purchase_link': purchaseLink,
+      'product_url': productPageUrl,
+      'checkout_url': 'https://neet-jee.in/checkout?productId=$seriesId',
       'purchase_button_text': seriesData['purchase_button_text'] ?? seriesData['purchaseButtonText'] ?? 'Enroll Now',
       'show_purchase_button': seriesData['show_purchase_button'] != false && seriesData['showPurchaseButton'] != false,
       'long_description': seriesData['long_description'] ?? seriesData['longDescription'] ?? '',
@@ -4971,7 +4982,31 @@ class SupabaseService {
       }
     }
 
-    // 3. Persist to SharedPreferences cache
+    // 3. Persist to Supabase system_config table ('admin_custom_test_series') for 100% reliable cloud sync
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('cosmyra_saved_test_series') ?? '[]';
+      List<dynamic> existingList = [];
+      try {
+        existingList = jsonDecode(raw);
+      } catch (_) {}
+      final List<Map<String, dynamic>> cloudList = existingList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      final idx = cloudList.indexWhere((item) => item['id'] == seriesId || item['title'] == title);
+      if (idx != -1) {
+        cloudList[idx] = fullData;
+      } else {
+        cloudList.insert(0, fullData);
+      }
+      await client.from('system_config').upsert({
+        'key': 'admin_custom_test_series',
+        'value': cloudList,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'key');
+    } catch (e) {
+      debugPrint('Notice saving test series to system_config: $e');
+    }
+
+    // 4. Persist to SharedPreferences cache
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString('cosmyra_saved_test_series') ?? '[]';
@@ -5016,7 +5051,24 @@ class SupabaseService {
       debugPrint('Notice deleting from tests: $e');
     }
 
-    // 3. Delete from local cache and add to deleted blacklist
+    // 3. Delete from Supabase system_config ('admin_custom_test_series')
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('cosmyra_saved_test_series') ?? '[]';
+      List<dynamic> existingList = [];
+      try {
+        existingList = jsonDecode(raw);
+      } catch (_) {}
+      final List<Map<String, dynamic>> cloudList = existingList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      cloudList.removeWhere((item) => item['id'] == seriesId);
+      await client.from('system_config').upsert({
+        'key': 'admin_custom_test_series',
+        'value': cloudList,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'key');
+    } catch (_) {}
+
+    // 4. Delete from local cache and add to deleted blacklist
     try {
       final prefs = await SharedPreferences.getInstance();
       final deletedList = prefs.getStringList('cosmyra_deleted_test_series') ?? [];
@@ -5362,6 +5414,38 @@ class SupabaseService {
       final prefs = await SharedPreferences.getInstance();
       deletedIds = (prefs.getStringList('cosmyra_deleted_test_series') ?? []).toSet();
     } catch (_) {}
+
+    // 0. Fetch from Supabase system_config table ('admin_custom_test_series')
+    try {
+      final res = await client
+          .from('system_config')
+          .select('value')
+          .eq('key', 'admin_custom_test_series')
+          .maybeSingle();
+      if (res != null && res['value'] != null) {
+        final raw = res['value'];
+        List<dynamic> items = [];
+        if (raw is List) {
+          items = raw;
+        } else if (raw is String && raw.trim().isNotEmpty) {
+          try {
+            items = jsonDecode(raw) as List;
+          } catch (_) {}
+        }
+        for (var item in items) {
+          if (item is Map) {
+            final map = Map<String, dynamic>.from(item);
+            final sId = map['id']?.toString() ?? '';
+            if (sId.isNotEmpty && !seenIds.contains(sId) && !deletedIds.contains(sId)) {
+              seenIds.add(sId);
+              list.add(map);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice querying system_config for test series: $e');
+    }
 
     // 1. Fetch from Supabase test_series table
     try {
