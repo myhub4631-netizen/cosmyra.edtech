@@ -27,6 +27,7 @@ import '../services/cart_service.dart';
 import '../../features/tests/mock_tests_screen.dart';
 import '../../features/tests/test_screen.dart';
 import '../../features/tests/test_result_screen.dart';
+import '../../features/student/subscription_pricing_screen.dart';
 import '../../features/tests/my_tests_history_screen.dart';
 import '../../features/practice/practice_screen.dart';
 import '../../features/practice/custom_practice_wizard.dart';
@@ -481,6 +482,18 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/cart',
       builder: (context, state) => const CartScreen(),
+    ),
+    GoRoute(
+      path: '/pricing',
+      builder: (context, state) => const SubscriptionPricingScreen(),
+    ),
+    GoRoute(
+      path: '/plans',
+      builder: (context, state) => const SubscriptionPricingScreen(),
+    ),
+    GoRoute(
+      path: '/subscription-plans',
+      builder: (context, state) => const SubscriptionPricingScreen(),
     ),
     GoRoute(
       path: '/checkout',

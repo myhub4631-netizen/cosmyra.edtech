@@ -5719,6 +5719,170 @@ class SupabaseService {
     } catch (_) {}
   }
 
+  /// Default subscription plan tiers for Cosmyra NEET/JEE
+  static List<Map<String, dynamic>> get defaultSubscriptionPlans => [
+    {
+      'id': 'plan_trial',
+      'title': 'Trial Pass',
+      'duration_title': '1 Month',
+      'duration_days': 30,
+      'badge': 'Trial',
+      'badge_color': 0xFFF59E0B,
+      'price': 99.0,
+      'original_price': 199.0,
+      'billing_period': '/ month',
+      'description': 'Try Cosmyra for 30 days with limited access.',
+      'status': 'Active',
+      'is_active': true,
+      'is_popular': false,
+      'max_questions_per_day': '100',
+      'mock_tests': '5 / Month',
+      'features_count': 15,
+      'icon_type': 'star',
+      'features': [
+        '30 Days Full Access',
+        '100 Questions Practice / Day',
+        '5 Full Syllabus Mock Tests / Month',
+        'Chapter-wise Basic Practice',
+        'Answer Explanations & Solutions',
+        'Basic Performance Analytics',
+        'Mobile App & Web Access',
+      ],
+    },
+    {
+      'id': 'plan_starter',
+      'title': 'Starter',
+      'duration_title': '4 Months',
+      'duration_days': 120,
+      'badge': 'Starter',
+      'badge_color': 0xFF10B981,
+      'price': 249.0,
+      'original_price': 499.0,
+      'billing_period': '/ 4 months',
+      'description': 'Short-term plan for focused preparation.',
+      'status': 'Active',
+      'is_active': true,
+      'is_popular': false,
+      'max_questions_per_day': 'Unlimited',
+      'mock_tests': '10 / Month',
+      'features_count': 22,
+      'icon_type': 'rocket',
+      'features': [
+        '120 Days Uninterrupted Access',
+        'Unlimited Question Practice Daily',
+        '10 All-India Mock Tests / Month',
+        'Previous 5 Years NTA PYQs',
+        'Topic-wise High Yield Drills',
+        'Subject-wise Accuracy Breakdown',
+        'Doubt Clearance Community Access',
+        'Revision Bookmarks & Notes',
+      ],
+    },
+    {
+      'id': 'plan_pro',
+      'title': 'Pro',
+      'duration_title': '8 Months',
+      'duration_days': 240,
+      'badge': 'Most Popular',
+      'badge_color': 0xFF8B5CF6,
+      'price': 449.0,
+      'original_price': 999.0,
+      'billing_period': '/ 8 months',
+      'description': 'Best for serious NEET & JEE aspirants.',
+      'status': 'Active',
+      'is_active': true,
+      'is_popular': true,
+      'max_questions_per_day': 'Unlimited',
+      'mock_tests': 'Unlimited',
+      'features_count': 35,
+      'icon_type': 'trophy',
+      'features': [
+        '8 Months Comprehensive Access',
+        'Unlimited Mock Tests & Grand Tests',
+        'AI Weakness & Error Pattern Analysis',
+        'Complete 15-Year Solved PYQ Bank',
+        'All-India Real-Time Rank & Percentile',
+        'Custom Test Creator (by Subject & Chapter)',
+        'NCERT Line-by-Line Question Engine',
+        'Speed & Accuracy Diagnostic Reports',
+        'Priority Doubt Resolution Support',
+      ],
+    },
+    {
+      'id': 'plan_ultimate',
+      'title': 'Ultimate',
+      'duration_title': '1 Year',
+      'duration_days': 365,
+      'badge': 'Ultimate',
+      'badge_color': 0xFF2563EB,
+      'price': 689.0,
+      'original_price': 1499.0,
+      'billing_period': '/ year',
+      'description': 'Complete preparation with advanced AI.',
+      'status': 'Active',
+      'is_active': true,
+      'is_popular': false,
+      'is_best_value': true,
+      'max_questions_per_day': 'Unlimited',
+      'mock_tests': 'Unlimited',
+      'features_count': 50,
+      'icon_type': 'diamond',
+      'features': [
+        '365 Days 360° Complete Exam Pass',
+        'Everything in Pro Plan Included',
+        'Advanced AI Paper Prediction Model',
+        'Downloadable Offline Test PDFs & Keys',
+        'State-Quota & All-India Rank Predictor',
+        '1-on-1 Exam Strategy & Study Mentorship',
+        'All Future Test Series Releases Included',
+        'Full Refund Guarantee if Exam Postponed',
+      ],
+    },
+  ];
+
+  /// Fetch subscription plans dynamically from Supabase
+  static Future<List<Map<String, dynamic>>> fetchSubscriptionPlans() async {
+    try {
+      final res = await client
+          .from('system_config')
+          .select('value')
+          .eq('key', 'subscription_plans')
+          .maybeSingle();
+      if (res != null && res['value'] != null) {
+        final raw = res['value'];
+        List<dynamic> items = [];
+        if (raw is List) {
+          items = raw;
+        } else if (raw is String && raw.trim().isNotEmpty) {
+          try {
+            items = jsonDecode(raw) as List;
+          } catch (_) {}
+        }
+        if (items.isNotEmpty) {
+          return items.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice reading subscription_plans from system_config: $e');
+    }
+    return defaultSubscriptionPlans;
+  }
+
+  /// Save subscription plans to Supabase
+  static Future<bool> saveSubscriptionPlans(List<Map<String, dynamic>> plans) async {
+    try {
+      await client.from('system_config').upsert({
+        'key': 'subscription_plans',
+        'value': plans,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'key');
+      return true;
+    } catch (e) {
+      debugPrint('Error saving subscription plans: $e');
+      return false;
+    }
+  }
+
   /// Fetch questions linked to a specific Test Series or Paper for editing
   static Future<List<Map<String, dynamic>>> fetchQuestionsForTestSeries(String seriesId, {String? paperId}) async {
     final List<Map<String, dynamic>> questions = [];
