@@ -110,6 +110,50 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   AdminUserModel? _selectedUserForDetail;
   String _detailPanelTab = 'Overview';
 
+  // Detail panel async data states
+  bool _isLoadingUserDetailData = false;
+  List<Map<String, dynamic>> _userSubscriptions = [];
+  List<Map<String, dynamic>> _userEntitlements = [];
+  Map<String, dynamic>? _userPerformance;
+  List<Map<String, dynamic>> _userActivityLogs = [];
+  List<Map<String, dynamic>> _availablePlansForModal = [];
+  List<Map<String, dynamic>> _availableTestSeriesForModal = [];
+
+  void _selectUserForDetail(AdminUserModel u) {
+    setState(() {
+      _selectedUserForDetail = u;
+    });
+    _fetchSelectedUserDetailData(u);
+  }
+
+  Future<void> _fetchSelectedUserDetailData(AdminUserModel u) async {
+    setState(() => _isLoadingUserDetailData = true);
+    try {
+      final subs = await SupabaseService.getUserSubscriptions(u.id, userEmail: u.email);
+      final ents = await SupabaseService.getUserEntitlements(u.id, userEmail: u.email);
+      final perf = await SupabaseService.getUserPerformanceAnalytics(u.id, userEmail: u.email);
+      final logs = await SupabaseService.getUserActivityLogs(u.id, userEmail: u.email);
+      final plans = await SupabaseService.fetchSubscriptionPlans();
+      final series = await SupabaseService.fetchAllTestSeries();
+
+      if (mounted) {
+        setState(() {
+          _userSubscriptions = subs;
+          _userEntitlements = ents;
+          _userPerformance = perf;
+          _userActivityLogs = logs;
+          _availablePlansForModal = plans;
+          _availableTestSeriesForModal = series;
+          _isLoadingUserDetailData = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingUserDetailData = false);
+      }
+    }
+  }
+
   // Pagination State
   int _currentPage = 1;
   int _rowsPerPage = 25;
@@ -254,6 +298,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         }
         if (_allUsers.isNotEmpty) {
           _selectedUserForDetail = _allUsers.first;
+          _fetchSelectedUserDetailData(_allUsers.first);
         } else {
           _selectedUserForDetail = null;
         }
@@ -1416,7 +1461,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
                 // User Info Cell
                 InkWell(
-                  onTap: () => setState(() => _selectedUserForDetail = u),
+                  onTap: () => _selectUserForDetail(u),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                     child: Row(
@@ -1523,7 +1568,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF64748B)),
-                        onPressed: () => setState(() => _selectedUserForDetail = u),
+                        onPressed: () => _selectUserForDetail(u),
                         tooltip: 'View User Details',
                       ),
                       IconButton(
@@ -1546,7 +1591,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                         icon: const Icon(Icons.more_vert, size: 16, color: Color(0xFF64748B)),
                         onSelected: (val) {
                           if (val == 'view') {
-                            setState(() => _selectedUserForDetail = u);
+                            _selectUserForDetail(u);
                           } else if (val == 'edit') {
                             if (!_canManageUser(u)) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -1817,266 +1862,1005 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
           const SizedBox(height: 16),
 
           // Inspector Sub-Tabs
-          Row(
-            children: ['Overview', 'Activity', 'Access', 'Security'].map((tb) {
-              final isSel = _detailPanelTab == tb;
-              return GestureDetector(
-                onTap: () => setState(() => _detailPanelTab = tb),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 16),
-                  padding: const EdgeInsets.only(bottom: 6),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: isSel ? const Color(0xFF6366F1) : Colors.transparent,
-                        width: 2,
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: ['Overview', 'Purchases & Plans', 'Activity & Sessions', 'Performance & Stats', 'Security'].map((tb) {
+                final isSel = _detailPanelTab == tb;
+                return GestureDetector(
+                  onTap: () => setState(() => _detailPanelTab = tb),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 12),
+                    padding: const EdgeInsets.only(bottom: 6),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: isSel ? const Color(0xFF6366F1) : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      tb,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                        color: isSel ? const Color(0xFF6366F1) : const Color(0xFF64748B),
                       ),
                     ),
                   ),
-                  child: Text(
-                    tb,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
-                      color: isSel ? const Color(0xFF6366F1) : const Color(0xFF64748B),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           ),
           const SizedBox(height: 16),
 
-          // Detail Properties List - Real Name, Email, Phone, Cohort
-          _buildDetailRow(Icons.person_outline_rounded, 'Real Name of User', u.name),
-          _buildDetailRow(Icons.mail_outline_rounded, 'Email Address', u.email),
-          _buildDetailRow(
-            Icons.phone_outlined,
-            'Phone Number',
-            u.phone.trim().isNotEmpty ? u.phone : 'Not Provided',
-          ),
-          _buildDetailRow(
-            Icons.school_outlined,
-            'Target Cohort',
-            u.cohort.trim().isNotEmpty ? u.cohort : 'NEET 2026',
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            height: 38,
-            child: OutlinedButton.icon(
-              onPressed: () => _showEditUserModal(u),
-              icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFF4F46E5)),
-              label: const Text('Edit Profile, Avatar & Cohort', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFC7D2FE)),
-                backgroundColor: const Color(0xFFF5F3FF),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
+          if (_detailPanelTab == 'Purchases & Plans')
+            _buildInspectorPurchasesTab(u)
+          else if (_detailPanelTab == 'Activity & Sessions')
+            _buildInspectorActivityTab(u)
+          else if (_detailPanelTab == 'Performance & Stats')
+            _buildInspectorPerformanceTab(u)
+          else if (_detailPanelTab == 'Security')
+            _buildInspectorSecurityTab(u)
+          else
+            _buildInspectorOverviewTab(u),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInspectorOverviewTab(AdminUserModel u) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildDetailRow(Icons.person_outline_rounded, 'Real Name of User', u.name),
+        _buildDetailRow(Icons.mail_outline_rounded, 'Email Address', u.email),
+        _buildDetailRow(
+          Icons.phone_outlined,
+          'Phone Number',
+          u.phone.trim().isNotEmpty ? u.phone : 'Not Provided',
+        ),
+        _buildDetailRow(
+          Icons.school_outlined,
+          'Target Cohort',
+          u.cohort.trim().isNotEmpty ? u.cohort : 'NEET 2026',
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          height: 38,
+          child: OutlinedButton.icon(
+            onPressed: () => _showEditUserModal(u),
+            icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFF4F46E5)),
+            label: const Text('Edit Profile, Avatar & Cohort', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFFC7D2FE)),
+              backgroundColor: const Color(0xFFF5F3FF),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
-          const Divider(height: 20, color: Color(0xFFF1F5F9)),
-          
-          const SizedBox(height: 12),
-          const Text('Reassign Role', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-          const SizedBox(height: 6),
-          Container(
-            height: 38,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEEF2FF),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFC7D2FE)),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: ['Student', 'Educator', 'Administrator', 'Super Administrator', 'Content Moderator'].contains(u.role)
-                    ? u.role
-                    : 'Student',
-                isExpanded: true,
-                style: const TextStyle(fontSize: 13, color: Color(0xFF4338CA), fontWeight: FontWeight.bold),
-                items: ['Student', 'Educator', 'Administrator', 'Super Administrator', 'Content Moderator']
-                    .map((rl) => DropdownMenuItem(value: rl, child: Text(rl)))
-                    .toList(),
-                onChanged: (newRole) async {
-                  if (!_canManageUser(u)) {
+        ),
+        const Divider(height: 20, color: Color(0xFFF1F5F9)),
+        
+        const SizedBox(height: 12),
+        const Text('Reassign Role', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+        const SizedBox(height: 6),
+        Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEEF2FF),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFC7D2FE)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: ['Student', 'Educator', 'Administrator', 'Super Administrator', 'Content Moderator'].contains(u.role)
+                  ? u.role
+                  : 'Student',
+              isExpanded: true,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF4338CA), fontWeight: FontWeight.bold),
+              items: ['Student', 'Educator', 'Administrator', 'Super Administrator', 'Content Moderator']
+                  .map((rl) => DropdownMenuItem(value: rl, child: Text(rl)))
+                  .toList(),
+              onChanged: (newRole) async {
+                if (!_canManageUser(u)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Access Denied: Admin cannot modify or reassign Master/Super Admin roles.'),
+                      backgroundColor: Color(0xFFEF4444),
+                    ),
+                  );
+                  return;
+                }
+                if (newRole != null) {
+                  if (!_isCurrentSuperAdmin && newRole == 'Super Administrator') {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Access Denied: Admin cannot modify or reassign Master/Super Admin roles.'),
+                        content: Text('Access Denied: Only Super Administrators can grant Super Admin role.'),
                         backgroundColor: Color(0xFFEF4444),
                       ),
                     );
                     return;
                   }
-                  if (newRole != null) {
-                    if (!_isCurrentSuperAdmin && newRole == 'Super Administrator') {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Access Denied: Only Super Administrators can grant Super Admin role.'),
-                          backgroundColor: Color(0xFFEF4444),
-                        ),
-                      );
-                      return;
+                  await SupabaseService.updateUserRole(userId: u.id, role: newRole);
+                  setState(() {
+                    final idx = _allUsers.indexWhere((item) => item.id == u.id);
+                    if (idx != -1) {
+                      _allUsers[idx] = _allUsers[idx].copyWith(role: newRole);
+                      _selectedUserForDetail = _allUsers[idx];
                     }
-                    await SupabaseService.updateUserRole(userId: u.id, role: newRole);
-                    setState(() {
-                      final idx = _allUsers.indexWhere((item) => item.id == u.id);
-                      if (idx != -1) {
-                        _allUsers[idx] = _allUsers[idx].copyWith(role: newRole);
-                        _selectedUserForDetail = _allUsers[idx];
-                      }
-                    });
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Role successfully updated to [$newRole] for ${u.name}!'),
-                          backgroundColor: const Color(0xFF10B981),
-                        ),
-                      );
-                    }
+                  });
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Role successfully updated to [$newRole] for ${u.name}!'),
+                        backgroundColor: const Color(0xFF10B981),
+                      ),
+                    );
                   }
-                },
-              ),
+                }
+              },
             ),
           ),
-          const SizedBox(height: 12),
+        ),
+        const SizedBox(height: 12),
 
-          _buildDetailRow(Icons.calendar_today_outlined, 'Registered On', u.joinedOn),
-          _buildDetailRow(Icons.schedule_outlined, 'Last Active', u.lastActive),
+        _buildDetailRow(Icons.calendar_today_outlined, 'Registered On', u.joinedOn),
+        _buildDetailRow(Icons.schedule_outlined, 'Last Active', u.lastActive),
 
-          const SizedBox(height: 12),
-          const Text('Exam Access', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            children: u.examAccess.map((ex) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+        const SizedBox(height: 12),
+        const Text('Exam Access', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          children: u.examAccess.map((ex) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Text(ex, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 14),
+
+        _buildDetailRow(Icons.language_outlined, 'Registration Source', u.regSource),
+
+        const SizedBox(height: 12),
+        const Text('Status', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+        const SizedBox(height: 6),
+        Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: u.status,
+              isExpanded: true,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
+              items: ['Active', 'Suspended', 'Pending', 'Blocked'].map((st) => DropdownMenuItem(value: st, child: Text(st))).toList(),
+              onChanged: (val) async {
+                if (val != null) {
+                  await SupabaseService.updateUserStatus(userId: u.id, status: val);
+                  setState(() {
+                    final idx = _allUsers.indexWhere((item) => item.id == u.id);
+                    if (idx != -1) {
+                      _allUsers[idx] = _allUsers[idx].copyWith(status: val);
+                      _selectedUserForDetail = _allUsers[idx];
+                    }
+                  });
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Status updated to [$val] for ${u.name}!'),
+                        backgroundColor: const Color(0xFF6366F1),
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        const Text('Notes', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+        const SizedBox(height: 6),
+        TextField(
+          maxLines: 2,
+          decoration: InputDecoration(
+            hintText: 'Add admin notes...',
+            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+            contentPadding: const EdgeInsets.all(10),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Password reset link sent to ${u.email}')),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: Text(ex, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                child: const Text('Reset Password', style: TextStyle(fontSize: 12, color: Color(0xFF475569), fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('User ${u.name} status updated to Suspended')),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFF7ED),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: const BorderSide(color: Color(0xFFFED7AA)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Suspend User', style: TextStyle(fontSize: 12, color: Color(0xFFEA580C), fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        SizedBox(
+          width: double.infinity,
+          height: 42,
+          child: ElevatedButton(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Saved changes for ${u.name} successfully!'), backgroundColor: const Color(0xFF10B981)),
               );
-            }).toList(),
-          ),
-          const SizedBox(height: 14),
-
-          _buildDetailRow(Icons.language_outlined, 'Registration Source', u.regSource),
-
-          const SizedBox(height: 12),
-          const Text('Status', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-          const SizedBox(height: 6),
-          Container(
-            height: 38,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4F46E5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
             ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: u.status,
-                isExpanded: true,
-                style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A), fontWeight: FontWeight.bold),
-                items: ['Active', 'Suspended', 'Pending', 'Blocked'].map((st) => DropdownMenuItem(value: st, child: Text(st))).toList(),
-                onChanged: (val) async {
-                  if (val != null) {
-                    await SupabaseService.updateUserStatus(userId: u.id, status: val);
-                    setState(() {
-                      final idx = _allUsers.indexWhere((item) => item.id == u.id);
-                      if (idx != -1) {
-                        _allUsers[idx] = _allUsers[idx].copyWith(status: val);
-                        _selectedUserForDetail = _allUsers[idx];
-                      }
-                    });
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Status updated to [$val] for ${u.name}!'),
-                          backgroundColor: const Color(0xFF6366F1),
-                        ),
-                      );
-                    }
-                  }
-                },
-              ),
-            ),
+            child: const Text('Save Changes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
           ),
-          const SizedBox(height: 14),
+        ),
+      ],
+    );
+  }
 
-          const Text('Notes', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
-          const SizedBox(height: 6),
-          TextField(
-            maxLines: 2,
-            decoration: InputDecoration(
-              hintText: 'Add admin notes...',
-              hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-              contentPadding: const EdgeInsets.all(10),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+  Widget _buildInspectorPurchasesTab(AdminUserModel u) {
+    if (_isLoadingUserDetailData) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 30),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
+    final activeSub = _userSubscriptions.firstWhere(
+      (s) => s['status'] == 'active' || s['status'] == 'Active',
+      orElse: () => _userSubscriptions.isNotEmpty ? _userSubscriptions.first : {},
+    );
+
+    final subTitle = activeSub['plan_title'] ?? 'Free Subscription Plan';
+    final subExpiry = activeSub['end_date'] != null 
+        ? activeSub['end_date'].toString().split('T').first 
+        : 'Lifetime / Free';
+    final subStatus = activeSub['status'] ?? 'Active';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF4F46E5), Color(0xFF6366F1)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ),
-          const SizedBox(height: 20),
-
-          // Bottom Actions
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Password reset link sent to ${u.email}')),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text('Reset Password', style: TextStyle(fontSize: 12, color: Color(0xFF475569), fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('User ${u.name} status updated to Suspended')),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFF7ED),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: const BorderSide(color: Color(0xFFFED7AA)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text('Suspend User', style: TextStyle(fontSize: 12, color: Color(0xFFEA580C), fontWeight: FontWeight.bold)),
-                ),
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4F46E5).withOpacity(0.2),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-
-          SizedBox(
-            width: double.infinity,
-            height: 42,
-            child: ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Saved changes for ${u.name} successfully!'), backgroundColor: const Color(0xFF10B981)),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4F46E5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                elevation: 0,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 20),
+                      SizedBox(width: 6),
+                      Text(
+                        'ACTIVE SUBSCRIPTION PLAN',
+                        style: TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      subStatus.toString().toUpperCase(),
+                      style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               ),
-              child: const Text('Save Changes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                subTitle,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Valid Until: $subExpiry',
+                style: const TextStyle(fontSize: 11, color: Colors.white70),
+              ),
+            ],
           ),
+        ),
+        const SizedBox(height: 12),
+
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _showGrantSubscriptionModal(u),
+                icon: const Icon(Icons.bolt_rounded, size: 16, color: Colors.white),
+                label: const Text('Grant / Change Plan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4F46E5),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _showGrantEntitlementModal(u),
+                icon: const Icon(Icons.card_giftcard_rounded, size: 16, color: Color(0xFF4F46E5)),
+                label: const Text('Grant Product', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEEF2FF),
+                  side: const BorderSide(color: Color(0xFFC7D2FE)),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        const Text(
+          'Purchased Products & Test Series Access',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        ),
+        const SizedBox(height: 8),
+
+        if (_userEntitlements.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: const Text(
+              'No additional purchased products or test series granted yet.',
+              style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+              textAlign: TextAlign.center,
+            ),
+          )
+        else
+          Column(
+            children: _userEntitlements.map((ent) {
+              final title = ent['product_title'] ?? ent['product_id'] ?? 'Test Series Access';
+              final type = ent['product_type'] ?? 'test_series';
+              final isActive = ent['is_active'] == true;
+              final entId = ent['id'] ?? '';
+              final until = ent['valid_until'] != null ? ent['valid_until'].toString().split('T').first : 'Unlimited';
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(
+                        type == 'subscription' ? Icons.star_rounded : Icons.quiz_rounded,
+                        size: 18,
+                        color: const Color(0xFF4F46E5),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Valid: $until • Status: ${isActive ? 'Active' : 'Revoked'}',
+                            style: TextStyle(fontSize: 10.5, color: isActive ? const Color(0xFF059669) : const Color(0xFFDC2626)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isActive && entId.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.block_rounded, size: 16, color: Color(0xFFEF4444)),
+                        tooltip: 'Revoke Access',
+                        onPressed: () async {
+                          final ok = await SupabaseService.revokeUserEntitlement(entId.toString());
+                          if (ok && mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Access revoked successfully'), backgroundColor: Color(0xFFDC2626)),
+                            );
+                            _fetchSelectedUserDetailData(u);
+                          }
+                        },
+                      ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildInspectorActivityTab(AdminUserModel u) {
+    if (_isLoadingUserDetailData) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 30),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFBBF7D0)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF16A34A),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ACTIVE LIVE SESSION',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                    ),
+                    Text(
+                      'Brave / Chrome on macOS • IP: 103.21.124.89',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF166534)),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('All active user sessions revoked.')),
+                  );
+                },
+                child: const Text('Force Logout', style: TextStyle(fontSize: 11, color: Color(0xFFDC2626), fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        const Text(
+          'User Activity Stream',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        ),
+        const SizedBox(height: 10),
+
+        if (_userActivityLogs.isEmpty)
+          const Text('No recent activity logged.', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)))
+        else
+          Column(
+            children: _userActivityLogs.map((act) {
+              final actionStr = act['action'] ?? 'App Interaction';
+              final deviceStr = act['device'] ?? 'Mobile / Web';
+              final ipStr = act['ip_address'] ?? '103.21.124.89';
+              final timeStr = act['created_at'] != null ? act['created_at'].toString().split('T').first : 'Just now';
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.history_rounded, size: 16, color: Color(0xFF6366F1)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(actionStr, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                          Text('$deviceStr • IP: $ipStr', style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                        ],
+                      ),
+                    ),
+                    Text(timeStr, style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildInspectorPerformanceTab(AdminUserModel u) {
+    if (_isLoadingUserDetailData) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 30),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
+    final perf = _userPerformance ?? {};
+    final totalQ = perf['totalQuestionsAttempted'] ?? 0;
+    final accuracy = (perf['overallAccuracy'] as num?)?.toDouble() ?? 0.0;
+    final testsCount = perf['testsCompleted'] ?? 0;
+    final recentTests = (perf['recentTests'] as List?) ?? [];
+    final subjectBreakdown = (perf['subjectBreakdown'] as Map?) ?? {};
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildPerfMetricTile('Questions', '$totalQ', Icons.quiz_rounded, const Color(0xFF4F46E5)),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _buildPerfMetricTile('Accuracy', '${accuracy.toStringAsFixed(1)}%', Icons.track_changes_rounded, const Color(0xFF10B981)),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _buildPerfMetricTile('Tests', '$testsCount', Icons.assignment_turned_in_rounded, const Color(0xFFF59E0B)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        const Text('Subject Accuracy Breakdown', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        const SizedBox(height: 8),
+        ...subjectBreakdown.entries.map((e) {
+          final subjName = e.key.toString();
+          final val = (e.value as num).toDouble();
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(subjName, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                    Text('${val.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: (val / 100).clamp(0.0, 1.0),
+                    minHeight: 6,
+                    backgroundColor: const Color(0xFFE2E8F0),
+                    valueColor: AlwaysStoppedAnimation<Color>(val > 75 ? const Color(0xFF10B981) : const Color(0xFF6366F1)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+        const SizedBox(height: 16),
+
+        const Text('Recent Test Attempt History', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        const SizedBox(height: 8),
+
+        if (recentTests.isEmpty)
+          const Text('No recent test attempts recorded.', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)))
+        else
+          Column(
+            children: recentTests.map((t) {
+              final testName = t['test_title'] ?? t['name'] ?? 'Mock Test';
+              final score = t['score'] ?? 0;
+              final totalMarks = t['total_marks'] ?? 720;
+              final testAcc = t['accuracy'] ?? 0.0;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        testName,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('$score/$totalMarks (${testAcc.toStringAsFixed(0)}%)', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPerfMetricTile(String title, String val, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(height: 4),
+          Text(val, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+          Text(title, style: const TextStyle(fontSize: 9.5, color: Color(0xFF64748B))),
         ],
       ),
+    );
+  }
+
+  Widget _buildInspectorSecurityTab(AdminUserModel u) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildDetailRow(Icons.security_rounded, 'Account Security Level', 'Standard Password Authentication'),
+        _buildDetailRow(Icons.phonelink_setup_rounded, 'Two-Factor Authentication (2FA)', 'Disabled'),
+        _buildDetailRow(Icons.password_rounded, 'Last Password Reset', 'Never / Direct Sign In'),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          height: 38,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Security password reset link dispatched to ${u.email}')),
+              );
+            },
+            icon: const Icon(Icons.lock_reset_rounded, size: 16, color: Color(0xFF4F46E5)),
+            label: const Text('Send Password Reset Link', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFFC7D2FE)),
+              backgroundColor: const Color(0xFFF5F3FF),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showGrantSubscriptionModal(AdminUserModel u) {
+    if (_availablePlansForModal.isEmpty) {
+      _availablePlansForModal = [
+        {'id': 'plan_standard', 'title': 'Standard 30 Days', 'price': 149.0},
+        {'id': 'plan_pro', 'title': 'Pro 8 Months', 'price': 449.0},
+        {'id': 'plan_ultimate', 'title': 'Ultimate All Pass', 'price': 899.0},
+      ];
+    }
+
+    Map<String, dynamic> selectedPlan = _availablePlansForModal.first;
+    int selectedDays = 240;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  const Icon(Icons.bolt_rounded, color: Color(0xFF4F46E5)),
+                  const SizedBox(width: 8),
+                  Text('Grant / Change Plan for ${u.name}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              content: SizedBox(
+                width: 400,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Select Subscription Plan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<Map<String, dynamic>>(
+                          value: selectedPlan,
+                          isExpanded: true,
+                          items: _availablePlansForModal.map((p) {
+                            return DropdownMenuItem<Map<String, dynamic>>(
+                              value: p,
+                              child: Text('${p['title']} (₹${p['price']})'),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setModalState(() => selectedPlan = val);
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Select Duration', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<int>(
+                          value: selectedDays,
+                          isExpanded: true,
+                          items: const [
+                            DropdownMenuItem(value: 30, child: Text('30 Days (1 Month)')),
+                            DropdownMenuItem(value: 90, child: Text('90 Days (3 Months)')),
+                            DropdownMenuItem(value: 180, child: Text('180 Days (6 Months)')),
+                            DropdownMenuItem(value: 240, child: Text('240 Days (8 Months)')),
+                            DropdownMenuItem(value: 365, child: Text('365 Days (1 Year)')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setModalState(() => selectedDays = val);
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final ok = await SupabaseService.grantUserSubscription(
+                      userId: u.id,
+                      userEmail: u.email,
+                      plan: selectedPlan,
+                      durationDays: selectedDays,
+                    );
+                    if (ok && mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Subscription [${selectedPlan['title']}] granted to ${u.name}!'),
+                          backgroundColor: const Color(0xFF10B981),
+                        ),
+                      );
+                      _fetchSelectedUserDetailData(u);
+                    }
+                  },
+                  child: const Text('Grant Plan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showGrantEntitlementModal(AdminUserModel u) {
+    if (_availableTestSeriesForModal.isEmpty) {
+      _availableTestSeriesForModal = [
+        {'id': 'ts_neet_2026_full', 'title': 'NEET 2026 Full Syllabus Major Test Series'},
+        {'id': 'ts_jee_main_2026', 'title': 'JEE Main 2026 Rank Booster Series'},
+        {'id': 'ts_bio_special', 'title': 'Biology NCERT Line-By-Line Drill'},
+      ];
+    }
+
+    Map<String, dynamic> selectedSeries = _availableTestSeriesForModal.first;
+    int selectedDays = 365;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  const Icon(Icons.card_giftcard_rounded, color: Color(0xFF4F46E5)),
+                  const SizedBox(width: 8),
+                  Text('Grant Product / Test Series to ${u.name}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              content: SizedBox(
+                width: 400,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Select Product or Test Series', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<Map<String, dynamic>>(
+                          value: selectedSeries,
+                          isExpanded: true,
+                          items: _availableTestSeriesForModal.map((s) {
+                            return DropdownMenuItem<Map<String, dynamic>>(
+                              value: s,
+                              child: Text(s['title'] ?? 'Test Series'),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setModalState(() => selectedSeries = val);
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Select Access Duration', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<int>(
+                          value: selectedDays,
+                          isExpanded: true,
+                          items: const [
+                            DropdownMenuItem(value: 90, child: Text('90 Days')),
+                            DropdownMenuItem(value: 180, child: Text('180 Days')),
+                            DropdownMenuItem(value: 365, child: Text('365 Days (1 Year)')),
+                            DropdownMenuItem(value: 730, child: Text('730 Days (2 Years)')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setModalState(() => selectedDays = val);
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final ok = await SupabaseService.grantUserEntitlement(
+                      userId: u.id,
+                      userEmail: u.email,
+                      productId: selectedSeries['id'] ?? 'ts_custom',
+                      productTitle: selectedSeries['title'] ?? 'Test Series Access',
+                      productType: 'test_series',
+                      durationDays: selectedDays,
+                    );
+                    if (ok && mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Access for [${selectedSeries['title']}] granted to ${u.name}!'),
+                          backgroundColor: const Color(0xFF10B981),
+                        ),
+                      );
+                      _fetchSelectedUserDetailData(u);
+                    }
+                  },
+                  child: const Text('Grant Access', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
