@@ -80,6 +80,8 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
 
     bool isActive = existingPlan?['is_active'] ?? true;
     bool isPopular = existingPlan?['is_popular'] ?? false;
+    bool includesPracticeStats = existingPlan?['includes_practice_stats'] ?? true;
+    bool includesFreePaidTestSeries = existingPlan?['includes_free_paid_test_series'] ?? (existingPlan?['price'] != null && (existingPlan!['price'] as num) >= 400);
     bool isSaving = false;
 
     showDialog(
@@ -356,6 +358,71 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                               ],
                             ),
                           ),
+                          const SizedBox(height: 12),
+
+                          // 8. Access Rights & Entitlements Toggles Row
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFBFDBFE)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Plan Access Rights & Entitlements', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1E40AF))),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Switch(
+                                            value: includesPracticeStats,
+                                            activeColor: const Color(0xFF3B82F6),
+                                            onChanged: (val) => setModalState(() => includesPracticeStats = val),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                const Text('Practice Stats Access', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                                Text(includesPracticeStats ? 'User can view practice stats & analytics' : 'Practice stats locked', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Switch(
+                                            value: includesFreePaidTestSeries,
+                                            activeColor: const Color(0xFF8B5CF6),
+                                            onChanged: (val) => setModalState(() => includesFreePaidTestSeries = val),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                const Text('Free Paid Test Series', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                                Text(includesFreePaidTestSeries ? 'Gets all paid test series for free' : 'Standard test series access', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -432,6 +499,8 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                                   'status': isActive ? 'Active' : 'Inactive',
                                   'is_active': isActive,
                                   'is_popular': isPopular,
+                                  'includes_practice_stats': includesPracticeStats,
+                                  'includes_free_paid_test_series': includesFreePaidTestSeries,
                                   'max_questions_per_day': maxQuestionsCtrl.text.trim().isEmpty ? 'Unlimited' : maxQuestionsCtrl.text.trim(),
                                   'mock_tests': mockTestsCtrl.text.trim().isEmpty ? 'Unlimited' : mockTestsCtrl.text.trim(),
                                   'features_count': featuresList.length,
@@ -600,6 +669,12 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                         // Main Content: Dynamic Tabs
                         if (_activeTab == 'Payment Gateways')
                           const _PaymentGatewaysConfigCard()
+                        else if (_activeTab == 'Plan Access & Limits')
+                          _PlanAccessAndLimitsCard(
+                            plans: _plans,
+                            onPlansUpdated: (updatedPlans) => setState(() => _plans = updatedPlans),
+                            onEditPlan: (plan, index) => _openCreateOrEditPlanModal(existingPlan: plan, planIndex: index),
+                          )
                         else if (_activeTab == 'Orders & Transactions')
                           _buildOrdersTabContent()
                         else if (_activeTab == 'Coupons & Offers')
@@ -1044,7 +1119,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
 
   // ================= 4. SUB-NAVIGATION TABS =================
   Widget _buildSubNavTabs() {
-    final tabs = ['Plans', 'Payment Gateways', 'Orders & Transactions', 'Coupons & Offers', 'Subscribers', 'Settings'];
+    final tabs = ['Plans', 'Plan Access & Limits', 'Payment Gateways', 'Orders & Transactions', 'Coupons & Offers', 'Subscribers', 'Settings'];
     return Container(
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
@@ -3240,6 +3315,412 @@ class _PaymentGatewaysConfigCardState extends State<_PaymentGatewaysConfigCard> 
           ),
         ],
       ),
+    );
+  }
+}
+
+// ===========================================================================
+// PLAN ACCESS & LIMITS CONFIGURATOR CARD
+// ===========================================================================
+class _PlanAccessAndLimitsCard extends StatefulWidget {
+  final List<Map<String, dynamic>> plans;
+  final Function(List<Map<String, dynamic>>) onPlansUpdated;
+  final Function(Map<String, dynamic>, int) onEditPlan;
+
+  const _PlanAccessAndLimitsCard({
+    Key? key,
+    required this.plans,
+    required this.onPlansUpdated,
+    required this.onEditPlan,
+  }) : super(key: key);
+
+  @override
+  State<_PlanAccessAndLimitsCard> createState() => _PlanAccessAndLimitsCardState();
+}
+
+class _PlanAccessAndLimitsCardState extends State<_PlanAccessAndLimitsCard> {
+  final _dailyPracticeCtrl = TextEditingController(text: '20');
+  final _monthlyTestCtrl = TextEditingController(text: '2');
+  final _dailyPyqCtrl = TextEditingController(text: '15');
+  bool _isLoadingLimits = true;
+  bool _isSavingLimits = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLimits();
+  }
+
+  Future<void> _loadLimits() async {
+    setState(() => _isLoadingLimits = true);
+    final limits = await SupabaseService.fetchFreeUserLimits();
+    if (mounted) {
+      setState(() {
+        _dailyPracticeCtrl.text = (limits['daily_practice_limit'] ?? 20).toString();
+        _monthlyTestCtrl.text = (limits['monthly_test_limit'] ?? 2).toString();
+        _dailyPyqCtrl.text = (limits['daily_pyq_limit'] ?? 15).toString();
+        _isLoadingLimits = false;
+      });
+    }
+  }
+
+  Future<void> _saveLimits() async {
+    setState(() => _isSavingLimits = true);
+    final limits = {
+      'daily_practice_limit': int.tryParse(_dailyPracticeCtrl.text.trim()) ?? 20,
+      'monthly_test_limit': int.tryParse(_monthlyTestCtrl.text.trim()) ?? 2,
+      'daily_pyq_limit': int.tryParse(_dailyPyqCtrl.text.trim()) ?? 15,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+
+    final success = await SupabaseService.saveFreeUserLimits(limits);
+    if (mounted) {
+      setState(() => _isSavingLimits = false);
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✓ Free user access limits saved successfully!'),
+            backgroundColor: Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to save free user limits. Please try again.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _togglePlanFeature(int index, String key) async {
+    List<Map<String, dynamic>> updated = List<Map<String, dynamic>>.from(widget.plans);
+    final plan = Map<String, dynamic>.from(updated[index]);
+
+    if (key == 'includes_practice_stats') {
+      final current = SupabaseService.planIncludesPracticeStats(plan);
+      plan['includes_practice_stats'] = !current;
+    } else if (key == 'includes_free_paid_test_series') {
+      final current = SupabaseService.planIncludesFreePaidTestSeries(plan);
+      plan['includes_free_paid_test_series'] = !current;
+    }
+
+    updated[index] = plan;
+    final saved = await SupabaseService.saveSubscriptionPlans(updated);
+    if (saved && mounted) {
+      widget.onPlansUpdated(updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✓ Updated access rules for "${plan['title']}"!'),
+          backgroundColor: const Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. FREE USER LIMITS CONFIGURATOR
+        Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 4))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.shield_outlined, color: Color(0xFF2563EB), size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Free Tier Access Limits Configurator', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                        Text('Set practice question quotas and test attempt limits for non-subscribed free users.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      ],
+                    ),
+                  ),
+                  if (_isLoadingLimits)
+                    const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Divider(height: 1),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _dailyPracticeCtrl,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(
+                        labelText: 'Free Practice Limit (Questions / Day)',
+                        hintText: 'e.g. 20',
+                        helperText: 'Max practice questions free users can attempt daily',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        prefixIcon: Icon(Icons.quiz_outlined, size: 20),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextField(
+                      controller: _monthlyTestCtrl,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(
+                        labelText: 'Free Test Limit (Tests / Month)',
+                        hintText: 'e.g. 2',
+                        helperText: 'Max custom tests free users can create monthly',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        prefixIcon: Icon(Icons.assignment_outlined, size: 20),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextField(
+                      controller: _dailyPyqCtrl,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: const InputDecoration(
+                        labelText: 'Free PYQ Limit (Questions / Day)',
+                        hintText: 'e.g. 15',
+                        helperText: 'Max PYQ questions free users can attempt daily',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        prefixIcon: Icon(Icons.history_edu_outlined, size: 20),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton.icon(
+                  onPressed: _isSavingLimits ? null : _saveLimits,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: _isSavingLimits
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Icon(Icons.save_rounded, size: 18),
+                  label: const Text('Save Free User Limits', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // 2. PLAN ACCESS & ENTITLEMENT MATRIX
+        Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 4))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.tune_rounded, color: Color(0xFF8B5CF6), size: 22),
+                  SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Subscription Plan Feature & Access Control Matrix', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      Text('Configure which plans unlock User Practice Stats & Analytics, and which plans include Paid Test Series for free.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Divider(height: 1),
+
+              // Table Headers
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 14.0),
+                child: Row(
+                  children: [
+                    Expanded(flex: 4, child: Text('Subscription Plan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                    Expanded(flex: 3, child: Text('Pricing & Duration', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                    Expanded(flex: 3, child: Text('Quotas & Limits', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)))),
+                    Expanded(flex: 4, child: Center(child: Text('📊 Practice Stats Access', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))))),
+                    Expanded(flex: 4, child: Center(child: Text('🎁 Free Paid Test Series', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))))),
+                    Expanded(flex: 2, child: Center(child: Text('Actions', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))))),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+
+              // Rows for each plan
+              if (widget.plans.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(32.0),
+                  child: Center(child: Text('No subscription plans found.', style: TextStyle(color: Colors.grey))),
+                )
+              else
+                ...widget.plans.asMap().entries.map((entry) {
+                  final idx = entry.key;
+                  final plan = entry.value;
+                  final hasStats = SupabaseService.planIncludesPracticeStats(plan);
+                  final hasFreeTests = SupabaseService.planIncludesFreePaidTestSeries(plan);
+                  final title = (plan['title'] ?? 'Plan').toString();
+                  final badge = (plan['badge'] ?? title).toString();
+                  final price = (plan['price'] as num?)?.toDouble() ?? 0.0;
+                  final duration = (plan['duration_title'] ?? 'Plan').toString();
+                  final maxQ = (plan['max_questions_per_day'] ?? 'Unlimited').toString();
+                  final mockTests = (plan['mock_tests'] ?? 'Unlimited').toString();
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14.0),
+                    decoration: const BoxDecoration(
+                      border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                    ),
+                    child: Row(
+                      children: [
+                        // Plan Name & Badge
+                        Expanded(
+                          flex: 4,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                              const SizedBox(height: 2),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEEF2FF),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(badge, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Pricing & Duration
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('₹${price.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                              Text(duration, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+
+                        // Quotas & Limits
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Daily Qs: $maxQ', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                              Text('Tests: $mockTests', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ),
+
+                        // Practice Stats Access Toggle
+                        Expanded(
+                          flex: 4,
+                          child: Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Switch(
+                                  value: hasStats,
+                                  activeColor: const Color(0xFF3B82F6),
+                                  onChanged: (val) => _togglePlanFeature(idx, 'includes_practice_stats'),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  hasStats ? 'UNLOCKED' : 'LOCKED',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: hasStats ? const Color(0xFF2563EB) : Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Free Paid Test Series Toggle
+                        Expanded(
+                          flex: 4,
+                          child: Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Switch(
+                                  value: hasFreeTests,
+                                  activeColor: const Color(0xFF8B5CF6),
+                                  onChanged: (val) => _togglePlanFeature(idx, 'includes_free_paid_test_series'),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  hasFreeTests ? 'FREE ACCESS' : 'PAID ONLY',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: hasFreeTests ? const Color(0xFF7C3AED) : Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Actions
+                        Expanded(
+                          flex: 2,
+                          child: Center(
+                            child: OutlinedButton(
+                              onPressed: () => widget.onEditPlan(plan, idx),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: const Text('Edit', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

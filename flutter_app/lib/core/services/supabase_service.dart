@@ -5746,6 +5746,66 @@ class SupabaseService {
     }
   }
 
+  /// Default limits for free users
+  static Map<String, dynamic> get defaultFreeUserLimits => const {
+    'daily_practice_limit': 20,
+    'monthly_test_limit': 2,
+    'daily_pyq_limit': 15,
+  };
+
+  /// Fetch configured Free User limits from Supabase / system_config
+  static Future<Map<String, dynamic>> fetchFreeUserLimits() async {
+    try {
+      final res = await client
+          .from('system_config')
+          .select('value')
+          .eq('key', 'free_user_access_limits')
+          .maybeSingle();
+      if (res != null && res['value'] != null) {
+        final val = res['value'];
+        if (val is Map) {
+          return Map<String, dynamic>.from(val);
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice reading free_user_access_limits from system_config: $e');
+    }
+    return Map<String, dynamic>.from(defaultFreeUserLimits);
+  }
+
+  /// Save Free User limits to Supabase / system_config
+  static Future<bool> saveFreeUserLimits(Map<String, dynamic> limits) async {
+    try {
+      await client.from('system_config').upsert({
+        'key': 'free_user_access_limits',
+        'value': limits,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'key');
+      return true;
+    } catch (e) {
+      debugPrint('Error saving free user limits: $e');
+      return false;
+    }
+  }
+
+  /// Check if a plan gives user access to Practice Stats & Analytics
+  static bool planIncludesPracticeStats(Map<String, dynamic> plan) {
+    if (plan.containsKey('includes_practice_stats')) {
+      return plan['includes_practice_stats'] == true;
+    }
+    final price = (plan['price'] as num?)?.toDouble() ?? 0.0;
+    return price >= 99.0;
+  }
+
+  /// Check if a plan gives user free access to Paid Test Series
+  static bool planIncludesFreePaidTestSeries(Map<String, dynamic> plan) {
+    if (plan.containsKey('includes_free_paid_test_series')) {
+      return plan['includes_free_paid_test_series'] == true;
+    }
+    final price = (plan['price'] as num?)?.toDouble() ?? 0.0;
+    return price >= 400.0;
+  }
+
   /// Fetch questions linked to a specific Test Series or Paper for editing
   static Future<List<Map<String, dynamic>>> fetchQuestionsForTestSeries(String seriesId, {String? paperId}) async {
     final List<Map<String, dynamic>> questions = [];
