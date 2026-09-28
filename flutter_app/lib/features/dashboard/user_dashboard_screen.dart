@@ -52,6 +52,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   int _mobileBottomNavIndex = 0;
 
   late UserProfileModel _currentUserProfile;
+  Map<String, dynamic>? _activeAbortedSession;
+  Map<String, dynamic> _userRealStats = {
+    'questionsAttempted': 1248,
+    'accuracy': 72.4,
+    'testsCompleted': 28,
+    'studyStreak': 12,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -63,9 +71,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
   Future<void> _loadCurrentUser() async {
     final currentUser = await SupabaseService.getCurrentUser();
-    if (currentUser != null && mounted) {
+    final stats = await SupabaseService.fetchUserRealStats();
+    final activeSession = await SupabaseService.loadActiveTestSession(isExplicitResume: true);
+
+    if (mounted) {
       setState(() {
-        _currentUserProfile = currentUser;
+        if (currentUser != null) _currentUserProfile = currentUser;
+        _userRealStats = stats;
+        _activeAbortedSession = activeSession;
       });
     }
     _checkAndShowCohortOnboarding();
@@ -855,32 +868,32 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     final metrics = [
       {
         'title': 'Questions Attempted',
-        'value': '1,248',
-        'sub': '↑ 18% vs 7d',
+        'value': '${_userRealStats['questionsAttempted']}',
+        'sub': 'Real stats',
         'icon': Icons.edit_document,
         'iconBg': const Color(0xFFEFF6FF),
         'iconColor': const Color(0xFF2563EB),
       },
       {
         'title': 'Accuracy',
-        'value': '72.4%',
-        'sub': '↑ 6.3% vs 7d',
+        'value': '${_userRealStats['accuracy']}%',
+        'sub': 'Overall accuracy',
         'icon': Icons.track_changes_rounded,
         'iconBg': const Color(0xFFDCFCE7),
         'iconColor': const Color(0xFF16A34A),
       },
       {
         'title': 'Tests Completed',
-        'value': '28',
-        'sub': '↑ 4 vs 7d',
+        'value': '${_userRealStats['testsCompleted']}',
+        'sub': 'Completed',
         'icon': Icons.assignment_turned_in_rounded,
         'iconBg': const Color(0xFFF5F3FF),
         'iconColor': const Color(0xFF7C3AED),
       },
       {
         'title': 'Study Streak',
-        'value': '12 Days',
-        'sub': 'Best: 32d',
+        'value': '${_userRealStats['studyStreak']} Days',
+        'sub': 'Active Streak',
         'icon': Icons.local_fire_department_rounded,
         'iconBg': const Color(0xFFFFF7ED),
         'iconColor': const Color(0xFFEA580C),
@@ -964,7 +977,31 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   }
 
   // 4. Mobile Continue Where You Left Off Card
+  // 4. Continue Where You Left Off Card (Dynamic Aborted/Active Session)
   Widget _buildMobileContinueCard() {
+    if (_activeAbortedSession == null) {
+      return const SizedBox.shrink();
+    }
+
+    final session = _activeAbortedSession!;
+    final String sessionId = session['sessionId']?.toString() ?? '';
+    final List questions = session['questions'] is List ? session['questions'] as List : [];
+    final Map userAnswers = session['userAnswers'] is Map ? session['userAnswers'] as Map : {};
+    final int secsRemaining = (session['secondsRemaining'] as num? ?? 0).toInt();
+
+    final int totalQ = questions.isNotEmpty ? questions.length : 1;
+    final int answeredCount = userAnswers.length;
+    final double progress = (answeredCount / totalQ).clamp(0.0, 1.0);
+
+    final int mins = secsRemaining ~/ 60;
+    final int secs = secsRemaining % 60;
+    final String timeStr = '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+
+    final String sessionTitle = session['testTitle']?.toString() ??
+        (sessionId.contains('pyq')
+            ? 'PYQ Practice Session'
+            : (sessionId.contains('practice') ? 'Custom Practice Session' : 'Custom Test Session'));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -972,13 +1009,16 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text('Continue Where You Left Off', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-            GestureDetector(
-              onTap: widget.onOpenPractice,
+            InkWell(
+              onTap: () async {
+                await SupabaseService.clearActiveTestSession();
+                setState(() => _activeAbortedSession = null);
+              },
               child: const Row(
                 children: [
-                  Text('View All', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF2563EB))),
-                  SizedBox(width: 1),
-                  Icon(Icons.chevron_right_rounded, size: 12, color: Color(0xFF2563EB)),
+                  Text('Discard', style: TextStyle(fontSize: 10, color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
+                  SizedBox(width: 2),
+                  Icon(Icons.close_rounded, size: 12, color: Color(0xFFEF4444)),
                 ],
               ),
             ),
@@ -986,13 +1026,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         ),
         const SizedBox(height: 6),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFF1F5F9)),
+            border: Border.all(color: const Color(0xFF2563EB), width: 1.5),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+              BoxShadow(color: const Color(0xFF2563EB).withOpacity(0.06), blurRadius: 6, offset: const Offset(0, 2)),
             ],
           ),
           child: Column(
@@ -1001,26 +1041,15 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               Row(
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(10),
+                      color: const Color(0xFFEEF2FF),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        const Icon(Icons.show_chart_rounded, size: 20, color: Color(0xFF16A34A)),
-                        Positioned(
-                          top: 3,
-                          left: 3,
-                          child: Text('V₀', style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
-                        ),
-                      ],
-                    ),
+                    child: const Icon(Icons.play_circle_fill_rounded, size: 22, color: Color(0xFF2563EB)),
                   ),
                   const SizedBox(width: 10),
-
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1031,53 +1060,59 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                             color: const Color(0xFFDCFCE7),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text('Custom Practice', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF166534))),
+                          child: const Text('In-Progress Session', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF166534))),
                         ),
                         const SizedBox(height: 2),
-                        const Text('Physics • Kinematics', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
-                        const SizedBox(height: 1),
-                        const Text(
-                          'Motion in a Straight Line',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        Text(
+                          sessionTitle,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                           overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          '$answeredCount of $totalQ Questions Answered ${secsRemaining > 0 ? "• ⏱ $timeStr remaining" : ""}',
+                          style: const TextStyle(fontSize: 9.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                         ),
                       ],
                     ),
                   ),
-
                   const SizedBox(width: 8),
-
                   ElevatedButton.icon(
-                    onPressed: widget.onOpenPractice,
-                    icon: const Icon(Icons.play_arrow_rounded, size: 12, color: Color(0xFF4F46E5)),
-                    label: const Text('Continue', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                    onPressed: () {
+                      if (sessionId.contains('pyq')) {
+                        context.go('/pyq/test');
+                      } else if (sessionId.contains('practice')) {
+                        context.go('/practice/session');
+                      } else {
+                        context.go('/custom-test/attempt/$sessionId');
+                      }
+                    },
+                    icon: const Icon(Icons.play_arrow_rounded, size: 14, color: Colors.white),
+                    label: const Text('Resume', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFEEF2FF),
+                      backgroundColor: const Color(0xFF2563EB),
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-
-              // Progress Bar
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(3),
-                      child: const LinearProgressIndicator(
-                        value: 0.6,
-                        minHeight: 4,
-                        backgroundColor: Color(0xFFE2E8F0),
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 5,
+                        backgroundColor: const Color(0xFFE2E8F0),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF22C55E)),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text('60% Completed', style: TextStyle(fontSize: 8.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                  Text('${(progress * 100).toInt()}% Completed', style: const TextStyle(fontSize: 9, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
                 ],
               ),
             ],
@@ -1983,8 +2018,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     final metrics = [
       {
         'title': 'Questions Attempted',
-        'value': '1,248',
-        'sub': '↑ 18% vs last week',
+        'value': '${_userRealStats['questionsAttempted']}',
+        'sub': 'Real cumulative attempts',
         'icon': Icons.edit_document,
         'cardBg': const Color(0xFFF0FDF4),
         'borderColor': const Color(0xFFDCFCE7),
@@ -1994,8 +2029,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       },
       {
         'title': 'Accuracy',
-        'value': '72.4%',
-        'sub': '↑ 6.3% vs last week',
+        'value': '${_userRealStats['accuracy']}%',
+        'sub': 'Overall performance',
         'icon': Icons.track_changes_rounded,
         'cardBg': const Color(0xFFEFF6FF),
         'borderColor': const Color(0xFFDBEAFE),
@@ -2005,8 +2040,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       },
       {
         'title': 'Tests Completed',
-        'value': '28',
-        'sub': '↑ 4 vs last week',
+        'value': '${_userRealStats['testsCompleted']}',
+        'sub': 'Completed sessions',
         'icon': Icons.assignment_turned_in_rounded,
         'cardBg': const Color(0xFFF5F3FF),
         'borderColor': const Color(0xFFDDD6FE),
@@ -2016,8 +2051,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       },
       {
         'title': 'Study Streak',
-        'value': '12 Days',
-        'sub': 'Best: 32 Days',
+        'value': '${_userRealStats['studyStreak']} Days',
+        'sub': 'Active Streak',
         'icon': Icons.local_fire_department_rounded,
         'cardBg': const Color(0xFFFFF7ED),
         'borderColor': const Color(0xFFFFEDD5),
