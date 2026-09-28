@@ -31,6 +31,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
   bool _allowUpgrade = true;
   bool _autoRenewal = true;
   List<Map<String, dynamic>> _plans = [];
+  List<Map<String, dynamic>> _allTestSeries = [];
   bool _isLoadingPlans = true;
 
   @override
@@ -48,12 +49,35 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
   Future<void> _loadPlans() async {
     setState(() => _isLoadingPlans = true);
     final plans = await SupabaseService.fetchSubscriptionPlans();
+    final testSeries = await SupabaseService.fetchAllTestSeries();
     if (mounted) {
       setState(() {
         _plans = List<Map<String, dynamic>>.from(plans);
+        _allTestSeries = List<Map<String, dynamic>>.from(testSeries);
         _isLoadingPlans = false;
       });
     }
+  }
+
+  List<Map<String, dynamic>> get _availableSeriesOptions {
+    final List<Map<String, dynamic>> result = List<Map<String, dynamic>>.from(_allTestSeries);
+    final Set<String> ids = result.map((e) => (e['id'] ?? '').toString()).toSet();
+
+    final standardList = [
+      {'id': 'ts_neet_all_india', 'title': 'NEET All-India Major Full Mock Test Series 2026', 'exam': 'NEET UG 2026', 'category': 'Full Mock Tests'},
+      {'id': 'ts_neet_chapter', 'title': 'NEET Chapter-wise Practice Drills & PYQs', 'exam': 'NEET UG', 'category': 'Chapter Tests'},
+      {'id': 'ts_jee_main_ranker', 'title': 'JEE Main Ranker Full Syllabus Test Series 2026', 'exam': 'JEE Main 2026', 'category': 'Full Mock Tests'},
+      {'id': 'ts_jee_adv_ranker', 'title': 'JEE Advanced High Yield Drills & PYQ Bank', 'exam': 'JEE Advanced', 'category': 'Advanced Tests'},
+      {'id': 'ts_nta_pyq_solved', 'title': 'NTA 15-Year Solved Question Papers Bank', 'exam': 'NEET & JEE', 'category': 'PYQ Bank'},
+      {'id': 'ts_ncert_line_by_line', 'title': 'NCERT Line-by-Line Subject Booster Series', 'exam': 'NEET UG', 'category': 'NCERT Engine'},
+    ];
+
+    for (var std in standardList) {
+      if (!ids.contains(std['id'])) {
+        result.add(std);
+      }
+    }
+    return result;
   }
 
   // Feature Toggles Matrix State
@@ -83,6 +107,13 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
     bool includesPracticeStats = existingPlan?['includes_practice_stats'] ?? true;
     bool includesFreePaidTestSeries = existingPlan?['includes_free_paid_test_series'] ?? (existingPlan?['price'] != null && (existingPlan!['price'] as num) >= 400);
     bool isSaving = false;
+
+    List<String> selectedSeriesIds = [];
+    if (existingPlan != null && existingPlan['accessible_test_series_ids'] is List) {
+      selectedSeriesIds = (existingPlan['accessible_test_series_ids'] as List).map((e) => e.toString()).toList();
+    } else {
+      selectedSeriesIds = ['ALL'];
+    }
 
     showDialog(
       context: context,
@@ -423,6 +454,148 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                               ],
                             ),
                           ),
+                          const SizedBox(height: 14),
+
+                          // 9. Test Series Access Control (Multiple Selection)
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFCBD5E1)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.quiz_rounded, color: Color(0xFF4F46E5), size: 18),
+                                    const SizedBox(width: 8),
+                                    const Text('Test Series Access Allocation (Multi-Select)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                                    const Spacer(),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(6)),
+                                      child: Text(
+                                        selectedSeriesIds.contains('ALL') ? 'ALL TEST SERIES (UNLIMITED)' : '${selectedSeriesIds.length} SERIES SELECTED',
+                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Select which specific test series students will get access to under this plan.',
+                                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                ),
+                                const SizedBox(height: 10),
+                                const Divider(height: 1),
+                                const SizedBox(height: 10),
+
+                                // "ALL" Option Toggle Card
+                                InkWell(
+                                  onTap: () {
+                                    setModalState(() {
+                                      if (selectedSeriesIds.contains('ALL')) {
+                                        selectedSeriesIds.remove('ALL');
+                                      } else {
+                                        selectedSeriesIds = ['ALL'];
+                                      }
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: selectedSeriesIds.contains('ALL') ? const Color(0xFFEEF2FF) : Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: selectedSeriesIds.contains('ALL') ? const Color(0xFF818CF8) : const Color(0xFFCBD5E1)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Checkbox(
+                                          value: selectedSeriesIds.contains('ALL'),
+                                          activeColor: const Color(0xFF4F46E5),
+                                          onChanged: (val) {
+                                            setModalState(() {
+                                              if (val == true) {
+                                                selectedSeriesIds = ['ALL'];
+                                              } else {
+                                                selectedSeriesIds.remove('ALL');
+                                              }
+                                            });
+                                          },
+                                        ),
+                                        const SizedBox(width: 4),
+                                        const Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text('🌟 Full Access (All Current & Future Test Series)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF1E1B4B))),
+                                              Text('Subscribers get instant free access to all present and future test series.', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+
+                                const Text('Or Select Specific Test Series Included:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                                const SizedBox(height: 6),
+
+                                ..._availableSeriesOptions.map((ts) {
+                                  final tsId = (ts['id'] ?? '').toString();
+                                  final tsTitle = (ts['title'] ?? ts['name'] ?? 'Test Series').toString();
+                                  final tsExam = (ts['exam'] ?? 'NEET / JEE').toString();
+                                  final isAllSelected = selectedSeriesIds.contains('ALL');
+                                  final isChecked = isAllSelected || selectedSeriesIds.contains(tsId);
+
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: isChecked ? const Color(0xFFF0FDF4) : Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: isChecked ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Checkbox(
+                                          value: isChecked,
+                                          activeColor: const Color(0xFF10B981),
+                                          onChanged: isAllSelected
+                                              ? null
+                                              : (val) {
+                                                  setModalState(() {
+                                                    if (val == true) {
+                                                      if (!selectedSeriesIds.contains(tsId)) {
+                                                        selectedSeriesIds.add(tsId);
+                                                      }
+                                                    } else {
+                                                      selectedSeriesIds.remove(tsId);
+                                                    }
+                                                  });
+                                                },
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(tsTitle, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                                              Text('Target Exam: $tsExam', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -501,6 +674,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                                   'is_popular': isPopular,
                                   'includes_practice_stats': includesPracticeStats,
                                   'includes_free_paid_test_series': includesFreePaidTestSeries,
+                                  'accessible_test_series_ids': selectedSeriesIds,
                                   'max_questions_per_day': maxQuestionsCtrl.text.trim().isEmpty ? 'Unlimited' : maxQuestionsCtrl.text.trim(),
                                   'mock_tests': mockTestsCtrl.text.trim().isEmpty ? 'Unlimited' : mockTestsCtrl.text.trim(),
                                   'features_count': featuresList.length,
