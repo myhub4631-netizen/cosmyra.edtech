@@ -29,10 +29,14 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
   String _selectedDefaultPlan = 'Pro (8 Months)';
   bool _allowDowngrade = true;
   bool _allowUpgrade = true;
+  bool _autoRenewal = true;
+  List<Map<String, dynamic>> _plans = [];
+  bool _isLoadingPlans = true;
 
   @override
   void initState() {
     super.initState();
+    _loadPlans();
     if (widget.autoOpenPaymentModal) {
       _activeTab = 'Payment Gateways';
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -40,65 +44,514 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
       });
     }
   }
-  bool _autoRenewal = true;
+
+  Future<void> _loadPlans() async {
+    setState(() => _isLoadingPlans = true);
+    final plans = await SupabaseService.fetchSubscriptionPlans();
+    if (mounted) {
+      setState(() {
+        _plans = List<Map<String, dynamic>>.from(plans);
+        _isLoadingPlans = false;
+      });
+    }
+  }
 
   // Feature Toggles Matrix State
   bool _f1Trial = false, _f1Starter = true, _f1Pro = true, _f1Ultimate = true;
   bool _f2Trial = false, _f2Starter = true, _f2Pro = true, _f2Ultimate = true;
   bool _f3Trial = false, _f3Starter = false, _f3Pro = true, _f3Ultimate = true;
 
-  void _openCreatePlanModal() {
-    final titleCtrl = TextEditingController();
-    final priceCtrl = TextEditingController();
-    final durationCtrl = TextEditingController();
+  void _openCreateOrEditPlanModal({Map<String, dynamic>? existingPlan, int? planIndex}) {
+    final titleCtrl = TextEditingController(text: existingPlan?['title'] ?? '');
+    final badgeCtrl = TextEditingController(text: existingPlan?['badge'] ?? '');
+    final priceCtrl = TextEditingController(text: existingPlan?['price'] != null ? '${existingPlan!['price']}' : '');
+    final origPriceCtrl = TextEditingController(text: existingPlan?['original_price'] != null ? '${existingPlan!['original_price']}' : '');
+    final billingPeriodCtrl = TextEditingController(text: existingPlan?['billing_period'] ?? '/ month');
+    final durationTitleCtrl = TextEditingController(text: existingPlan?['duration_title'] ?? '');
+    final durationDaysCtrl = TextEditingController(text: (existingPlan?['duration_days'] ?? 30).toString());
+    final maxQuestionsCtrl = TextEditingController(text: existingPlan?['max_questions_per_day'] ?? 'Unlimited');
+    final mockTestsCtrl = TextEditingController(text: existingPlan?['mock_tests'] ?? 'Unlimited');
+    final descriptionCtrl = TextEditingController(text: existingPlan?['description'] ?? '');
+    final featuresCtrl = TextEditingController(
+      text: (existingPlan?['features'] is List)
+          ? (existingPlan!['features'] as List).join('\n')
+          : (existingPlan?['features']?.toString() ?? ''),
+    );
+
+    bool isActive = existingPlan?['is_active'] ?? true;
+    bool isPopular = existingPlan?['is_popular'] ?? false;
+    bool isSaving = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Container(
-          width: 500,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setModalState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Container(
+              width: 650,
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Create New Subscription Plan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(ctx).pop()),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Plan Name (e.g. Super Pro)')),
-              const SizedBox(height: 12),
-              TextField(controller: priceCtrl, decoration: const InputDecoration(labelText: 'Price in INR (₹)')),
-              const SizedBox(height: 12),
-              TextField(controller: durationCtrl, decoration: const InputDecoration(labelText: 'Duration (e.g. 6 Months)')),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('New Subscription Plan created successfully!')),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5)),
-                    child: const Text('Create & Publish Plan'),
+                  // Dialog Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            existingPlan != null ? 'Edit Subscription Plan' : 'Create New Subscription Plan',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Configure plan name, pricing, duration in days, limits & features.',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 16),
+
+                  // Form Fields in SingleChildScrollView
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 1. Plan Name & Badge Text
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 6,
+                                child: TextField(
+                                  controller: titleCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Plan Name *',
+                                    hintText: 'e.g. Pro 8 Months',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 6,
+                                child: TextField(
+                                  controller: badgeCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Badge Tag (Optional)',
+                                    hintText: 'e.g. Most Popular, Trial, Starter',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+
+                          // 2. Pricing Row
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 4,
+                                child: TextField(
+                                  controller: priceCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                                  decoration: const InputDecoration(
+                                    labelText: 'Price in INR (₹) *',
+                                    hintText: 'e.g. 449',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 4,
+                                child: TextField(
+                                  controller: origPriceCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))],
+                                  decoration: const InputDecoration(
+                                    labelText: 'Original MRP Price (₹)',
+                                    hintText: 'e.g. 999 (Strike-through)',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 4,
+                                child: TextField(
+                                  controller: billingPeriodCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Billing Unit',
+                                    hintText: 'e.g. / 8 months, / month',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+
+                          // 3. Duration Row
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 6,
+                                child: TextField(
+                                  controller: durationTitleCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Duration Display Name',
+                                    hintText: 'e.g. 8 Months, 30 Days, 1 Year',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 6,
+                                child: TextField(
+                                  controller: durationDaysCtrl,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                  decoration: const InputDecoration(
+                                    labelText: 'Duration in Days *',
+                                    hintText: 'e.g. 240, 30, 365',
+                                    helperText: 'Required for validity calculation',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+
+                          // 4. Feature Limits Row
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 6,
+                                child: TextField(
+                                  controller: maxQuestionsCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Max Questions / Day',
+                                    hintText: 'e.g. Unlimited or 100',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 6,
+                                child: TextField(
+                                  controller: mockTestsCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Mock Tests Limit',
+                                    hintText: 'e.g. Unlimited or 10 / Month',
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+
+                          // 5. Short Description
+                          TextField(
+                            controller: descriptionCtrl,
+                            decoration: const InputDecoration(
+                              labelText: 'Plan Summary Description',
+                              hintText: 'e.g. Best for serious NEET & JEE aspirants.',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // 6. Included Features List (Multiline)
+                          TextField(
+                            controller: featuresCtrl,
+                            maxLines: 4,
+                            decoration: const InputDecoration(
+                              labelText: 'Included Features (One feature per line)',
+                              hintText: "Unlimited Question Practice Daily\nAll-India Real-Time Rank & Percentile\nComplete 15-Year Solved PYQ Bank",
+                              border: OutlineInputBorder(),
+                              alignLabelWithHint: true,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+
+                          // 7. Status Toggles Row
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Switch(
+                                        value: isActive,
+                                        activeColor: const Color(0xFF10B981),
+                                        onChanged: (val) => setModalState(() => isActive = val),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('Active Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                          Text(isActive ? 'Visible to students' : 'Hidden from students', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Switch(
+                                        value: isPopular,
+                                        activeColor: const Color(0xFF4F46E5),
+                                        onChanged: (val) => setModalState(() => isPopular = val),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('Most Popular Badge', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                          Text(isPopular ? 'Highlighted card' : 'Standard card', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 16),
+
+                  // Bottom Action Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: isSaving
+                            ? null
+                            : () async {
+                                final title = titleCtrl.text.trim();
+                                final priceText = priceCtrl.text.trim();
+                                final daysText = durationDaysCtrl.text.trim();
+
+                                if (title.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enter a Plan Name.')),
+                                  );
+                                  return;
+                                }
+                                if (priceText.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enter Price in INR.')),
+                                  );
+                                  return;
+                                }
+                                if (daysText.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please enter Duration in Days.')),
+                                  );
+                                  return;
+                                }
+
+                                final double price = double.tryParse(priceText) ?? 0.0;
+                                final int days = int.tryParse(daysText) ?? 30;
+                                final double origPrice = double.tryParse(origPriceCtrl.text.trim()) ?? (price * 2);
+
+                                final featuresList = featuresCtrl.text
+                                    .split('\n')
+                                    .map((e) => e.trim())
+                                    .where((e) => e.isNotEmpty)
+                                    .toList();
+
+                                String durTitle = durationTitleCtrl.text.trim();
+                                if (durTitle.isEmpty) {
+                                  durTitle = days >= 365 ? '${(days / 365).round()} Year' : (days >= 30 ? '${(days / 30).round()} Months' : '$days Days');
+                                }
+
+                                setModalState(() => isSaving = true);
+
+                                final newPlan = {
+                                  'id': existingPlan != null ? (existingPlan['id'] ?? 'plan_${DateTime.now().millisecondsSinceEpoch}') : 'plan_${DateTime.now().millisecondsSinceEpoch}',
+                                  'title': title,
+                                  'duration_title': durTitle,
+                                  'duration_days': days,
+                                  'badge': badgeCtrl.text.trim().isEmpty ? title : badgeCtrl.text.trim(),
+                                  'badge_color': existingPlan?['badge_color'] ?? (isPopular ? 0xFF8B5CF6 : 0xFF10B981),
+                                  'price': price,
+                                  'original_price': origPrice,
+                                  'billing_period': billingPeriodCtrl.text.trim().isEmpty ? '/ period' : billingPeriodCtrl.text.trim(),
+                                  'description': descriptionCtrl.text.trim(),
+                                  'status': isActive ? 'Active' : 'Inactive',
+                                  'is_active': isActive,
+                                  'is_popular': isPopular,
+                                  'max_questions_per_day': maxQuestionsCtrl.text.trim().isEmpty ? 'Unlimited' : maxQuestionsCtrl.text.trim(),
+                                  'mock_tests': mockTestsCtrl.text.trim().isEmpty ? 'Unlimited' : mockTestsCtrl.text.trim(),
+                                  'features_count': featuresList.length,
+                                  'features': featuresList,
+                                  'created_at': existingPlan?['created_at'] ?? DateTime.now().toIso8601String(),
+                                };
+
+                                List<Map<String, dynamic>> updatedPlans = List<Map<String, dynamic>>.from(_plans);
+                                if (planIndex != null && planIndex >= 0 && planIndex < updatedPlans.length) {
+                                  updatedPlans[planIndex] = newPlan;
+                                } else {
+                                  updatedPlans.add(newPlan);
+                                }
+
+                                bool saved = await SupabaseService.saveSubscriptionPlans(updatedPlans);
+                                if (dialogCtx.mounted) {
+                                  setModalState(() => isSaving = false);
+                                }
+
+                                if (saved && context.mounted) {
+                                  setState(() => _plans = updatedPlans);
+                                  Navigator.of(ctx).pop();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(existingPlan != null ? '✓ Subscription Plan updated successfully!' : '✓ New Subscription Plan created & published!'),
+                                      backgroundColor: const Color(0xFF10B981),
+                                    ),
+                                  );
+                                } else if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Failed to save subscription plan. Please try again.')),
+                                  );
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4F46E5),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: isSaving
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : Text(existingPlan != null ? 'Save Changes' : 'Create & Publish Plan'),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
+  }
+
+  void _togglePlanStatus(int index) async {
+    if (index < 0 || index >= _plans.length) return;
+    List<Map<String, dynamic>> updatedPlans = List<Map<String, dynamic>>.from(_plans);
+    final plan = Map<String, dynamic>.from(updatedPlans[index]);
+    final currentActive = plan['is_active'] != false;
+    plan['is_active'] = !currentActive;
+    plan['status'] = !currentActive ? 'Active' : 'Inactive';
+    updatedPlans[index] = plan;
+
+    bool success = await SupabaseService.saveSubscriptionPlans(updatedPlans);
+    if (success && mounted) {
+      setState(() => _plans = updatedPlans);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Plan "${plan['title']}" status updated to ${plan['status']}')),
+      );
+    }
+  }
+
+  void _togglePlanPopular(int index) async {
+    if (index < 0 || index >= _plans.length) return;
+    List<Map<String, dynamic>> updatedPlans = List<Map<String, dynamic>>.from(_plans);
+    final plan = Map<String, dynamic>.from(updatedPlans[index]);
+    final currentPopular = plan['is_popular'] == true;
+    plan['is_popular'] = !currentPopular;
+    updatedPlans[index] = plan;
+
+    bool success = await SupabaseService.saveSubscriptionPlans(updatedPlans);
+    if (success && mounted) {
+      setState(() => _plans = updatedPlans);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Plan "${plan['title']}" popular badge updated!')),
+      );
+    }
+  }
+
+  void _deletePlan(int index) async {
+    if (index < 0 || index >= _plans.length) return;
+    final plan = _plans[index];
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Subscription Plan'),
+        content: Text('Are you sure you want to delete "${plan['title']}"? This action cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      List<Map<String, dynamic>> updatedPlans = List<Map<String, dynamic>>.from(_plans);
+      updatedPlans.removeAt(index);
+      bool success = await SupabaseService.saveSubscriptionPlans(updatedPlans);
+      if (success && mounted) {
+        setState(() => _plans = updatedPlans);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Subscription Plan deleted successfully.'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   @override
@@ -501,7 +954,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
             ),
             const SizedBox(width: 12),
             ElevatedButton.icon(
-              onPressed: _openCreatePlanModal,
+              onPressed: () => _openCreateOrEditPlanModal(),
               icon: const Icon(Icons.add, size: 18),
               label: const Text('Create New Plan', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
@@ -682,47 +1135,111 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
     );
   }
 
-  // ================= 6. SUBSCRIPTION PLAN CARDS GRID (4 CARDS) =================
+  // ================= 6. SUBSCRIPTION PLAN CARDS GRID (DYNAMIC) =================
   Widget _buildPlanCardsGrid() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: _buildPlanCard('Trial Pass', '1 Month', 'Trial', '₹99', '/ month', 'Try Cosmyra for 30 days with limited access.', '30 Days', '100', '5 / Month', '15', Icons.star_border_rounded, Colors.amber, false)),
-        const SizedBox(width: 12),
-        Expanded(child: _buildPlanCard('Starter', '4 Months', 'Starter', '₹249', '/ 4 months', 'Short-term plan for focused preparation.', '4 Months', 'Unlimited', '10 / Month', '22', Icons.rocket_launch_outlined, const Color(0xFF10B981), false)),
-        const SizedBox(width: 12),
-        Expanded(child: _buildPlanCard('Pro', '8 Months', 'Most Popular', '₹449', '/ 8 months', 'Best for serious NEET & JEE aspirants.', '8 Months', 'Unlimited', 'Unlimited', '35', Icons.workspace_premium_outlined, const Color(0xFF8B5CF6), true)),
-        const SizedBox(width: 12),
-        Expanded(child: _buildPlanCard('Ultimate', '1 Year', 'Ultimate', '₹689', '/ year', 'Complete preparation with advanced AI.', '1 Year', 'Unlimited', 'Unlimited', '50', Icons.diamond_outlined, const Color(0xFF3B82F6), false)),
-      ],
+    if (_isLoadingPlans) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    final displayedPlans = _plans.where((p) => _showInactivePlans || (p['is_active'] != false)).toList();
+
+    if (displayedPlans.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.inventory_2_outlined, size: 48, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 12),
+            const Text('No Subscription Plans Available', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A))),
+            const SizedBox(height: 4),
+            const Text('Click "Create New Plan" to set up your subscription packages.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => _openCreateOrEditPlanModal(),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Create New Plan'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        int crossAxisCount = constraints.maxWidth > 1100 ? 4 : (constraints.maxWidth > 750 ? 2 : 1);
+        double cardWidth = (constraints.maxWidth - ((crossAxisCount - 1) * 12)) / crossAxisCount;
+
+        return Wrap(
+          spacing: 12,
+          runSpacing: 16,
+          children: List.generate(displayedPlans.length, (index) {
+            final plan = displayedPlans[index];
+            final originalIndex = _plans.indexOf(plan);
+            return SizedBox(
+              width: cardWidth,
+              child: _buildDynamicPlanCard(plan, originalIndex),
+            );
+          }),
+        );
+      },
     );
   }
 
-  Widget _buildPlanCard(
-    String title,
-    String durationTitle,
-    String badgeText,
-    String price,
-    String priceUnit,
-    String description,
-    String durationVal,
-    String maxQuestionsVal,
-    String mockTestsVal,
-    String featuresCount,
-    IconData icon,
-    Color themeColor,
-    bool isPopular,
-  ) {
+  Widget _buildDynamicPlanCard(Map<String, dynamic> plan, int originalIndex) {
+    final String title = plan['title']?.toString() ?? 'Plan';
+    final String durationTitle = plan['duration_title']?.toString() ?? '${plan['duration_days'] ?? 30} Days';
+    final String badgeText = plan['badge']?.toString() ?? title;
+    final double price = (plan['price'] as num?)?.toDouble() ?? 0.0;
+    final String priceUnit = plan['billing_period']?.toString() ?? '/ period';
+    final String description = plan['description']?.toString() ?? '';
+    final String durationVal = '${plan['duration_days'] ?? 30} Days';
+    final String maxQuestionsVal = plan['max_questions_per_day']?.toString() ?? 'Unlimited';
+    final String mockTestsVal = plan['mock_tests']?.toString() ?? 'Unlimited';
+    final String featuresCount = '${(plan['features'] as List?)?.length ?? plan['features_count'] ?? 0}';
+    final bool isPopular = plan['is_popular'] == true;
+    final bool isActive = plan['is_active'] != false;
+
+    Color themeColor = const Color(0xFF10B981);
+    IconData icon = Icons.rocket_launch_outlined;
+
+    if (plan['badge_color'] is int) {
+      themeColor = Color(plan['badge_color'] as int);
+    } else if (isPopular) {
+      themeColor = const Color(0xFF8B5CF6);
+      icon = Icons.workspace_premium_outlined;
+    } else if (title.toLowerCase().contains('trial')) {
+      themeColor = Colors.amber;
+      icon = Icons.star_border_rounded;
+    } else if (title.toLowerCase().contains('ultimate')) {
+      themeColor = const Color(0xFF3B82F6);
+      icon = Icons.diamond_outlined;
+    }
+
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isActive ? Colors.white : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isPopular ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
+              color: isPopular ? const Color(0xFF4F46E5) : (isActive ? const Color(0xFFE2E8F0) : const Color(0xFFCBD5E1)),
               width: isPopular ? 2 : 1,
             ),
             boxShadow: isPopular
@@ -741,7 +1258,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                     decoration: BoxDecoration(color: themeColor.withOpacity(0.1), shape: BoxShape.circle),
                     child: Icon(icon, color: themeColor, size: 20),
                   ),
-                  if (!isPopular)
+                  if (!isPopular && badgeText.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
@@ -753,7 +1270,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isActive ? const Color(0xFF0F172A) : const Color(0xFF64748B))),
               Text(durationTitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
               const SizedBox(height: 12),
 
@@ -762,33 +1279,33 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text(price, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  Text('₹${price == price.toInt() ? price.toInt() : price}', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: isActive ? const Color(0xFF0F172A) : const Color(0xFF64748B))),
                   const SizedBox(width: 4),
                   Text(priceUnit, style: const TextStyle(fontSize: 11, color: Colors.grey)),
                 ],
               ),
               const SizedBox(height: 8),
-              Text(description, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)), maxLines: 2),
+              Text(description, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)), maxLines: 2, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 16),
               const Divider(height: 1),
               const SizedBox(height: 12),
 
               // Details List
-              _buildPlanDetailRow('Status', 'Active', isStatusBadge: true),
+              _buildPlanDetailRow('Status', isActive ? 'Active' : 'Inactive', isStatusBadge: true, isActive: isActive),
               _buildPlanDetailRow('Duration', durationVal),
               _buildPlanDetailRow('Max Questions / Day', maxQuestionsVal),
               _buildPlanDetailRow('Mock Tests', mockTestsVal),
               _buildPlanDetailRow('Features', featuresCount),
-              _buildPlanDetailRow('Created On', '12 May 2025'),
+              _buildPlanDetailRow('Created On', plan['created_at'] != null ? plan['created_at'].toString().split('T').first : '12 May 2025'),
               const SizedBox(height: 16),
 
-              // Card Actions
+              // Card Actions (Edit Plan Button & Options Menu)
               Row(
                 children: [
                   Expanded(
                     child: isPopular
                         ? ElevatedButton(
-                            onPressed: () {},
+                            onPressed: () => _openCreateOrEditPlanModal(existingPlan: plan, planIndex: originalIndex),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF4F46E5),
                               foregroundColor: Colors.white,
@@ -799,7 +1316,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                             child: const Text('Edit Plan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                           )
                         : OutlinedButton(
-                            onPressed: () {},
+                            onPressed: () => _openCreateOrEditPlanModal(existingPlan: plan, planIndex: originalIndex),
                             style: OutlinedButton.styleFrom(
                               side: const BorderSide(color: Color(0xFFE2E8F0)),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -809,15 +1326,72 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                           ),
                   ),
                   const SizedBox(width: 8),
-                  OutlinedButton(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
-                      padding: const EdgeInsets.all(12),
-                      minimumSize: Size.zero,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+
+                  // Options Popup Menu Button (3 dots)
+                  PopupMenuButton<String>(
+                    tooltip: 'Plan Options',
+                    onSelected: (action) {
+                      if (action == 'edit') {
+                        _openCreateOrEditPlanModal(existingPlan: plan, planIndex: originalIndex);
+                      } else if (action == 'toggle_active') {
+                        _togglePlanStatus(originalIndex);
+                      } else if (action == 'toggle_popular') {
+                        _togglePlanPopular(originalIndex);
+                      } else if (action == 'delete') {
+                        _deletePlan(originalIndex);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined, size: 16, color: Color(0xFF4F46E5)),
+                            SizedBox(width: 8),
+                            Text('Edit Plan', style: TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'toggle_active',
+                        child: Row(
+                          children: [
+                            Icon(isActive ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 16, color: const Color(0xFF10B981)),
+                            const SizedBox(width: 8),
+                            Text(isActive ? 'Mark Inactive' : 'Mark Active', style: const TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'toggle_popular',
+                        child: Row(
+                          children: [
+                            Icon(isPopular ? Icons.star_outline : Icons.star_rounded, size: 16, color: const Color(0xFFF59E0B)),
+                            const SizedBox(width: 8),
+                            Text(isPopular ? 'Remove Popular Badge' : 'Set as Most Popular', style: const TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Delete Plan', style: TextStyle(fontSize: 12, color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.more_horiz, size: 16, color: Color(0xFF64748B)),
                     ),
-                    child: const Icon(Icons.more_horiz, size: 16, color: Colors.grey),
                   ),
                 ],
               ),
@@ -846,7 +1420,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
     );
   }
 
-  Widget _buildPlanDetailRow(String label, String val, {bool isStatusBadge = false}) {
+  Widget _buildPlanDetailRow(String label, String val, {bool isStatusBadge = false, bool isActive = true}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: Row(
@@ -856,8 +1430,18 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
           if (isStatusBadge)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(color: const Color(0xFF10B981).withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
-              child: const Text('Active', style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 10)),
+              decoration: BoxDecoration(
+                color: (isActive ? const Color(0xFF10B981) : const Color(0xFF64748B)).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                isActive ? 'Active' : 'Inactive',
+                style: TextStyle(
+                  color: isActive ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10,
+                ),
+              ),
             )
           else
             Text(val, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
@@ -978,7 +1562,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
           const Text('Quick Actions', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
           const SizedBox(height: 12),
           _buildQuickActionItem('💳 Configure Payment Gateways (UPI & Cashfree)', Icons.payment_rounded, const Color(0xFF10B981), () => _showPaymentGatewayModal(context)),
-          _buildQuickActionItem('+ Add New Plan', Icons.add, const Color(0xFF4F46E5), _openCreatePlanModal),
+          _buildQuickActionItem('+ Add New Plan', Icons.add, const Color(0xFF4F46E5), () => _openCreateOrEditPlanModal()),
           _buildQuickActionItem('Manage Features', Icons.tune, const Color(0xFF64748B), () {}),
           _buildQuickActionItem('Plan Comparison', Icons.bar_chart, const Color(0xFF64748B), () {}),
           _buildQuickActionItem('Bulk Update Prices', Icons.sell_outlined, const Color(0xFF64748B), () {}),
