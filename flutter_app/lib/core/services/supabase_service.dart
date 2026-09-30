@@ -5178,6 +5178,12 @@ class SupabaseService {
     'ts_neet_sprint',
     'ts_nta_pyq',
     'ts_neet_topic_booster',
+    'ts_neet_2027_leader',
+    'ts_jee_main_2026',
+    'ts_neet_2028_foundation',
+    'ts_jee_adv_2026',
+    'ts_neet_12th_board_combo',
+    'ts_jee_main_2027_crash',
   };
 
   /// Curated production-ready default test series for NEET & JEE (Demo data purged - only dynamic)
