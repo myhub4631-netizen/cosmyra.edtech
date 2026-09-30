@@ -106,6 +106,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   String _paperId = '';
   bool _isLoading = true;
   bool _isSavingBatch = false;
+  List<String> _paperDefaultAvailableIn = ['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
 
   bool _hasEssentialDetails(QuestionItemData q) {
     // 1. Question text or image must be provided
@@ -134,9 +135,9 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       }
     }
 
-    // Auto-fix visibility if empty
+    // Auto-fix visibility if empty (use the test series' default visibility configured in Step 1)
     if (q.availableIn.isEmpty) {
-      q.availableIn = ['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
+      q.availableIn = List<String>.from(_paperDefaultAvailableIn);
     }
 
     return true;
@@ -222,10 +223,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
     final int qCount = (int.tryParse(_paperData?['question_count']?.toString() ?? '') ?? widget.totalQuestionsCount).clamp(1, 1000);
 
-    final dynamic paperAvailRaw = _paperData?['available_in'] ?? _paperData?['availableIn'];
+    final dynamic paperAvailRaw = widget.paperRecord?['available_in'] ?? widget.paperRecord?['availableIn'] ?? _paperData?['available_in'] ?? _paperData?['availableIn'];
     final List<String> defaultAvailableIn = (paperAvailRaw is List && paperAvailRaw.isNotEmpty)
         ? List<String>.from(paperAvailRaw)
         : <String>['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
+    _paperDefaultAvailableIn = List<String>.from(defaultAvailableIn);
 
     final String optionPresetKey = widget.paperRecord?['defaultOptionPreset'] ?? widget.paperRecord?['default_option_preset'] ?? _paperData?['defaultOptionPreset'] ?? _paperData?['default_option_preset'] ?? '1_2_3_4';
     final List<String> defaultPresetOpts = _getPresetOptions(optionPresetKey);
@@ -756,6 +758,24 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   }
 
   void _applyOptionPresetToAllQuestions(String presetKey) {
+    if (presetKey == 'sync_visibility') {
+      setState(() {
+        for (var q in _questionsList) {
+          q.availableIn = List<String>.from(_paperDefaultAvailableIn);
+        }
+      });
+      _saveAllQuestions(showToast: false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('⚡ Synced visibility to paper default across all ${_questionsList.length} questions!'),
+          backgroundColor: const Color(0xFF4F46E5),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     final newOpts = _getPresetOptions(presetKey);
     setState(() {
       for (var q in _questionsList) {
@@ -1376,6 +1396,10 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                   const PopupMenuItem(
                     value: '(A)_(B)_(C)_(D)',
                     child: Text('⚡ Set All Questions: A=(A), B=(B), C=(C), D=(D)'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'sync_visibility',
+                    child: Text('⚡ Sync All Questions Visibility to Test Series Default'),
                   ),
                   const PopupMenuItem(
                     value: 'blank',
@@ -2396,7 +2420,30 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         const SizedBox(height: 16),
 
         // 9. Visibility / Available In *
-        Text('9. Visibility / Available In *', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('9. Visibility / Available In *', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+            InkWell(
+              onTap: () {
+                setState(() {
+                  q.availableIn = List<String>.from(_paperDefaultAvailableIn);
+                });
+                _scheduleAutoSave(q);
+              },
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFC7D2FE)),
+                ),
+                child: Text('⚡ Use Test Series Default', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5))),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 6),
         Container(
           width: double.infinity,
