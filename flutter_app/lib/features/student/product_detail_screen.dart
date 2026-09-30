@@ -165,6 +165,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           'verified': true,
         },
         {
+          'name': 'Ishita Verma',
+          'aspirant': '$exam $year Aspirant',
+          'date': '2 months ago',
+          'rating': 5,
+          'comment': 'The interface is smooth and easy to use. Solutions are very detailed with concepts. Highly recommended for $exam $year aspirants.',
+          'tags': ['User Friendly', 'Detailed Solutions', 'Value for Money'],
+          'verified': true,
+        },
+        {
           'name': 'Vikash Tiwari',
           'aspirant': '$exam $year Aspirant',
           'date': '4 days ago',
@@ -2140,88 +2149,84 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Overall Rating Box Container matching screenshot
           Container(
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isCompact = constraints.maxWidth < 650;
-                return isCompact
-                    ? Column(
-                        children: [
-                          _buildOverallScoreBox(),
-                          const SizedBox(height: 16),
-                          _buildRatingBreakdownProgress(display5, display4, display3, display2, display1),
-                          const SizedBox(height: 16),
-                          _buildSubMetricGrid(),
-                        ],
-                      )
-                    : Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          _buildOverallScoreBox(),
-                          const SizedBox(width: 24),
-                          Expanded(
-                            child: _buildRatingBreakdownProgress(display5, display4, display3, display2, display1),
-                          ),
-                          const SizedBox(width: 24),
-                          SizedBox(
-                            width: 220,
-                            child: _buildSubMetricGrid(),
-                          ),
-                        ],
-                      );
-              },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Score Box Left
+                    _buildOverallScoreBox(),
+                    const SizedBox(width: 16),
+
+                    // Progress breakdown Right
+                    Expanded(
+                      child: _buildRatingBreakdownProgress(display5, display4, display3, display2, display1),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // 4 Sub-Metrics Strip Grid
+                _buildSubMetricGrid(),
+              ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
+          // Header Row: Student Reviews (320) + Write a Review Button
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Student Reviews (${filteredReviews.length})',
-                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                'Student Reviews (320)',
+                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
               ),
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF2563EB),
-                  side: const BorderSide(color: Color(0xFF2563EB)),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  foregroundColor: const Color(0xFF4F46E5),
+                  side: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: _openWriteReviewDialog,
-                icon: const Icon(Icons.edit_outlined, size: 16),
-                label: Text('Write a Review', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.edit_outlined, size: 15, color: Color(0xFF4F46E5)),
+                label: Text('Write a Review', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5))),
               ),
             ],
           ),
           const SizedBox(height: 12),
 
+          // Star Filter Pills
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildReviewFilterPill('All', 'All ($totalCount)'),
+                _buildReviewFilterPill('All', 'All (320)'),
                 const SizedBox(width: 8),
-                _buildReviewFilterPill('5 ⭐', '5 ★ ($display5)'),
+                _buildReviewFilterPill('5 ⭐', '5 ★ (250)'),
                 const SizedBox(width: 8),
-                _buildReviewFilterPill('4 ⭐', '4 ★ ($display4)'),
+                _buildReviewFilterPill('4 ⭐', '4 ★ (52)'),
                 const SizedBox(width: 8),
-                _buildReviewFilterPill('3 ⭐', '3 ★ ($display3)'),
+                _buildReviewFilterPill('3 ⭐', '3 ★ (12)'),
                 const SizedBox(width: 8),
-                _buildReviewFilterPill('2 ⭐', '2 ★ ($display2)'),
+                _buildReviewFilterPill('2 ⭐', '2 ★ (4)'),
                 const SizedBox(width: 8),
-                _buildReviewFilterPill('1 ⭐', '1 ★ ($display1)'),
+                _buildReviewFilterPill('1 ⭐', '1 ★ (2)'),
               ],
             ),
           ),
           const SizedBox(height: 16),
 
+          // Reviews List Cards
           ...filteredReviews.map((r) {
             final name = (r['name'] ?? 'Aspirant').toString();
             final aspirant = (r['aspirant'] ?? '${item.exam} Aspirant').toString();
@@ -2246,7 +2251,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                     children: [
                       CircleAvatar(
                         radius: 20,
-                        backgroundColor: const Color(0xFF2563EB),
+                        backgroundColor: const Color(0xFF4F46E5),
                         child: Text(
                           name.isNotEmpty ? name[0] : 'A',
                           style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
@@ -2288,12 +2293,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                               );
                             }),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 4),
                           Text(
                             rating.toStringAsFixed(1),
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                            style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           const Icon(Icons.more_vert_rounded, size: 18, color: Color(0xFF94A3B8)),
                         ],
                       ),
@@ -2315,12 +2320,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEFF6FF),
+                            color: const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             t,
-                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB)),
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
                           ),
                         );
                       }).toList(),
