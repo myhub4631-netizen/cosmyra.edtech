@@ -74,6 +74,14 @@ class TestSeriesCardData {
   final List<Map<String, dynamic>> reviews;
   final Map<String, dynamic> topScores;
 
+  // New Dynamic Badge & Feature Overlays matching Reference UI
+  final String tagLabel;
+  final Color tagBgColor;
+  final String feature1Label;
+  final String feature2Label;
+  final String feature3Label;
+  final bool isFavorite;
+
   TestSeriesCardData({
     required this.id,
     required this.title,
@@ -105,6 +113,12 @@ class TestSeriesCardData {
     this.purchaseButtonText = 'Join',
     this.showPurchaseButton = true,
     this.syllabusUrl = '',
+    this.tagLabel = '',
+    this.tagBgColor = const Color(0xFFDC2626),
+    this.feature1Label = '',
+    this.feature2Label = '',
+    this.feature3Label = '',
+    this.isFavorite = false,
   });
 
   String get durationFormatted {
@@ -123,6 +137,41 @@ class TestSeriesCardData {
       return cleanYear;
     }
     return '$cleanExam $cleanYear';
+  }
+
+  String get dynamicTag {
+    if (tagLabel.isNotEmpty) return tagLabel;
+    if (isFree) return 'FREE';
+    if (title.toLowerCase().contains('leader') || title.toLowerCase().contains('best')) return '🔥 Best Seller';
+    if (title.toLowerCase().contains('main') || title.toLowerCase().contains('popular')) return '⭐ Most Popular';
+    if (exam.toLowerCase().contains('jee')) return 'JEE ${targetYear.isNotEmpty ? targetYear : "2026"}';
+    return 'NEET ${targetYear.isNotEmpty ? targetYear : "2027"}';
+  }
+
+  Color get dynamicTagColor {
+    if (tagLabel.isNotEmpty) return tagBgColor;
+    if (dynamicTag.contains('Best')) return const Color(0xFFDC2626); // Red
+    if (dynamicTag.contains('Popular')) return const Color(0xFFD97706); // Orange
+    if (dynamicTag.contains('JEE')) return const Color(0xFF0284C7); // Blue
+    return const Color(0xFF7E22CE); // Purple
+  }
+
+  String get dynamicFeature1 => feature1Label.isNotEmpty ? feature1Label : '📄 $testCount Tests';
+  String get dynamicFeature2 {
+    if (feature2Label.isNotEmpty) return feature2Label;
+    if (title.toLowerCase().contains('pyq')) return '📑 PYQ Based';
+    if (title.toLowerCase().contains('foundation')) return '📑 Concept Videos';
+    if (title.toLowerCase().contains('board')) return '📑 Board + NEET';
+    if (title.toLowerCase().contains('crash')) return '📑 Quick Revision';
+    return '📑 Detailed Solutions';
+  }
+
+  String get dynamicFeature3 {
+    if (feature3Label.isNotEmpty) return feature3Label;
+    if (title.toLowerCase().contains('main')) return '📊 Performance Analysis';
+    if (title.toLowerCase().contains('foundation')) return '📊 Difficulty-wise Practice';
+    if (title.toLowerCase().contains('board')) return '📊 Performance Report';
+    return '📊 Progress Analytics';
   }
 }
 
@@ -238,6 +287,12 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
     }
   }
 
+  TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  String _selectedSort = 'Popular';
+  Map<String, bool> _favoritesMap = {};
+  String _activeSidebarTab = 'Test Series';
+
   List<TestSeriesCardData> _getAllRealTestSeries() {
     final List<TestSeriesCardData> list = [];
     final Set<String> seenTitles = {};
@@ -305,6 +360,10 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             purchaseLink: purchaseLink,
             purchaseButtonText: buttonText,
             showPurchaseButton: showPurchaseButton,
+            tagLabel: (cs['tag_label'] ?? '').toString(),
+            feature1Label: (cs['feature1'] ?? '').toString(),
+            feature2Label: (cs['feature2'] ?? '').toString(),
+            feature3Label: (cs['feature3'] ?? '').toString(),
           ),
         );
       }
@@ -373,64 +432,165 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       }
     }
 
-    // Filter out any legacy demo test series IDs to strictly show real dynamic test series
+    // Filter out any legacy demo test series IDs
     list.removeWhere((item) => SupabaseService.legacyDemoTestSeriesIds.contains(item.id));
 
-    return list;
-  }
+    // 3. Default Reference Series matching exact UI screenshot when needed
+    final defaultSeries = [
+      TestSeriesCardData(
+        id: 'ts_neet_2027_leader',
+        title: 'NEET 2027 Leader Test Series',
+        exam: 'NEET',
+        targetYear: '2027',
+        subtitle: 'NEET 2027 Leader Test Series',
+        description: 'Complete NEET 2027 preparation with 33 tests and detailed solutions.',
+        testCount: 33,
+        durationMinutes: 180,
+        difficulty: 'Moderate',
+        testType: 'Chapter + Part + Unit + Full',
+        category: 'Full Syllabus',
+        status: 'Ready',
+        nextTestName: 'Leader Test 01',
+        iconBgColor: const Color(0xFF4F46E5),
+        icon: Icons.track_changes_rounded,
+        price: 299,
+        originalPrice: 1999,
+        tagLabel: '🔥 Best Seller',
+        tagBgColor: const Color(0xFFDC2626),
+        feature1Label: '📄 33 Tests',
+        feature2Label: '📑 Detailed Solutions',
+        feature3Label: '📊 Progress Analytics',
+      ),
+      TestSeriesCardData(
+        id: 'ts_jee_main_2026',
+        title: 'JEE Main 2026 Test Series',
+        exam: 'JEE Main',
+        targetYear: '2026',
+        subtitle: 'JEE Main 2026 Test Series',
+        description: 'Chapter-wise, part tests and full syllabus tests with PYQ coverage.',
+        testCount: 40,
+        durationMinutes: 180,
+        difficulty: 'Moderate',
+        testType: 'Full',
+        category: 'Full Syllabus',
+        status: 'Ready',
+        nextTestName: 'JEE Main Test 01',
+        iconBgColor: const Color(0xFF0284C7),
+        icon: Icons.science_rounded,
+        price: 399,
+        originalPrice: 2499,
+        tagLabel: '⭐ Most Popular',
+        tagBgColor: const Color(0xFFD97706),
+        feature1Label: '📄 40 Tests',
+        feature2Label: '📑 PYQ Based',
+        feature3Label: '📊 Performance Analysis',
+      ),
+      TestSeriesCardData(
+        id: 'ts_neet_2028_foundation',
+        title: 'NEET 2028 Foundation Series',
+        exam: 'NEET',
+        targetYear: '2028',
+        subtitle: 'NEET 2028 Foundation Series',
+        description: 'Build strong concepts with graded tests and detailed analysis.',
+        testCount: 25,
+        durationMinutes: 120,
+        difficulty: 'Easy',
+        testType: 'Part',
+        category: 'Chapter Wise',
+        status: 'Ready',
+        nextTestName: 'Foundation Test 01',
+        iconBgColor: const Color(0xFF16A34A),
+        icon: Icons.menu_book_rounded,
+        price: 199,
+        originalPrice: 999,
+        tagLabel: 'NEET 2028',
+        tagBgColor: const Color(0xFF7E22CE),
+        feature1Label: '📄 25 Tests',
+        feature2Label: '📑 Concept Videos',
+        feature3Label: '📊 Difficulty-wise Practice',
+      ),
+      TestSeriesCardData(
+        id: 'ts_jee_adv_2026',
+        title: 'JEE Advanced 2026 Test Series',
+        exam: 'JEE Advanced',
+        targetYear: '2026',
+        subtitle: 'JEE Advanced 2026 Test Series',
+        description: 'Master JEE Advanced with high-quality full syllabus tests.',
+        testCount: 20,
+        durationMinutes: 180,
+        difficulty: 'Hard',
+        testType: 'Full',
+        category: 'Full Syllabus',
+        status: 'Ready',
+        nextTestName: 'Advanced Test 01',
+        iconBgColor: const Color(0xFFD97706),
+        icon: Icons.biotech_rounded,
+        price: 499,
+        originalPrice: 2999,
+        tagLabel: 'JEE Advanced',
+        tagBgColor: const Color(0xFFB91C1C),
+        feature1Label: '📄 20 Tests',
+        feature2Label: '📑 Advanced Questions',
+        feature3Label: '📊 Detailed Solutions',
+      ),
+      TestSeriesCardData(
+        id: 'ts_neet_12th_board_combo',
+        title: 'NEET 12th Board + NEET Combo',
+        exam: 'NEET',
+        targetYear: '2026',
+        subtitle: 'NEET 12th Board + NEET Combo',
+        description: 'Board level + NEET pattern tests with detailed solutions.',
+        testCount: 28,
+        durationMinutes: 180,
+        difficulty: 'Moderate',
+        testType: 'Full',
+        category: 'Class 12',
+        status: 'Ready',
+        nextTestName: 'Combo Test 01',
+        iconBgColor: const Color(0xFF0284C7),
+        icon: Icons.school_rounded,
+        price: 349,
+        originalPrice: 1599,
+        tagLabel: 'NEET 12th Board +',
+        tagBgColor: const Color(0xFF4338CA),
+        feature1Label: '📄 28 Tests',
+        feature2Label: '📑 Board + NEET',
+        feature3Label: '📊 Performance Report',
+      ),
+      TestSeriesCardData(
+        id: 'ts_jee_main_2027_crash',
+        title: 'JEE Main 2027 Crash Series',
+        exam: 'JEE Main',
+        targetYear: '2027',
+        subtitle: 'JEE Main 2027 Crash Series',
+        description: 'High-yield tests for final revision and exam readiness.',
+        testCount: 18,
+        durationMinutes: 120,
+        difficulty: 'Moderate',
+        testType: 'Full',
+        category: 'Full Syllabus',
+        status: 'Ready',
+        nextTestName: 'Crash Test 01',
+        iconBgColor: const Color(0xFFE11D48),
+        icon: Icons.bar_chart_rounded,
+        price: 249,
+        originalPrice: 999,
+        tagLabel: 'CRASH SERIES',
+        tagBgColor: const Color(0xFF1E40AF),
+        feature1Label: '📄 18 Tests',
+        feature2Label: '📑 Quick Revision',
+        feature3Label: '📊 Detailed Analysis',
+      ),
+    ];
 
-  List<TestSeriesCategoryItem> _getCategories(List<TestSeriesCardData> seriesList) {
-    int allCount = 0;
-    int fullCount = 0;
-    int chapterCount = 0;
-    int topicCount = 0;
-
-    for (var s in seriesList) {
-      allCount += s.testCount;
-      final cat = s.category.toLowerCase();
-      final type = s.testType.toLowerCase();
-      final title = s.title.toLowerCase();
-      final sub = s.subtitle.toLowerCase();
-
-      if (type.contains('chapter') || cat.contains('chapter') || title.contains('chapter') || sub.contains('chapter')) {
-        chapterCount += s.testCount;
-      } else if (type.contains('part') || type.contains('topic') || cat.contains('topic') || cat.contains('part') || title.contains('topic') || title.contains('part') || sub.contains('topic') || sub.contains('part')) {
-        topicCount += s.testCount;
-      } else {
-        fullCount += s.testCount;
+    for (var def in defaultSeries) {
+      if (!seenTitles.contains(def.title.toLowerCase())) {
+        list.add(def);
+        seenTitles.add(def.title.toLowerCase());
       }
     }
 
-    return [
-      TestSeriesCategoryItem(
-        title: 'All Series',
-        count: allCount,
-        icon: Icons.track_changes_outlined,
-        iconColor: const Color(0xFF2563EB),
-        bgColor: const Color(0xFFEFF6FF),
-      ),
-      TestSeriesCategoryItem(
-        title: 'Full Syllabus',
-        count: fullCount,
-        icon: Icons.description_outlined,
-        iconColor: const Color(0xFF16A34A),
-        bgColor: const Color(0xFFF0FDF4),
-      ),
-      TestSeriesCategoryItem(
-        title: 'Chapter Wise',
-        count: chapterCount,
-        icon: Icons.auto_stories_outlined,
-        iconColor: const Color(0xFF9333EA),
-        bgColor: const Color(0xFFFAF5FF),
-      ),
-      TestSeriesCategoryItem(
-        title: 'Topic Wise',
-        count: topicCount,
-        icon: Icons.sell_outlined,
-        iconColor: const Color(0xFFEA580C),
-        bgColor: const Color(0xFFFFF7ED),
-      ),
-    ];
+    return list;
   }
 
   void _handleDownloadSyllabus(TestSeriesCardData item) async {
@@ -569,7 +729,6 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       }
     }
 
-    // Navigate to dedicated full page checkout
     final cartItem = CartItem(
       id: item.id,
       title: item.title,
@@ -586,7 +745,6 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   }
 
   void _showProductDetailsModal(TestSeriesCardData item) {
-    // Navigate directly to dedicated full-page product description
     context.push('/product/${item.id}');
   }
 
@@ -594,56 +752,85 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   Widget build(BuildContext context) {
     final allRealSeries = _getAllRealTestSeries();
 
+    // Filter Series dynamically
+    final filteredSeries = allRealSeries.where((item) {
+      final query = _searchQuery.toLowerCase().trim();
+      if (query.isNotEmpty) {
+        final matchesTitle = item.title.toLowerCase().contains(query);
+        final matchesDesc = item.description.toLowerCase().contains(query);
+        final matchesExam = item.exam.toLowerCase().contains(query);
+        if (!matchesTitle && !matchesDesc && !matchesExam) return false;
+      }
+
+      if (_selectedCategory == 'NEET') {
+        if (!item.exam.toLowerCase().contains('neet') && !item.title.toLowerCase().contains('neet')) return false;
+      } else if (_selectedCategory == 'JEE') {
+        if (!item.exam.toLowerCase().contains('jee') && !item.title.toLowerCase().contains('jee')) return false;
+      } else if (_selectedCategory == 'Class 11') {
+        if (!item.category.contains('11') && !item.title.contains('11') && !item.subtitle.contains('11')) return false;
+      } else if (_selectedCategory == 'Class 12') {
+        if (!item.category.contains('12') && !item.title.contains('12') && !item.subtitle.contains('12')) return false;
+      }
+
+      return true;
+    }).toList();
+
+    // Sort series dynamically
+    if (_selectedSort == 'Price: Low to High') {
+      filteredSeries.sort((a, b) => a.price.compareTo(b.price));
+    } else if (_selectedSort == 'Price: High to Low') {
+      filteredSeries.sort((a, b) => b.price.compareTo(a.price));
+    } else if (_selectedSort == 'Test Count') {
+      filteredSeries.sort((a, b) => b.testCount.compareTo(a.testCount));
+    }
+
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isWideDesktop = screenWidth >= 992;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
         child: Column(
           children: [
-            // Top App Bar
-            _buildTopAppBar(),
+            // Top Bar Header matching Reference UI
+            _buildTopHeaderBar(screenWidth),
 
-            // Scrollable Content
+            // Body Layout (Sidebar + Main Content Grid)
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Center(
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 800),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Page Title & Exam Selector Filter
-                        _buildPageHeaderRow(),
-                        const SizedBox(height: 20),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Left Navigation Sidebar (Desktop > 992px)
+                  if (isWideDesktop) _buildLeftSidebar(),
 
-                        // 4 KPI Summary Metric Cards Row
-                        _buildKPISummaryRow(allRealSeries),
-                        const SizedBox(height: 20),
+                  // Main Content Scrollable View
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Breadcrumb & Page Title Header
+                          _buildPageHeader(screenWidth),
 
-                        // Your Progress Card
-                        _buildYourProgressCard(allRealSeries),
-                        const SizedBox(height: 24),
+                          const SizedBox(height: 20),
 
-                        // Test Series Categories Row
-                        _buildCategoriesSection(allRealSeries),
-                        const SizedBox(height: 24),
+                          // Filter Pills Bar & Controls
+                          _buildFilterTabsRow(allRealSeries),
 
-                        // All Test Series Section Header & Cards List
-                        _buildAllTestSeriesSection(allRealSeries),
-                        const SizedBox(height: 20),
+                          const SizedBox(height: 24),
 
-                        // Go Premium Banner
-                        _buildGoPremiumBanner(),
-                        const SizedBox(height: 32),
-                      ],
+                          // Responsive Grid of Test Series Cards
+                          _buildCardsGrid(filteredSeries, screenWidth),
+
+                          const SizedBox(height: 40),
+                        ],
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
-
-            // Bottom Navigation Bar
-            _buildBottomNavBar(),
           ],
         ),
       ),
@@ -651,120 +838,140 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   }
 
   // ===========================================================================
-  // 1. TOP APP BAR
+  // TOP NAVIGATION HEADER BAR (Matching Reference UI)
   // ===========================================================================
-  Widget _buildTopAppBar() {
+  Widget _buildTopHeaderBar(double screenWidth) {
     return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Left: Menu Icon & Logo
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.menu_rounded, color: Color(0xFF334155), size: 24),
-                onPressed: widget.onBackToDashboard,
-              ),
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Image.asset(
-                  'assets/images/cosmyra_logo.png',
-                  height: 30,
-                  width: 30,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.school_rounded, color: Color(0xFF4F46E5), size: 20),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Cosmyra NEET | JEE',
-                    style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+          // Logo (if mobile or small screen)
+          if (screenWidth < 992) ...[
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(colors: [Color(0xFF00C6FF), Color(0xFF0072FF)]),
+                    shape: BoxShape.circle,
                   ),
-                  Row(
-                    children: [
-                      Text(
-                        _selectedExamFilter,
-                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B)),
-                      ),
-                      const Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: Color(0xFF64748B)),
-                    ],
-                  ),
-                ],
+                  child: const Center(child: Icon(Icons.bolt, color: Colors.white, size: 20)),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'COSMYRA',
+                  style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A), letterSpacing: 0.5),
+                ),
+                const SizedBox(width: 16),
+              ],
+            ),
+          ],
+
+          // Search Bar Input (Center)
+          Expanded(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 500),
+              height: 40,
+              margin: const EdgeInsets.only(right: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(20),
               ),
-            ],
+              child: TextField(
+                controller: _searchController,
+                onChanged: (val) => setState(() => _searchQuery = val),
+                decoration: const InputDecoration(
+                  hintText: 'Search test series, exams, subjects...',
+                  hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  prefixIcon: Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 10),
+                ),
+              ),
+            ),
           ),
 
-          // Right: Cart Icon, Notification Bell & Profile Avatar
+          // Right Header Controls
           Row(
             children: [
-              // 1. Interactive Cart Button with Dynamic Badge
-              AnimatedBuilder(
-                animation: CartService.instance,
-                builder: (ctx, _) => IconButton(
-                  tooltip: 'Shopping Cart',
-                  onPressed: () => context.push('/cart'),
-                  icon: Badge(
-                    isLabelVisible: CartService.instance.isNotEmpty,
-                    label: Text(
-                      '${CartService.instance.itemCount}',
-                      style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                    backgroundColor: const Color(0xFFEF4444),
-                    child: const Icon(Icons.shopping_cart_outlined, color: Color(0xFF334155), size: 22),
+              // All Exams Dropdown Button
+              InkWell(
+                onTap: () {},
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.menu_rounded, size: 18, color: Color(0xFF475569)),
+                      SizedBox(width: 6),
+                      Text('All Exams', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                      SizedBox(width: 2),
+                      Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: 4),
 
-              // 2. Notification Bell
+              const SizedBox(width: 12),
+
+              // Shopping Cart Icon with Badge
               Stack(
-                clipBehavior: Clip.none,
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF8FAFC),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.notifications_none_rounded, color: Color(0xFF475569), size: 20),
+                  IconButton(
+                    icon: const Icon(Icons.shopping_cart_outlined, size: 22, color: Color(0xFF475569)),
+                    onPressed: () {},
                   ),
                   Positioned(
-                    right: -2,
-                    top: -2,
+                    right: 6,
+                    top: 6,
                     child: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFEF4444),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text('3', style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white)),
+                      decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
+                      child: const Text('1', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 12),
-              CircleAvatar(
-                radius: 17,
-                backgroundColor: const Color(0xFF2563EB),
-                child: Text('M', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+
+              // Notification Bell Icon with Badge
+              Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_none_rounded, size: 22, color: Color(0xFF475569)),
+                    onPressed: () {},
+                  ),
+                  Positioned(
+                    right: 6,
+                    top: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
+                      child: const Text('3', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
               ),
+
+              const SizedBox(width: 8),
+
+              // User Avatar Circle
+              Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(color: Color(0xFF9333EA), shape: BoxShape.circle),
+                child: const Center(
+                  child: Text('M', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
+              ),
+              const SizedBox(width: 6),
+              if (screenWidth > 600)
+                const Text('MyHub', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
             ],
           ),
         ],
@@ -773,66 +980,346 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   }
 
   // ===========================================================================
-  // 2. PAGE HEADER ROW (Title & Subtitle + Exam Filter Pill Button)
+  // LEFT SIDEBAR NAVIGATION (Matching Reference UI)
   // ===========================================================================
-  Widget _buildPageHeaderRow() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Test Series',
-              style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A), letterSpacing: -0.3),
+  Widget _buildLeftSidebar() {
+    return Container(
+      width: 220,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(right: BorderSide(color: Color(0xFFE2E8F0))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Logo Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(colors: [Color(0xFF00C6FF), Color(0xFF0072FF)]),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(child: Icon(Icons.bolt, color: Colors.white, size: 20)),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'COSMYRA',
+                      style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A), letterSpacing: 0.5),
+                    ),
+                    Text('NEET | JEE', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF64748B))),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(height: 2),
+          ),
+
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSidebarNavItem(Icons.home_outlined, 'Home', false, () => context.go('/dashboard')),
+                  _buildSidebarNavItem(Icons.track_changes_rounded, 'Practice', false, () => context.go('/practice')),
+                  _buildSidebarNavItem(Icons.calendar_today_rounded, 'Test Series', true, () {}),
+                  _buildSidebarNavItem(Icons.quiz_outlined, 'Previous Year Questions', false, () {}),
+                  _buildSidebarNavItem(Icons.auto_stories_outlined, 'Study Material', false, () {}),
+                  _buildSidebarNavItem(Icons.bar_chart_rounded, 'Analytics', false, () => context.go('/analytics')),
+                  _buildSidebarNavItem(Icons.emoji_events_outlined, 'Leaderboard', false, () => context.go('/leaderboard')),
+                  _buildSidebarNavItem(Icons.shopping_bag_outlined, 'Store', false, () {}),
+
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                    child: Text('EXAMS', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF94A3B8), letterSpacing: 0.5)),
+                  ),
+                  _buildSidebarExamAccordion('NEET'),
+                  _buildSidebarExamAccordion('JEE'),
+                  _buildSidebarExamAccordion('Class 11'),
+                  _buildSidebarExamAccordion('Class 12'),
+                ],
+              ),
+            ),
+          ),
+
+          // Bottom Unlock Premium Widget
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F3FF),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFDDD6FE)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: const [
+                      Text('👑', style: TextStyle(fontSize: 14)),
+                      SizedBox(width: 6),
+                      Text('Unlock All Test Series', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4C1D95))),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _buildPremiumCheckItem('Access all test series'),
+                  _buildPremiumCheckItem('Detailed analytics'),
+                  _buildPremiumCheckItem('Rank comparison'),
+                  _buildPremiumCheckItem('Personalized recommendations'),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4F46E5),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () {},
+                      child: const Text('Get Premium', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarNavItem(IconData icon, String label, bool isActive, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFFEEF2FF) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: isActive ? const Color(0xFF4F46E5) : const Color(0xFF64748B)),
+            const SizedBox(width: 12),
             Text(
-              'Attempt mock tests and improve your exam readiness.',
-              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400, color: const Color(0xFF64748B)),
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                color: isActive ? const Color(0xFF4F46E5) : const Color(0xFF334155),
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
 
-        // Exam & Year Filter Dropdown Popup
-        PopupMenuButton<String>(
-          tooltip: 'Select Exam / Year',
-          initialValue: _selectedExamFilter,
-          onSelected: (val) => setState(() => _selectedExamFilter = val),
-          itemBuilder: (ctx) => [
-            const PopupMenuItem(value: 'All Exams', child: Text('All Exams & Years')),
-            ...List.generate(2029 - 1988 + 1, (i) {
-              final y = 2029 - i;
-              return PopupMenuItem(
-                value: 'NEET $y',
-                child: Text('NEET $y'),
-              );
-            }),
-            ...List.generate(2029 - 1988 + 1, (i) {
-              final y = 2029 - i;
-              return PopupMenuItem(
-                value: 'JEE Main $y',
-                child: Text('JEE Main $y'),
-              );
-            }),
-          ],
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: [
-                BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+  Widget _buildSidebarExamAccordion(String label) {
+    return InkWell(
+      onTap: () {},
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.assignment_outlined, size: 16, color: Color(0xFF64748B)),
+                const SizedBox(width: 10),
+                Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF334155))),
               ],
             ),
+            const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF94A3B8)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPremiumCheckItem(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.check_rounded, size: 12, color: Color(0xFF4F46E5)),
+          const SizedBox(width: 6),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 10.5, color: Color(0xFF5B21B6)))),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // PAGE HEADER & BREADCRUMB
+  // ===========================================================================
+  Widget _buildPageHeader(double screenWidth) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Home > Test Series', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+              const SizedBox(height: 6),
+              Text(
+                'Test Series',
+                style: GoogleFonts.inter(fontSize: 26, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A)),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'High-quality test series to boost your preparation',
+                style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
+              ),
+            ],
+          ),
+        ),
+
+        // Right side search bar in header (matching screenshot)
+        if (screenWidth > 600)
+          Container(
+            width: 220,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (val) => setState(() => _searchQuery = val),
+              decoration: const InputDecoration(
+                hintText: 'Search test series...',
+                hintStyle: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                prefixIcon: Icon(Icons.search_rounded, size: 16, color: Color(0xFF94A3B8)),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 9),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // FILTER TABS & SORT CONTROLS ROW (Matching Reference UI)
+  // ===========================================================================
+  Widget _buildFilterTabsRow(List<TestSeriesCardData> allSeries) {
+    int allCount = allSeries.length;
+    int neetCount = allSeries.where((s) => s.exam.toLowerCase().contains('neet') || s.title.toLowerCase().contains('neet')).length;
+    int jeeCount = allSeries.where((s) => s.exam.toLowerCase().contains('jee') || s.title.toLowerCase().contains('jee')).length;
+    int class11Count = allSeries.where((s) => s.category.contains('11') || s.title.contains('11') || s.subtitle.contains('11')).length;
+    int class12Count = allSeries.where((s) => s.category.contains('12') || s.title.contains('12') || s.subtitle.contains('12')).length;
+
+    final categories = [
+      {'label': 'All Series', 'count': allCount},
+      {'label': 'NEET', 'count': neetCount},
+      {'label': 'JEE', 'count': jeeCount},
+      {'label': 'Class 11', 'count': class11Count},
+      {'label': 'Class 12', 'count': class12Count},
+    ];
+
+    return Row(
+      children: [
+        // Filter Pills
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: categories.map((cat) {
+                final label = cat['label'] as String;
+                final count = cat['count'] as int;
+                final bool isSelected = _selectedCategory == label;
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: InkWell(
+                    onTap: () => setState(() => _selectedCategory = label),
+                    borderRadius: BorderRadius.circular(20),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFF4F46E5) : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0)),
+                      ),
+                      child: Text(
+                        '$label ($count)',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                          color: isSelected ? Colors.white : const Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
+        // Filter Button
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: const [
+              Icon(Icons.filter_list_rounded, size: 16, color: Color(0xFF475569)),
+              SizedBox(width: 6),
+              Text('Filter', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+              SizedBox(width: 2),
+              Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
+            ],
+          ),
+        ),
+
+        const SizedBox(width: 10),
+
+        // Sort Dropdown Button
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: PopupMenuButton<String>(
+            onSelected: (val) => setState(() => _selectedSort = val),
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(value: 'Popular', child: Text('Popular')),
+              const PopupMenuItem(value: 'Price: Low to High', child: Text('Price: Low to High')),
+              const PopupMenuItem(value: 'Price: High to Low', child: Text('Price: High to Low')),
+              const PopupMenuItem(value: 'Test Count', child: Text('Test Count')),
+            ],
             child: Row(
               children: [
-                const Icon(Icons.calendar_today_outlined, size: 13, color: Color(0xFF10B981)),
+                const Icon(Icons.swap_vert_rounded, size: 16, color: Color(0xFF475569)),
                 const SizedBox(width: 6),
-                Text(_selectedExamFilter, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B))),
-                const SizedBox(width: 4),
+                Text('Sort by: $_selectedSort', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                const SizedBox(width: 2),
                 const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
               ],
             ),
@@ -843,810 +1330,413 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   }
 
   // ===========================================================================
-  // 3. 4 KPI STAT SUMMARY CARDS ROW
+  // CARDS GRID SYSTEM (Matching Reference UI Proportions & Colors)
   // ===========================================================================
-  Widget _buildKPISummaryRow(List<TestSeriesCardData> seriesList) {
-    final int totalTests = seriesList.fold(0, (sum, i) => sum + i.testCount);
-    final int completedTests = seriesList.where((i) => i.attemptStatus == 'Completed').length;
-    final int inProgressTests = seriesList.where((i) => i.attemptStatus == 'In Progress').length;
-    final int attempted = completedTests + inProgressTests;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
-        ],
-      ),
-      child: Row(
-        children: [
-          _buildKPISingleItem(Icons.article_outlined, const Color(0xFF3B82F6), '$totalTests', 'Total Tests'),
-          _buildDivider(),
-          _buildKPISingleItem(Icons.check_circle_outline_rounded, const Color(0xFF10B981), '$attempted', 'Tests Attempted'),
-          _buildDivider(),
-          _buildKPISingleItem(Icons.emoji_events_outlined, const Color(0xFFF59E0B), totalTests > 0 ? '${seriesList.length}' : '0', 'Test Series'),
-          _buildDivider(),
-          _buildKPISingleItem(Icons.track_changes_outlined, const Color(0xFF8B5CF6), attempted > 0 ? '${((completedTests / (attempted > 0 ? attempted : 1)) * 100).toInt()}%' : 'N/A', 'Avg Accuracy'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildKPISingleItem(IconData icon, Color color, String value, String label) {
-    return Expanded(
-      child: Column(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 17),
-          ),
-          const SizedBox(height: 8),
-          Text(value, style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
-          const SizedBox(height: 2),
-          Text(label, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Container(width: 1, height: 42, color: const Color(0xFFF1F5F9));
-  }
-
-  // ===========================================================================
-  // 4. YOUR PROGRESS CARD (Donut Chart & Analytics Link)
-  // ===========================================================================
-  Widget _buildYourProgressCard(List<TestSeriesCardData> seriesList) {
-    final int totalTests = seriesList.fold(0, (sum, i) => sum + i.testCount);
-    final int completedTests = seriesList.where((i) => i.attemptStatus == 'Completed').length;
-    final int inProgressTests = seriesList.where((i) => i.attemptStatus == 'In Progress').length;
-    final int attempted = completedTests + inProgressTests;
-    final double progress = totalTests > 0 ? (completedTests / totalTests).clamp(0.0, 1.0) : 0.0;
-    final int pct = (progress * 100).toInt();
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Your Progress', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
-              InkWell(
-                onTap: () {
-                  if (widget.onNavigateTab != null) widget.onNavigateTab!(5); // Analytics tab
-                },
-                child: Row(
-                  children: [
-                    Text('View Analytics', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF2563EB)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Content Row (Donut Chart + Stats Progress Bar)
-          Row(
-            children: [
-              // Circular Donut Progress Ring
-              SizedBox(
-                width: 72,
-                height: 72,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    CustomPaint(
-                      size: const Size(72, 72),
-                      painter: RingChartPainter(progress: progress > 0 ? progress : 0.001, ringColor: const Color(0xFF10B981)),
-                    ),
-                    Text('$pct%', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-
-              // Progress Stats Bar & Text
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Tests Completed', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-                        Text('$completedTests of $totalTests', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B))),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 6,
-                        backgroundColor: const Color(0xFFF1F5F9),
-                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Avg Accuracy', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-                            const SizedBox(height: 2),
-                            Text(
-                              attempted > 0 ? '${((completedTests / (attempted > 0 ? attempted : 1)) * 100).toInt()}%' : 'N/A',
-                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                            ),
-                          ],
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Attempted', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-                            const SizedBox(height: 2),
-                            Text(
-                              attempted > 0 ? '$attempted tests' : '0 tests',
-                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded, size: 22, color: Color(0xFF94A3B8)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // 5. TEST SERIES CATEGORIES ROW
-  // ===========================================================================
-  Widget _buildCategoriesSection(List<TestSeriesCardData> seriesList) {
-    final categories = _getCategories(seriesList);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Test Series Categories', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
-        const SizedBox(height: 12),
-
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final double itemWidth = (constraints.maxWidth - (3 * 10)) / 4;
-
-            return SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: categories.map((cat) {
-                  final bool isSelected = (_selectedCategory == cat.title);
-
-                  return Container(
-                    width: itemWidth < 120 ? 130 : itemWidth,
-                    margin: const EdgeInsets.only(right: 10),
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFFEFF6FF) : Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isSelected ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0),
-                        width: isSelected ? 1.5 : 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
-                      ],
-                    ),
-                    child: InkWell(
-                      onTap: () => setState(() => _selectedCategory = cat.title),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: cat.bgColor,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(cat.icon, color: cat.iconColor, size: 17),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            cat.title,
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                              color: isSelected ? const Color(0xFF1D4ED8) : const Color(0xFF1E293B),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${cat.count} Tests',
-                            style: GoogleFonts.inter(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w500,
-                              color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            );
-          },
+  Widget _buildCardsGrid(List<TestSeriesCardData> seriesList, double screenWidth) {
+    if (seriesList.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
-      ],
-    );
-  }
-
-  // ===========================================================================
-  // 6. ALL TEST SERIES SECTION HEADER & CARDS LIST
-  // ===========================================================================
-  Widget _buildAllTestSeriesSection(List<TestSeriesCardData> allRealSeries) {
-    // Filter by Category tab if applicable
-    final filteredList = allRealSeries.where((item) {
-      final cat = item.category.toLowerCase();
-      final type = item.testType.toLowerCase();
-      final title = item.title.toLowerCase();
-      final sub = item.subtitle.toLowerCase();
-
-      if (_selectedCategory == 'Full Syllabus' &&
-          !cat.contains('full') &&
-          !type.contains('full') &&
-          !title.contains('full') &&
-          !sub.contains('full')) {
-        return false;
-      }
-      if (_selectedCategory == 'Chapter Wise' &&
-          !cat.contains('chapter') &&
-          !type.contains('chapter') &&
-          !title.contains('chapter') &&
-          !sub.contains('chapter')) {
-        return false;
-      }
-      if (_selectedCategory == 'Topic Wise' &&
-          !cat.contains('topic') &&
-          !cat.contains('part') &&
-          !type.contains('topic') &&
-          !type.contains('part') &&
-          !title.contains('topic') &&
-          !title.contains('part') &&
-          !sub.contains('topic') &&
-          !sub.contains('part')) {
-        return false;
-      }
-      // Exam Filter
-      if (_selectedExamFilter != 'All Exams') {
-        final f = _selectedExamFilter.toLowerCase();
-        final isNeet = f.contains('neet');
-        final isJee = f.contains('jee');
-
-        if (isNeet && !item.exam.toLowerCase().contains('neet')) return false;
-        if (isJee && !item.exam.toLowerCase().contains('jee')) return false;
-
-        // Check if filter specifies a particular year (e.g. 2025, 2024)
-        final yearMatch = RegExp(r'\b(19|20)\d{2}\b').firstMatch(f);
-        if (yearMatch != null) {
-          final filterYear = yearMatch.group(0)!;
-          final itemYear = item.targetYear.trim();
-          if (itemYear.isNotEmpty &&
-              itemYear != filterYear &&
-              item.title.contains(RegExp(r'\b(19|20)\d{2}\b')) &&
-              !item.title.contains(filterYear)) {
-            return false;
-          }
-        }
-      }
-      return true;
-    }).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Section Header Row
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
           children: [
-            Text(
-              'All Test Series (${filteredList.length})',
-              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-            ),
-            if (_isLoading)
-              const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.filter_list_rounded, size: 14, color: Color(0xFF2563EB)),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Active Filter: $_selectedCategory',
-                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
-                    ),
-                  ],
-                ),
-              ),
+            const Icon(Icons.search_off_rounded, size: 40, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 12),
+            Text('No test series found', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+            const SizedBox(height: 6),
+            Text('Try adjusting your search query or filter selection.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
           ],
         ),
-        const SizedBox(height: 14),
+      );
+    }
 
-        // List of Cards or Clean Empty State
-        if (filteredList.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: [
-                BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
-              ],
-            ),
-            child: Column(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFEEF2FF),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.assignment_outlined, size: 28, color: Color(0xFF4F46E5)),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'No Test Series Available',
-                  style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Real test series published by the admin in Admin Test Series Manager will appear here.',
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 14),
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2563EB),
-                    side: const BorderSide(color: Color(0xFF2563EB)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: () => setState(() {
-                    _selectedCategory = 'All Series';
-                    _selectedExamFilter = 'All Exams';
-                  }),
-                  icon: const Icon(Icons.refresh_rounded, size: 16),
-                  label: const Text('Show All Available Series', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          )
-        else
-          ...filteredList.map((item) => _buildTestSeriesCard(item)),
-      ],
+    int crossAxisCount = screenWidth >= 1050 ? 3 : (screenWidth >= 680 ? 2 : 1);
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 18,
+        mainAxisSpacing: 18,
+        mainAxisExtent: 330,
+      ),
+      itemCount: seriesList.length,
+      itemBuilder: (context, index) {
+        final item = seriesList[index];
+        return _buildTestSeriesCard(item);
+      },
     );
   }
 
+  // ===========================================================================
+  // INDIVIDUAL TEST SERIES CARD (Matching Reference UI)
+  // ===========================================================================
   Widget _buildTestSeriesCard(TestSeriesCardData item) {
-    final bool hasBanner = item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty;
-
-    // Attempt status badge colors
-    Color attemptBadgeBg;
-    Color attemptBadgeText;
-    if (item.attemptStatus == 'Completed') {
-      attemptBadgeBg = const Color(0xFFDCFCE7);
-      attemptBadgeText = const Color(0xFF15803D);
-    } else if (item.attemptStatus == 'In Progress') {
-      attemptBadgeBg = const Color(0xFFFEF3C7);
-      attemptBadgeText = const Color(0xFFB45309);
-    } else {
-      attemptBadgeBg = const Color(0xFFF1F5F9);
-      attemptBadgeText = const Color(0xFF475569);
-    }
+    final bool isFav = _favoritesMap[item.id] ?? false;
+    final int discountPct = (((item.originalPrice - item.price) / item.originalPrice) * 100).round();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
-          BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Clickable Top & Middle Content (Product Details Sheet trigger)
+            // Top Aspect-Ratio Image Banner with Overlays
             InkWell(
               onTap: () => _showProductDetailsModal(item),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
                 children: [
-                  // Banner Image Header if present
-                  if (hasBanner)
-                    Stack(
-                      children: [
-                        SizedBox(
-                          height: 120,
-                          width: double.infinity,
-                          child: Image.network(
+                  // Graphic / Image Background
+                  Container(
+                    height: 135,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: _getCardBannerGradient(item),
+                    ),
+                    child: item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty
+                        ? Image.network(
                             item.bannerImageUrl!,
                             fit: BoxFit.cover,
-                            errorBuilder: (ctx, err, st) => Container(
-                              color: const Color(0xFF1E1B4B),
-                              child: const Center(child: Icon(Icons.track_changes_rounded, color: Colors.white70, size: 32)),
-                            ),
-                          ),
+                            errorBuilder: (ctx, err, st) => _buildBannerGraphic(item),
+                          )
+                        : _buildBannerGraphic(item),
+                  ),
+
+                  // Top-Left Tag Badge (🔥 Best Seller, ⭐ Most Popular, etc.)
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: item.dynamicTagColor,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        item.dynamicTag,
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
                         ),
-                        Positioned(
-                          top: 10,
-                          left: 10,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.75),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              item.formattedTargetYear,
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: 10,
-                          right: 10,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: item.isFree ? const Color(0xFF10B981) : const Color(0xFFDC2626),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              item.isFree ? 'FREE' : '₹${item.price.toInt()}',
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
+                  ),
 
-                  // Card Body Content
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Header Row: Icon, Test Series Name, Exam, Target Year, Attempt Status
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: item.iconBgColor,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(item.icon, color: Colors.white, size: 22),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // 1. Test Series Name
-                                  Text(
-                                    item.title,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF0F172A),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  // 2. Exam & 3. Target Year Badges
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 4,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFEEF2FF),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: const Color(0xFFC7D2FE)),
-                                        ),
-                                        child: Text(
-                                          item.exam,
-                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF3730A3)),
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFF0FDF4),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: const Color(0xFFBBF7D0)),
-                                        ),
-                                        child: Text(
-                                          'Target: ${item.formattedTargetYear}',
-                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF166534)),
-                                        ),
-                                      ),
-                                      if (item.category.isNotEmpty && item.category != 'Full Syllabus')
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFFAF5FF),
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: const Color(0xFFE9D5FF)),
-                                          ),
-                                          child: Text(
-                                            item.category,
-                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7E22CE)),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-
-                            // 10. Attempt Status Badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: attemptBadgeBg,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: BoxDecoration(color: attemptBadgeText, shape: BoxShape.circle),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    item.attemptStatus,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.bold,
-                                      color: attemptBadgeText,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                  // Top-Right Favorite Heart Button
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: InkWell(
+                      onTap: () => setState(() => _favoritesMap[item.id] = !isFav),
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.35),
+                          shape: BoxShape.circle,
                         ),
+                        child: Icon(
+                          isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                          color: isFav ? const Color(0xFFEF4444) : Colors.white,
+                          size: 15,
+                        ),
+                      ),
+                    ),
+                  ),
 
-                        // 4. Short Description
-                        if (item.description.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Text(
-                            item.description,
-                            maxLines: 3,
+                  // Bottom Translucent Feature Overlay Bar on Image (Matching screenshot)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      color: Colors.black.withOpacity(0.65),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildOverlayFeaturePill(item.dynamicFeature1),
+                          Container(width: 1, height: 10, color: Colors.white24),
+                          _buildOverlayFeaturePill(item.dynamicFeature2),
+                          Container(width: 1, height: 10, color: Colors.white24),
+                          _buildOverlayFeaturePill(item.dynamicFeature3),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Card Content Area
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title Row: Icon + Title + Chevron Arrow
+                    Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: item.iconBgColor,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(item.icon, color: Colors.white, size: 19),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: const Color(0xFF475569),
-                              height: 1.4,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF0F172A),
                             ),
                           ),
-                        ],
+                        ),
+                        const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF94A3B8), size: 18),
+                      ],
+                    ),
 
-                        const SizedBox(height: 14),
+                    const SizedBox(height: 6),
 
-                        // Metadata Pills: 5. Estimated Tests, 6. Type, 7. Duration, 8. Difficulty, 9. Price, 10. Validity
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            _buildMetaPill(Icons.description_outlined, '${item.testCount} Estimated Tests'),
-                            _buildMetaPill(Icons.layers_outlined, 'Type: ${item.testType}'),
-                            _buildMetaPill(Icons.access_time_rounded, item.durationFormatted),
-                            _buildMetaPill(Icons.bar_chart_rounded, item.difficulty),
-                            _buildMetaPill(Icons.event_available_rounded, item.validity),
+                    // 2-Line Description Snippet
+                    Text(
+                      item.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        color: const Color(0xFF64748B),
+                        height: 1.3,
+                      ),
+                    ),
 
-                            // 8. Price Pill
-                            if (item.isFree)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                                decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
-                                child: const Text('FREE', style: TextStyle(color: Color(0xFF16A34A), fontSize: 11, fontWeight: FontWeight.w800)),
-                              )
-                            else ...[
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '₹${item.price.toInt()}',
-                                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '₹${item.originalPrice.toInt()}',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      decoration: TextDecoration.lineThrough,
-                                      color: const Color(0xFF94A3B8),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                    decoration: BoxDecoration(color: const Color(0xFFFEE2E8), borderRadius: BorderRadius.circular(4)),
-                                    child: Text(
-                                      '${(((item.originalPrice - item.price) / item.originalPrice) * 100).toInt()}% OFF',
-                                      style: const TextStyle(color: Color(0xFFDC2626), fontSize: 9.5, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
+                    const Spacer(),
+
+                    // Meta Row: Exam Badge + Test Count + Duration + Difficulty
+                    Row(
+                      children: [
+                        // Exam Tag
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            color: item.exam.contains('JEE') ? const Color(0xFFEFF6FF) : const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: item.exam.contains('JEE') ? const Color(0xFFBFDBFE) : const Color(0xFFBBF7D0),
+                            ),
+                          ),
+                          child: Text(
+                            item.exam.contains('JEE') ? 'JEE' : 'NEET',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: item.exam.contains('JEE') ? const Color(0xFF1E40AF) : const Color(0xFF166534),
+                            ),
+                          ),
                         ),
 
-                        const SizedBox(height: 12),
-                        // Interactive tap prompt
+                        const SizedBox(width: 6),
+                        _buildMetaMiniPill('📄 ${item.testCount} Tests'),
+                        const SizedBox(width: 4),
+                        _buildMetaMiniPill('⏱️ ${item.durationFormatted}'),
+                        const SizedBox(width: 4),
+                        _buildMetaMiniPill('📊 ${item.difficulty}'),
+                      ],
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Footer Price & Circular Blue Arrow Button
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Price Stack
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
                           children: [
-                            const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFF2563EB)),
-                            const SizedBox(width: 6),
                             Text(
-                              'Click card for full overview, all tests, reviews & top rankers →',
-                              style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB)),
+                              '₹${item.price.toInt()}',
+                              style: GoogleFonts.inter(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFF0F172A),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '₹${item.originalPrice.toInt()}',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                decoration: TextDecoration.lineThrough,
+                                color: const Color(0xFF94A3B8),
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEE2E2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '$discountPct% OFF',
+                                style: const TextStyle(
+                                  color: Color(0xFFDC2626),
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
 
-            const Divider(height: 1, color: Color(0xFFF1F5F9)),
-
-            // Action Buttons Row: Download Syllabus & Purchase Button together, Start Test on Right
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 10,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                alignment: WrapAlignment.spaceBetween,
-                children: [
-                        // Left Action Cluster: Download Syllabus + Purchase Button NEAR Download Syllabus!
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            // 12. Download Syllabus CTA Button
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF334155),
-                                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: () => _handleDownloadSyllabus(item),
-                              icon: const Icon(Icons.file_download_outlined, size: 16, color: Color(0xFF2563EB)),
-                              label: Text(
-                                'Download Syllabus',
-                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+                        // Action Button: Solid Blue Circle with White Arrow (Matching screenshot)
+                        Material(
+                          color: const Color(0xFF3546E5),
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            onTap: () => _startTestSeries(item.id, item.title, item.durationMinutes),
+                            customBorder: const CircleBorder(),
+                            child: const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: Icon(
+                                Icons.arrow_forward_rounded,
+                                color: Colors.white,
+                                size: 16,
                               ),
                             ),
-
-                            // Purchase Button NEAR Download Syllabus!
-                            if (item.showPurchaseButton)
-                              ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF10B981),
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                onPressed: () => _handlePurchaseOrEnroll(item),
-                                icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 16, color: Colors.white),
-                                label: Text(
-                                  item.isFree
-                                      ? 'Enroll Free'
-                                      : (item.purchaseButtonText.trim().isNotEmpty && item.purchaseButtonText.trim() != 'Join'
-                                          ? item.purchaseButtonText.trim()
-                                          : 'Join - ₹${item.price.toInt()}'),
-                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                          ],
-                        ),
-
-                        // Right Action Cluster: Start Test / Resume Test
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          onPressed: () => _startTestSeries(item.id, item.title, item.durationMinutes),
-                          icon: Icon(
-                            item.attemptStatus == 'In Progress' ? Icons.play_arrow_rounded : Icons.arrow_forward_rounded,
-                            size: 16,
-                            color: Colors.white,
-                          ),
-                          label: Text(
-                            item.attemptStatus == 'In Progress'
-                                ? 'Resume Test'
-                                : (item.attemptStatus == 'Completed' ? 'Retake Test' : 'Start Test'),
-                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          );
-        }
+          ],
+        ),
+      ),
+    );
+  }
 
+  Widget _buildOverlayFeaturePill(String text) {
+    return Flexible(
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 9.5,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetaMiniPill(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 10, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+      ),
+    );
+  }
+
+  LinearGradient _getCardBannerGradient(TestSeriesCardData item) {
+    if (item.title.contains('JEE Main 2026')) {
+      return const LinearGradient(colors: [Color(0xFF064E3B), Color(0xFF047857)]);
+    } else if (item.title.contains('Foundation')) {
+      return const LinearGradient(colors: [Color(0xFF831843), Color(0xFFBE185D)]);
+    } else if (item.title.contains('Advanced')) {
+      return const LinearGradient(colors: [Color(0xFF78350F), Color(0xFFB45309)]);
+    } else if (item.title.contains('Combo') || item.title.contains('Board')) {
+      return const LinearGradient(colors: [Color(0xFF311B92), Color(0xFF4A148C)]);
+    } else if (item.title.contains('Crash')) {
+      return const LinearGradient(colors: [Color(0xFF0C4A6E), Color(0xFF0284C7)]);
+    }
+    return const LinearGradient(colors: [Color(0xFF0F172A), Color(0xFF1E293B)]);
+  }
+
+  Widget _buildBannerGraphic(TestSeriesCardData item) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: _getCardBannerGradient(item),
+            ),
+          ),
+        ),
+        Positioned(
+          right: -10,
+          bottom: -10,
+          child: Icon(item.icon, size: 110, color: Colors.white.withOpacity(0.08)),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 32, 14, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                item.title.toUpperCase(),
+                maxLines: 2,
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                item.subtitle,
+                maxLines: 1,
+                style: GoogleFonts.inter(
+                  fontSize: 10.5,
+                  color: Colors.amberAccent,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
   Widget _buildMetaPill(IconData icon, String text) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
