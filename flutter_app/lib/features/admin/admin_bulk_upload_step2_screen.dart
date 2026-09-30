@@ -198,8 +198,22 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     }
 
     final int qCount = (int.tryParse(_paperData?['question_count']?.toString() ?? '') ?? widget.totalQuestionsCount).clamp(1, 1000);
+
+    final dynamic paperAvailRaw = _paperData?['available_in'] ?? _paperData?['availableIn'];
+    final List<String> defaultAvailableIn = (paperAvailRaw is List && paperAvailRaw.isNotEmpty)
+        ? List<String>.from(paperAvailRaw)
+        : <String>['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
+
     if (_questionsList.length != qCount) {
-      _questionsList = List.generate(qCount, (index) => QuestionItemData(number: index + 1));
+      _questionsList = List.generate(
+        qCount,
+        (index) => QuestionItemData(
+          number: index + 1,
+          availableIn: List<String>.from(defaultAvailableIn),
+          positiveMarks: '4',
+          negativeMarks: '-1',
+        ),
+      );
     }
 
     final savedQList = await SupabaseService.fetchQuestionsForPaper(_paperId);
@@ -295,9 +309,9 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         }
 
         final dynamic availInRaw = savedMatch['available_in'] ?? savedMatch['availableIn'];
-        final List<String> availInList = availInRaw is List
+        final List<String> availInList = (availInRaw is List && availInRaw.isNotEmpty)
             ? List<String>.from(availInRaw)
-            : <String>[];
+            : List<String>.from(defaultAvailableIn);
 
         _questionsList[i] = QuestionItemData(
           id: savedMatch['id'] ?? 'q_${_paperId}_$qNum',
@@ -324,6 +338,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         if (firstUnsavedIndex == -1) {
           firstUnsavedIndex = i;
         }
+        _questionsList[i] = QuestionItemData(
+          number: qNum,
+          availableIn: List<String>.from(defaultAvailableIn),
+          positiveMarks: '4',
+          negativeMarks: '-1',
+        );
       }
     }
 
@@ -378,6 +398,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           'chapter': q.chapter,
           'topic': q.topic,
           'sourceType': _paperData?['source_category'] ?? _paperData?['sourceCategory'] ?? 'PYQ',
+          'available_in': q.availableIn,
+          'availableIn': q.availableIn,
           'exam': _paperData?['exam'] ?? _paperData?['exam_name'] ?? 'NEET',
           'year': _paperData?['year']?.toString() ?? '2026',
           'paperName': _paperData?['paper_name'] ?? _paperData?['paperName'] ?? widget.paperName,

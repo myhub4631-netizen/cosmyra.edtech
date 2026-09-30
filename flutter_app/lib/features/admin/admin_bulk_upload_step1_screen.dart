@@ -99,10 +99,10 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     super.initState();
     _paperNameCtrl = TextEditingController(text: 'NEET 2026 Phase 1');
     _paperCodeCtrl = TextEditingController(text: 'N26P1');
-    _questionCountCtrl = TextEditingController(text: '200');
+    _questionCountCtrl = TextEditingController(text: '180');
     _totalMarksCtrl = TextEditingController(text: '720');
     _durationCtrl = TextEditingController(text: '180');
-    _negativeMarksCtrl = TextEditingController(text: '-4');
+    _negativeMarksCtrl = TextEditingController(text: '-1');
     _positiveMarksCtrl = TextEditingController(text: '+4');
     _instructionsCtrl = TextEditingController();
     _newTestSeriesCtrl = TextEditingController();
@@ -163,11 +163,11 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       _conductingBody = 'NTA';
       _paperType = 'Medical (UG)';
       if (!preserveMarks) {
-        _questionCountCtrl.text = '200';
+        _questionCountCtrl.text = '180';
         _totalMarksCtrl.text = '720';
         _durationCtrl.text = '180';
         _positiveMarksCtrl.text = '+4';
-        _negativeMarksCtrl.text = '-4';
+        _negativeMarksCtrl.text = '-1';
       }
       _subjectPhysics = true;
       _subjectChemistry = true;
@@ -441,13 +441,13 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       'language': _language,
       'conductingBody': _conductingBody,
       'conducting_body': _conductingBody,
-      'questionCount': int.tryParse(_questionCountCtrl.text) ?? 200,
+      'questionCount': int.tryParse(_questionCountCtrl.text) ?? 180,
       'totalMarks': int.tryParse(_totalMarksCtrl.text) ?? 720,
       'total_marks': double.tryParse(_totalMarksCtrl.text) ?? 720.0,
       'durationMinutes': int.tryParse(_durationCtrl.text) ?? 180,
       'duration': int.tryParse(_durationCtrl.text) ?? 180,
       'negativeMarking': _negativeMarking == 'Yes',
-      'negativeMarks': double.tryParse(_negativeMarksCtrl.text) ?? -4.0,
+      'negativeMarks': double.tryParse(_negativeMarksCtrl.text) ?? -1.0,
       'positiveMarks': double.tryParse(_positiveMarksCtrl.text) ?? 4.0,
       'subjects': [
         if (_subjectPhysics) 'Physics',
@@ -496,7 +496,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           'purchase_link': _testSeriesPurchaseLinkCtrl.text.trim(),
           'purchase_button_text': _testSeriesButtonTextCtrl.text.trim(),
           'show_purchase_button': _testSeriesShowButton,
-          'question_count': int.tryParse(_questionCountCtrl.text) ?? 200,
+          'question_count': int.tryParse(_questionCountCtrl.text) ?? 180,
           'total_marks': double.tryParse(_totalMarksCtrl.text) ?? (_examName.contains('JEE') ? 300.0 : 720.0),
           'conducting_body': _conductingBody,
           'duration_minutes': int.tryParse(_durationCtrl.text) ?? 180,
@@ -524,7 +524,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
             userProfile: widget.userProfile,
             paperRecord: paperDetails,
             paperName: pName,
-            totalQuestionsCount: paperDetails['questionCount'] as int? ?? 200,
+            totalQuestionsCount: paperDetails['questionCount'] as int? ?? 180,
           ),
         ),
       );
