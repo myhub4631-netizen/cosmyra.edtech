@@ -1175,8 +1175,6 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   }
 
   // ===========================================================================
-  // CARDS GRID SYSTEM (Matching Reference UI Proportions & Colors)
-  // ===========================================================================
   Widget _buildCardsGrid(List<TestSeriesCardData> seriesList, double screenWidth) {
     if (seriesList.isEmpty) {
       return Container(
@@ -1199,7 +1197,19 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       );
     }
 
-    int crossAxisCount = screenWidth >= 1050 ? 3 : (screenWidth >= 680 ? 2 : 1);
+    if (screenWidth < 680) {
+      return ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: seriesList.length,
+        itemBuilder: (context, index) {
+          final item = seriesList[index];
+          return _buildMobileTestSeriesCard(item);
+        },
+      );
+    }
+
+    int crossAxisCount = screenWidth >= 1050 ? 3 : 2;
 
     return GridView.builder(
       shrinkWrap: true,
@@ -1213,15 +1223,280 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       itemCount: seriesList.length,
       itemBuilder: (context, index) {
         final item = seriesList[index];
-        return _buildTestSeriesCard(item);
+        return _buildDesktopTestSeriesCard(item);
       },
     );
   }
 
   // ===========================================================================
-  // INDIVIDUAL TEST SERIES CARD (Matching Reference UI)
+  // MOBILE TEST SERIES CARD (Horizontal Split Layout matching Mobile Screenshot)
   // ===========================================================================
-  Widget _buildTestSeriesCard(TestSeriesCardData item) {
+  Widget _buildMobileTestSeriesCard(TestSeriesCardData item) {
+    final bool isFav = _favoritesMap[item.id] ?? false;
+    final int discountPct = (((item.originalPrice - item.price) / item.originalPrice) * 100).round();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Left Image Banner Column (~40-42% width)
+              InkWell(
+                onTap: () => _showProductDetailsModal(item),
+                child: SizedBox(
+                  width: 155,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: _getCardBannerGradient(item),
+                          ),
+                          child: item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty
+                              ? Image.network(
+                                  item.bannerImageUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (ctx, err, st) => _buildBannerGraphic(item),
+                                )
+                              : _buildBannerGraphic(item),
+                        ),
+                      ),
+
+                      // Top-Left Tag Badge (🔥 Best Seller, ⭐ Most Popular, etc.)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: item.dynamicTagColor,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            item.dynamicTag,
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Bottom Translucent Feature Overlay Bar on Image
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                          color: Colors.black.withValues(alpha: 0.65),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildOverlayFeaturePill(item.dynamicFeature1),
+                              Container(width: 1, height: 8, color: Colors.white24),
+                              _buildOverlayFeaturePill(item.dynamicFeature2),
+                              Container(width: 1, height: 8, color: Colors.white24),
+                              _buildOverlayFeaturePill(item.dynamicFeature3),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Right Content Area (~58-60% width)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Header: Icon + Title + Heart Outline
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: item.iconBgColor,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(item.icon, color: Colors.white, size: 16),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              item.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF0F172A),
+                                height: 1.25,
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () => setState(() => _favoritesMap[item.id] = !isFav),
+                            child: Icon(
+                              isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                              color: isFav ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
+                              size: 17,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      // Description snippet
+                      Text(
+                        item.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          color: const Color(0xFF64748B),
+                          height: 1.25,
+                        ),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      // Badges Row: Exam + Tests + Duration + Difficulty
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: item.exam.contains('JEE') ? const Color(0xFFEFF6FF) : const Color(0xFFF0FDF4),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: item.exam.contains('JEE') ? const Color(0xFFBFDBFE) : const Color(0xFFBBF7D0),
+                              ),
+                            ),
+                            child: Text(
+                              item.exam.contains('JEE') ? 'JEE' : 'NEET',
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: item.exam.contains('JEE') ? const Color(0xFF1E40AF) : const Color(0xFF166534),
+                              ),
+                            ),
+                          ),
+                          _buildMetaMiniPill('📄 ${item.testCount} Tests'),
+                          _buildMetaMiniPill('⏱️ ${item.durationFormatted}'),
+                          _buildMetaMiniPill('📊 ${item.difficulty}'),
+                        ],
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Footer Row: Price + Green "Buy Now" Button (Matching Mobile Screenshot)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // Price Stack
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                '₹${item.price.toInt()}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                '₹${item.originalPrice.toInt()}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.5,
+                                  decoration: TextDecoration.lineThrough,
+                                  color: const Color(0xFF94A3B8),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEE2E2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '$discountPct% OFF',
+                                  style: const TextStyle(
+                                    color: Color(0xFFDC2626),
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // Green "Buy Now" CTA Button (Matching Mobile Screenshot)
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: () => _handlePurchaseOrEnroll(item),
+                            icon: const Icon(Icons.shopping_cart_outlined, size: 13, color: Colors.white),
+                            label: Text(
+                              item.isFree ? 'Enroll Free' : 'Buy Now',
+                              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // DESKTOP TEST SERIES CARD (Matching Desktop Screenshot)
+  // ===========================================================================
+  Widget _buildDesktopTestSeriesCard(TestSeriesCardData item) {
     final bool isFav = _favoritesMap[item.id] ?? false;
     final int discountPct = (((item.originalPrice - item.price) / item.originalPrice) * 100).round();
 
@@ -1232,7 +1507,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.04),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -1243,12 +1518,10 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Aspect-Ratio Image Banner with Overlays
             InkWell(
               onTap: () => _showProductDetailsModal(item),
               child: Stack(
                 children: [
-                  // Graphic / Image Background
                   Container(
                     height: 135,
                     width: double.infinity,
@@ -1264,7 +1537,6 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                         : _buildBannerGraphic(item),
                   ),
 
-                  // Top-Left Tag Badge (🔥 Best Seller, ⭐ Most Popular, etc.)
                   Positioned(
                     top: 10,
                     left: 10,
@@ -1285,7 +1557,6 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                     ),
                   ),
 
-                  // Top-Right Favorite Heart Button
                   Positioned(
                     top: 10,
                     right: 10,
@@ -1294,7 +1565,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(5),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.35),
+                          color: Colors.black.withValues(alpha: 0.35),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -1306,14 +1577,13 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                     ),
                   ),
 
-                  // Bottom Translucent Feature Overlay Bar on Image (Matching screenshot)
                   Positioned(
                     bottom: 0,
                     left: 0,
                     right: 0,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      color: Colors.black.withOpacity(0.65),
+                      color: Colors.black.withValues(alpha: 0.65),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
@@ -1330,14 +1600,12 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
               ),
             ),
 
-            // Card Content Area
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Title Row: Icon + Title + Chevron Arrow
                     Row(
                       children: [
                         Container(
@@ -1368,7 +1636,6 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
 
                     const SizedBox(height: 6),
 
-                    // 2-Line Description Snippet
                     Text(
                       item.description,
                       maxLines: 2,
@@ -1382,10 +1649,8 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
 
                     const Spacer(),
 
-                    // Meta Row: Exam Badge + Test Count + Duration + Difficulty
                     Row(
                       children: [
-                        // Exam Tag
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                           decoration: BoxDecoration(
@@ -1416,11 +1681,9 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
 
                     const SizedBox(height: 10),
 
-                    // Footer Price & Circular Blue Arrow Button
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Price Stack
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.baseline,
                           textBaseline: TextBaseline.alphabetic,
@@ -1461,7 +1724,6 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                           ],
                         ),
 
-                        // Action Button: Solid Blue Circle with White Arrow (Matching screenshot)
                         Material(
                           color: const Color(0xFF3546E5),
                           shape: const CircleBorder(),
