@@ -227,12 +227,16 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         ? List<String>.from(paperAvailRaw)
         : <String>['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
 
+    final String optionPresetKey = widget.paperRecord?['defaultOptionPreset'] ?? widget.paperRecord?['default_option_preset'] ?? _paperData?['defaultOptionPreset'] ?? _paperData?['default_option_preset'] ?? '1_2_3_4';
+    final List<String> defaultPresetOpts = _getPresetOptions(optionPresetKey);
+
     if (_questionsList.length != qCount) {
       _questionsList = List.generate(
         qCount,
         (index) => QuestionItemData(
           id: 'q_${_paperId}_${index + 1}',
           number: index + 1,
+          options: List<String>.from(defaultPresetOpts),
           availableIn: List<String>.from(defaultAvailableIn),
           positiveMarks: '4',
           negativeMarks: '-1',
@@ -366,6 +370,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         _questionsList[i] = QuestionItemData(
           id: 'q_${_paperId}_$qNum',
           number: qNum,
+          options: List<String>.from(defaultPresetOpts),
           availableIn: List<String>.from(defaultAvailableIn),
           positiveMarks: '4',
           negativeMarks: '-1',
@@ -731,6 +736,77 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     for (int i = 0; i < _questionsList.length; i++) {
       _questionsList[i].number = i + 1;
     }
+  }
+
+  List<String> _getPresetOptions(String presetKey) {
+    switch (presetKey) {
+      case '1_2_3_4':
+        return ['1', '2', '3', '4'];
+      case 'A_B_C_D':
+        return ['A', 'B', 'C', 'D'];
+      case '(1)_(2)_(3)_(4)':
+        return ['(1)', '(2)', '(3)', '(4)'];
+      case '(A)_(B)_(C)_(D)':
+        return ['(A)', '(B)', '(C)', '(D)'];
+      case 'blank':
+        return ['', '', '', ''];
+      default:
+        return ['1', '2', '3', '4'];
+    }
+  }
+
+  void _applyOptionPresetToAllQuestions(String presetKey) {
+    final newOpts = _getPresetOptions(presetKey);
+    setState(() {
+      for (var q in _questionsList) {
+        for (int i = 0; i < newOpts.length; i++) {
+          if (i < q.options.length) {
+            q.options[i] = newOpts[i];
+          }
+        }
+      }
+    });
+    _saveAllQuestions(showToast: false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          presetKey == 'blank'
+              ? 'Cleared options text across all ${_questionsList.length} questions.'
+              : '⚡ Applied option preset [${newOpts.join(', ')}] across all ${_questionsList.length} questions!',
+        ),
+        backgroundColor: const Color(0xFF4F46E5),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Widget _buildQuickOptionPresetPill(QuestionItemData q, List<String> presetOpts, String label) {
+    return InkWell(
+      onTap: () {
+        setState(() {
+          for (int i = 0; i < presetOpts.length; i++) {
+            if (i < q.options.length) {
+              q.options[i] = presetOpts[i];
+            }
+          }
+        });
+        _scheduleAutoSave(q);
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEEF2FF),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFC7D2FE)),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF4F46E5)),
+        ),
+      ),
+    );
   }
 
   @override
@@ -1258,6 +1334,55 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                   ),
                 ),
               ),
+              const SizedBox(width: 10),
+
+              // ⚡ 1-Click Bulk Option Set Popup Menu Button
+              PopupMenuButton<String>(
+                tooltip: 'Bulk set options for all questions in 1-click',
+                child: Container(
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFC7D2FE)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.bolt_rounded, size: 16, color: Color(0xFF4F46E5)),
+                      const SizedBox(width: 6),
+                      Text(
+                        '⚡ 1-Click Options (All)',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5)),
+                      ),
+                      const Icon(Icons.arrow_drop_down_rounded, size: 18, color: Color(0xFF4F46E5)),
+                    ],
+                  ),
+                ),
+                onSelected: (val) => _applyOptionPresetToAllQuestions(val),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: '1_2_3_4',
+                    child: Text('⚡ Set All Questions: A=1, B=2, C=3, D=4'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'A_B_C_D',
+                    child: Text('⚡ Set All Questions: A=A, B=B, C=C, D=D'),
+                  ),
+                  const PopupMenuItem(
+                    value: '(1)_(2)_(3)_(4)',
+                    child: Text('⚡ Set All Questions: A=(1), B=(2), C=(3), D=(4)'),
+                  ),
+                  const PopupMenuItem(
+                    value: '(A)_(B)_(C)_(D)',
+                    child: Text('⚡ Set All Questions: A=(A), B=(B), C=(C), D=(D)'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'blank',
+                    child: Text('Clear All Option Text'),
+                  ),
+                ],
+              ),
               const SizedBox(width: 16),
 
               // Auto Save ON Badge
@@ -1715,10 +1840,18 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 6,
+              runSpacing: 4,
               children: [
                 Text('2. Options ', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
                 Text('*', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
+                const SizedBox(width: 4),
+                _buildQuickOptionPresetPill(q, ['1', '2', '3', '4'], '1,2,3,4'),
+                _buildQuickOptionPresetPill(q, ['A', 'B', 'C', 'D'], 'A,B,C,D'),
+                _buildQuickOptionPresetPill(q, ['(1)', '(2)', '(3)', '(4)'], '(1),(2),(3),(4)'),
+                _buildQuickOptionPresetPill(q, ['(A)', '(B)', '(C)', '(D)'], '(A),(B),(C),(D)'),
               ],
             ),
             Text('Is Correct?', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),

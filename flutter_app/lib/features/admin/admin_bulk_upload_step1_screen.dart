@@ -91,6 +91,9 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   // Toggle Switch
   bool _showSectionBreaks = true;
 
+  // Option Bulk Preset State
+  String _defaultOptionPreset = '1_2_3_4'; // '1_2_3_4', 'A_B_C_D', '(1)_(2)_(3)_(4)', '(A)_(B)_(C)_(D)', 'blank'
+
   // Active Sidebar Item tracking
   String _activeSidebarItem = 'Question & Paper Bank';
 
@@ -474,6 +477,8 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       'existingPaper': _existingPaper,
       'existing_paper': _existingPaper,
       'is_test_series': _sourceCategory == 'Test Series' || availableInModules.contains('test_series'),
+      'defaultOptionPreset': _defaultOptionPreset,
+      'default_option_preset': _defaultOptionPreset,
     };
 
     // Immediately persist created Test Series so it shows up in Test Series section
@@ -1670,6 +1675,79 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                 borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
               ),
             ),
+          ),
+
+          const SizedBox(height: 24),
+          _buildQuickOptionsPresetCard(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickOptionsPresetCard() {
+    final List<Map<String, String>> presets = [
+      {'key': '1_2_3_4', 'badge': '1, 2, 3, 4', 'label': 'Option A=1, B=2, C=3, D=4'},
+      {'key': 'A_B_C_D', 'badge': 'A, B, C, D', 'label': 'Option A=A, B=B, C=C, D=D'},
+      {'key': '(1)_(2)_(3)_(4)', 'badge': '(1), (2), (3), (4)', 'label': 'Option A=(1), B=(2), C=(3), D=(4)'},
+      {'key': '(A)_(B)_(C)_(D)', 'badge': '(A), (B), (C), (D)', 'label': 'Option A=(A), B=(B), C=(C), D=(D)'},
+      {'key': 'blank', 'badge': 'Blank', 'label': 'Manual Custom Text'},
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.bolt_rounded, size: 20, color: Color(0xFF2563EB)),
+              SizedBox(width: 8),
+              Text(
+                '⚡ 1-Click Bulk Option Set (Fast Question Upload)',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Select a default option preset for all questions in this paper so option text is pre-filled automatically.',
+            style: TextStyle(fontSize: 11.5, color: Color(0xFF1E40AF)),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: presets.map((p) {
+              final isSel = (_defaultOptionPreset == p['key']);
+              return ChoiceChip(
+                label: Text(
+                  '${p['badge']}  (${p['label']})',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSel ? FontWeight.bold : FontWeight.w600,
+                    color: isSel ? const Color(0xFF1E40AF) : const Color(0xFF334155),
+                  ),
+                ),
+                selected: isSel,
+                onSelected: (val) {
+                  if (val) setState(() => _defaultOptionPreset = p['key']!);
+                },
+                selectedColor: const Color(0xFFDBEAFE),
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(
+                    color: isSel ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
+                    width: isSel ? 1.5 : 1.0,
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),
