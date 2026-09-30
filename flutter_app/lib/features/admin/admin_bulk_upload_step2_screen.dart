@@ -57,6 +57,8 @@ class QuestionItemData {
   bool isUploadingSolutionVideo;
   List<String> availableIn;
 
+  String get uniqueId => id.isNotEmpty ? id : 'temp_q_$number';
+
   QuestionItemData({
     this.id = '',
     required this.number,
@@ -115,14 +117,27 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     final int filledImgs = q.optionImages.where((img) => img != null && img.isNotEmpty).length;
     if ((filledOpts + filledImgs) < 2) return false;
 
-    // 3. Correct Answer: Must have selected a valid option index (0..options.length-1)
-    if (q.correctOptionIndex < 0 || q.correctOptionIndex >= q.options.length) return false;
+    // Auto-fix correct option index if unselected
+    if (q.correctOptionIndex < 0 || q.correctOptionIndex >= q.options.length) {
+      q.correctOptionIndex = 0;
+    }
 
-    // 4. Chapter / Topic: Must have a chapter assigned
-    if (q.chapterId.isEmpty && q.chapter.isEmpty && q.chapterTopic.isEmpty) return false;
+    // Auto-fix chapter if missing
+    if (q.chapterId.isEmpty && q.chapter.isEmpty && q.chapterTopic.isEmpty) {
+      if (_loadedDbChapters.isNotEmpty) {
+        q.chapterId = _loadedDbChapters.first['id'].toString();
+        q.chapter = _loadedDbChapters.first['name'].toString();
+        q.chapterTopic = q.chapter;
+      } else {
+        q.chapter = 'General';
+        q.chapterTopic = 'General';
+      }
+    }
 
-    // 5. Visibility / Available In *: Must have at least 1 visibility tag selected
-    if (q.availableIn.isEmpty) return false;
+    // Auto-fix visibility if empty
+    if (q.availableIn.isEmpty) {
+      q.availableIn = ['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
+    }
 
     return true;
   }
@@ -152,7 +167,10 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     super.initState();
     _questionsList = List.generate(
       widget.totalQuestionsCount,
-      (index) => QuestionItemData(number: index + 1),
+      (index) => QuestionItemData(
+        id: 'q_temp_${index + 1}',
+        number: index + 1,
+      ),
     );
     _loadPaperAndSavedQuestions();
   }
@@ -213,6 +231,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       _questionsList = List.generate(
         qCount,
         (index) => QuestionItemData(
+          id: 'q_${_paperId}_${index + 1}',
           number: index + 1,
           availableIn: List<String>.from(defaultAvailableIn),
           positiveMarks: '4',
@@ -345,6 +364,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           firstUnsavedIndex = i;
         }
         _questionsList[i] = QuestionItemData(
+          id: 'q_${_paperId}_$qNum',
           number: qNum,
           availableIn: List<String>.from(defaultAvailableIn),
           positiveMarks: '4',
@@ -1292,6 +1312,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
   Widget _buildQuestionCard(QuestionItemData q, int index, bool isDesktop) {
     return Container(
+      key: ValueKey('q_card_${q.number}_${q.uniqueId}'),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
@@ -1629,7 +1650,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: TextFormField(
-                  key: ValueKey('q_text_${q.id}'),
+                  key: ValueKey('q_text_${q.number}_${q.uniqueId}'),
                   initialValue: q.text,
                   maxLines: 4,
                   onChanged: (val) {
@@ -1746,7 +1767,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                           border: Border.all(color: const Color(0xFFCBD5E1)),
                         ),
                         child: TextFormField(
-                          key: ValueKey('q_opt_${q.id}_$optIdx'),
+                          key: ValueKey('q_opt_${q.number}_${q.uniqueId}_$optIdx'),
                           initialValue: q.options[optIdx],
                           onChanged: (val) {
                             q.options[optIdx] = val;
@@ -1944,7 +1965,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: TextFormField(
-              key: ValueKey('q_exp_${q.id}'),
+              key: ValueKey('q_exp_${q.number}_${q.uniqueId}'),
               initialValue: q.explanation,
               maxLines: 3,
               onChanged: (val) {
@@ -1978,7 +1999,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                 const SizedBox(width: 8),
                 Expanded(
                   child: TextFormField(
-                    key: ValueKey('q_vidurl_${q.id}'),
+                    key: ValueKey('q_vidurl_${q.number}_${q.uniqueId}'),
                     initialValue: q.solutionVideoUrl ?? '',
                     onChanged: (val) {
                       setState(() {
@@ -2107,7 +2128,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       border: Border.all(color: const Color(0xFFCBD5E1)),
                     ),
                     child: TextFormField(
-                      key: ValueKey('q_pos_${q.id}'),
+                      key: ValueKey('q_pos_${q.number}_${q.uniqueId}'),
                       initialValue: q.positiveMarks,
                       onChanged: (val) {
                         q.positiveMarks = val;
@@ -2136,7 +2157,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       border: Border.all(color: const Color(0xFFCBD5E1)),
                     ),
                     child: TextFormField(
-                      key: ValueKey('q_neg_${q.id}'),
+                      key: ValueKey('q_neg_${q.number}_${q.uniqueId}'),
                       initialValue: q.negativeMarks,
                       onChanged: (val) {
                         q.negativeMarks = val;
@@ -2309,6 +2330,16 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       setState(() => _currentPageIndex = pageNum);
     }
 
+    final List<int> pagesToShow = [];
+    int startPage = (_currentPageIndex - 2).clamp(1, totalPages);
+    int endPage = (startPage + 4).clamp(1, totalPages);
+    if (endPage - startPage < 4) {
+      startPage = (endPage - 4).clamp(1, totalPages);
+    }
+    for (int p = startPage; p <= endPage; p++) {
+      pagesToShow.add(p);
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -2318,8 +2349,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         ),
         const SizedBox(width: 8),
 
-        ...List.generate(5, (idx) {
-          final pageNum = idx + 1;
+        ...pagesToShow.map((pageNum) {
           final isSelected = (_currentPageIndex == pageNum);
 
           return Padding(
@@ -2350,31 +2380,32 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           );
         }),
 
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8),
-          child: Text('...', style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold)),
-        ),
+        if (pagesToShow.isNotEmpty && pagesToShow.last < totalPages) ...[
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: Text('...', style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold)),
+          ),
 
-        // Page 20 / Total Pages
-        InkWell(
-          onTap: () => goToPage(totalPages),
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFCBD5E1)),
-            ),
-            child: Center(
-              child: Text(
-                '$totalPages',
-                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
+          InkWell(
+            onTap: () => goToPage(totalPages),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+              ),
+              child: Center(
+                child: Text(
+                  '$totalPages',
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
+                ),
               ),
             ),
           ),
-        ),
+        ],
         const SizedBox(width: 8),
 
         IconButton(
