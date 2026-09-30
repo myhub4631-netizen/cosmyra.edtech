@@ -17,7 +17,7 @@ class CloudflareR2Service {
   static String accountId = const String.fromEnvironment('R2_ACCOUNT_ID', defaultValue: '');
   static String accessKeyId = const String.fromEnvironment('R2_ACCESS_KEY_ID', defaultValue: '');
   static String secretAccessKey = const String.fromEnvironment('R2_SECRET_ACCESS_KEY', defaultValue: '');
-  static String bucketName = const String.fromEnvironment('R2_BUCKET_NAME', defaultValue: 'cosmyra-media');
+  static String bucketName = const String.fromEnvironment('R2_BUCKET_NAME', defaultValue: 'question-bank-assets');
   static String publicDomain = const String.fromEnvironment('R2_PUBLIC_DOMAIN', defaultValue: 'https://media.neet-jee.in');
 
   static bool get isConfigured =>

@@ -717,7 +717,7 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                 TextField(
                   controller: bucketCtrl,
                   decoration: InputDecoration(
-                    hintText: 'cosmyra-media',
+                    hintText: 'question-bank-assets',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
