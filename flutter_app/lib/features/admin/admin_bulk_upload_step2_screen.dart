@@ -121,21 +121,14 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     final int filledImgs = q.optionImages.where((img) => img != null && img.isNotEmpty).length;
     if ((filledOpts + filledImgs) < 2) return false;
 
-    // Auto-fix correct option index if unselected
+    // 3. Correct Option Index: MUST be selected by admin (>= 0 and < options.length)
     if (q.correctOptionIndex < 0 || q.correctOptionIndex >= q.options.length) {
-      q.correctOptionIndex = 0;
+      return false;
     }
 
-    // Auto-fix chapter if missing
-    if (q.chapterId.isEmpty && q.chapter.isEmpty && q.chapterTopic.isEmpty) {
-      if (_loadedDbChapters.isNotEmpty) {
-        q.chapterId = _loadedDbChapters.first['id'].toString();
-        q.chapter = _loadedDbChapters.first['name'].toString();
-        q.chapterTopic = q.chapter;
-      } else {
-        q.chapter = 'General';
-        q.chapterTopic = 'General';
-      }
+    // 4. Chapter & Topic: MUST be selected by admin from dropdown
+    if (q.chapterId.trim().isEmpty && q.chapter.trim().isEmpty && q.chapterTopic.trim().isEmpty) {
+      return false;
     }
 
     // Auto-fix visibility if empty (use the test series' default visibility configured in Step 1)
@@ -277,7 +270,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         opts = List<String>.from(parsed['options'] as List);
         while (opts.length < 4) opts.add('');
 
-        int correctIdx = 0;
+        int correctIdx = -1;
         if (savedMatch['correct_option_index'] != null) {
           correctIdx = (savedMatch['correct_option_index'] as num).toInt();
         } else if (savedMatch['correctOptionIndex'] != null) {
@@ -285,8 +278,10 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         } else {
           String correctOptText = (savedMatch['correct_answer'] ?? savedMatch['correctAnswer'] ?? '').toString().trim();
           if (correctOptText.startsWith('Option ')) {
-            int optNum = int.tryParse(correctOptText.replaceAll('Option ', '')) ?? 1;
-            correctIdx = (optNum - 1).clamp(0, opts.length > 0 ? opts.length - 1 : 0);
+            int optNum = int.tryParse(correctOptText.replaceAll('Option ', '')) ?? -1;
+            if (optNum > 0) {
+              correctIdx = (optNum - 1).clamp(0, opts.length > 0 ? opts.length - 1 : 0);
+            }
           } else if (correctOptText.isNotEmpty) {
             int foundIdx = opts.indexOf(correctOptText);
             if (foundIdx != -1) {
@@ -332,13 +327,6 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         } else if (chapNameFromMatch.isNotEmpty || chapIdFromMatch.isNotEmpty) {
           finalChapId = chapIdFromMatch;
           finalChapName = chapNameFromMatch.isNotEmpty ? chapNameFromMatch : chapIdFromMatch;
-        } else if (qSubject.isNotEmpty && _loadedDbChapters.any((c) => c['subject_name']?.toString().toLowerCase() == qSubject.toLowerCase() || c['subject']?.toString().toLowerCase() == qSubject.toLowerCase())) {
-          final matchedC = _loadedDbChapters.firstWhere((c) => c['subject_name']?.toString().toLowerCase() == qSubject.toLowerCase() || c['subject']?.toString().toLowerCase() == qSubject.toLowerCase());
-          finalChapId = matchedC['id'].toString();
-          finalChapName = matchedC['name'].toString();
-        } else if (_loadedDbChapters.isNotEmpty) {
-          finalChapId = _loadedDbChapters.first['id'].toString();
-          finalChapName = _loadedDbChapters.first['name'].toString();
         }
 
         final dynamic availInRaw = savedMatch['available_in'] ?? savedMatch['availableIn'];
@@ -353,7 +341,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           questionImage: savedMatch['question_image'] ?? savedMatch['questionImage'],
           options: opts,
           optionImages: optImgs,
-          correctOptionIndex: correctIdx >= 0 ? correctIdx : 0,
+          correctOptionIndex: correctIdx,
           explanation: savedMatch['explanation'] ?? savedMatch['solution'] ?? '',
           solutionVideoUrl: savedMatch['solution_video_url'] ?? savedMatch['solutionVideoUrl'] ?? savedMatch['video_url'],
           difficulty: normDiff,
@@ -366,7 +354,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           chapterTopic: finalChapName,
           chapterId: finalChapId,
           availableIn: availInList,
-          isSaved: true,
+          isSaved: savedMatch.isNotEmpty && correctIdx >= 0 && finalChapName.isNotEmpty,
         );
       } else {
         if (firstUnsavedIndex == -1) {
