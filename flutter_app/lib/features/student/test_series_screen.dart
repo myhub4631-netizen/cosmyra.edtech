@@ -82,6 +82,8 @@ class TestSeriesCardData {
   final String feature3Label;
   final bool isFavorite;
 
+  final String bannerImageFit;
+
   TestSeriesCardData({
     required this.id,
     required this.title,
@@ -106,6 +108,7 @@ class TestSeriesCardData {
     required this.iconBgColor,
     required this.icon,
     this.bannerImageUrl,
+    this.bannerImageFit = 'contain',
     this.isFree = false,
     this.price = 299.0,
     this.originalPrice = 999.0,
@@ -120,6 +123,24 @@ class TestSeriesCardData {
     this.feature3Label = '',
     this.isFavorite = false,
   });
+
+  BoxFit get imageBoxFit {
+    switch (bannerImageFit.toLowerCase()) {
+      case 'cover':
+        return BoxFit.cover;
+      case 'fill':
+        return BoxFit.fill;
+      case 'fitwidth':
+      case 'fit_width':
+        return BoxFit.fitWidth;
+      case 'fitheight':
+      case 'fit_height':
+        return BoxFit.fitHeight;
+      case 'contain':
+      default:
+        return BoxFit.contain;
+    }
+  }
 
   String get durationFormatted {
     if (durationMinutes <= 0) return '3 Hours';
@@ -354,6 +375,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             iconBgColor: const Color(0xFF4F46E5),
             icon: Icons.track_changes_rounded,
             bannerImageUrl: cs['banner_image_url'] ?? cs['bannerImageUrl'],
+            bannerImageFit: (cs['banner_image_fit'] ?? cs['bannerImageFit'] ?? 'contain').toString(),
             isFree: isFree,
             price: price,
             originalPrice: origPrice,
@@ -421,6 +443,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             iconBgColor: const Color(0xFF7C3AED),
             icon: Icons.assignment_turned_in_rounded,
             bannerImageUrl: p['banner_image_url'] ?? p['bannerImageUrl'],
+            bannerImageFit: (p['banner_image_fit'] ?? p['bannerImageFit'] ?? 'contain').toString(),
             isFree: isFree,
             price: price,
             originalPrice: origPrice,
@@ -1268,7 +1291,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                     child: item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty
                         ? Image.network(
                             item.bannerImageUrl!,
-                            fit: BoxFit.cover,
+                            fit: item.imageBoxFit,
                             errorBuilder: (ctx, err, st) => _buildBannerGraphic(item),
                           )
                         : _buildBannerGraphic(item),
@@ -1536,7 +1559,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                     child: item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty
                         ? Image.network(
                             item.bannerImageUrl!,
-                            fit: BoxFit.cover,
+                            fit: item.imageBoxFit,
                             errorBuilder: (ctx, err, st) => _buildBannerGraphic(item),
                           )
                         : _buildBannerGraphic(item),

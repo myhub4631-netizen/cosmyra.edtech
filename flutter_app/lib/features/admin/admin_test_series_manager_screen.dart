@@ -863,6 +863,26 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=60',
   ];
 
+  String _bannerImageFit = 'contain';
+
+  BoxFit _getBoxFitFromString(String fitStr) {
+    switch (fitStr.toLowerCase()) {
+      case 'cover':
+        return BoxFit.cover;
+      case 'fill':
+        return BoxFit.fill;
+      case 'fitwidth':
+      case 'fit_width':
+        return BoxFit.fitWidth;
+      case 'fitheight':
+      case 'fit_height':
+        return BoxFit.fitHeight;
+      case 'contain':
+      default:
+        return BoxFit.contain;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -876,6 +896,7 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     _titleCtrl = TextEditingController(text: d['title'] ?? d['name'] ?? '');
     _descCtrl = TextEditingController(text: d['description'] ?? 'Curated test series for comprehensive exam readiness.');
     _bannerCtrl = TextEditingController(text: d['banner_image_url'] ?? _sampleBanners[0]);
+    _bannerImageFit = (d['banner_image_fit'] ?? d['bannerImageFit'] ?? 'contain').toString();
     _priceCtrl = TextEditingController(text: (d['price'] ?? 299).toString());
     _origPriceCtrl = TextEditingController(text: (d['original_price'] ?? 999).toString());
 
@@ -1037,6 +1058,7 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
       'year': _year,
       'category': _category,
       'banner_image_url': _bannerCtrl.text.trim(),
+      'banner_image_fit': _bannerImageFit,
       'is_free': _isFree,
       'price': double.tryParse(_priceCtrl.text) ?? 299.0,
       'original_price': double.tryParse(_origPriceCtrl.text) ?? 999.0,
@@ -1944,17 +1966,46 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
           // Section 2: Banner Image
           _buildSectionHeading('2. Banner Graphic & Thumbnail'),
           const SizedBox(height: 12),
-          TextFormField(
-            controller: _bannerCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Banner Image URL',
-              hintText: 'https://example.com/banner.jpg',
-            ),
-            onChanged: (v) => setState(() {}),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: TextFormField(
+                  controller: _bannerCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Banner Image URL',
+                    hintText: 'https://example.com/banner.jpg',
+                  ),
+                  onChanged: (v) => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: DropdownButtonFormField<String>(
+                  value: _bannerImageFit,
+                  decoration: const InputDecoration(
+                    labelText: 'Thumbnail Fit Mode *',
+                    helperText: 'Prevents text cropping on mobile',
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'contain', child: Text('Fit Entire Image (No Crop)')),
+                    DropdownMenuItem(value: 'cover', child: Text('Fill & Crop (Cover)')),
+                    DropdownMenuItem(value: 'fitWidth', child: Text('Fit Full Width')),
+                    DropdownMenuItem(value: 'fill', child: Text('Stretch to Fill')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _bannerImageFit = val);
+                  },
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               const Text('Presets: ', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
               ...List.generate(_sampleBanners.length, (i) {
@@ -1969,16 +2020,30 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
               }),
             ],
           ),
-          const SizedBox(height: 10),
-          if (_bannerCtrl.text.isNotEmpty)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                height: 100,
-                width: double.infinity,
+          const SizedBox(height: 12),
+          if (_bannerCtrl.text.isNotEmpty) ...[
+            const Text(
+              'Live Card Banner Preview (as rendered on Mobile App & Website):',
+              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              height: 135,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
                 child: Image.network(
                   _bannerCtrl.text,
-                  fit: BoxFit.cover,
+                  fit: _getBoxFitFromString(_bannerImageFit),
                   errorBuilder: (ctx, err, st) => Container(
                     color: const Color(0xFFF1F5F9),
                     child: const Center(child: Text('Invalid Image URL', style: TextStyle(color: Colors.red, fontSize: 11))),
@@ -1986,6 +2051,7 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                 ),
               ),
             ),
+          ],
           const SizedBox(height: 24),
 
           // Section 3: Pricing & Purchase Links
