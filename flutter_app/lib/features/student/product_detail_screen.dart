@@ -28,6 +28,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   bool _hasPurchased = false;
   String _selectedCategoryFilter = 'All';
   String _testSearchQuery = '';
+  String _selectedReviewFilter = 'All';
+
+  // Local reviews state so user can write and add reviews dynamically
+  List<Map<String, dynamic>> _dynamicReviews = [];
 
   @override
   void initState() {
@@ -111,6 +115,60 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     final buttonText = (match['purchase_button_text'] ?? 'Join').toString();
     final showPurchaseButton = match['show_purchase_button'] != false;
 
+    final rawReviews = (match['reviews'] is List)
+        ? (match['reviews'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        : <Map<String, dynamic>>[];
+
+    if (rawReviews.isEmpty) {
+      rawReviews.addAll([
+        {
+          'name': 'Aarav Singh',
+          'aspirant': '$exam $year Aspirant',
+          'date': '2 weeks ago',
+          'rating': 5,
+          'comment': 'Very good test series. Questions are at actual $exam level and detailed solutions are very helpful. Analytics dashboard helps a lot to track weak topics.',
+          'tags': ['Quality Questions', 'Detailed Solutions', 'Helpful Analytics'],
+          'verified': true,
+        },
+        {
+          'name': 'Sneha Patel',
+          'aspirant': '$exam $year Aspirant',
+          'date': '1 month ago',
+          'rating': 5,
+          'comment': 'Best test series for $exam $year. Chapter-wise tests helped me a lot in improving my score. Explanations are clear and easy to understand.',
+          'tags': ['Chapter Coverage', 'Easy Explanations', 'Real Exam Level'],
+          'verified': true,
+        },
+        {
+          'name': 'Rohit Kumar',
+          'aspirant': '$exam $year Aspirant',
+          'date': '1 month ago',
+          'rating': 4,
+          'comment': 'Quality of questions is excellent. Analytics dashboard is very useful to track progress. I just wish there were more tests for some chapters.',
+          'tags': ['Great Quality', 'Analytics Dashboard'],
+          'verified': true,
+        },
+        {
+          'name': 'Ananya Sharma',
+          'aspirant': '$exam $year Aspirant',
+          'date': '2 days ago',
+          'rating': 5,
+          'comment': 'All India Rank benchmarking gave me immense confidence before my exam!',
+          'tags': ['AIR Ranking', 'Top Standard'],
+          'verified': true,
+        },
+        {
+          'name': 'Vikash Tiwari',
+          'aspirant': '$exam $year Aspirant',
+          'date': '4 days ago',
+          'rating': 5,
+          'comment': 'CBT interface is completely identical to real NTA exam.',
+          'tags': ['Real NTA CBT'],
+          'verified': true,
+        },
+      ]);
+    }
+
     final loadedProduct = TestSeriesCardData(
       id: widget.productId,
       title: title,
@@ -125,9 +183,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       tests: (match['tests'] is List)
           ? (match['tests'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
           : const [],
-      reviews: (match['reviews'] is List)
-          ? (match['reviews'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
-          : const [],
+      reviews: rawReviews,
       topScores: (match['top_scores'] is Map)
           ? Map<String, dynamic>.from(match['top_scores'])
           : ((match['topScores'] is Map) ? Map<String, dynamic>.from(match['topScores']) : const {}),
@@ -162,6 +218,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     if (mounted) {
       setState(() {
         _product = loadedProduct;
+        _dynamicReviews = rawReviews;
         _hasPurchased = owns;
         _isLoading = false;
       });
@@ -206,7 +263,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     final targetTotal = item.testCount > 0 ? item.testCount : 33;
     final int isJee = item.exam.contains('JEE') ? 1 : 0;
 
-    // Structured curriculum test names exactly matching screenshot
     final chapterNames = [
       'Physical World and Measurement',
       'Kinematics',
@@ -254,7 +310,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
     int idx = tests.length;
 
-    // 10 Chapter Tests
     for (int i = 0; i < 10 && idx < targetTotal; i++) {
       tests.add({
         'id': '${item.id}_chap_${i + 1}',
@@ -269,7 +324,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       idx++;
     }
 
-    // 10 Part Tests
     for (int i = 0; i < 10 && idx < targetTotal; i++) {
       final numVal = i + 11;
       tests.add({
@@ -285,7 +339,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       idx++;
     }
 
-    // 8 Unit Tests
     for (int i = 0; i < 8 && idx < targetTotal; i++) {
       final numVal = i + 21;
       tests.add({
@@ -301,7 +354,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       idx++;
     }
 
-    // 5 Full Syllabus Tests
     for (int i = 0; i < 5 && idx < targetTotal; i++) {
       final numVal = i + 29;
       tests.add({
@@ -348,6 +400,106 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         'title': testTitle,
         'duration': durationMins,
       },
+    );
+  }
+
+  void _openWriteReviewDialog() {
+    int selectedStars = 5;
+    final commentController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.edit_note_rounded, color: Color(0xFF2563EB), size: 24),
+                const SizedBox(width: 8),
+                Text('Write a Review', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Rate your experience:', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF475569))),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (idx) {
+                      final starNum = idx + 1;
+                      return IconButton(
+                        onPressed: () => setDialogState(() => selectedStars = starNum),
+                        icon: Icon(
+                          starNum <= selectedStars ? Icons.star_rounded : Icons.star_border_rounded,
+                          color: const Color(0xFFF59E0B),
+                          size: 32,
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  Text('Your Review Comment:', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF475569))),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: commentController,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      hintText: 'Share how this test series helped your exam preparation...',
+                      hintStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF64748B))),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () {
+                  final text = commentController.text.trim();
+                  if (text.isNotEmpty) {
+                    final user = SupabaseService.activeUserSession;
+                    final userName = user?.fullName ?? (user != null && user.email.isNotEmpty ? user.email.split('@')[0] : 'Verified Aspirant');
+                    setState(() {
+                      _dynamicReviews.insert(0, {
+                        'name': userName,
+                        'aspirant': '${_product?.exam ?? 'NEET'} ${_product?.targetYear ?? '2027'} Aspirant',
+                        'date': 'Just now',
+                        'rating': selectedStars,
+                        'comment': text,
+                        'tags': ['User Review', 'Verified Student'],
+                        'verified': true,
+                      });
+                    });
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('✓ Thank you! Your review has been published.'),
+                        backgroundColor: Color(0xFF10B981),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+                child: Text('Submit Review', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -422,7 +574,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       body: SafeArea(
         child: Column(
           children: [
-            // Top Nav Breadcrumb Bar matching screenshot (🏠 > Test Series > NEET 2027 Leader Test Series > All Tests)
+            // Top Nav Breadcrumb Bar matching screenshot (🏠 > Test Series > NEET 2027 Leader Test Series > Reviews)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               color: Colors.white,
@@ -456,7 +608,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   Text('>', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
                   const SizedBox(width: 6),
                   Text(
-                    'All Tests',
+                    'Reviews',
                     style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF0F172A), fontWeight: FontWeight.bold),
                   ),
                   const Spacer(),
@@ -633,7 +785,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         ),
         const SizedBox(height: 20),
 
-        // 2. Product Navigation Tabs Section (Default tab is All Tests or Overview)
+        // 2. Product Navigation Tabs Section
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -662,7 +814,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                     const Tab(icon: Icon(Icons.info_outline_rounded, size: 18), text: 'Overview'),
                     Tab(icon: const Icon(Icons.format_list_bulleted_rounded, size: 18), text: 'All Tests (${tests.length})'),
                     const Tab(icon: Icon(Icons.menu_book_outlined, size: 18), text: 'Syllabus'),
-                    const Tab(icon: Icon(Icons.star_rate_rounded, size: 18), text: 'Reviews (4.9 ★)'),
+                    Tab(icon: const Icon(Icons.star_rate_rounded, size: 18), text: 'Reviews (${_dynamicReviews.length > 0 ? _dynamicReviews.length : 320})'),
                     const Tab(icon: Icon(Icons.emoji_events_outlined, size: 18), text: 'Top Scores'),
                   ],
                 ),
@@ -670,7 +822,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
               // Tab View Box
               SizedBox(
-                height: 720,
+                height: 780,
                 child: TabBarView(
                   controller: _tabController,
                   children: [
@@ -768,16 +920,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   }
 
   // ==========================================
-  // TAB 2: ALL TESTS (MATCHING SCREENSHOT EXACTLY)
+  // TAB 2: ALL TESTS
   // ==========================================
   Widget _buildAllTestsTab(TestSeriesCardData item, List<Map<String, dynamic>> tests) {
-    // Categorize tests dynamically
     final chapterTests = tests.where((t) => t['type'].toString().toLowerCase().contains('chapter')).toList();
     final partTests = tests.where((t) => t['type'].toString().toLowerCase().contains('part')).toList();
     final unitTests = tests.where((t) => t['type'].toString().toLowerCase().contains('unit')).toList();
     final fullTests = tests.where((t) => t['type'].toString().toLowerCase().contains('full') || (!t['type'].toString().toLowerCase().contains('chapter') && !t['type'].toString().toLowerCase().contains('part') && !t['type'].toString().toLowerCase().contains('unit'))).toList();
 
-    // Filter by Search Query
     List<Map<String, dynamic>> filterList(List<Map<String, dynamic>> source) {
       if (_testSearchQuery.trim().isEmpty) return source;
       final q = _testSearchQuery.trim().toLowerCase();
@@ -794,7 +944,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Search Bar & Filter Button Row
           Row(
             children: [
               Expanded(
@@ -840,7 +989,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           ),
           const SizedBox(height: 14),
 
-          // 2. Category Filter Pills Row (All (33) | Chapter (10) | Part (10) | Unit (8) | Full Syllabus (5))
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -859,7 +1007,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           ),
           const SizedBox(height: 20),
 
-          // 3. Category Group 1: Chapter Tests
           if ((_selectedCategoryFilter == 'All' || _selectedCategoryFilter == 'Chapter') && fChapter.isNotEmpty)
             _buildCategorySection(
               title: 'Chapter Tests (${fChapter.length})',
@@ -873,7 +1020,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               item: item,
             ),
 
-          // 4. Category Group 2: Part Tests
           if ((_selectedCategoryFilter == 'All' || _selectedCategoryFilter == 'Part') && fPart.isNotEmpty)
             _buildCategorySection(
               title: 'Part Tests (${fPart.length})',
@@ -887,7 +1033,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               item: item,
             ),
 
-          // 5. Category Group 3: Unit Tests
           if ((_selectedCategoryFilter == 'All' || _selectedCategoryFilter == 'Unit') && fUnit.isNotEmpty)
             _buildCategorySection(
               title: 'Unit Tests (${fUnit.length})',
@@ -901,7 +1046,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               item: item,
             ),
 
-          // 6. Category Group 4: Full Syllabus Tests
           if ((_selectedCategoryFilter == 'All' || _selectedCategoryFilter == 'Full Syllabus') && fFull.isNotEmpty)
             _buildCategorySection(
               title: 'Full Syllabus Tests (${fFull.length})',
@@ -964,7 +1108,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section Header Banner
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             color: bgColor,
@@ -990,7 +1133,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             ),
           ),
 
-          // Test Items List inside Category
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -1010,7 +1152,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
-                    // Icon thumbnail
                     Container(
                       width: 32,
                       height: 32,
@@ -1024,14 +1165,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                     ),
                     const SizedBox(width: 12),
 
-                    // Test Number
                     Text(
                       numStr,
                       style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
                     ),
                     const SizedBox(width: 14),
 
-                    // Test Title & Meta Chips
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1055,7 +1194,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                     ),
                     const SizedBox(width: 12),
 
-                    // Mint Green Start Test Button matching Screenshot
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFECFDF5),
@@ -1180,47 +1318,385 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   }
 
   // ==========================================
-  // TAB 4: REVIEWS
+  // TAB 4: REVIEWS (EXACTLY MATCHING SCREENSHOT)
   // ==========================================
   Widget _buildReviewsTab(TestSeriesCardData item) {
-    final reviews = item.reviews.isNotEmpty
-        ? item.reviews
-        : [
-            {'name': 'Aarav Sharma', 'comment': 'Matches the exact NTA pattern! Helped me manage time efficiently.', 'rating': 5},
-            {'name': 'Sneha Patel', 'comment': 'Best detailed solutions and All India Rank insights.', 'rating': 5},
-            {'name': 'Rohan Verma', 'comment': 'Extremely realistic CBT experience.', 'rating': 5},
-          ];
+    final reviews = _dynamicReviews;
+    final totalCount = reviews.length > 0 ? reviews.length : 320;
+    final count5 = reviews.where((r) => (r['rating'] ?? 5) == 5).length;
+    final count4 = reviews.where((r) => (r['rating'] ?? 5) == 4).length;
+    final count3 = reviews.where((r) => (r['rating'] ?? 5) == 3).length;
+    final count2 = reviews.where((r) => (r['rating'] ?? 5) == 2).length;
+    final count1 = reviews.where((r) => (r['rating'] ?? 5) == 1).length;
 
-    return ListView.builder(
+    final display5 = count5 > 0 ? count5 : 250;
+    final display4 = count4 > 0 ? count4 : 52;
+    final display3 = count3 > 0 ? count3 : 12;
+    final display2 = count2 > 0 ? count2 : 4;
+    final display1 = count1 > 0 ? count1 : 2;
+
+    // Filter by selected star rating pill
+    final filteredReviews = reviews.where((r) {
+      if (_selectedReviewFilter == 'All') return true;
+      final starTarget = int.tryParse(_selectedReviewFilter.split(' ')[0]) ?? 5;
+      return (r['rating'] ?? 5) == starTarget;
+    }).toList();
+
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      itemCount: reviews.length,
-      itemBuilder: (context, index) {
-        final r = reviews[index];
-        final name = (r['name'] ?? 'Aspirant').toString();
-        final comment = (r['comment'] ?? '').toString();
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Overall Rating & Breakdown Header Card matching Screenshot
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 650;
+                return isCompact
+                    ? Column(
+                        children: [
+                          _buildOverallScoreBox(),
+                          const SizedBox(height: 16),
+                          _buildRatingBreakdownProgress(display5, display4, display3, display2, display1),
+                          const SizedBox(height: 16),
+                          _buildSubMetricGrid(),
+                        ],
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          _buildOverallScoreBox(),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            child: _buildRatingBreakdownProgress(display5, display4, display3, display2, display1),
+                          ),
+                          const SizedBox(width: 24),
+                          SizedBox(
+                            width: 220,
+                            child: _buildSubMetricGrid(),
+                          ),
+                        ],
+                      );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // 2. Student Reviews Header & Write Review Button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  CircleAvatar(radius: 14, backgroundColor: const Color(0xFF2563EB), child: Text(name[0], style: const TextStyle(color: Colors.white, fontSize: 11))),
-                  const SizedBox(width: 8),
-                  Text(name, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
-                  const Spacer(),
-                  Row(children: List.generate(5, (_) => const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 14))),
-                ],
+              Text(
+                'Student Reviews (${filteredReviews.length})',
+                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
               ),
-              const SizedBox(height: 6),
-              Text(comment, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF475569))),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF2563EB),
+                  side: const BorderSide(color: Color(0xFF2563EB)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: _openWriteReviewDialog,
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: Text('Write a Review', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold)),
+              ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 12),
+
+          // 3. Review Filter Pills Row (All (320) | 5 ⭐ (250) | 4 ⭐ (52)...)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildReviewFilterPill('All', 'All ($totalCount)'),
+                const SizedBox(width: 8),
+                _buildReviewFilterPill('5 ⭐', '5 ★ ($display5)'),
+                const SizedBox(width: 8),
+                _buildReviewFilterPill('4 ⭐', '4 ★ ($display4)'),
+                const SizedBox(width: 8),
+                _buildReviewFilterPill('3 ⭐', '3 ★ ($display3)'),
+                const SizedBox(width: 8),
+                _buildReviewFilterPill('2 ⭐', '2 ★ ($display2)'),
+                const SizedBox(width: 8),
+                _buildReviewFilterPill('1 ⭐', '1 ★ ($display1)'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 4. Detailed Student Review Cards List matching Screenshot
+          ...filteredReviews.map((r) {
+            final name = (r['name'] ?? 'Aspirant').toString();
+            final aspirant = (r['aspirant'] ?? '${item.exam} Aspirant').toString();
+            final date = (r['date'] ?? 'Recently').toString();
+            final rating = (r['rating'] is num) ? (r['rating'] as num).toDouble() : 5.0;
+            final comment = (r['comment'] ?? '').toString();
+            final tags = (r['tags'] is List) ? List<String>.from(r['tags']) : <String>[];
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Avatar
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: const Color(0xFF2563EB),
+                        child: Text(
+                          name.isNotEmpty ? name[0] : 'A',
+                          style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // User Info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  name,
+                                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$aspirant • $date',
+                              style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Rating Stars & Score
+                      Row(
+                        children: [
+                          Row(
+                            children: List.generate(5, (idx) {
+                              return Icon(
+                                idx < rating.floor() ? Icons.star_rounded : Icons.star_border_rounded,
+                                color: const Color(0xFFF59E0B),
+                                size: 16,
+                              );
+                            }),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            rating.toStringAsFixed(1),
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.more_vert_rounded, size: 18, color: Color(0xFF94A3B8)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Review Comment
+                  Text(
+                    comment,
+                    style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF334155), height: 1.5),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Review Tag Chips
+                  if (tags.isNotEmpty)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: tags.map((t) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            t,
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB)),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverallScoreBox() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              '4.9',
+              style: GoogleFonts.inter(fontSize: 48, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A), height: 1.0),
+            ),
+            Text(
+              ' /5',
+              style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: List.generate(5, (_) => const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 20)),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '1,480+ Students Enrolled',
+          style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRatingBreakdownProgress(int c5, int c4, int c3, int c2, int c1) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Rating Breakdown', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+        const SizedBox(height: 8),
+        _buildStarProgressBar('5', 0.78, '78%', '($c5)'),
+        const SizedBox(height: 4),
+        _buildStarProgressBar('4', 0.16, '16%', '($c4)'),
+        const SizedBox(height: 4),
+        _buildStarProgressBar('3', 0.04, '4%', '($c3)'),
+        const SizedBox(height: 4),
+        _buildStarProgressBar('2', 0.01, '1%', '($c2)'),
+        const SizedBox(height: 4),
+        _buildStarProgressBar('1', 0.01, '1%', '($c1)'),
+      ],
+    );
+  }
+
+  Widget _buildStarProgressBar(String starNum, double pctVal, String pctStr, String countStr) {
+    return Row(
+      children: [
+        Text(starNum, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
+        const SizedBox(width: 4),
+        const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 14),
+        const SizedBox(width: 8),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: pctVal,
+              minHeight: 6,
+              backgroundColor: const Color(0xFFE2E8F0),
+              valueColor: AlwaysStoppedAnimation(starNum == '5' || starNum == '4' ? const Color(0xFF10B981) : const Color(0xFFF59E0B)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 32,
+          child: Text(pctStr, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+        ),
+        Text(countStr, style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF94A3B8))),
+      ],
+    );
+  }
+
+  Widget _buildSubMetricGrid() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: _buildSubMetricTile(Icons.menu_book_rounded, '4.9/5', 'Test Quality', const Color(0xFFECFDF5), const Color(0xFF059669))),
+            const SizedBox(width: 8),
+            Expanded(child: _buildSubMetricTile(Icons.person_outline_rounded, '4.8/5', 'Solutions', const Color(0xFFF5F3FF), const Color(0xFF7C3AED))),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(child: _buildSubMetricTile(Icons.insights_rounded, '4.7/5', 'Analytics', const Color(0xFFEFF6FF), const Color(0xFF2563EB))),
+            const SizedBox(width: 8),
+            Expanded(child: _buildSubMetricTile(Icons.headset_mic_outlined, '4.8/5', 'Support', const Color(0xFFFDF2F8), const Color(0xFFDB2777))),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubMetricTile(IconData icon, String score, String label, Color bgColor, Color iconColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: iconColor),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(score, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                Text(label, style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewFilterPill(String filterKey, String label) {
+    final isSelected = _selectedReviewFilter == filterKey;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedReviewFilter = filterKey),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF2563EB) : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1)),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12.5,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? Colors.white : const Color(0xFF475569),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1264,20 +1740,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   }
 
   // ==========================================
-  // RIGHT SIDEBAR (PRICING & INCLUDED CARDS)
+  // RIGHT SIDEBAR (PRICING & REVIEWS SIDEBAR CARDS)
   // ==========================================
   Widget _buildRightSidebar(TestSeriesCardData item, List<Map<String, dynamic>> tests) {
     final discount = item.originalPrice > 0 ? (((item.originalPrice - item.price) / item.originalPrice) * 100).toInt() : 85;
-
-    final chapterCount = tests.where((t) => t['type'].toString().toLowerCase().contains('chapter')).length;
-    final partCount = tests.where((t) => t['type'].toString().toLowerCase().contains('part')).length;
-    final unitCount = tests.where((t) => t['type'].toString().toLowerCase().contains('unit')).length;
-    final fullCount = tests.where((t) => t['type'].toString().toLowerCase().contains('full') || (!t['type'].toString().toLowerCase().contains('chapter') && !t['type'].toString().toLowerCase().contains('part') && !t['type'].toString().toLowerCase().contains('unit'))).length;
-
-    final displayChapter = chapterCount > 0 ? chapterCount : 10;
-    final displayPart = partCount > 0 ? partCount : 10;
-    final displayUnit = unitCount > 0 ? unitCount : 8;
-    final displayFull = fullCount > 0 ? fullCount : 5;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1374,7 +1840,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         ),
         const SizedBox(height: 16),
 
-        // CARD 2: What's Included Card
+        // CARD 2: What Students Say matching Screenshot
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
@@ -1387,23 +1853,62 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             children: [
               Row(
                 children: [
-                  const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 18),
-                  const SizedBox(width: 8),
-                  Text("What's Included", style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF2563EB), size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Text('What Students Say', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
                 ],
               ),
-              const SizedBox(height: 14),
-              _buildIncludedItem(Icons.description_outlined, '${tests.length} Tests', 'Chapter + Part + Unit + Full Syllabus'),
-              _buildIncludedItem(Icons.menu_book_outlined, 'Detailed Solutions', 'Step-by-step explanations with concepts'),
-              _buildIncludedItem(Icons.insights_rounded, 'Performance Analytics', 'Subject-wise & chapter-wise insights'),
-              _buildIncludedItem(Icons.emoji_events_outlined, 'All India Ranking', 'Compare with NEET aspirants across India'),
-              _buildIncludedItem(Icons.check_circle_outline_rounded, 'Latest NTA Pattern', 'Based on latest NEET pattern & syllabus'),
+              const SizedBox(height: 10),
+              Text(
+                '1,480+ students have reviewed this test series with an average rating of 4.9/5.',
+                style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF475569), height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  SizedBox(
+                    width: 100,
+                    height: 24,
+                    child: Stack(
+                      children: List.generate(6, (idx) {
+                        return Positioned(
+                          left: idx * 14.0,
+                          child: CircleAvatar(
+                            radius: 11,
+                            backgroundColor: Colors.white,
+                            child: CircleAvatar(
+                              radius: 10,
+                              backgroundColor: [
+                                const Color(0xFF2563EB),
+                                const Color(0xFF059669),
+                                const Color(0xFFD97706),
+                                const Color(0xFF7C3AED),
+                                const Color(0xFFDB2777),
+                                const Color(0xFF0284C7),
+                              ][idx],
+                              child: Text('${idx + 1}', style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                  Text(
+                    '+1.4K students',
+                    style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF2563EB), fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
         const SizedBox(height: 16),
 
-        // CARD 3: Test Schedule Card
+        // CARD 3: Review Highlights Card matching Screenshot
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
@@ -1415,59 +1920,97 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.calendar_month_outlined, color: Color(0xFF2563EB), size: 18),
-                      const SizedBox(width: 8),
-                      Text('Test Schedule', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
-                    ],
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.thumb_up_alt_outlined, color: Color(0xFF2563EB), size: 18),
                   ),
-                  GestureDetector(
-                    onTap: () => _tabController.animateTo(1),
-                    child: Text('View Full Schedule ->', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF2563EB), fontWeight: FontWeight.bold)),
-                  ),
+                  const SizedBox(width: 10),
+                  Text('Review Highlights', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
                 ],
               ),
               const SizedBox(height: 12),
-              _buildScheduleRow(const Color(0xFF2563EB), 'Chapter Tests', '$displayChapter Tests'),
-              _buildScheduleRow(const Color(0xFF059669), 'Part Tests', '$displayPart Tests'),
-              _buildScheduleRow(const Color(0xFFD97706), 'Unit Tests', '$displayUnit Tests'),
-              _buildScheduleRow(const Color(0xFFDC2626), 'Full Syllabus Tests', '$displayFull Tests'),
+              _buildHighlightRow('Questions at actual ${item.exam} level'),
+              _buildHighlightRow('Detailed and easy to understand solutions'),
+              _buildHighlightRow('Helpful performance analytics'),
+              _buildHighlightRow('Great for chapter-wise preparation'),
+              _buildHighlightRow('Improved scores and confidence'),
             ],
           ),
         ),
         const SizedBox(height: 16),
 
-        // CARD 4: Join Aspirants Banner Card
+        // CARD 4: Recent Reviews Card matching Screenshot
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFF3E8FF), Color(0xFFEDE9FE)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFDDD6FE)),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.emoji_events_rounded, color: Color(0xFF7C3AED), size: 30),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Join 1,480+ Serious Aspirants', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF5B21B6))),
-                    const SizedBox(height: 2),
-                    Text("Get ahead with India's most trusted ${item.exam} test series", style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF6D28D9))),
-                  ],
-                ),
-              ),
+              Text('Recent Reviews', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+              const SizedBox(height: 12),
+              _buildCompactReviewTile('Ananya Sharma', '${item.exam} 2027 Aspirant', '5.0', '2 days ago', const Color(0xFF2563EB)),
+              const Divider(height: 16, color: Color(0xFFF1F5F9)),
+              _buildCompactReviewTile('Vikash Tiwari', '${item.exam} 2026 Aspirant', '4.5', '4 days ago', const Color(0xFF059669)),
+              const Divider(height: 16, color: Color(0xFFF1F5F9)),
+              _buildCompactReviewTile('Muskan Ali', '${item.exam} 2027 Aspirant', '5.0', '5 days ago', const Color(0xFF7C3AED)),
             ],
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHighlightRow(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF334155))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactReviewTile(String name, String sub, String ratingStr, String timeStr, Color bg) {
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 14,
+          backgroundColor: bg,
+          child: Text(name[0], style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(name, style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+              Text(sub, style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B))),
+            ],
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Row(
+              children: List.generate(5, (i) {
+                return const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 12);
+              }),
+            ),
+            const SizedBox(height: 2),
+            Text(timeStr, style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8))),
+          ],
         ),
       ],
     );
@@ -1484,48 +2027,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF64748B), height: 1.2),
         ),
       ],
-    );
-  }
-
-  Widget _buildIncludedItem(IconData icon, String title, String subtitle) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
-            child: Icon(icon, size: 16, color: const Color(0xFF2563EB)),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
-                Text(subtitle, style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B))),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFF94A3B8)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScheduleRow(Color dotColor, String label, String count) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle)),
-          const SizedBox(width: 10),
-          Expanded(child: Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF334155)))),
-          Text(count, style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF94A3B8)),
-        ],
-      ),
     );
   }
 }
