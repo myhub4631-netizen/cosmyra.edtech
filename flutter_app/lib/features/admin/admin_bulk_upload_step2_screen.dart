@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/smart_image.dart';
 import '../../shared/widgets/solution_video_player.dart';
+import '../../shared/widgets/latex_view.dart';
 import 'admin_bulk_upload_step1_screen.dart';
 
 class AdminBulkUploadStep2Screen extends StatefulWidget {
@@ -51,6 +52,7 @@ class QuestionItemData {
   bool isMarkedForReview;
   bool isCollapsed;
   bool isSaved;
+  bool showLivePreview;
   bool isUploadingQuestionImage;
   List<bool> isUploadingOptionImage;
   String? solutionVideoUrl;
@@ -83,6 +85,7 @@ class QuestionItemData {
     this.isMarkedForReview = false,
     this.isCollapsed = false,
     this.isSaved = false,
+    this.showLivePreview = false,
     this.isUploadingQuestionImage = false,
     List<bool>? isUploadingOptionImage,
     this.solutionVideoUrl,
@@ -829,6 +832,329 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     );
   }
 
+  void _showQuestionLivePreviewDialog(QuestionItemData q) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 820, maxHeight: 750),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEEF2FF),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.remove_red_eye_rounded, color: Color(0xFF4F46E5), size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Student View Live Preview — Question ${q.number}',
+                              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                            ),
+                            Text(
+                              'Authentic student renderer for LaTeX, KaTeX equations, images, and options.',
+                              style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24, thickness: 1, color: Color(0xFFE2E8F0)),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: _buildStudentLivePreviewContent(q),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStudentLivePreviewContent(QuestionItemData q) {
+    final optionLetters = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Meta Badges Bar
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: Text(
+                'Q${q.number} • ${q.subject}',
+                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF1D4ED8)),
+              ),
+            ),
+            if (q.chapter.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Text(
+                  q.chapter,
+                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
+                ),
+              ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: q.difficulty == 'Hard'
+                    ? const Color(0xFFFEF2F2)
+                    : q.difficulty == 'Easy'
+                        ? const Color(0xFFECFDF5)
+                        : const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: q.difficulty == 'Hard'
+                      ? const Color(0xFFFCA5A5)
+                      : q.difficulty == 'Easy'
+                          ? const Color(0xFFA7F3D0)
+                          : const Color(0xFFFDE68A),
+                ),
+              ),
+              child: Text(
+                '${q.difficulty} Difficulty',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: q.difficulty == 'Hard'
+                      ? const Color(0xFF991B1B)
+                      : q.difficulty == 'Easy'
+                          ? const Color(0xFF065F46)
+                          : const Color(0xFF92400E),
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'Marks: +${q.positiveMarks} / ${q.negativeMarks}',
+                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF475569)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Question Statement Card with LaTeXView
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (q.text.trim().isNotEmpty)
+                LaTeXView(
+                  text: q.text,
+                  style: GoogleFonts.inter(fontSize: 14.5, height: 1.5, color: const Color(0xFF0F172A), fontWeight: FontWeight.w500),
+                )
+              else
+                Text(
+                  '*(No text provided for this question)*',
+                  style: GoogleFonts.inter(fontSize: 13, fontStyle: FontStyle.italic, color: const Color(0xFF94A3B8)),
+                ),
+
+              if (q.questionImage != null && q.questionImage!.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SmartImage(
+                    url: q.questionImage,
+                    height: 260,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Options List (Rendered with LaTeXView)
+        Text('Options:', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF334155))),
+        const SizedBox(height: 8),
+
+        ...List.generate(q.options.length, (optIdx) {
+          final letter = optionLetters[optIdx];
+          final isCorrect = (q.correctOptionIndex == optIdx);
+          final optText = q.options[optIdx];
+          final optImg = (optIdx < q.optionImages.length) ? q.optionImages[optIdx] : null;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: isCorrect ? const Color(0xFFECFDF5) : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isCorrect ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+                width: isCorrect ? 1.5 : 1.0,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Radio Letter Badge
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isCorrect ? const Color(0xFF10B981) : const Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      letter,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isCorrect ? Colors.white : const Color(0xFF475569),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Option Text with LaTeXView
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (optText.trim().isNotEmpty)
+                        LaTeXView(
+                          text: optText,
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            color: isCorrect ? const Color(0xFF065F46) : const Color(0xFF1E293B),
+                            fontWeight: isCorrect ? FontWeight.bold : FontWeight.w500,
+                          ),
+                        )
+                      else if (optImg == null || optImg.isEmpty)
+                        Text('(Option $letter)', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8))),
+
+                      if (optImg != null && optImg.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        SmartImage(
+                          url: optImg,
+                          height: 120,
+                          fit: BoxFit.contain,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                if (isCorrect) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Correct Answer',
+                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        }),
+
+        // Solution & Explanation Preview Section (If Provided)
+        if (q.explanation.trim().isNotEmpty || (q.solutionVideoUrl != null && q.solutionVideoUrl!.trim().isNotEmpty)) ...[
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.lightbulb_rounded, size: 18, color: Color(0xFF4F46E5)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Explanation & Solution',
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF1E1B4B)),
+                    ),
+                  ],
+                ),
+                if (q.explanation.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  LaTeXView(
+                    text: q.explanation,
+                    style: GoogleFonts.inter(fontSize: 13, height: 1.5, color: const Color(0xFF334155)),
+                  ),
+                ],
+                if (q.solutionVideoUrl != null && q.solutionVideoUrl!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  SolutionVideoPlayerWidget(
+                    videoUrl: q.solutionVideoUrl!,
+                    height: 200,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final double screenWidth = MediaQuery.of(context).size.width;
@@ -1516,6 +1842,48 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                 ),
                 Row(
                   children: [
+                    // 👁️ Live Student View Button
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          q.showLivePreview = !q.showLivePreview;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: q.showLivePreview ? const Color(0xFF4F46E5) : const Color(0xFFEEF2FF),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: q.showLivePreview ? const Color(0xFF4F46E5) : const Color(0xFFC7D2FE)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              q.showLivePreview ? Icons.edit_note_rounded : Icons.remove_red_eye_rounded,
+                              size: 14,
+                              color: q.showLivePreview ? Colors.white : const Color(0xFF4F46E5),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              q.showLivePreview ? 'Edit Question' : '👁️ Student View',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: q.showLivePreview ? Colors.white : const Color(0xFF4F46E5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      icon: const Icon(Icons.open_in_new_rounded, color: Color(0xFF4F46E5), size: 18),
+                      onPressed: () => _showQuestionLivePreviewDialog(q),
+                      tooltip: 'Open Full Student Preview Modal',
+                    ),
                     IconButton(
                       icon: Icon(
                         q.isCollapsed ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
@@ -1544,48 +1912,50 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           if (!q.isCollapsed)
             Padding(
               padding: const EdgeInsets.all(20),
-              child: isDesktop
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Left Column (~65%)
-                        Expanded(
-                          flex: 65,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildQuestionRichTextInput(q),
-                              const SizedBox(height: 24),
-                              _buildOptionsListSection(q),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 24),
-                        Container(width: 1, height: 520, color: const Color(0xFFF1F5F9)),
-                        const SizedBox(width: 24),
+              child: q.showLivePreview
+                  ? _buildStudentLivePreviewContent(q)
+                  : isDesktop
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Left Column (~65%)
+                            Expanded(
+                              flex: 65,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildQuestionRichTextInput(q),
+                                  const SizedBox(height: 24),
+                                  _buildOptionsListSection(q),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Container(width: 1, height: 520, color: const Color(0xFFF1F5F9)),
+                            const SizedBox(width: 24),
 
-                        // Right Column (~35%)
-                        Expanded(
-                          flex: 35,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildRightColumnDetails(q),
-                            ],
-                          ),
+                            // Right Column (~35%)
+                            Expanded(
+                              flex: 35,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildRightColumnDetails(q),
+                                ],
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildQuestionRichTextInput(q),
+                            const SizedBox(height: 24),
+                            _buildOptionsListSection(q),
+                            const Divider(height: 32),
+                            _buildRightColumnDetails(q),
+                          ],
                         ),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildQuestionRichTextInput(q),
-                        const SizedBox(height: 24),
-                        _buildOptionsListSection(q),
-                        const Divider(height: 32),
-                        _buildRightColumnDetails(q),
-                      ],
-                    ),
             ),
 
           // Footer Bar of Question Card
