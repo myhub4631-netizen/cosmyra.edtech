@@ -1251,243 +1251,248 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Left Image Banner Column (~40-42% width)
-              InkWell(
-                onTap: () => _showProductDetailsModal(item),
-                child: SizedBox(
-                  width: 155,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: _getCardBannerGradient(item),
-                          ),
-                          child: item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty
-                              ? Image.network(
-                                  item.bannerImageUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (ctx, err, st) => _buildBannerGraphic(item),
-                                )
-                              : _buildBannerGraphic(item),
-                        ),
-                      ),
-
-                      // Top-Left Tag Badge (🔥 Best Seller, ⭐ Most Popular, etc.)
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: item.dynamicTagColor,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            item.dynamicTag,
-                            style: GoogleFonts.inter(
-                              color: Colors.white,
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Bottom Translucent Feature Overlay Bar on Image
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                          color: Colors.black.withValues(alpha: 0.65),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              _buildOverlayFeaturePill(item.dynamicFeature1),
-                              Container(width: 1, height: 8, color: Colors.white24),
-                              _buildOverlayFeaturePill(item.dynamicFeature2),
-                              Container(width: 1, height: 8, color: Colors.white24),
-                              _buildOverlayFeaturePill(item.dynamicFeature3),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top Image Banner (Full Width, ~140px Height)
+            InkWell(
+              onTap: () => _showProductDetailsModal(item),
+              child: Stack(
+                children: [
+                  Container(
+                    height: 140,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: _getCardBannerGradient(item),
+                    ),
+                    child: item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty
+                        ? Image.network(
+                            item.bannerImageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (ctx, err, st) => _buildBannerGraphic(item),
+                          )
+                        : _buildBannerGraphic(item),
                   ),
-                ),
-              ),
 
-              // Right Content Area (~58-60% width)
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Header: Icon + Title + Heart Outline
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 30,
-                            height: 30,
-                            decoration: BoxDecoration(
-                              color: item.iconBgColor,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(item.icon, color: Colors.white, size: 16),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              item.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF0F172A),
-                                height: 1.25,
-                              ),
-                            ),
-                          ),
-                          InkWell(
-                            onTap: () => setState(() => _favoritesMap[item.id] = !isFav),
-                            child: Icon(
-                              isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                              color: isFav ? const Color(0xFFEF4444) : const Color(0xFF94A3B8),
-                              size: 17,
-                            ),
-                          ),
-                        ],
+                  // Top-Left Tag Badge
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        color: item.dynamicTagColor,
+                        borderRadius: BorderRadius.circular(6),
                       ),
-
-                      const SizedBox(height: 4),
-
-                      // Description snippet
-                      Text(
-                        item.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      child: Text(
+                        item.dynamicTag,
                         style: GoogleFonts.inter(
-                          fontSize: 10.5,
-                          color: const Color(0xFF64748B),
-                          height: 1.25,
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
+                    ),
+                  ),
 
-                      const SizedBox(height: 6),
+                  // Top-Right Favorite Heart Icon
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: InkWell(
+                      onTap: () => setState(() => _favoritesMap[item.id] = !isFav),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                          color: isFav ? const Color(0xFFEF4444) : Colors.white,
+                          size: 16,
+                        ),
+                      ),
+                    ),
+                  ),
 
-                      // Badges Row: Exam + Tests + Duration + Difficulty
-                      Wrap(
-                        spacing: 4,
-                        runSpacing: 4,
+                  // Bottom Translucent Feature Overlay Bar on Image
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      color: Colors.black.withValues(alpha: 0.65),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: item.exam.contains('JEE') ? const Color(0xFFEFF6FF) : const Color(0xFFF0FDF4),
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(
-                                color: item.exam.contains('JEE') ? const Color(0xFFBFDBFE) : const Color(0xFFBBF7D0),
-                              ),
-                            ),
-                            child: Text(
-                              item.exam.contains('JEE') ? 'JEE' : 'NEET',
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.bold,
-                                color: item.exam.contains('JEE') ? const Color(0xFF1E40AF) : const Color(0xFF166534),
-                              ),
-                            ),
-                          ),
-                          _buildMetaMiniPill('📄 ${item.testCount} Tests'),
-                          _buildMetaMiniPill('⏱️ ${item.durationFormatted}'),
-                          _buildMetaMiniPill('📊 ${item.difficulty}'),
+                          _buildOverlayFeaturePill(item.dynamicFeature1),
+                          Container(width: 1, height: 10, color: Colors.white24),
+                          _buildOverlayFeaturePill(item.dynamicFeature2),
+                          Container(width: 1, height: 10, color: Colors.white24),
+                          _buildOverlayFeaturePill(item.dynamicFeature3),
                         ],
                       ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-                      const SizedBox(height: 8),
-
-                      // Footer Row: Price + Green "Buy Now" Button (Matching Mobile Screenshot)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // Price Stack
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              Text(
-                                '₹${item.price.toInt()}',
-                                style: GoogleFonts.inter(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: const Color(0xFF0F172A),
-                                ),
-                              ),
-                              const SizedBox(width: 3),
-                              Text(
-                                '₹${item.originalPrice.toInt()}',
-                                style: GoogleFonts.inter(
-                                  fontSize: 10.5,
-                                  decoration: TextDecoration.lineThrough,
-                                  color: const Color(0xFF94A3B8),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFEE2E2),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  '$discountPct% OFF',
-                                  style: const TextStyle(
-                                    color: Color(0xFFDC2626),
-                                    fontSize: 8.5,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
+            // Card Content Area
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title + Icon Row
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: item.iconBgColor,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(item.icon, color: Colors.white, size: 17),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF0F172A),
+                            height: 1.25,
                           ),
-
-                          // Green "Buy Now" CTA Button (Matching Mobile Screenshot)
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF10B981),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            onPressed: () => _handlePurchaseOrEnroll(item),
-                            icon: const Icon(Icons.shopping_cart_outlined, size: 13, color: Colors.white),
-                            label: Text(
-                              item.isFree ? 'Enroll Free' : 'Buy Now',
-                              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
-                ),
+
+                  const SizedBox(height: 6),
+
+                  // Description
+                  Text(
+                    item.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: const Color(0xFF64748B),
+                      height: 1.3,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Meta Pills Row
+                  Wrap(
+                    spacing: 5,
+                    runSpacing: 5,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: item.exam.contains('JEE') ? const Color(0xFFEFF6FF) : const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: item.exam.contains('JEE') ? const Color(0xFFBFDBFE) : const Color(0xFFBBF7D0),
+                          ),
+                        ),
+                        child: Text(
+                          item.exam.contains('JEE') ? 'JEE' : 'NEET',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: item.exam.contains('JEE') ? const Color(0xFF1E40AF) : const Color(0xFF166534),
+                          ),
+                        ),
+                      ),
+                      _buildMetaMiniPill('📄 ${item.testCount} Tests'),
+                      _buildMetaMiniPill('⏱️ ${item.durationFormatted}'),
+                      _buildMetaMiniPill('📊 ${item.difficulty}'),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Footer Row: Price + Green "Buy Now" CTA Button
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Price Stack
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '₹${item.price.toInt()}',
+                            style: GoogleFonts.inter(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                              color: const Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '₹${item.originalPrice.toInt()}',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              decoration: TextDecoration.lineThrough,
+                              color: const Color(0xFF94A3B8),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEE2E2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '$discountPct% OFF',
+                              style: const TextStyle(
+                                color: Color(0xFFDC2626),
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Green "Buy Now" CTA Button
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () => _handlePurchaseOrEnroll(item),
+                        icon: const Icon(Icons.shopping_cart_outlined, size: 14, color: Colors.white),
+                        label: Text(
+                          item.isFree ? 'Enroll Free' : 'Buy Now',
+                          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1724,20 +1729,21 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                           ],
                         ),
 
-                        Material(
-                          color: const Color(0xFF3546E5),
-                          shape: const CircleBorder(),
-                          child: InkWell(
-                            onTap: () => _startTestSeries(item.id, item.title, item.durationMinutes),
-                            customBorder: const CircleBorder(),
-                            child: const Padding(
-                              padding: EdgeInsets.all(8),
-                              child: Icon(
-                                Icons.arrow_forward_rounded,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                            ),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () => _handlePurchaseOrEnroll(item),
+                          icon: const Icon(Icons.shopping_cart_outlined, size: 14, color: Colors.white),
+                          label: Text(
+                            item.isFree ? 'Enroll Free' : 'Buy Now',
+                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
