@@ -280,6 +280,45 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     });
   }
 
+  List<int> _selectedPaperPendingQNumbers = [];
+  int _selectedPaperSavedCount = 0;
+  bool _isLoadingPaperPendingStatus = false;
+
+  Future<void> _checkPaperPendingQuestions(String paperId, int totalQCount) async {
+    if (paperId.isEmpty) return;
+    setState(() => _isLoadingPaperPendingStatus = true);
+    try {
+      final savedQuestions = await SupabaseService.fetchQuestionsForPaper(paperId);
+      final Set<int> savedNumSet = {};
+      for (var sq in savedQuestions) {
+        final rawNum = sq['question_number'] ?? sq['questionNumber'];
+        final int? parsedNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum?.toString() ?? '');
+        final hasCorrect = (sq['correct_option_index'] != null || sq['correctOptionIndex'] != null || (sq['correct_answer'] ?? '').toString().isNotEmpty);
+        final hasChap = (sq['chapter'] ?? sq['chapterTopic'] ?? '').toString().isNotEmpty;
+        if (parsedNum != null && hasCorrect && hasChap) {
+          savedNumSet.add(parsedNum);
+        }
+      }
+
+      final List<int> pending = [];
+      for (int i = 1; i <= totalQCount; i++) {
+        if (!savedNumSet.contains(i)) {
+          pending.add(i);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _selectedPaperSavedCount = savedNumSet.length;
+          _selectedPaperPendingQNumbers = pending;
+          _isLoadingPaperPendingStatus = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingPaperPendingStatus = false);
+    }
+  }
+
   void _onExistingPaperSelected(String paperTitle) {
     setState(() {
       _existingPaper = paperTitle;
@@ -344,6 +383,10 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           _subjectBotany = subList.contains('botany') || subList.contains('biology');
           _subjectZoology = subList.contains('zoology') || subList.contains('biology');
         }
+
+        final String paperId = foundPaper['id']?.toString() ?? '';
+        final int totalQ = int.tryParse(foundPaper['question_count']?.toString() ?? '') ?? 180;
+        _checkPaperPendingQuestions(paperId, totalQ);
       }
     });
   }
@@ -1455,18 +1498,83 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                       ),
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
-                        child: Row(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _selectedPaperPendingQNumbers.isEmpty ? const Color(0xFFDCFCE7) : const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: _selectedPaperPendingQNumbers.isEmpty ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A), size: 16),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '✓ Auto-fetched parameters for "$_existingPaper": Total Marks: ${_totalMarksCtrl.text} | Questions: ${_questionCountCtrl.text} | Conducting Body: $_conductingBody | Duration: ${_durationCtrl.text}m | Marking: ${_positiveMarksCtrl.text}/${_negativeMarksCtrl.text}',
-                                style: const TextStyle(fontSize: 11, color: Color(0xFF15803D), fontWeight: FontWeight.bold),
-                              ),
+                            Row(
+                              children: [
+                                Icon(
+                                  _selectedPaperPendingQNumbers.isEmpty ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
+                                  color: _selectedPaperPendingQNumbers.isEmpty ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '✓ Auto-fetched parameters for "$_existingPaper": Total Marks: ${_totalMarksCtrl.text} | Questions: ${_questionCountCtrl.text} | Duration: ${_durationCtrl.text}m | Marking: ${_positiveMarksCtrl.text}/${_negativeMarksCtrl.text}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: _selectedPaperPendingQNumbers.isEmpty ? const Color(0xFF15803D) : const Color(0xFF991B1B),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Text(
+                                  _isLoadingPaperPendingStatus
+                                      ? 'Checking pending question status...'
+                                      : (_selectedPaperPendingQNumbers.isEmpty
+                                          ? '✓ Upload Status: All ${_questionCountCtrl.text} questions saved!'
+                                          : '⚠️ Upload Status: $_selectedPaperSavedCount / ${_questionCountCtrl.text} Saved | Pending (${_selectedPaperPendingQNumbers.length}):'),
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: _selectedPaperPendingQNumbers.isEmpty ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (!_isLoadingPaperPendingStatus && _selectedPaperPendingQNumbers.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 4,
+                                runSpacing: 4,
+                                children: [
+                                  ..._selectedPaperPendingQNumbers.take(25).map((qNum) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: const Color(0xFFEF4444)),
+                                      ),
+                                      child: Text(
+                                        'Q$qNum',
+                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+                                      ),
+                                    );
+                                  }),
+                                  if (_selectedPaperPendingQNumbers.length > 25)
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 4, top: 2),
+                                      child: Text(
+                                        '+${_selectedPaperPendingQNumbers.length - 25} more pending...',
+                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF991B1B)),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),

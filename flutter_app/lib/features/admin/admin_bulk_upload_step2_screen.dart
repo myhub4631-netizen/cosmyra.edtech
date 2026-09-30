@@ -1467,10 +1467,32 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     );
   }
 
+  List<int> get _pendingQuestionNumbers {
+    return _questionsList.where((q) => !q.isSaved).map((q) => q.number).toList();
+  }
+
+  void _jumpToQuestion(int qNum) {
+    if (qNum < 1 || qNum > _questionsList.length) return;
+    final targetPage = ((qNum - 1) ~/ _itemsPerPage) + 1;
+    setState(() {
+      _jumpToQuestionNumber = qNum;
+      _currentPageIndex = targetPage;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Jumped to Question $qNum (Page $targetPage)'),
+        backgroundColor: const Color(0xFF4F46E5),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
   // ===========================================================================
   // 5. KPI SUMMARY METRIC CARD
   // ===========================================================================
   Widget _buildKPISummaryCard(int remainingCount, double progressPercent) {
+    final pendingNums = _pendingQuestionNumbers;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -1478,81 +1500,182 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
-          BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Total Questions
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Total Questions', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-                const SizedBox(height: 4),
-                Text('${widget.totalQuestionsCount}', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
-              ],
-            ),
-          ),
-          Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
-
-          // Added
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Added', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-                  const SizedBox(height: 4),
-                  Text('$_addedCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
-                ],
+          Row(
+            children: [
+              // Total Questions
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Total Questions', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                    const SizedBox(height: 4),
+                    Text('${widget.totalQuestionsCount}', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
+                  ],
+                ),
               ),
-            ),
-          ),
-          Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
+              Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
 
-          // Remaining
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Remaining', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-                  const SizedBox(height: 4),
-                  Text('$remainingCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
-                ],
+              // Added
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Added', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                      const SizedBox(height: 4),
+                      Text('$_addedCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-          Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
+              Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
 
-          // Progress
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 20),
+              // Remaining
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Remaining', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                      const SizedBox(height: 4),
+                      Text('$remainingCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: remainingCount > 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A))),
+                    ],
+                  ),
+                ),
+              ),
+              Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
+
+              // Progress
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Progress', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                      const SizedBox(height: 4),
+                      Text('${(progressPercent * 100).toInt()}%', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: progressPercent,
+                          minHeight: 6,
+                          backgroundColor: const Color(0xFFF1F5F9),
+                          valueColor: AlwaysStoppedAnimation<Color>(remainingCount == 0 ? const Color(0xFF10B981) : const Color(0xFF4F46E5)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Pending Question Numbers Section
+          if (pendingNums.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Progress', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-                  const SizedBox(height: 4),
-                  Text('${(progressPercent * 100).toInt()}%', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progressPercent,
-                      minHeight: 6,
-                      backgroundColor: const Color(0xFFF1F5F9),
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4F46E5)),
-                    ),
+                  Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Questions Still Pending Upload (${pendingNums.length}):',
+                        style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF991B1B)),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Click any question number to jump directly to it ➔',
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFB91C1C)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      ...pendingNums.take(30).map((qNum) {
+                        return InkWell(
+                          onTap: () => _jumpToQuestion(qNum),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFEF4444)),
+                              boxShadow: const [
+                                BoxShadow(color: Color(0x1AEF4444), blurRadius: 4, offset: Offset(0, 1)),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Q$qNum',
+                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626)),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.arrow_forward_rounded, size: 12, color: Color(0xFFDC2626)),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                      if (pendingNums.length > 30)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6, top: 4),
+                          child: Text(
+                            '+${pendingNums.length - 30} more pending...',
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF991B1B)),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
             ),
-          ),
+          ] else ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFA7F3D0)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    '✓ Great job! All ${widget.totalQuestionsCount} questions have been successfully filled and saved!',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF065F46)),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1562,6 +1685,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   // 6. FILTER / JUMP TOOLBAR BAR
   // ===========================================================================
   Widget _buildFilterToolbarBar() {
+    final pendingNums = _pendingQuestionNumbers;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -1603,10 +1728,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
               ),
               const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: () {
-                  final targetPage = ((_jumpToQuestionNumber - 1) ~/ _itemsPerPage) + 1;
-                  setState(() => _currentPageIndex = targetPage);
-                },
+                onPressed: () => _jumpToQuestion(_jumpToQuestionNumber),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEEF2FF),
                   foregroundColor: const Color(0xFF4F46E5),
@@ -1616,6 +1738,23 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                 ),
                 child: Text('Go to', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
               ),
+              if (pendingNums.isNotEmpty) ...[
+                const SizedBox(width: 10),
+                ElevatedButton.icon(
+                  onPressed: () => _jumpToQuestion(pendingNums.first),
+                  icon: const Icon(Icons.bolt_rounded, size: 14, color: Colors.white),
+                  label: Text(
+                    '⚡ Next Pending: Q${pendingNums.first}',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ],
             ],
           ),
 
