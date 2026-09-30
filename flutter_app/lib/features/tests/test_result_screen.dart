@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/latex_view.dart';
 import '../../shared/widgets/smart_image.dart';
+import '../../shared/widgets/solution_video_player.dart';
 import '../../shared/utils/question_copy_helper.dart';
 import 'exam_config_engine.dart';
 import '../leaderboard/leaderboard_screen.dart';
@@ -1238,6 +1239,35 @@ class _TestResultScreenState extends State<TestResultScreen> {
                             LaTeXView(
                               text: (q.explanation != null && q.explanation!.isNotEmpty) ? q.explanation! : q.solution!,
                               style: const TextStyle(fontSize: 13.5, height: 1.4, color: Color(0xFF0F172A)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    if (q.solutionVideoUrl != null && q.solutionVideoUrl!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: const [
+                                Icon(Icons.play_circle_fill, color: Color(0xFF4F46E5), size: 18),
+                                SizedBox(width: 6),
+                                Text('Video Solution', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            SolutionVideoPlayerWidget(
+                              videoUrl: q.solutionVideoUrl!,
+                              height: 220,
                             ),
                           ],
                         ),

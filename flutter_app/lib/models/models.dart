@@ -419,6 +419,7 @@ class QuestionModel {
   final double? numericalTolerance;
   final String? explanation;
   final String? solution;
+  final String? solutionVideoUrl;
   final String? hint;
   final List<String> tags;
   final List<String> availableIn; // ['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series']
@@ -526,6 +527,7 @@ class QuestionModel {
     this.numericalTolerance,
     this.explanation,
     this.solution,
+    this.solutionVideoUrl,
     this.hint,
     this.tags = const [],
     this.availableIn = const [
@@ -741,6 +743,7 @@ class QuestionModel {
       numericalTolerance: (json['numerical_tolerance'] as num?)?.toDouble(),
       explanation: json['explanation']?.toString(),
       solution: json['solution']?.toString(),
+      solutionVideoUrl: json['solution_video_url']?.toString() ?? json['solutionVideoUrl']?.toString() ?? json['video_url']?.toString(),
       hint: json['hint']?.toString(),
       tags: parsedTags,
       availableIn: parsedAvailableIn,
@@ -776,6 +779,8 @@ class QuestionModel {
       'numerical_tolerance': numericalTolerance,
       'explanation': explanation,
       'solution': solution,
+      'solution_video_url': solutionVideoUrl,
+      'solutionVideoUrl': solutionVideoUrl,
       'hint': hint,
       'tags': tags,
       'available_in': availableIn,

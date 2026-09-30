@@ -35,6 +35,7 @@ class Question {
   final String source;
   final String? explanation;
   final String? solution;
+  final String? solutionVideoUrl;
   final double marks;
   final double negativeMarks;
   final int? year;
@@ -51,6 +52,7 @@ class Question {
     required this.source,
     this.explanation,
     this.solution,
+    this.solutionVideoUrl,
     required this.marks,
     required this.negativeMarks,
     this.year,
@@ -69,6 +71,7 @@ class Question {
       source: json['source'] ?? 'practice',
       explanation: json['explanation'],
       solution: json['solution'],
+      solutionVideoUrl: json['solution_video_url'] ?? json['solutionVideoUrl'] ?? json['video_url'],
       marks: (json['marks'] as num?)?.toDouble() ?? 4.0,
       negativeMarks: (json['negative_marks'] as num?)?.toDouble() ?? 1.0,
       year: json['year'],

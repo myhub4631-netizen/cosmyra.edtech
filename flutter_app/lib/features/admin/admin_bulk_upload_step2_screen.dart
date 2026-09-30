@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/smart_image.dart';
+import '../../shared/widgets/solution_video_player.dart';
 import 'admin_bulk_upload_step1_screen.dart';
 
 class AdminBulkUploadStep2Screen extends StatefulWidget {
@@ -52,6 +53,8 @@ class QuestionItemData {
   bool isSaved;
   bool isUploadingQuestionImage;
   List<bool> isUploadingOptionImage;
+  String? solutionVideoUrl;
+  bool isUploadingSolutionVideo;
   List<String> availableIn;
 
   QuestionItemData({
@@ -80,6 +83,8 @@ class QuestionItemData {
     this.isSaved = false,
     this.isUploadingQuestionImage = false,
     List<bool>? isUploadingOptionImage,
+    this.solutionVideoUrl,
+    this.isUploadingSolutionVideo = false,
     List<String>? availableIn,
   })  : options = options != null ? List<String>.from(options) : ['', '', '', ''],
         optionImages = optionImages != null ? List<String?>.from(optionImages) : [null, null, null, null],
@@ -322,6 +327,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           optionImages: optImgs,
           correctOptionIndex: correctIdx >= 0 ? correctIdx : 0,
           explanation: savedMatch['explanation'] ?? savedMatch['solution'] ?? '',
+          solutionVideoUrl: savedMatch['solution_video_url'] ?? savedMatch['solutionVideoUrl'] ?? savedMatch['video_url'],
           difficulty: normDiff,
           positiveMarks: savedMatch['marks']?.toString() ?? savedMatch['positiveMarks']?.toString() ?? '4',
           negativeMarks: savedMatch['negative_marks']?.toString() ?? savedMatch['negativeMarks']?.toString() ?? '-1',
@@ -390,6 +396,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           'correct_option_index': correctIdx,
           'correctText': correctAnsText,
           'explanation': q.explanation,
+          'solution_video_url': q.solutionVideoUrl ?? '',
+          'solutionVideoUrl': q.solutionVideoUrl ?? '',
           'difficulty': q.difficulty,
           'marks': double.tryParse(q.positiveMarks) ?? 4.0,
           'negativeMarks': double.tryParse(q.negativeMarks) ?? 1.0,
@@ -510,6 +518,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       'correct_option_index': correctIdx,
       'correctText': correctAnsText,
       'explanation': q.explanation,
+      'solution_video_url': q.solutionVideoUrl ?? '',
+      'solutionVideoUrl': q.solutionVideoUrl ?? '',
       'difficulty': q.difficulty,
       'marks': double.tryParse(q.positiveMarks) ?? 4.0,
       'negativeMarks': double.tryParse(q.negativeMarks) ?? 1.0,
@@ -617,6 +627,48 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     }
   }
 
+  Future<void> _pickAndUploadSolutionVideo(QuestionItemData q) async {
+    try {
+      setState(() => q.isUploadingSolutionVideo = true);
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['mp4', 'webm', 'mov', 'm4v', 'avi', 'mkv'],
+        withData: true,
+      );
+      if (result != null && result.files.single.bytes != null) {
+        final bytes = result.files.single.bytes!;
+        final filename = result.files.single.name;
+        final ext = result.files.single.extension?.toLowerCase() ?? 'mp4';
+        final mimeType = ext == 'webm' ? 'video/webm' : (ext == 'mov' ? 'video/quicktime' : 'video/mp4');
+        final url = await SupabaseService.uploadMediaFile(
+          fileBytes: bytes,
+          fileName: 'solution_vid_${DateTime.now().millisecondsSinceEpoch}_$filename',
+          mimeType: mimeType,
+        );
+        if (url != null && url.isNotEmpty) {
+          setState(() {
+            q.solutionVideoUrl = url;
+            _scheduleAutoSave(q);
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Solution video uploaded successfully!')),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error uploading solution video: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading video: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => q.isUploadingSolutionVideo = false);
+    }
+  }
+
   void _addOptionToQuestion(QuestionItemData q) {
     if (q.options.length < 6) {
       setState(() {
@@ -634,6 +686,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         options: List.from(source.options),
         correctOptionIndex: source.correctOptionIndex,
         explanation: source.explanation,
+        solutionVideoUrl: source.solutionVideoUrl,
         difficulty: source.difficulty,
         positiveMarks: source.positiveMarks,
         negativeMarks: source.negativeMarks,
@@ -1848,11 +1901,37 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         ),
         const SizedBox(height: 16),
 
-        // 4. Explanation (Optional)
+        // 4. Explanation (Optional) & Solution Video
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('4. Explanation ', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
-            Text('(Optional)', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: const Color(0xFF64748B))),
+            Row(
+              children: [
+                Text('4. Explanation & Video Solution ', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                Text('(Optional)', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: const Color(0xFF64748B))),
+              ],
+            ),
+            OutlinedButton.icon(
+              onPressed: () => _pickAndUploadSolutionVideo(q),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF4F46E5),
+                backgroundColor: const Color(0xFFEEF2FF),
+                side: const BorderSide(color: Color(0xFFC7D2FE)),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              ),
+              icon: q.isUploadingSolutionVideo
+                  ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFF4F46E5)))
+                  : const Icon(Icons.video_call_rounded, size: 15, color: Color(0xFF4F46E5)),
+              label: Text(
+                q.isUploadingSolutionVideo
+                    ? 'Uploading...'
+                    : (q.solutionVideoUrl != null && q.solutionVideoUrl!.isNotEmpty ? 'Change Video File' : 'Upload Video File'),
+                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF4F46E5)),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 6),
@@ -1882,6 +1961,101 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
             ),
           ),
         ),
+        const SizedBox(height: 8),
+
+        // Video URL Input Field
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.link_rounded, size: 16, color: Color(0xFF64748B)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextFormField(
+                    key: ValueKey('q_vidurl_${q.id}'),
+                    initialValue: q.solutionVideoUrl ?? '',
+                    onChanged: (val) {
+                      setState(() {
+                        q.solutionVideoUrl = val.trim();
+                      });
+                      _scheduleAutoSave(q);
+                    },
+                    decoration: const InputDecoration(
+                      hintText: 'Or enter Solution Video URL (MP4, YouTube, Vimeo, Supabase)...',
+                      hintStyle: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF0F172A)),
+                  ),
+                ),
+                if (q.solutionVideoUrl != null && q.solutionVideoUrl!.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFEF4444)),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Remove video',
+                    onPressed: () {
+                      setState(() {
+                        q.solutionVideoUrl = null;
+                      });
+                      _scheduleAutoSave(q);
+                    },
+                  ),
+              ],
+            ),
+          ),
+        ),
+
+        // Live Video Player Preview
+        if (q.solutionVideoUrl != null && q.solutionVideoUrl!.trim().isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.play_circle_fill, color: Color(0xFF4F46E5), size: 16),
+                        SizedBox(width: 6),
+                        Text('Video Solution Preview', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                      ],
+                    ),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          q.solutionVideoUrl = null;
+                        });
+                        _scheduleAutoSave(q);
+                      },
+                      child: const Text('Delete Video', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFEF4444))),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SolutionVideoPlayerWidget(
+                  videoUrl: q.solutionVideoUrl!,
+                  height: 200,
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
 
         // 5. Difficulty / Toughness
