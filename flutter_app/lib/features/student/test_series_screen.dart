@@ -1277,13 +1277,13 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Image Banner (Full Width, ~140px Height)
+            // Top Image Banner (Full Width, ~150px Height)
             InkWell(
-              onTap: () => _showProductDetailsModal(item),
+              onTap: () => context.push('/product/${item.id}'),
               child: Stack(
                 children: [
                   Container(
-                    height: 140,
+                    height: 150,
                     width: double.infinity,
                     decoration: BoxDecoration(
                       gradient: _getCardBannerGradient(item),
@@ -1511,6 +1511,33 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () => context.push('/product/${item.id}'),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFBFDBFE)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFF2563EB)),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Click card for full overview, all tests, reviews & top scores',
+                              style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
