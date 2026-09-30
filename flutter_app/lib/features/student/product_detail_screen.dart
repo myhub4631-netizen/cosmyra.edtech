@@ -1670,6 +1670,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Search Bar & Filter Dropdown Row
           Row(
             children: [
               Expanded(
@@ -1715,6 +1716,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           ),
           const SizedBox(height: 14),
 
+          // Horizontal Category Filter Pills
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -1731,56 +1733,86 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
+          // 1. Chapter Tests Section
           if ((_selectedCategoryFilter == 'All' || _selectedCategoryFilter == 'Chapter') && fChapter.isNotEmpty)
             _buildCategorySection(
               title: 'Chapter Tests (${fChapter.length})',
               subtitle: 'Topic-wise tests for concept clarity',
               icon: Icons.menu_book_rounded,
-              bgColor: const Color(0xFFECFDF5),
-              borderColor: const Color(0xFFA7F3D0),
-              iconBgColor: const Color(0xFF10B981),
+              headerBgColor: const Color(0xFFECFDF5),
+              iconBgColor: const Color(0xFF059669),
               textColor: const Color(0xFF065F46),
+              btnBgColor: const Color(0xFFDCFCE7),
+              btnTextColor: const Color(0xFF059669),
+              testIconData: [Icons.public_rounded, Icons.science_rounded, Icons.balance_rounded],
+              testIconGradients: [
+                [const Color(0xFF1E1B4B), const Color(0xFF312E81)],
+                [const Color(0xFF4C0519), const Color(0xFF881337)],
+                [const Color(0xFF451A03), const Color(0xFF78350F)],
+              ],
               tests: fChapter,
               item: item,
             ),
 
+          // 2. Part Tests Section
           if ((_selectedCategoryFilter == 'All' || _selectedCategoryFilter == 'Part') && fPart.isNotEmpty)
             _buildCategorySection(
               title: 'Part Tests (${fPart.length})',
               subtitle: 'Combination of multiple chapters',
-              icon: Icons.layers_rounded,
-              bgColor: const Color(0xFFF5F3FF),
-              borderColor: const Color(0xFFDDD6FE),
+              icon: Icons.description_rounded,
+              headerBgColor: const Color(0xFFF5F3FF),
               iconBgColor: const Color(0xFF7C3AED),
               textColor: const Color(0xFF5B21B6),
+              btnBgColor: const Color(0xFFF3E8FF),
+              btnTextColor: const Color(0xFF7C3AED),
+              testIconData: [Icons.settings_rounded, Icons.settings_rounded, Icons.local_fire_department_rounded],
+              testIconGradients: [
+                [const Color(0xFF0F172A), const Color(0xFF1E293B)],
+                [const Color(0xFF0F172A), const Color(0xFF1E293B)],
+                [const Color(0xFF0F172A), const Color(0xFF1E293B)],
+              ],
               tests: fPart,
               item: item,
             ),
 
+          // 3. Unit Tests Section
           if ((_selectedCategoryFilter == 'All' || _selectedCategoryFilter == 'Unit') && fUnit.isNotEmpty)
             _buildCategorySection(
               title: 'Unit Tests (${fUnit.length})',
               subtitle: 'Full unit coverage tests',
               icon: Icons.inventory_2_rounded,
-              bgColor: const Color(0xFFFFFBEB),
-              borderColor: const Color(0xFFFDE68A),
+              headerBgColor: const Color(0xFFFFFBEB),
               iconBgColor: const Color(0xFFD97706),
               textColor: const Color(0xFF92400E),
+              btnBgColor: const Color(0xFFFEF3C7),
+              btnTextColor: const Color(0xFFD97706),
+              testIconData: [Icons.grid_view_rounded, Icons.center_focus_strong_rounded],
+              testIconGradients: [
+                [const Color(0xFF0B1329), const Color(0xFF1E293B)],
+                [const Color(0xFF064E3B), const Color(0xFF047857)],
+              ],
               tests: fUnit,
               item: item,
             ),
 
+          // 4. Full Syllabus Tests Section
           if ((_selectedCategoryFilter == 'All' || _selectedCategoryFilter == 'Full Syllabus') && fFull.isNotEmpty)
             _buildCategorySection(
               title: 'Full Syllabus Tests (${fFull.length})',
               subtitle: 'Complete NEET paper simulation',
               icon: Icons.emoji_events_rounded,
-              bgColor: const Color(0xFFFEF2F2),
-              borderColor: const Color(0xFFFCA5A5),
+              headerBgColor: const Color(0xFFFEF2F2),
               iconBgColor: const Color(0xFFDC2626),
               textColor: const Color(0xFF991B1B),
+              btnBgColor: const Color(0xFFFEE2E2),
+              btnTextColor: const Color(0xFFDC2626),
+              testIconData: [Icons.article_rounded, Icons.emoji_events_rounded],
+              testIconGradients: [
+                [const Color(0xFF334155), const Color(0xFF475569)],
+                [const Color(0xFF991B1B), const Color(0xFFB91C1C)],
+              ],
               tests: fFull,
               item: item,
             ),
@@ -1816,10 +1848,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     required String title,
     required String subtitle,
     required IconData icon,
-    required Color bgColor,
-    required Color borderColor,
+    required Color headerBgColor,
     required Color iconBgColor,
     required Color textColor,
+    required Color btnBgColor,
+    required Color btnTextColor,
+    required List<IconData> testIconData,
+    required List<List<Color>> testIconGradients,
     required List<Map<String, dynamic>> tests,
     required TestSeriesCardData item,
   }) {
@@ -1835,26 +1870,40 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: bgColor,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            color: headerBgColor,
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(color: iconBgColor, borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(color: iconBgColor, shape: BoxShape.circle),
                   child: Icon(icon, color: Colors.white, size: 16),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: textColor)),
-                      Text(subtitle, style: GoogleFonts.inter(fontSize: 11, color: textColor.withOpacity(0.8))),
+                      Text(subtitle, style: GoogleFonts.inter(fontSize: 11, color: textColor.withValues(alpha: 0.8))),
                     ],
                   ),
                 ),
-                Text('View All >', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: btnBgColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('View All', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: btnTextColor)),
+                      const SizedBox(width: 2),
+                      Icon(Icons.chevron_right_rounded, size: 14, color: btnTextColor),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -1867,35 +1916,52 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             itemBuilder: (context, index) {
               final t = tests[index];
               final testTitle = (t['title'] ?? 'Mock Test').toString();
-              final testId = (t['id'] ?? 'test_$index').toString();
+              final testId = (t['id'] ?? 'test_${index}').toString();
               final numStr = (t['number'] ?? '${index + 1 < 10 ? '0${index + 1}' : '${index + 1}'}').toString();
               final durationMins = (t['duration'] is num) ? (t['duration'] as num).toInt() : 180;
               final qCount = (t['questions'] is num) ? (t['questions'] as num).toInt() : 200;
               final marks = (t['marks'] is num) ? (t['marks'] as num).toInt() : 720;
               final isUnlocked = item.isFree || _hasPurchased;
 
+              final iconData = testIconData[index % testIconData.length];
+              final iconGrad = testIconGradients[index % testIconGradients.length];
+
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 child: Row(
                   children: [
                     Container(
-                      width: 32,
-                      height: 32,
+                      width: 38,
+                      height: 38,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
+                        gradient: LinearGradient(
+                          colors: iconGrad,
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
                       ),
-                      child: const Center(
-                        child: Icon(Icons.auto_awesome_rounded, color: Color(0xFF38BDF8), size: 16),
+                      child: Center(
+                        child: Icon(iconData, color: Colors.white, size: 18),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
 
-                    Text(
-                      numStr,
-                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+                    Container(
+                      width: 26,
+                      height: 26,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Center(
+                        child: Text(
+                          numStr,
+                          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF475569)),
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 10),
 
                     Expanded(
                       child: Column(
@@ -1903,30 +1969,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                         children: [
                           Text(
                             testTitle,
-                            style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 4),
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 4,
+                          const SizedBox(height: 3),
+                          Row(
                             children: [
                               _buildMetaChip(Icons.description_outlined, '$qCount Questions'),
+                              const SizedBox(width: 8),
                               _buildMetaChip(Icons.access_time_rounded, '${(durationMins / 60).toStringAsFixed(0)} Hours'),
+                              const SizedBox(width: 8),
                               _buildMetaChip(Icons.bar_chart_rounded, '$marks Marks'),
                             ],
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
 
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFECFDF5),
                         foregroundColor: const Color(0xFF059669),
                         elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: Color(0xFFA7F3D0))),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       onPressed: () {
                         if (isUnlocked) {
@@ -1950,11 +2018,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            isUnlocked ? 'Start Test' : 'Buy Now',
-                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                            'Start Test',
+                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
                           ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.chevron_right_rounded, size: 16),
+                          const SizedBox(width: 2),
+                          const Icon(Icons.chevron_right_rounded, size: 14, color: Color(0xFF059669)),
                         ],
                       ),
                     ),
