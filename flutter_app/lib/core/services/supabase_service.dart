@@ -13,6 +13,7 @@ import '../../models/pyq_models.dart';
 import 'supabase_question_mapper.dart';
 import '../../shared/widgets/latex_view.dart';
 import 'ecommerce_automation_service.dart';
+import 'cloudflare_r2_service.dart';
 
 class SupabaseService {
   // Supports dynamic injection via --dart-define=SUPABASE_URL=... and --dart-define=SUPABASE_ANON_KEY=...
@@ -9092,8 +9093,23 @@ class SupabaseService {
   }) async {
     if (fileBytes == null || fileBytes.isEmpty) return null;
     final cleanName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-    final path = 'uploads/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
 
+    // 1. Attempt Cloudflare R2 Upload
+    try {
+      final r2Url = await CloudflareR2Service.uploadFile(
+        fileBytes: fileBytes,
+        fileName: cleanName,
+        mimeType: mimeType,
+      );
+      if (r2Url != null && r2Url.isNotEmpty && !r2Url.contains('data:')) {
+        return r2Url;
+      }
+    } catch (e) {
+      debugPrint('Notice uploading to Cloudflare R2: $e');
+    }
+
+    // 2. Fallback to Supabase Storage
+    final path = 'uploads/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
     try {
       await client.storage.from('media_assets').uploadBinary(
         path,
@@ -9108,8 +9124,8 @@ class SupabaseService {
       debugPrint('Notice uploading to Supabase Storage media_assets bucket: $e');
     }
 
-    // Fallback clean public web URL for website usage
-    return 'https://neet-jee.in/assets/uploads/$cleanName';
+    // 3. Fallback clean public web URL for website usage
+    return 'https://media.neet-jee.in/uploads/$cleanName';
   }
 
   static Future<bool> saveAdminMediaAsset(Map<String, dynamic> asset) async {

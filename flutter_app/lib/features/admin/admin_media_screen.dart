@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/cloudflare_r2_service.dart';
 
 class AdminMediaScreen extends StatefulWidget {
   const AdminMediaScreen({Key? key}) : super(key: key);
@@ -646,6 +647,123 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
     );
   }
 
+  Future<void> _openR2SettingsDialog() async {
+    await CloudflareR2Service.loadConfig();
+    final accountIdCtrl = TextEditingController(text: CloudflareR2Service.accountId);
+    final accessKeyCtrl = TextEditingController(text: CloudflareR2Service.accessKeyId);
+    final secretKeyCtrl = TextEditingController(text: CloudflareR2Service.secretAccessKey);
+    final bucketCtrl = TextEditingController(text: CloudflareR2Service.bucketName);
+    final domainCtrl = TextEditingController(text: CloudflareR2Service.publicDomain);
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.cloud_sync_rounded, color: Color(0xFFF97316)),
+            const SizedBox(width: 8),
+            Text('Cloudflare R2 Storage Settings', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Configure your Cloudflare R2 S3-compatible credentials to upload images and PDFs with short public URLs and \$0 bandwidth cost.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 14),
+                Text('Cloudflare Account ID', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: accountIdCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. c1a2b3c4d5e6f7...',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text('R2 Access Key ID', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: accessKeyCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. 9f8e7d6c5b4a3...',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text('R2 Secret Access Key', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: secretKeyCtrl,
+                  obscureText: true,
+                  decoration: InputDecoration(
+                    hintText: 'e.g. 1a2b3c4d5e6f7g8...',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text('R2 Bucket Name', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: bucketCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'cosmyra-media',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text('Public Custom Domain / R2 URL', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: domainCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'https://media.neet-jee.in or https://pub-xxx.r2.dev',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF97316), foregroundColor: Colors.white),
+            onPressed: () async {
+              await CloudflareR2Service.saveConfig(
+                accountIdVal: accountIdCtrl.text,
+                accessKeyIdVal: accessKeyCtrl.text,
+                secretAccessKeyVal: secretKeyCtrl.text,
+                bucketNameVal: bucketCtrl.text,
+                publicDomainVal: domainCtrl.text,
+              );
+              if (mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('✓ Cloudflare R2 credentials updated successfully!'), backgroundColor: Color(0xFF10B981)),
+                );
+              }
+            },
+            icon: const Icon(Icons.save_rounded, size: 16),
+            label: const Text('Save R2 Settings', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filteredAssets;
@@ -664,6 +782,18 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
           style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
         ),
         actions: [
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFF97316),
+              side: const BorderSide(color: Color(0xFFF97316)),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: _openR2SettingsDialog,
+            icon: const Icon(Icons.cloud_sync_rounded, size: 18),
+            label: const Text('R2 Config', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+          const SizedBox(width: 10),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF4F46E5),
