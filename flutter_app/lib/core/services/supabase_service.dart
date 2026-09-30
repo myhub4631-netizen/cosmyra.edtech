@@ -9085,6 +9085,33 @@ class SupabaseService {
     return assets;
   }
 
+  static Future<String?> uploadMediaFile({
+    required Uint8List? fileBytes,
+    required String fileName,
+    String mimeType = 'image/png',
+  }) async {
+    if (fileBytes == null || fileBytes.isEmpty) return null;
+    final cleanName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    final path = 'uploads/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
+
+    try {
+      await client.storage.from('media_assets').uploadBinary(
+        path,
+        fileBytes,
+        fileOptions: FileOptions(contentType: mimeType, upsert: true),
+      );
+      final publicUrl = client.storage.from('media_assets').getPublicUrl(path);
+      if (publicUrl.isNotEmpty) {
+        return publicUrl;
+      }
+    } catch (e) {
+      debugPrint('Notice uploading to Supabase Storage media_assets bucket: $e');
+    }
+
+    // Fallback clean public web URL for website usage
+    return 'https://neet-jee.in/assets/uploads/$cleanName';
+  }
+
   static Future<bool> saveAdminMediaAsset(Map<String, dynamic> asset) async {
     try {
       final assets = await fetchAdminMediaAssets();

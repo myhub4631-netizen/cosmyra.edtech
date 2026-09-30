@@ -122,6 +122,16 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
     return totalKb / 1024.0;
   }
 
+  String _getShortWebUrl(Map<String, dynamic> asset) {
+    final url = (asset['public_url'] ?? '').toString();
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    final rawName = (asset['file_name'] ?? 'asset.png').toString();
+    final cleanName = rawName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    return 'https://neet-jee.in/assets/uploads/$cleanName';
+  }
+
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -138,6 +148,7 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
     final titleCtrl = TextEditingController();
     final categoryCtrl = TextEditingController(text: 'Question Diagrams');
     final tagsCtrl = TextEditingController();
+    final urlCtrl = TextEditingController();
     PlatformFile? pickedFile;
     String fileType = 'image';
 
@@ -232,7 +243,21 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
+
+                  // Direct Public Web URL Option
+                  Text('Or Enter Direct Web / CDN URL (Optional)', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: urlCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'https://neet-jee.in/assets/uploads/diagram.png',
+                      prefixIcon: const Icon(Icons.link_rounded, size: 18),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
 
                   // Title Input
                   Text('Asset Title / Label', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
@@ -306,15 +331,21 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                             return;
                           }
 
-                          String publicUrl = 'https://neet-jee.in/assets/uploads/custom_asset.png';
+                          String publicUrl = urlCtrl.text.trim();
                           int sizeKb = 120;
 
-                          if (pickedFile != null) {
+                          if (publicUrl.isEmpty && pickedFile != null) {
                             sizeKb = (pickedFile!.size / 1024).ceil();
-                            if (pickedFile!.bytes != null) {
-                              final b64 = base64Encode(pickedFile!.bytes!);
-                              publicUrl = 'data:${fileType == 'pdf' ? 'application/pdf' : 'image/png'};base64,$b64';
-                            }
+                            final cleanName = pickedFile!.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+                            final uploadedUrl = await SupabaseService.uploadMediaFile(
+                              fileBytes: pickedFile!.bytes,
+                              fileName: cleanName,
+                              mimeType: fileType == 'pdf' ? 'application/pdf' : (fileType == 'svg' ? 'image/svg+xml' : 'image/png'),
+                            );
+                            publicUrl = uploadedUrl ?? 'https://neet-jee.in/assets/uploads/$cleanName';
+                          } else if (publicUrl.isEmpty) {
+                            final cleanName = 'asset_${DateTime.now().millisecondsSinceEpoch}.${fileType == 'pdf' ? 'pdf' : (fileType == 'svg' ? 'svg' : 'png')}';
+                            publicUrl = 'https://neet-jee.in/assets/uploads/$cleanName';
                           }
 
                           final newAsset = {
@@ -562,22 +593,40 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      url.startsWith('data:')
-                          ? '[Embedded Data URI • ${(url.length / 1024).toStringAsFixed(1)} KB]'
-                          : (url.length > 50 ? '${url.substring(0, 47)}...' : url),
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                      overflow: TextOverflow.ellipsis,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Web URL: ${_getShortWebUrl(asset)}',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (url.startsWith('data:'))
+                          Text(
+                            '[Embedded Base64 Data • ${(url.length / 1024).toStringAsFixed(1)} KB]',
+                            style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                          ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => _copyToClipboard(url, 'Public URL'),
-                    icon: const Icon(Icons.copy_rounded, size: 14),
-                    label: const Text('Copy URL', style: TextStyle(fontSize: 12)),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
+                    onPressed: () => _copyToClipboard(_getShortWebUrl(asset), 'Short Web URL'),
+                    icon: const Icon(Icons.link_rounded, size: 14),
+                    label: const Text('Copy Short URL', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
-                  const SizedBox(width: 8),
+                  if (url.startsWith('data:')) ...[
+                    const SizedBox(width: 6),
+                    OutlinedButton.icon(
+                      onPressed: () => _copyToClipboard(url, 'Full Base64 Data'),
+                      icon: const Icon(Icons.copy_rounded, size: 14),
+                      label: const Text('Copy Base64', style: TextStyle(fontSize: 11)),
+                    ),
+                  ],
                   if (url.startsWith('http')) ...[
+                    const SizedBox(width: 6),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
                       onPressed: () async {
@@ -879,8 +928,8 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                     ),
                     IconButton(
                       icon: const Icon(Icons.copy_rounded, size: 18, color: Color(0xFF10B981)),
-                      onPressed: () => _copyToClipboard(url, 'URL'),
-                      tooltip: 'Copy Public URL',
+                      onPressed: () => _copyToClipboard(_getShortWebUrl(asset), 'Short Web URL'),
+                      tooltip: 'Copy Short Web URL',
                       constraints: const BoxConstraints(),
                       padding: EdgeInsets.zero,
                     ),
@@ -975,7 +1024,8 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.copy_rounded, size: 18, color: Color(0xFF10B981)),
-                    onPressed: () => _copyToClipboard(a['public_url'] ?? '', 'URL'),
+                    onPressed: () => _copyToClipboard(_getShortWebUrl(a), 'Short Web URL'),
+                    tooltip: 'Copy Short Web URL',
                   ),
                   IconButton(
                     icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
