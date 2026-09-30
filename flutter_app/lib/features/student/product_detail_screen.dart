@@ -26,12 +26,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   TestSeriesCardData? _product;
   List<Map<String, dynamic>> _dbPapers = [];
   bool _hasPurchased = false;
-  bool _checkingAccess = true;
+  String _selectedCategoryFilter = 'All';
+  String _testSearchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 5, vsync: this, initialIndex: 0);
     _loadProductData();
   }
 
@@ -45,7 +46,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     setState(() => _isLoading = true);
     final allSeriesMaps = await SupabaseService.fetchAllTestSeries();
 
-    // Fetch db papers to match real tests
     try {
       final res = await SupabaseService.client.from('papers').select();
       if (res != null) {
@@ -163,7 +163,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       setState(() {
         _product = loadedProduct;
         _hasPurchased = owns;
-        _checkingAccess = false;
         _isLoading = false;
       });
     }
@@ -195,7 +194,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         tests.add({
           'id': p['id']?.toString() ?? 'test_${tests.length + 1}',
           'title': name.isNotEmpty ? name : 'Mock Test ${tests.length + 1}',
-          'type': item.testType,
+          'type': p['paper_type'] ?? item.testType,
           'questions': p['saved_questions_count'] ?? p['question_count'] ?? (item.exam.contains('JEE') ? 90 : 200),
           'marks': p['total_marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
           'duration': p['duration_minutes'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
@@ -205,36 +204,117 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     }
 
     final targetTotal = item.testCount > 0 ? item.testCount : 33;
-    final int defaultQCount = item.exam.contains('JEE') ? 90 : 200;
-    final int defaultMarks = item.exam.contains('JEE') ? 300 : 720;
+    final int isJee = item.exam.contains('JEE') ? 1 : 0;
 
-    final types = ['Chapter Test', 'Part Test', 'Unit Test', 'Full Syllabus Test'];
-    final mockNames = [
-      'Chapter Mock 01: Physics & Chemistry Core',
-      'Chapter Mock 02: Organic Chemistry & Cell Biology',
-      'Part Mock 01: Mechanics & Energetics',
-      'Unit Mock 01: Optics & Modern Physics',
-      'Full Syllabus Grand Mock 01',
-      'All India Benchmark Mock 02',
-      'High Yield NTA Standard Mock 03',
-      'National Ranker Grand Mock 04',
+    // Structured curriculum test names exactly matching screenshot
+    final chapterNames = [
+      'Physical World and Measurement',
+      'Kinematics',
+      'Laws of Motion',
+      'Work, Energy and Power',
+      'Motion of System of Particles',
+      'Gravitation',
+      'Properties of Bulk Matter',
+      'Thermodynamics',
+      'Behavior of Perfect Gas & Kinetic Theory',
+      'Oscillations and Waves',
     ];
 
-    while (tests.length < targetTotal) {
-      final idx = tests.length;
-      final type = types[idx % types.length];
-      final title = idx < mockNames.length
-          ? mockNames[idx]
-          : '$type ${idx + 1 < 10 ? '0${idx + 1}' : '${idx + 1}'}';
+    final partNames = [
+      'Mechanics - Part 1',
+      'Mechanics - Part 2',
+      'Thermodynamics - Part 1',
+      'Electrodynamics - Part 1',
+      'Electrodynamics - Part 2',
+      'Optics & Modern Physics - Part 1',
+      'Organic Chemistry - Part 1',
+      'Inorganic Chemistry - Part 1',
+      isJee == 1 ? 'Calculus & Algebra - Part 1' : 'Botany & Diversity - Part 1',
+      isJee == 1 ? 'Coordinate Geometry - Part 1' : 'Human Physiology & Zoology - Part 1',
+    ];
+
+    final unitNames = [
+      'Electrostatics - Unit Test',
+      'Current Electricity - Unit Test',
+      'Magnetic Effects & Alternating Current - Unit Test',
+      'Ray & Wave Optics - Unit Test',
+      'Chemical Bonding & Periodic Properties - Unit Test',
+      'Organic Mechanisms & Hydrocarbons - Unit Test',
+      isJee == 1 ? 'Vectors & 3D Geometry - Unit Test' : 'Genetics & Evolution - Unit Test',
+      isJee == 1 ? 'Integral Calculus & Matrices - Unit Test' : 'Cell Structure & Plant Physiology - Unit Test',
+    ];
+
+    final fullNames = [
+      'Full Syllabus Test 01',
+      'Full Syllabus Test 02',
+      'Full Syllabus Test 03',
+      'Full Syllabus Test 04',
+      'Full Syllabus Test 05',
+    ];
+
+    int idx = tests.length;
+
+    // 10 Chapter Tests
+    for (int i = 0; i < 10 && idx < targetTotal; i++) {
       tests.add({
-        'id': '${item.id}_test_${idx + 1}',
-        'title': title,
-        'type': type,
-        'questions': defaultQCount,
-        'marks': defaultMarks,
-        'duration': item.durationMinutes > 0 ? item.durationMinutes : 180,
-        'status': idx == 0 ? item.attemptStatus : 'Not Attempted',
+        'id': '${item.id}_chap_${i + 1}',
+        'number': '${i + 1 < 10 ? '0${i + 1}' : '${i + 1}'}',
+        'title': chapterNames[i % chapterNames.length],
+        'type': 'Chapter Test',
+        'questions': 25,
+        'marks': 180,
+        'duration': 180,
+        'status': i == 0 ? item.attemptStatus : 'Not Attempted',
       });
+      idx++;
+    }
+
+    // 10 Part Tests
+    for (int i = 0; i < 10 && idx < targetTotal; i++) {
+      final numVal = i + 11;
+      tests.add({
+        'id': '${item.id}_part_${i + 1}',
+        'number': '$numVal',
+        'title': partNames[i % partNames.length],
+        'type': 'Part Test',
+        'questions': 50,
+        'marks': 180,
+        'duration': 180,
+        'status': 'Not Attempted',
+      });
+      idx++;
+    }
+
+    // 8 Unit Tests
+    for (int i = 0; i < 8 && idx < targetTotal; i++) {
+      final numVal = i + 21;
+      tests.add({
+        'id': '${item.id}_unit_${i + 1}',
+        'number': '$numVal',
+        'title': unitNames[i % unitNames.length],
+        'type': 'Unit Test',
+        'questions': 100,
+        'marks': 720,
+        'duration': 180,
+        'status': 'Not Attempted',
+      });
+      idx++;
+    }
+
+    // 5 Full Syllabus Tests
+    for (int i = 0; i < 5 && idx < targetTotal; i++) {
+      final numVal = i + 29;
+      tests.add({
+        'id': '${item.id}_full_${i + 1}',
+        'number': '$numVal',
+        'title': fullNames[i % fullNames.length],
+        'type': 'Full Syllabus Test',
+        'questions': isJee == 1 ? 90 : 200,
+        'marks': isJee == 1 ? 300 : 720,
+        'duration': 180,
+        'status': 'Not Attempted',
+      });
+      idx++;
     }
 
     return tests;
@@ -342,7 +422,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       body: SafeArea(
         child: Column(
           children: [
-            // Top Nav Breadcrumb Bar
+            // Top Nav Breadcrumb Bar matching screenshot (🏠 > Test Series > NEET 2027 Leader Test Series > All Tests)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               color: Colors.white,
@@ -367,13 +447,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   const SizedBox(width: 6),
                   Text('>', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
                   const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      item.title,
-                      style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF475569), fontWeight: FontWeight.w500),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  Text(
+                    item.title,
+                    style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF475569), fontWeight: FontWeight.w500),
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  const SizedBox(width: 6),
+                  Text('>', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+                  const SizedBox(width: 6),
+                  Text(
+                    'All Tests',
+                    style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF0F172A), fontWeight: FontWeight.bold),
+                  ),
+                  const Spacer(),
                   IconButton(
                     tooltip: 'Share',
                     icon: const Icon(Icons.share_outlined, size: 20, color: Color(0xFF475569)),
@@ -460,7 +546,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           ),
           child: Stack(
             children: [
-              // Banner Image if available
               if (item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty)
                 Positioned.fill(
                   child: Image.network(
@@ -470,7 +555,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   ),
                 ),
 
-              // Overlay content
               Positioned.fill(
                 child: Container(
                   padding: const EdgeInsets.all(20),
@@ -487,7 +571,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Best Seller Badge
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
@@ -523,7 +606,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                       ),
                       const Spacer(),
 
-                      // Bottom Overlay Bar inside Banner
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
@@ -537,7 +619,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                           children: [
                             _buildBannerChip(Icons.description_outlined, '${tests.length} Tests'),
                             _buildBannerChip(Icons.menu_book_outlined, 'Detailed Solutions'),
-                            _buildBannerChip(Icons.analytics_outlined, 'Performance Analysis'),
+                            _buildBannerChip(Icons.analytics_outlined, 'Performance Analytics'),
                             _buildBannerChip(Icons.emoji_events_outlined, 'All India Ranking'),
                           ],
                         ),
@@ -551,154 +633,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         ),
         const SizedBox(height: 20),
 
-        // 2. Title & Metadata Header Block
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4F46E5),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      item.exam,
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Target: ${item.formattedTargetYear}',
-                    style: GoogleFonts.inter(color: const Color(0xFF475569), fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-
-              Text(
-                item.title,
-                style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
-              ),
-              const SizedBox(height: 10),
-
-              // Rating & Aspirants Enrolled Row
-              Row(
-                children: [
-                  const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 18),
-                  const SizedBox(width: 4),
-                  Text(
-                    '4.9 (1,480+ Aspirants Enrolled)',
-                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFFD97706)),
-                  ),
-                  const SizedBox(width: 12),
-                  // Avatar Stack
-                  SizedBox(
-                    width: 70,
-                    height: 24,
-                    child: Stack(
-                      children: List.generate(4, (index) {
-                        return Positioned(
-                          left: index * 14.0,
-                          child: CircleAvatar(
-                            radius: 11,
-                            backgroundColor: Colors.white,
-                            child: CircleAvatar(
-                              radius: 10,
-                              backgroundColor: [const Color(0xFF2563EB), const Color(0xFF059669), const Color(0xFFD97706), const Color(0xFF7C3AED)][index],
-                              child: Text('${index + 1}', style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                  Text(
-                    '+1.4K students',
-                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              Text(
-                item.description,
-                style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF475569), height: 1.5),
-              ),
-              const SizedBox(height: 16),
-
-              // 4 Stat Cards Row (Light Purple Cards)
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isNarrow = constraints.maxWidth < 500;
-                  return isNarrow
-                      ? Column(
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(child: _buildStatBox(Icons.description_outlined, '${tests.length}', 'Tests')),
-                                const SizedBox(width: 8),
-                                Expanded(child: _buildStatBox(Icons.access_time_rounded, '${(item.durationMinutes / 60).toStringAsFixed(0)} Hours', 'Per Test')),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(child: _buildStatBox(Icons.bar_chart_rounded, item.difficulty, 'Difficulty')),
-                                const SizedBox(width: 8),
-                                Expanded(child: _buildStatBox(Icons.calendar_month_outlined, item.validity, 'Validity')),
-                              ],
-                            ),
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            Expanded(child: _buildStatBox(Icons.description_outlined, '${tests.length}', 'Tests')),
-                            const SizedBox(width: 8),
-                            Expanded(child: _buildStatBox(Icons.access_time_rounded, '${(item.durationMinutes / 60).toStringAsFixed(0)} Hours', 'Per Test')),
-                            const SizedBox(width: 8),
-                            Expanded(child: _buildStatBox(Icons.bar_chart_rounded, item.difficulty, 'Difficulty')),
-                            const SizedBox(width: 8),
-                            Expanded(child: _buildStatBox(Icons.calendar_month_outlined, item.validity, 'Validity')),
-                          ],
-                        );
-                },
-              ),
-              const SizedBox(height: 14),
-
-              // 4 Mint Highlight Pills Bar
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFDCFCE7)),
-                ),
-                child: Wrap(
-                  spacing: 16,
-                  runSpacing: 8,
-                  children: [
-                    _buildMintPill(Icons.check_circle_rounded, 'Latest NTA Pattern'),
-                    _buildMintPill(Icons.article_outlined, 'Detailed Solutions'),
-                    _buildMintPill(Icons.insights_rounded, 'Performance Analytics'),
-                    _buildMintPill(Icons.emoji_events_outlined, 'All India Ranking'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // 3. Main Product Content Tabs Section
+        // 2. Product Navigation Tabs Section (Default tab is All Tests or Overview)
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -708,7 +643,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Tab Bar
+              // Navigation Tab Bar
               Container(
                 decoration: const BoxDecoration(
                   border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
@@ -735,7 +670,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
               // Tab View Box
               SizedBox(
-                height: 520,
+                height: 720,
                 child: TabBarView(
                   controller: _tabController,
                   children: [
@@ -765,61 +700,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     );
   }
 
-  Widget _buildStatBox(IconData icon, String title, String subtitle) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEEF2FF),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: const Color(0xFF4F46E5), size: 18),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMintPill(IconData icon, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: const Color(0xFF16A34A)),
-        const SizedBox(width: 6),
-        Text(label, style: GoogleFonts.inter(color: const Color(0xFF15803D), fontSize: 12, fontWeight: FontWeight.bold)),
-      ],
-    );
-  }
-
   // ==========================================
-  // TAB 1: OVERVIEW & 2x2 FEATURE GRID
+  // TAB 1: OVERVIEW
   // ==========================================
   Widget _buildOverviewTab(TestSeriesCardData item, List<Map<String, dynamic>> tests) {
     return SingleChildScrollView(
@@ -837,7 +719,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           ),
           const SizedBox(height: 20),
 
-          // 2x2 Feature Cards Grid
           Wrap(
             spacing: 12,
             runSpacing: 12,
@@ -887,82 +768,350 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   }
 
   // ==========================================
-  // TAB 2: ALL TESTS
+  // TAB 2: ALL TESTS (MATCHING SCREENSHOT EXACTLY)
   // ==========================================
   Widget _buildAllTestsTab(TestSeriesCardData item, List<Map<String, dynamic>> tests) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: tests.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final t = tests[index];
-        final testTitle = (t['title'] ?? 'Mock Test ${index + 1}').toString();
-        final testId = (t['id'] ?? 'test_${index + 1}').toString();
-        final durationMins = (t['duration'] is num) ? (t['duration'] as num).toInt() : item.durationMinutes;
-        final qCount = (t['questions'] is num) ? (t['questions'] as num).toInt() : 200;
-        final marks = (t['marks'] is num) ? (t['marks'] as num).toInt() : 720;
-        final status = (t['status'] ?? 'Not Attempted').toString();
-        final isUnlocked = item.isFree || _hasPurchased;
+    // Categorize tests dynamically
+    final chapterTests = tests.where((t) => t['type'].toString().toLowerCase().contains('chapter')).toList();
+    final partTests = tests.where((t) => t['type'].toString().toLowerCase().contains('part')).toList();
+    final unitTests = tests.where((t) => t['type'].toString().toLowerCase().contains('unit')).toList();
+    final fullTests = tests.where((t) => t['type'].toString().toLowerCase().contains('full') || (!t['type'].toString().toLowerCase().contains('chapter') && !t['type'].toString().toLowerCase().contains('part') && !t['type'].toString().toLowerCase().contains('unit'))).toList();
 
-        return Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Row(
+    // Filter by Search Query
+    List<Map<String, dynamic>> filterList(List<Map<String, dynamic>> source) {
+      if (_testSearchQuery.trim().isEmpty) return source;
+      final q = _testSearchQuery.trim().toLowerCase();
+      return source.where((t) => (t['title'] ?? '').toString().toLowerCase().contains(q) || (t['type'] ?? '').toString().toLowerCase().contains(q)).toList();
+    }
+
+    final fChapter = filterList(chapterTests);
+    final fPart = filterList(partTests);
+    final fUnit = filterList(unitTests);
+    final fFull = filterList(fullTests);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Search Bar & Filter Button Row
+          Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(8)),
-                child: Center(
-                  child: Text('#${index + 1}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+              Expanded(
+                child: Container(
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: TextField(
+                    onChanged: (val) => setState(() => _testSearchQuery = val),
+                    decoration: InputDecoration(
+                      hintText: 'Search tests, chapters...',
+                      hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
+                      prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF94A3B8)),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(width: 10),
+              Container(
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
                   children: [
-                    Text(testTitle, style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
-                    const SizedBox(height: 4),
-                    Text('$qCount Questions • $marks Marks • $durationMins Mins', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+                    const Icon(Icons.filter_list_rounded, size: 18, color: Color(0xFF475569)),
+                    const SizedBox(width: 6),
+                    Text('Filter', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF475569))),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF475569)),
                   ],
                 ),
               ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isUnlocked ? const Color(0xFF2563EB) : const Color(0xFF10B981),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: () {
-                  if (isUnlocked) {
-                    _startTest(testId, testTitle, durationMins);
-                  } else {
-                    final cartItem = CartItem(
-                      id: item.id,
-                      title: item.title,
-                      description: item.description,
-                      price: item.price,
-                      originalPrice: item.originalPrice,
-                      bannerImageUrl: item.bannerImageUrl ?? '',
-                      exam: item.exam,
-                      validity: item.validity,
-                      testCount: item.testCount,
-                    );
-                    context.push('/checkout', extra: cartItem);
-                  }
-                },
-                child: Text(isUnlocked ? (status == 'Completed' ? 'Retake' : 'Start Test') : 'Buy Now', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 14),
+
+          // 2. Category Filter Pills Row (All (33) | Chapter (10) | Part (10) | Unit (8) | Full Syllabus (5))
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildCategoryPill('All', 'All (${tests.length})'),
+                const SizedBox(width: 8),
+                _buildCategoryPill('Chapter', 'Chapter (${chapterTests.length})'),
+                const SizedBox(width: 8),
+                _buildCategoryPill('Part', 'Part (${partTests.length})'),
+                const SizedBox(width: 8),
+                _buildCategoryPill('Unit', 'Unit (${unitTests.length})'),
+                const SizedBox(width: 8),
+                _buildCategoryPill('Full Syllabus', 'Full Syllabus (${fullTests.length})'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // 3. Category Group 1: Chapter Tests
+          if ((_selectedCategoryFilter == 'All' || _selectedCategoryFilter == 'Chapter') && fChapter.isNotEmpty)
+            _buildCategorySection(
+              title: 'Chapter Tests (${fChapter.length})',
+              subtitle: 'Topic-wise tests for concept clarity',
+              icon: Icons.menu_book_rounded,
+              bgColor: const Color(0xFFECFDF5),
+              borderColor: const Color(0xFFA7F3D0),
+              iconBgColor: const Color(0xFF10B981),
+              textColor: const Color(0xFF065F46),
+              tests: fChapter,
+              item: item,
+            ),
+
+          // 4. Category Group 2: Part Tests
+          if ((_selectedCategoryFilter == 'All' || _selectedCategoryFilter == 'Part') && fPart.isNotEmpty)
+            _buildCategorySection(
+              title: 'Part Tests (${fPart.length})',
+              subtitle: 'Combination of multiple chapters',
+              icon: Icons.layers_rounded,
+              bgColor: const Color(0xFFF5F3FF),
+              borderColor: const Color(0xFFDDD6FE),
+              iconBgColor: const Color(0xFF7C3AED),
+              textColor: const Color(0xFF5B21B6),
+              tests: fPart,
+              item: item,
+            ),
+
+          // 5. Category Group 3: Unit Tests
+          if ((_selectedCategoryFilter == 'All' || _selectedCategoryFilter == 'Unit') && fUnit.isNotEmpty)
+            _buildCategorySection(
+              title: 'Unit Tests (${fUnit.length})',
+              subtitle: 'Full unit coverage tests',
+              icon: Icons.inventory_2_rounded,
+              bgColor: const Color(0xFFFFFBEB),
+              borderColor: const Color(0xFFFDE68A),
+              iconBgColor: const Color(0xFFD97706),
+              textColor: const Color(0xFF92400E),
+              tests: fUnit,
+              item: item,
+            ),
+
+          // 6. Category Group 4: Full Syllabus Tests
+          if ((_selectedCategoryFilter == 'All' || _selectedCategoryFilter == 'Full Syllabus') && fFull.isNotEmpty)
+            _buildCategorySection(
+              title: 'Full Syllabus Tests (${fFull.length})',
+              subtitle: 'Complete NEET paper simulation',
+              icon: Icons.emoji_events_rounded,
+              bgColor: const Color(0xFFFEF2F2),
+              borderColor: const Color(0xFFFCA5A5),
+              iconBgColor: const Color(0xFFDC2626),
+              textColor: const Color(0xFF991B1B),
+              tests: fFull,
+              item: item,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryPill(String filterKey, String label) {
+    final isSelected = _selectedCategoryFilter == filterKey;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedCategoryFilter = filterKey),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF2563EB) : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1)),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12.5,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? Colors.white : const Color(0xFF475569),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategorySection({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color bgColor,
+    required Color borderColor,
+    required Color iconBgColor,
+    required Color textColor,
+    required List<Map<String, dynamic>> tests,
+    required TestSeriesCardData item,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section Header Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: bgColor,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: iconBgColor, borderRadius: BorderRadius.circular(8)),
+                  child: Icon(icon, color: Colors.white, size: 16),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: textColor)),
+                      Text(subtitle, style: GoogleFonts.inter(fontSize: 11, color: textColor.withOpacity(0.8))),
+                    ],
+                  ),
+                ),
+                Text('View All >', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: textColor)),
+              ],
+            ),
+          ),
+
+          // Test Items List inside Category
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: tests.length,
+            separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            itemBuilder: (context, index) {
+              final t = tests[index];
+              final testTitle = (t['title'] ?? 'Mock Test').toString();
+              final testId = (t['id'] ?? 'test_$index').toString();
+              final numStr = (t['number'] ?? '${index + 1 < 10 ? '0${index + 1}' : '${index + 1}'}').toString();
+              final durationMins = (t['duration'] is num) ? (t['duration'] as num).toInt() : 180;
+              final qCount = (t['questions'] is num) ? (t['questions'] as num).toInt() : 200;
+              final marks = (t['marks'] is num) ? (t['marks'] as num).toInt() : 720;
+              final isUnlocked = item.isFree || _hasPurchased;
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    // Icon thumbnail
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.auto_awesome_rounded, color: Color(0xFF38BDF8), size: 16),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Test Number
+                    Text(
+                      numStr,
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+                    ),
+                    const SizedBox(width: 14),
+
+                    // Test Title & Meta Chips
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            testTitle,
+                            style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 4,
+                            children: [
+                              _buildMetaChip(Icons.description_outlined, '$qCount Questions'),
+                              _buildMetaChip(Icons.access_time_rounded, '${(durationMins / 60).toStringAsFixed(0)} Hours'),
+                              _buildMetaChip(Icons.bar_chart_rounded, '$marks Marks'),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Mint Green Start Test Button matching Screenshot
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFECFDF5),
+                        foregroundColor: const Color(0xFF059669),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: Color(0xFFA7F3D0))),
+                      ),
+                      onPressed: () {
+                        if (isUnlocked) {
+                          _startTest(testId, testTitle, durationMins);
+                        } else {
+                          final cartItem = CartItem(
+                            id: item.id,
+                            title: item.title,
+                            description: item.description,
+                            price: item.price,
+                            originalPrice: item.originalPrice,
+                            bannerImageUrl: item.bannerImageUrl ?? '',
+                            exam: item.exam,
+                            validity: item.validity,
+                            testCount: item.testCount,
+                          );
+                          context.push('/checkout', extra: cartItem);
+                        }
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            isUnlocked ? 'Start Test' : 'Buy Now',
+                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right_rounded, size: 16),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetaChip(IconData icon, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: const Color(0xFF94A3B8)),
+        const SizedBox(width: 4),
+        Text(label, style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B))),
+      ],
     );
   }
 
@@ -1120,7 +1269,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   Widget _buildRightSidebar(TestSeriesCardData item, List<Map<String, dynamic>> tests) {
     final discount = item.originalPrice > 0 ? (((item.originalPrice - item.price) / item.originalPrice) * 100).toInt() : 85;
 
-    // Calculate Test Schedule counts dynamically
     final chapterCount = tests.where((t) => t['type'].toString().toLowerCase().contains('chapter')).length;
     final partCount = tests.where((t) => t['type'].toString().toLowerCase().contains('part')).length;
     final unitCount = tests.where((t) => t['type'].toString().toLowerCase().contains('unit')).length;
@@ -1176,7 +1324,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               ),
               const SizedBox(height: 16),
 
-              // Green Buy Now Button matching Screenshot (#10B981)
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -1214,7 +1361,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               ),
               const SizedBox(height: 16),
 
-              // 3 Guarantees Row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
