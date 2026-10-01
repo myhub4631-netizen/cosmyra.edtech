@@ -2674,7 +2674,7 @@ class MiniSparklinePainter extends CustomPainter {
 
     final paintLine = Paint()
       ..color = color
-      ..strokeWidth = 2
+      ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
@@ -2682,7 +2682,13 @@ class MiniSparklinePainter extends CustomPainter {
       ..color = color
       ..style = PaintingStyle.fill;
 
+    final paintDotHalo = Paint()
+      ..color = color.withValues(alpha: 0.25)
+      ..style = PaintingStyle.fill;
+
     final path = Path();
+    final fillPath = Path();
+
     final stepX = size.width / (values.length - 1);
 
     for (int i = 0; i < values.length; i++) {
@@ -2691,12 +2697,37 @@ class MiniSparklinePainter extends CustomPainter {
 
       if (i == 0) {
         path.moveTo(x, y);
+        fillPath.moveTo(x, size.height);
+        fillPath.lineTo(x, y);
       } else {
-        path.lineTo(x, y);
+        final prevX = (i - 1) * stepX;
+        final prevY = size.height * (1.0 - values[i - 1]);
+        final controlX1 = prevX + (stepX / 2);
+        final controlX2 = x - (stepX / 2);
+        path.cubicTo(controlX1, prevY, controlX2, y, x, y);
+        fillPath.cubicTo(controlX1, prevY, controlX2, y, x, y);
       }
-      canvas.drawCircle(Offset(x, y), 2.5, paintDot);
+
+      if (i == values.length - 1) {
+        fillPath.lineTo(x, size.height);
+        fillPath.close();
+      }
+
+      if (i == values.length - 1) {
+        canvas.drawCircle(Offset(x, y), 5, paintDotHalo);
+        canvas.drawCircle(Offset(x, y), 2.5, paintDot);
+      }
     }
 
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [color.withValues(alpha: 0.25), color.withValues(alpha: 0.0)],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..style = PaintingStyle.fill;
+
+    canvas.drawPath(fillPath, fillPaint);
     canvas.drawPath(path, paintLine);
   }
 
