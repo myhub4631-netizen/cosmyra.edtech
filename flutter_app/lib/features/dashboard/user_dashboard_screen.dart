@@ -739,7 +739,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        'v1.1.3',
+                        'v1.1.4',
                         style: GoogleFonts.inter(
                           fontSize: 9,
                           fontWeight: FontWeight.w900,
