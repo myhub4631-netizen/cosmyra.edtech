@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -1276,6 +1277,10 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     final marksCtrl = TextEditingController(text: _exam.contains('JEE') ? '300' : '720');
     final durCtrl = TextEditingController(text: '180');
     String type = _normalizeTestType(_testType);
+    DateTime addTestDateTime = DateTime.now();
+    final addTestDateCtrl = TextEditingController(
+      text: DateFormat('yyyy-MM-dd HH:mm').format(addTestDateTime),
+    );
 
     showDialog(
       context: context,
@@ -1359,6 +1364,40 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                       ),
                     ],
                   ),
+                  const SizedBox(height: 14),
+                  GestureDetector(
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: addTestDateTime,
+                        firstDate: DateTime(2024),
+                        lastDate: DateTime(2030),
+                      );
+                      if (date != null) {
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.fromDateTime(addTestDateTime),
+                        );
+                        if (time != null) {
+                          final newDt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                          setDlgState(() {
+                            addTestDateTime = newDt;
+                            addTestDateCtrl.text = DateFormat('yyyy-MM-dd HH:mm').format(newDt);
+                          });
+                        }
+                      }
+                    },
+                    child: AbsorbPointer(
+                      child: TextFormField(
+                        controller: addTestDateCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Test Date & Time * (Select Schedule)',
+                          hintText: 'Select test start date & time',
+                          suffixIcon: Icon(Icons.event_available_rounded, color: Color(0xFF4F46E5)),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1378,6 +1417,9 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                     'duration': int.tryParse(durCtrl.text.trim()) ?? 180,
                     'type': type,
                     'status': 'Not Attempted',
+                    'test_date_time': addTestDateTime.toIso8601String(),
+                    'test_date': addTestDateTime.toIso8601String(),
+                    'scheduled_at': addTestDateTime.toIso8601String(),
                   });
                   _testCountCtrl.text = _tests.length.toString();
                 });
@@ -1405,6 +1447,19 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     if (!['Not Attempted', 'In Progress', 'Completed'].contains(status)) {
       status = 'Not Attempted';
     }
+
+    final rawDateTime = t['test_date_time'] ?? t['scheduled_at'] ?? t['test_date'] ?? t['start_time'] ?? t['date_time'];
+    DateTime editTestDateTime = DateTime.now();
+    if (rawDateTime != null) {
+      if (rawDateTime is DateTime) {
+        editTestDateTime = rawDateTime;
+      } else {
+        editTestDateTime = DateTime.tryParse(rawDateTime.toString().trim()) ?? DateTime.now();
+      }
+    }
+    final editTestDateCtrl = TextEditingController(
+      text: DateFormat('yyyy-MM-dd HH:mm').format(editTestDateTime),
+    );
 
     showDialog(
       context: context,
@@ -1498,6 +1553,40 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                       ),
                     ],
                   ),
+                  const SizedBox(height: 14),
+                  GestureDetector(
+                    onTap: () async {
+                      final date = await showDatePicker(
+                        context: context,
+                        initialDate: editTestDateTime,
+                        firstDate: DateTime(2024),
+                        lastDate: DateTime(2030),
+                      );
+                      if (date != null) {
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.fromDateTime(editTestDateTime),
+                        );
+                        if (time != null) {
+                          final newDt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                          setDlgState(() {
+                            editTestDateTime = newDt;
+                            editTestDateCtrl.text = DateFormat('yyyy-MM-dd HH:mm').format(newDt);
+                          });
+                        }
+                      }
+                    },
+                    child: AbsorbPointer(
+                      child: TextFormField(
+                        controller: editTestDateCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Test Date & Time * (Select Schedule)',
+                          hintText: 'Select test start date & time',
+                          suffixIcon: Icon(Icons.event_available_rounded, color: Color(0xFF4F46E5)),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1517,6 +1606,9 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                     'duration': int.tryParse(durCtrl.text.trim()) ?? 180,
                     'type': type,
                     'status': status,
+                    'test_date_time': editTestDateTime.toIso8601String(),
+                    'test_date': editTestDateTime.toIso8601String(),
+                    'scheduled_at': editTestDateTime.toIso8601String(),
                   };
                 });
                 Navigator.pop(ctx);
@@ -2787,6 +2879,16 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                 final duration = t['duration'] ?? 180;
                 final type = _normalizeTestType((t['type'] ?? 'Full').toString());
                 final status = (t['status'] ?? 'Not Attempted').toString();
+                final rawDateTime = t['test_date_time'] ?? t['scheduled_at'] ?? t['test_date'] ?? t['start_time'] ?? t['date_time'];
+                DateTime? dt;
+                if (rawDateTime != null) {
+                  if (rawDateTime is DateTime) {
+                    dt = rawDateTime;
+                  } else {
+                    dt = DateTime.tryParse(rawDateTime.toString().trim());
+                  }
+                }
+                final String formattedDt = dt != null ? DateFormat('dd MMM yyyy, hh:mm a').format(dt) : '';
 
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -2840,6 +2942,8 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                                     _buildMiniBadge('$qCount Qs'),
                                     _buildMiniBadge('$marks Marks'),
                                     _buildMiniBadge('$duration Mins'),
+                                    if (formattedDt.isNotEmpty)
+                                      _buildMiniBadge('📅 $formattedDt', color: const Color(0xFF2563EB)),
                                     // Interactive Test Type Dropdown Chip
                                     _buildTypeChangeChip(idx, type),
                                     _buildMiniBadge(
