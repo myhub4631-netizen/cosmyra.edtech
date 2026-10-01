@@ -6603,27 +6603,108 @@ class SupabaseService {
   /// Fetch all saved papers/test series records from DB and local cache
   static Future<List<Map<String, dynamic>>> fetchAllPapersAndTestSeries() async {
     final List<Map<String, dynamic>> papers = [];
+    final Set<String> seenIds = {};
 
+    // 1. SharedPreferences local cache
     try {
       final prefs = await SharedPreferences.getInstance();
       final str = prefs.getString('cosmyra_saved_papers');
       if (str != null && str.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(str);
-        papers.addAll(decoded.map((e) => Map<String, dynamic>.from(e as Map)));
+        for (var e in decoded) {
+          final map = Map<String, dynamic>.from(e as Map);
+          final id = (map['id'] ?? map['paper_id'] ?? '').toString();
+          if (id.isNotEmpty && !seenIds.contains(id)) {
+            seenIds.add(id);
+            papers.add(map);
+          }
+        }
       }
     } catch (e) {
       debugPrint('Notice reading local saved papers: $e');
     }
 
+    // 2. Query Supabase system_config table for 'admin_custom_test_series' & 'admin_custom_papers'
+    try {
+      final res = await client
+          .from('system_config')
+          .select('key, value')
+          .inFilter('key', ['admin_custom_test_series', 'admin_custom_papers', 'created_test_papers']);
+
+      if (res != null && (res as List).isNotEmpty) {
+        for (var row in res) {
+          final val = row['value'];
+          List<dynamic> items = [];
+          if (val is List) {
+            items = val;
+          } else if (val is String && val.trim().isNotEmpty) {
+            try {
+              items = jsonDecode(val) as List;
+            } catch (_) {}
+          }
+          for (var item in items) {
+            if (item is Map) {
+              final map = Map<String, dynamic>.from(item);
+              // Extract embedded tests list if test series contains embedded created tests
+              if (map['tests'] is List) {
+                final embeddedTests = (map['tests'] as List).whereType<Map>().toList();
+                for (var et in embeddedTests) {
+                  final etMap = Map<String, dynamic>.from(et);
+                  etMap['test_series_id'] ??= map['id'];
+                  etMap['test_series_title'] ??= map['title'] ?? map['name'];
+                  etMap['target_exam'] ??= map['exam'];
+                  final etId = (etMap['id'] ?? etMap['paper_id'] ?? '').toString();
+                  if (etId.isNotEmpty && !seenIds.contains(etId)) {
+                    seenIds.add(etId);
+                    papers.add(etMap);
+                  } else if (etId.isEmpty) {
+                    papers.add(etMap);
+                  }
+                }
+              }
+
+              final id = (map['id'] ?? map['paper_id'] ?? '').toString();
+              if (id.isNotEmpty && !seenIds.contains(id)) {
+                seenIds.add(id);
+                papers.add(map);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice reading system_config papers & test series: $e');
+    }
+
+    // 3. Query Supabase tests table
+    try {
+      final res = await client.from('tests').select().order('created_at', ascending: false);
+      if (res != null && (res as List).isNotEmpty) {
+        for (var row in res) {
+          final map = Map<String, dynamic>.from(row as Map);
+          final id = (map['id'] ?? map['paper_id'] ?? '').toString();
+          if (id.isNotEmpty && !seenIds.contains(id)) {
+            seenIds.add(id);
+            papers.add(map);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice reading tests table: $e');
+    }
+
+    // 4. Query Supabase papers table
     try {
       final res = await client.from('papers').select().order('created_at', ascending: false);
       if (res != null && (res as List).isNotEmpty) {
         final dbPapers = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         for (var dbP in dbPapers) {
-          final idx = papers.indexWhere((p) => p['id'] == dbP['id']);
+          final id = (dbP['id'] ?? dbP['paper_id'] ?? '').toString();
+          final idx = papers.indexWhere((p) => p['id'] == id);
           if (idx != -1) {
             papers[idx] = dbP;
           } else {
+            if (id.isNotEmpty) seenIds.add(id);
             papers.add(dbP);
           }
         }

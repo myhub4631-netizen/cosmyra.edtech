@@ -333,14 +333,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       if (pName.isNotEmpty && (pName == itemTitleLower || itemTitleLower.contains(pName) || pName.contains(itemTitleLower))) {
         isMatch = true;
       }
-      if (isTs && pExam.isNotEmpty && itemExamLower.isNotEmpty && pExam.contains(itemExamLower)) {
-        if (pSeriesTitle.isEmpty || pSeriesTitle == itemTitleLower || itemTitleLower.contains(pSeriesTitle) || pSeriesTitle.contains(itemTitleLower)) {
-          isMatch = true;
-        }
-      }
-      // General matching fallback for created papers under NEET/JEE full syllabus
-      if (!isMatch && isTs && (pName.contains('full') || pName.contains('syllabus') || pName.contains('mock') || pName.contains('test'))) {
-        if (pExam.contains(itemExamLower) || itemExamLower.contains(pExam)) {
+      if (pExam.isNotEmpty && itemExamLower.isNotEmpty && (pExam.contains(itemExamLower) || itemExamLower.contains(pExam))) {
+        if (pSeriesTitle.isEmpty || pSeriesTitle == itemTitleLower || itemTitleLower.contains(pSeriesTitle) || pSeriesTitle.contains(itemTitleLower) || pName.contains('mock') || pName.contains('test') || pName.contains('full') || pName.contains('syllabus')) {
           isMatch = true;
         }
       }
@@ -364,8 +358,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       }
     }
 
-    // 3. Fallback: If item.testCount > testMap.length, generate dynamic entries up to item.testCount so count is 100% dynamic & matches created total
-    final targetTotalCount = item.testCount > testMap.length ? item.testCount : testMap.length;
+    // 3. Fallback: Ensure total test count matches created total or at least 5 tests
+    int targetTotalCount = testMap.length;
+    if (item.testCount > targetTotalCount) {
+      targetTotalCount = item.testCount;
+    }
+    if (targetTotalCount < 5) {
+      targetTotalCount = 5; // Minimum 5 created test papers dynamically resolved
+    }
+
     final result = testMap.values.toList();
     if (result.length < targetTotalCount) {
       for (int i = result.length + 1; i <= targetTotalCount; i++) {
