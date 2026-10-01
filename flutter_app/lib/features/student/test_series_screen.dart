@@ -9,6 +9,7 @@ import '../../core/services/cart_service.dart';
 import 'widgets/ecommerce_checkout_dialog.dart';
 import 'widgets/ecommerce_cart_modal.dart';
 import '../tests/test_screen.dart';
+import '../../shared/widgets/app_avatar.dart';
 
 class TestSeriesScreen extends StatefulWidget {
   final VoidCallback? onBackToDashboard;
@@ -202,11 +203,40 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   bool _isLoading = false;
   List<Map<String, dynamic>> _dbPapers = [];
   List<Map<String, dynamic>> _customSeriesList = [];
+  UserProfileModel? _currentUser;
 
   @override
   void initState() {
     super.initState();
     _loadPapers();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    final user = await SupabaseService.getCurrentUser();
+    if (mounted) {
+      setState(() {
+        _currentUser = user ?? SupabaseService.activeUserSession;
+      });
+    }
+  }
+
+  String _getUserDisplayName() {
+    final profile = _currentUser ?? SupabaseService.activeUserSession;
+    if (profile != null && profile.fullName.trim().isNotEmpty) {
+      return profile.fullName;
+    }
+    final authUser = SupabaseService.client.auth.currentUser;
+    if (authUser != null) {
+      final metaName = authUser.userMetadata?['full_name'] ?? authUser.userMetadata?['name'];
+      if (metaName != null && metaName.toString().trim().isNotEmpty) {
+        return metaName.toString().trim();
+      }
+      if (authUser.email != null && authUser.email!.isNotEmpty) {
+        return authUser.email!.split('@').first;
+      }
+    }
+    return 'My Profile';
   }
 
   Future<void> _loadPapers() async {
@@ -391,18 +421,29 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       }
     }
 
-    // 2. Load from dbPapers marked as test series
+    // 2. Load from dbPapers marked as test series (Only standalone Test Series packages, excluding individual test papers)
     for (var p in _dbPapers) {
       final String pId = p['id']?.toString() ?? '';
       final String tsTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? '').toString().trim();
       final String pName = (p['paper_name'] ?? p['paperName'] ?? '').toString().trim();
       final String effectiveTitle = tsTitle.isNotEmpty ? tsTitle : pName;
 
-      final bool isTestSeries = (p['source_category'] == 'Test Series') ||
-          (p['category'] == 'Test Series') ||
-          tsTitle.isNotEmpty ||
-          (p['test_series_option'] != null && p['test_series_option'].toString().isNotEmpty) ||
-          ((p['available_in'] is List) && (p['available_in'] as List).contains('test_series'));
+      final bool isIndividualPaper = (p['is_paper'] == true || p['isPaper'] == true) ||
+          pName.toLowerCase().contains('paper') ||
+          pName.toLowerCase().contains('mock paper') ||
+          effectiveTitle.toLowerCase().contains('paper 1') ||
+          effectiveTitle.toLowerCase().contains('paper 2') ||
+          effectiveTitle.toLowerCase().contains('paper 3') ||
+          effectiveTitle.toLowerCase().contains('paper-') ||
+          effectiveTitle.toLowerCase().contains('paper_') ||
+          (p['test_series_id'] != null && p['test_series_id'].toString().isNotEmpty) ||
+          (p['test_series_title'] != null && p['test_series_title'].toString().isNotEmpty);
+
+      final bool isTestSeries = !isIndividualPaper &&
+          ((p['source_category'] == 'Test Series') ||
+           (p['category'] == 'Test Series') ||
+           (p['is_test_series'] == true) ||
+           ((p['available_in'] is List) && (p['available_in'] as List).contains('test_series')));
 
       if (isTestSeries && effectiveTitle.isNotEmpty && !seenTitles.contains(effectiveTitle.toLowerCase())) {
         seenTitles.add(effectiveTitle.toLowerCase());
@@ -719,17 +760,28 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       child: Row(
         children: [
           // Logo (if mobile or small screen)
+          // Logo (if mobile or small screen)
           if (screenWidth < 992) ...[
             Row(
               children: [
-                Container(
-                  width: 32,
+                Image.asset(
+                  'assets/images/cosmyra_logo.png',
                   height: 32,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(colors: [Color(0xFF00C6FF), Color(0xFF0072FF)]),
-                    shape: BoxShape.circle,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Image.network(
+                    'https://neet-jee.in/assets/images/cosmyra_logo.png',
+                    height: 32,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 32,
+                      height: 32,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(colors: [Color(0xFF00C6FF), Color(0xFF0072FF)]),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(child: Icon(Icons.bolt, color: Colors.white, size: 20)),
+                    ),
                   ),
-                  child: const Center(child: Icon(Icons.bolt, color: Colors.white, size: 20)),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -828,18 +880,17 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
 
               const SizedBox(width: 8),
 
-              // User Avatar Circle
-              Container(
-                width: 34,
-                height: 34,
-                decoration: const BoxDecoration(color: Color(0xFF9333EA), shape: BoxShape.circle),
-                child: const Center(
-                  child: Text('M', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                ),
+              // User Real Profile Avatar & Name (from Google account / Supabase auth)
+              AppAvatar.fromProfile(
+                _currentUser ?? SupabaseService.activeUserSession,
+                size: 34,
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               if (screenWidth > 600)
-                const Text('MyHub', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                Text(
+                  _getUserDisplayName(),
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF334155)),
+                ),
             ],
           ),
         ],
@@ -865,14 +916,24 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             child: Row(
               children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(colors: [Color(0xFF00C6FF), Color(0xFF0072FF)]),
-                    shape: BoxShape.circle,
+                Image.asset(
+                  'assets/images/cosmyra_logo.png',
+                  height: 34,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Image.network(
+                    'https://neet-jee.in/assets/images/cosmyra_logo.png',
+                    height: 34,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 32,
+                      height: 32,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(colors: [Color(0xFF00C6FF), Color(0xFF0072FF)]),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(child: Icon(Icons.bolt, color: Colors.white, size: 20)),
+                    ),
                   ),
-                  child: const Center(child: Icon(Icons.bolt, color: Colors.white, size: 20)),
                 ),
                 const SizedBox(width: 10),
                 Column(
