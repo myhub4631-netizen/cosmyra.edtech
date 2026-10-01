@@ -1330,27 +1330,6 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                         : _buildBannerGraphic(item),
                   ),
 
-                  // Top-Left Tag Badge
-                  Positioned(
-                    top: 10,
-                    left: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                      decoration: BoxDecoration(
-                        color: item.dynamicTagColor,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        item.dynamicTag,
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-
                   // Top-Right Favorite Heart Icon
                   Positioned(
                     top: 10,
@@ -1368,27 +1347,6 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                           color: isFav ? const Color(0xFFEF4444) : Colors.white,
                           size: 16,
                         ),
-                      ),
-                    ),
-                  ),
-
-                  // Bottom Translucent Feature Overlay Bar on Image
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      color: Colors.black.withValues(alpha: 0.65),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildOverlayFeaturePill(item.dynamicFeature1),
-                          Container(width: 1, height: 10, color: Colors.white24),
-                          _buildOverlayFeaturePill(item.dynamicFeature2),
-                          Container(width: 1, height: 10, color: Colors.white24),
-                          _buildOverlayFeaturePill(item.dynamicFeature3),
-                        ],
                       ),
                     ),
                   ),
@@ -1627,26 +1585,6 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
 
                   Positioned(
                     top: 10,
-                    left: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                      decoration: BoxDecoration(
-                        color: item.dynamicTagColor,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        item.dynamicTag,
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  Positioned(
-                    top: 10,
                     right: 10,
                     child: InkWell(
                       onTap: () => setState(() => _favoritesMap[item.id] = !isFav),
@@ -1661,26 +1599,6 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                           color: isFav ? const Color(0xFFEF4444) : Colors.white,
                           size: 15,
                         ),
-                      ),
-                    ),
-                  ),
-
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      color: Colors.black.withValues(alpha: 0.65),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildOverlayFeaturePill(item.dynamicFeature1),
-                          Container(width: 1, height: 10, color: Colors.white24),
-                          _buildOverlayFeaturePill(item.dynamicFeature2),
-                          Container(width: 1, height: 10, color: Colors.white24),
-                          _buildOverlayFeaturePill(item.dynamicFeature3),
-                        ],
                       ),
                     ),
                   ),
