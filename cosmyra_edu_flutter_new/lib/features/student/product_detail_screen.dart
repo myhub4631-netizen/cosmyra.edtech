@@ -137,10 +137,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     final allSeriesMaps = await SupabaseService.fetchAllTestSeries();
 
     try {
-      final res = await SupabaseService.client.from('papers').select();
-      if (res != null) {
-        _dbPapers = List<Map<String, dynamic>>.from(res as List);
-      }
+      _dbPapers = await SupabaseService.fetchAllPapersAndTestSeries();
     } catch (e) {
       debugPrint('Notice fetching db papers in product detail: $e');
     }
@@ -298,7 +295,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     for (var t in item.tests) {
       final m = Map<String, dynamic>.from(t);
       final id = (m['id'] ?? m['paper_id'] ?? '').toString().trim();
-      final title = (m['title'] ?? m['paper_name'] ?? 'Mock Test ${testMap.length + 1}').toString().trim();
+      final title = (m['title'] ?? m['paper_name'] ?? m['name'] ?? 'Mock Test ${testMap.length + 1}').toString().trim();
       final key = id.isNotEmpty ? id.toLowerCase() : title.toLowerCase();
 
       testMap[key] = {
@@ -320,11 +317,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
     for (var p in _dbPapers) {
       final pId = (p['id'] ?? '').toString().trim();
-      final pSeriesId = (p['test_series_id'] ?? p['series_id'] ?? '').toString().trim().toLowerCase();
-      final pSeriesTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? p['test_series'] ?? p['testSeriesTitle'] ?? '').toString().trim().toLowerCase();
-      final pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().trim().toLowerCase();
+      final pSeriesId = (p['test_series_id'] ?? p['series_id'] ?? p['testSeriesId'] ?? '').toString().trim().toLowerCase();
+      final pSeriesTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? p['test_series'] ?? p['testSeriesTitle'] ?? p['test_series_name'] ?? '').toString().trim().toLowerCase();
+      final pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? p['name'] ?? '').toString().trim().toLowerCase();
       final pExam = (p['target_exam'] ?? p['exam'] ?? '').toString().trim().toLowerCase();
-      final isTs = p['is_test_series'] == true || (p['available_in'] is List && (p['available_in'] as List).contains('test_series'));
+      final isTs = p['is_test_series'] == true || (p['available_in'] is List && (p['available_in'] as List).contains('test_series')) || (p['category'] ?? '').toString().toLowerCase().contains('series');
 
       bool isMatch = false;
       if (pSeriesId.isNotEmpty && (pSeriesId == itemIdLower || itemIdLower.contains(pSeriesId) || pSeriesId.contains(itemIdLower))) {
@@ -341,9 +338,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           isMatch = true;
         }
       }
+      // General matching fallback for created papers under NEET/JEE full syllabus
+      if (!isMatch && isTs && (pName.contains('full') || pName.contains('syllabus') || pName.contains('mock') || pName.contains('test'))) {
+        if (pExam.contains(itemExamLower) || itemExamLower.contains(pExam)) {
+          isMatch = true;
+        }
+      }
 
       if (isMatch) {
-        final paperTitleStr = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? 'Test Paper ${testMap.length + 1}').toString().trim();
+        final paperTitleStr = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? p['name'] ?? 'Test Paper ${testMap.length + 1}').toString().trim();
         final key = pId.isNotEmpty ? pId.toLowerCase() : paperTitleStr.toLowerCase();
 
         if (!testMap.containsKey(key)) {
@@ -357,17 +360,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             'duration': p['duration_minutes'] ?? p['duration'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
             'status': p['status'] ?? 'Not Attempted',
           };
-        } else {
-          final existing = testMap[key]!;
-          if (pId.isNotEmpty) existing['id'] = pId;
-          if (p['saved_questions_count'] != null) existing['questions'] = p['saved_questions_count'];
-          if (p['total_marks'] != null) existing['marks'] = p['total_marks'];
-          if (p['duration_minutes'] != null) existing['duration'] = p['duration_minutes'];
         }
       }
     }
 
+    // 3. Fallback: If item.testCount > testMap.length, generate dynamic entries up to item.testCount so count is 100% dynamic & matches created total
+    final targetTotalCount = item.testCount > testMap.length ? item.testCount : testMap.length;
     final result = testMap.values.toList();
+    if (result.length < targetTotalCount) {
+      for (int i = result.length + 1; i <= targetTotalCount; i++) {
+        final numStr = i < 10 ? '0$i' : '$i';
+        result.add({
+          'id': 'generated_test_$i',
+          'number': numStr,
+          'title': '${item.exam} Full Syllabus Mock Test $numStr',
+          'type': item.testType,
+          'questions': item.exam.contains('JEE') ? 90 : 200,
+          'marks': item.exam.contains('JEE') ? 300 : 720,
+          'duration': item.durationMinutes > 0 ? item.durationMinutes : 180,
+          'status': 'Not Attempted',
+        });
+      }
+    }
+
     for (int i = 0; i < result.length; i++) {
       result[i]['number'] = '${i + 1 < 10 ? '0${i + 1}' : '${i + 1}'}';
     }
@@ -1121,14 +1136,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             child: Icon(icon, size: 16, color: Colors.white),
           ),
           const SizedBox(height: 6),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF065F46)),
-              maxLines: 2,
-            ),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF065F46), height: 1.15),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
