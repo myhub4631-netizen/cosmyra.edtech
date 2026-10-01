@@ -550,6 +550,19 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           'duration_minutes': int.tryParse(_durationCtrl.text) ?? 180,
           'difficulty': 'High',
           'status': 'Published',
+          'tests': [
+            {
+              'id': paperId,
+              'paper_id': paperId,
+              'title': pName,
+              'questions': int.tryParse(_questionCountCtrl.text) ?? 180,
+              'marks': double.tryParse(_totalMarksCtrl.text) ?? (_examName.contains('JEE') ? 300.0 : 720.0),
+              'duration': int.tryParse(_durationCtrl.text) ?? 180,
+              'type': 'Full',
+              'status': 'Published',
+            }
+          ],
+          'test_count': 1,
         });
       } catch (e) {
         debugPrint('Notice persisting test series in step 1: $e');

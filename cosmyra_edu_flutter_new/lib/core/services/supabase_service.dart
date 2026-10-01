@@ -4490,23 +4490,73 @@ class SupabaseService {
 
     // Auto-register in Test Series catalog if associated with a test series
     final String tsTitle = (fullData['test_series_title']?.toString() ?? '').trim();
-    if (tsTitle.isNotEmpty || fullData['is_test_series'] == true) {
+    final String existingTs = (fullData['existing_test_series']?.toString() ?? '').trim();
+    final String newTs = (fullData['new_test_series_name']?.toString() ?? '').trim();
+    final String targetTsTitle = tsTitle.isNotEmpty
+        ? tsTitle
+        : (existingTs.isNotEmpty ? existingTs : (newTs.isNotEmpty ? newTs : (fullData['paper_name'] ?? 'NEET Test Series')));
+
+    if (targetTsTitle.isNotEmpty || fullData['is_test_series'] == true) {
       try {
-        final title = tsTitle.isNotEmpty ? tsTitle : (fullData['paper_name'] ?? 'NEET Test Series');
-        await saveTestSeries({
-          'id': toValidUuid('ts_${fullData['exam']}_${fullData['year']}_$title'),
-          'title': title,
-          'name': title,
+        final title = targetTsTitle;
+        final seriesId = toValidUuid('ts_${fullData['exam']}_${fullData['year']}_$title');
+
+        // Check if test series already exists
+        final existingList = await fetchAllTestSeries();
+        Map<String, dynamic>? existingSeries;
+        for (var s in existingList) {
+          final sId = (s['id'] ?? '').toString().toLowerCase().trim();
+          final sTitle = (s['title'] ?? s['name'] ?? '').toString().toLowerCase().trim();
+          if (sId == seriesId.toLowerCase().trim() || sTitle == title.toLowerCase().trim()) {
+            existingSeries = Map<String, dynamic>.from(s);
+            break;
+          }
+        }
+
+        final List<Map<String, dynamic>> testsList = (existingSeries != null && existingSeries['tests'] is List)
+            ? (existingSeries['tests'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+            : [];
+
+        final paperTestItem = {
+          'id': paperId,
+          'paper_id': paperId,
+          'title': fullData['paper_name'] ?? title,
+          'questions': fullData['question_count'] ?? 200,
+          'marks': fullData['total_marks'] ?? 720,
+          'duration': fullData['duration_minutes'] ?? 180,
+          'type': existingSeries?['test_type'] ?? 'Full',
+          'status': fullData['status'] ?? 'Ready',
+        };
+
+        final idx = testsList.indexWhere((t) =>
+            (t['id']?.toString() ?? '') == paperId ||
+            (t['paper_id']?.toString() ?? '') == paperId ||
+            (t['title']?.toString().toLowerCase().trim() ?? '') == (fullData['paper_name'] ?? '').toString().toLowerCase().trim());
+        if (idx != -1) {
+          testsList[idx] = {...testsList[idx], ...paperTestItem};
+        } else {
+          testsList.add(paperTestItem);
+        }
+
+        final seriesToSave = {
+          if (existingSeries != null) ...existingSeries,
+          'id': existingSeries?['id'] ?? seriesId,
+          'title': existingSeries?['title'] ?? title,
+          'name': existingSeries?['name'] ?? title,
           'exam': fullData['exam'],
           'year': fullData['year'],
-          'category': 'Full Syllabus',
+          'category': existingSeries?['category'] ?? 'Full Syllabus',
           'paper_id': paperId,
           'paper_name': fullData['paper_name'],
           'question_count': fullData['question_count'],
           'duration_minutes': fullData['duration_minutes'],
-          'difficulty': 'High',
-          'status': 'Ready',
-        });
+          'difficulty': existingSeries?['difficulty'] ?? 'High',
+          'status': existingSeries?['status'] ?? 'Published',
+          'tests': testsList,
+          'test_count': testsList.length,
+        };
+
+        await saveTestSeries(seriesToSave);
       } catch (tsErr) {
         debugPrint('Notice auto-registering test series: $tsErr');
       }
@@ -5254,7 +5304,71 @@ class SupabaseService {
       return deletedIds.contains(sId) || legacyDemoTestSeriesIds.contains(sId);
     });
 
-    // 5. Cache list in SharedPreferences for instantaneous offline availability
+    // 5. Auto-link all created/published papers into matching test series
+    try {
+      final allPapers = await fetchAllPapersAndTestSeries();
+      if (allPapers.isNotEmpty) {
+        for (var s in list) {
+          final sId = (s['id'] ?? '').toString().toLowerCase().trim();
+          final sTitle = (s['title'] ?? s['name'] ?? '').toString().toLowerCase().trim();
+          final sPaperId = (s['paper_id'] ?? '').toString().toLowerCase().trim();
+
+          List<Map<String, dynamic>> seriesTests = [];
+          if (s['tests'] is List) {
+            seriesTests = (s['tests'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+          }
+
+          for (var p in allPapers) {
+            final pId = (p['id'] ?? '').toString().toLowerCase().trim();
+            final pTsOption = (p['existing_test_series'] ?? p['test_series_title'] ?? p['new_test_series_name'] ?? '').toString().toLowerCase().trim();
+            final pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toLowerCase().trim();
+
+            bool isMatch = false;
+            if (pId.isNotEmpty && sPaperId.isNotEmpty && pId == sPaperId) isMatch = true;
+            if (pTsOption.isNotEmpty && (pTsOption == sId || pTsOption == sTitle)) isMatch = true;
+            if (p['is_test_series'] == true && pName.isNotEmpty && (pName == sTitle || sTitle.contains(pName) || pName.contains(sTitle))) isMatch = true;
+
+            if (isMatch) {
+              final rawPaperId = p['id']?.toString() ?? '';
+              final pTitleStr = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? 'Test Paper').toString();
+              final qCount = p['saved_questions_count'] ?? p['question_count'] ?? (s['exam']?.toString().contains('JEE') == true ? 90 : 200);
+              final marks = p['total_marks'] ?? (s['exam']?.toString().contains('JEE') == true ? 300 : 720);
+              final duration = p['duration_minutes'] ?? (s['duration_minutes'] ?? 180);
+              final status = (p['status'] ?? 'Published').toString();
+
+              final idx = seriesTests.indexWhere((t) =>
+                  (t['id']?.toString().toLowerCase().trim() ?? '') == rawPaperId.toLowerCase().trim() ||
+                  (t['paper_id']?.toString().toLowerCase().trim() ?? '') == rawPaperId.toLowerCase().trim() ||
+                  (t['title']?.toString().toLowerCase().trim() ?? '') == pTitleStr.toLowerCase().trim());
+
+              final itemMap = {
+                'id': rawPaperId.isNotEmpty ? rawPaperId : 'test_${seriesTests.length + 1}',
+                'paper_id': rawPaperId,
+                'title': pTitleStr,
+                'questions': qCount,
+                'marks': marks,
+                'duration': duration,
+                'type': s['test_type'] ?? 'Full',
+                'status': status,
+              };
+
+              if (idx != -1) {
+                seriesTests[idx] = {...itemMap, ...seriesTests[idx]};
+              } else {
+                seriesTests.add(itemMap);
+              }
+            }
+          }
+
+          s['tests'] = seriesTests;
+          s['test_count'] = seriesTests.isNotEmpty ? seriesTests.length : (s['test_count'] ?? 1);
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice auto-linking papers to test series in fetchAllTestSeries: $e');
+    }
+
+    // 6. Cache list in SharedPreferences for instantaneous offline availability
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cosmyra_saved_test_series', jsonEncode(list));

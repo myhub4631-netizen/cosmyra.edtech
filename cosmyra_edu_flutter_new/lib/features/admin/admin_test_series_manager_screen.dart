@@ -952,6 +952,48 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
       _tests = [];
     }
 
+    // Auto-sync matching papers from availablePapers into _tests
+    final sId = _seriesId.toLowerCase().trim();
+    final sTitle = (_titleCtrl.text).toLowerCase().trim();
+    for (var p in widget.availablePapers) {
+      final pId = (p['id'] ?? '').toString().toLowerCase().trim();
+      final pTsOption = (p['existing_test_series'] ?? p['test_series_title'] ?? p['new_test_series_name'] ?? '').toString().toLowerCase().trim();
+      final pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toLowerCase().trim();
+      final dPaperId = (d['paper_id'] ?? '').toString().toLowerCase().trim();
+
+      bool isMatch = false;
+      if (pId.isNotEmpty && dPaperId.isNotEmpty && pId == dPaperId) isMatch = true;
+      if (pTsOption.isNotEmpty && (pTsOption == sId || pTsOption == sTitle)) isMatch = true;
+      if (p['is_test_series'] == true && pName.isNotEmpty && (pName == sTitle || sTitle.contains(pName) || pName.contains(sTitle))) isMatch = true;
+
+      if (isMatch) {
+        final rawPaperId = p['id']?.toString() ?? '';
+        final pTitleStr = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? 'Test Paper').toString();
+        final idx = _tests.indexWhere((t) =>
+            (t['id']?.toString().toLowerCase().trim() ?? '') == rawPaperId.toLowerCase().trim() ||
+            (t['paper_id']?.toString().toLowerCase().trim() ?? '') == rawPaperId.toLowerCase().trim() ||
+            (t['title']?.toString().toLowerCase().trim() ?? '') == pTitleStr.toLowerCase().trim());
+        final testItem = {
+          'id': rawPaperId,
+          'paper_id': rawPaperId,
+          'title': pTitleStr,
+          'questions': p['saved_questions_count'] ?? p['question_count'] ?? (_exam.contains('JEE') ? 90 : 200),
+          'marks': p['total_marks'] ?? (_exam.contains('JEE') ? 300 : 720),
+          'duration': p['duration_minutes'] ?? 180,
+          'type': _testType,
+          'status': p['status'] ?? 'Published',
+        };
+        if (idx != -1) {
+          _tests[idx] = {...testItem, ..._tests[idx]};
+        } else {
+          _tests.add(testItem);
+        }
+      }
+    }
+    if (_tests.isNotEmpty) {
+      _testCountCtrl.text = _tests.length.toString();
+    }
+
     // Reviews List init
     if (d['reviews'] is List && (d['reviews'] as List).isNotEmpty) {
       _reviews = (d['reviews'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
