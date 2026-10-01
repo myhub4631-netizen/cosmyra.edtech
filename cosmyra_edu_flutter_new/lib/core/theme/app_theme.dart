@@ -1,6 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+class SmoothPageTransitionsBuilder extends PageTransitionsBuilder {
+  const SmoothPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curvedAnimation = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+
+    final slideAnimation = Tween<Offset>(
+      begin: const Offset(0.0, 0.015),
+      end: Offset.zero,
+    ).animate(curvedAnimation);
+
+    return FadeTransition(
+      opacity: curvedAnimation,
+      child: SlideTransition(
+        position: slideAnimation,
+        child: child,
+      ),
+    );
+  }
+}
+
 class AppTheme {
   // Brand Colors
   static const Color primaryBlue = Color(0xFF2563EB);
@@ -17,6 +49,16 @@ class AppTheme {
   static const Color biologyColor = Color(0xFFEC4899);
   static const Color mathsColor = Color(0xFFF59E0B);
 
+  static const _smoothTransitionsTheme = PageTransitionsTheme(
+    builders: {
+      TargetPlatform.android: SmoothPageTransitionsBuilder(),
+      TargetPlatform.iOS: SmoothPageTransitionsBuilder(),
+      TargetPlatform.macOS: SmoothPageTransitionsBuilder(),
+      TargetPlatform.windows: SmoothPageTransitionsBuilder(),
+      TargetPlatform.linux: SmoothPageTransitionsBuilder(),
+    },
+  );
+
   // Light Mode Theme
   static ThemeData get lightTheme {
     return ThemeData(
@@ -24,6 +66,7 @@ class AppTheme {
       brightness: Brightness.light,
       primaryColor: primaryBlue,
       scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+      pageTransitionsTheme: _smoothTransitionsTheme,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryBlue,
         brightness: Brightness.light,
@@ -103,6 +146,7 @@ class AppTheme {
       brightness: Brightness.dark,
       primaryColor: primaryIndigo,
       scaffoldBackgroundColor: const Color(0xFF0F172A),
+      pageTransitionsTheme: _smoothTransitionsTheme,
       colorScheme: ColorScheme.fromSeed(
         seedColor: primaryIndigo,
         brightness: Brightness.dark,

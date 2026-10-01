@@ -127,6 +127,39 @@ UserProfileModel _getEffectiveAdminProfile() {
   return SupabaseService.getMockProfile(role: 'student');
 }
 
+Page<dynamic> buildSmoothPage({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 250),
+    reverseTransitionDuration: const Duration(milliseconds: 200),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final curvedAnimation = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+
+      final slideAnimation = Tween<Offset>(
+        begin: const Offset(0.0, 0.015),
+        end: Offset.zero,
+      ).animate(curvedAnimation);
+
+      return FadeTransition(
+        opacity: curvedAnimation,
+        child: SlideTransition(
+          position: slideAnimation,
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
 final GoRouter appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
   initialLocation: '/',
@@ -325,139 +358,156 @@ final GoRouter appRouter = GoRouter(
     // =========================================================================
     GoRoute(
       path: '/dashboard',
-      builder: (context, state) => UserDashboardScreen(
-        userProfile: _getEffectiveProfile(),
-        activeExam: 'NEET',
-        onOpenPractice: () => context.go('/practice'),
-        onOpenCustomTest: () => context.go('/my-tests'),
-        onOpenMockTests: () => context.go('/my-tests'),
-        onOpenMyTests: () => context.go('/my-tests'),
-        onOpenTestSeries: () => context.go('/test-series'),
-        onOpenPyqs: () => context.go('/pyq'),
-        onOpenMistakes: () => context.go('/mistakes'),
-        onLogout: () async {
-          await SupabaseService.logoutUserSession();
-          if (context.mounted) {
-            context.go('/login');
-          }
-        },
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: UserDashboardScreen(
+          userProfile: _getEffectiveProfile(),
+          activeExam: 'NEET',
+          onOpenPractice: () => context.go('/practice'),
+          onOpenCustomTest: () => context.go('/my-tests'),
+          onOpenMockTests: () => context.go('/my-tests'),
+          onOpenMyTests: () => context.go('/my-tests'),
+          onOpenTestSeries: () => context.go('/test-series'),
+          onOpenPyqs: () => context.go('/pyq'),
+          onOpenMistakes: () => context.go('/mistakes'),
+          onLogout: () async {
+            await SupabaseService.logoutUserSession();
+            if (context.mounted) {
+              context.go('/login');
+            }
+          },
+        ),
       ),
     ),
     GoRoute(
       path: '/user/dashboard',
-      builder: (context, state) => UserDashboardScreen(
-        userProfile: _getEffectiveProfile(),
-        activeExam: 'NEET',
-        onOpenPractice: () => context.go('/practice'),
-        onOpenCustomTest: () => context.go('/my-tests'),
-        onOpenMockTests: () => context.go('/my-tests'),
-        onOpenMyTests: () => context.go('/my-tests'),
-        onOpenTestSeries: () => context.go('/test-series'),
-        onOpenPyqs: () => context.go('/pyq'),
-        onOpenMistakes: () => context.go('/mistakes'),
-        onLogout: () async {
-          await SupabaseService.logoutUserSession();
-          if (context.mounted) {
-            context.go('/login');
-          }
-        },
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: UserDashboardScreen(
+          userProfile: _getEffectiveProfile(),
+          activeExam: 'NEET',
+          onOpenPractice: () => context.go('/practice'),
+          onOpenCustomTest: () => context.go('/my-tests'),
+          onOpenMockTests: () => context.go('/my-tests'),
+          onOpenMyTests: () => context.go('/my-tests'),
+          onOpenTestSeries: () => context.go('/test-series'),
+          onOpenPyqs: () => context.go('/pyq'),
+          onOpenMistakes: () => context.go('/mistakes'),
+          onLogout: () async {
+            await SupabaseService.logoutUserSession();
+            if (context.mounted) {
+              context.go('/login');
+            }
+          },
+        ),
       ),
     ),
     GoRoute(
       path: '/my-tests',
-      builder: (context, state) => MyTestsHistoryScreen(
-        userProfile: _getEffectiveProfile(),
-        onBack: () => context.go('/dashboard'),
-        onNavigateTab: (idx) {},
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: MyTestsHistoryScreen(
+          userProfile: _getEffectiveProfile(),
+          onBack: () => context.go('/dashboard'),
+          onNavigateTab: (idx) {},
+        ),
       ),
     ),
     GoRoute(
       path: '/tests',
-      builder: (context, state) => MyTestsHistoryScreen(
-        userProfile: _getEffectiveProfile(),
-        onBack: () => context.go('/dashboard'),
-        onNavigateTab: (idx) {},
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: MyTestsHistoryScreen(
+          userProfile: _getEffectiveProfile(),
+          onBack: () => context.go('/dashboard'),
+          onNavigateTab: (idx) {},
+        ),
       ),
     ),
     GoRoute(
       path: '/history',
-      builder: (context, state) => MyTestsHistoryScreen(
-        userProfile: _getEffectiveProfile(),
-        onBack: () => context.go('/dashboard'),
-        onNavigateTab: (idx) {},
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: MyTestsHistoryScreen(
+          userProfile: _getEffectiveProfile(),
+          onBack: () => context.go('/dashboard'),
+          onNavigateTab: (idx) {},
+        ),
       ),
     ),
     GoRoute(
       path: '/profile',
-      builder: (context, state) => ProfileScreen(
-        userProfile: _getEffectiveProfile(),
-        activeExam: 'NEET',
-        onExamChanged: (newExam) {},
-        onSignOut: () => context.go('/login'),
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: ProfileScreen(
+          userProfile: _getEffectiveProfile(),
+          activeExam: 'NEET',
+          onExamChanged: (newExam) {},
+          onSignOut: () => context.go('/login'),
+        ),
       ),
     ),
     GoRoute(
       path: '/settings',
-      builder: (context, state) => ProfileScreen(
-        userProfile: _getEffectiveProfile(),
-        activeExam: 'NEET',
-        onExamChanged: (newExam) {},
-        onSignOut: () => context.go('/login'),
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: ProfileScreen(
+          userProfile: _getEffectiveProfile(),
+          activeExam: 'NEET',
+          onExamChanged: (newExam) {},
+          onSignOut: () => context.go('/login'),
+        ),
       ),
     ),
     GoRoute(
       path: '/courses',
-      builder: (context, state) => TestSeriesScreen(
-        onBackToDashboard: () => context.go('/dashboard'),
-        onNavigateTab: (idx) {},
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: TestSeriesScreen(
+          onBackToDashboard: () => context.go('/dashboard'),
+          onNavigateTab: (idx) {},
+        ),
       ),
     ),
     GoRoute(
       path: '/courses/:courseId',
-      builder: (context, state) => TestSeriesScreen(
-        onBackToDashboard: () => context.go('/dashboard'),
-        onNavigateTab: (idx) {},
-      ),
-    ),
-    GoRoute(
-      path: '/exams',
-      builder: (context, state) => PyqNtaScreen(
-        activeExam: state.uri.queryParameters['exam'] ?? 'NEET',
-      ),
-    ),
-    GoRoute(
-      path: '/exams/:examId',
-      builder: (context, state) => PyqNtaScreen(
-        activeExam: state.pathParameters['examId'] ?? 'NEET',
-      ),
-    ),
-    GoRoute(
-      path: '/mock-tests',
-      builder: (context, state) => MyTestsHistoryScreen(
-        userProfile: _getEffectiveProfile(),
-        onBack: () => context.go('/dashboard'),
-        onNavigateTab: (idx) {},
-      ),
-    ),
-    GoRoute(
-      path: '/mock-tests/:testId',
-      builder: (context, state) => TestSeriesScreen(
-        onBackToDashboard: () => context.go('/dashboard'),
-        onNavigateTab: (idx) {},
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: TestSeriesScreen(
+          onBackToDashboard: () => context.go('/dashboard'),
+          onNavigateTab: (idx) {},
+        ),
       ),
     ),
     GoRoute(
       path: '/test-series',
-      builder: (context, state) => TestSeriesScreen(
-        onBackToDashboard: () => context.go('/dashboard'),
-        onNavigateTab: (idx) {},
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: TestSeriesScreen(
+          onBackToDashboard: () => context.go('/dashboard'),
+          onNavigateTab: (idx) {},
+        ),
       ),
     ),
     GoRoute(
       path: '/store',
-      builder: (context, state) => TestSeriesScreen(
-        onBackToDashboard: () => context.go('/dashboard'),
-        onNavigateTab: (idx) {},
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: TestSeriesScreen(
+          onBackToDashboard: () => context.go('/dashboard'),
+          onNavigateTab: (idx) {},
+        ),
       ),
     ),
     GoRoute(
