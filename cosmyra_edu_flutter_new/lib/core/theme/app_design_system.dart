@@ -64,6 +64,21 @@ class AppGradients {
 }
 
 class AppShadows {
+  static final List<BoxShadow> sm = soft;
+  static final List<BoxShadow> md = medium;
+  static final List<BoxShadow> lg = [
+    BoxShadow(
+      color: const Color(0xFF0F172A).withValues(alpha: 0.08),
+      blurRadius: 24,
+      offset: const Offset(0, 8),
+    ),
+    BoxShadow(
+      color: const Color(0xFF4F46E5).withValues(alpha: 0.05),
+      blurRadius: 36,
+      offset: const Offset(0, 12),
+    ),
+  ];
+
   static final List<BoxShadow> soft = [
     BoxShadow(
       color: const Color(0xFF0F172A).withValues(alpha: 0.04),
@@ -88,6 +103,15 @@ class AppShadows {
   static final List<BoxShadow> glowing = [
     BoxShadow(
       color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
+      blurRadius: 20,
+      offset: const Offset(0, 8),
+    ),
+  ];
+
+  static final List<BoxShadow> purpleGlow = glowing;
+  static final List<BoxShadow> emeraldGlow = [
+    BoxShadow(
+      color: const Color(0xFF10B981).withValues(alpha: 0.25),
       blurRadius: 20,
       offset: const Offset(0, 8),
     ),

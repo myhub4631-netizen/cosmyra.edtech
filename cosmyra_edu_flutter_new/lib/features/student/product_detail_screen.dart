@@ -755,31 +755,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 1. Hero Banner
-        Container(
-          width: double.infinity,
-          height: 190,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF0B1329)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: const [
-              BoxShadow(color: Color(0x1F0F172A), blurRadius: 10, offset: Offset(0, 4)),
-            ],
-          ),
-          child: Stack(
-            children: [
-              if (item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty)
-                Positioned.fill(
-                  child: Image.network(
-                    item.bannerImageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox(),
-                  ),
+        Hero(
+          tag: 'test_series_banner_${item.id}',
+          child: Material(
+            type: MaterialType.transparency,
+            child: Container(
+              width: double.infinity,
+              height: 190,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF0B1329)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x1F0F172A), blurRadius: 10, offset: Offset(0, 4)),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  if (item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty)
+                    Positioned.fill(
+                      child: Image.network(
+                        item.bannerImageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox(),
+                      ),
+                    ),
 
               Positioned.fill(
                 child: Container(
@@ -860,7 +864,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             ],
           ),
         ),
-        const SizedBox(height: 16),
+      ),
+    ),
+    const SizedBox(height: 16),
 
         // 2. Category Badges & Title Section
         Row(
@@ -2827,29 +2833,49 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
   Widget _buildPodiumTile(Map<String, dynamic> r, int rank, Color color, String badge, {bool isFirst = false}) {
     final nameStr = (r['name'] ?? 'Aspirant').toString();
+    final percentile = (r['percentile'] ?? '99.9%ile').toString();
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 3),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
-        color: isFirst ? Colors.white : Colors.white.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isFirst ? color : color.withValues(alpha: 0.3), width: isFirst ? 2 : 1),
-        boxShadow: isFirst ? [BoxShadow(color: color.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))] : null,
+        color: isFirst ? Colors.white : Colors.white.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isFirst ? color : color.withValues(alpha: 0.4),
+          width: isFirst ? 2.0 : 1.0,
+        ),
+        boxShadow: isFirst
+            ? [
+                BoxShadow(color: color.withValues(alpha: 0.25), blurRadius: 12, offset: const Offset(0, 4)),
+                BoxShadow(color: color.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 1)),
+              ]
+            : AppShadows.sm,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(badge, style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w900, color: color)),
-          const SizedBox(height: 5),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              badge,
+              style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w900, color: color),
+            ),
+          ),
+          const SizedBox(height: 6),
           CircleAvatar(
-            radius: isFirst ? 19 : 15,
+            radius: isFirst ? 20 : 16,
             backgroundColor: color,
             child: Text(
               nameStr.isNotEmpty ? nameStr[0].toUpperCase() : 'A',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: isFirst ? 14 : 12),
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 6),
           Text(
             nameStr,
             style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
@@ -2857,12 +2883,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
               '${r['score']} Marks',
-              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: color),
+              style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w900, color: const Color(0xFF059669)),
+            ),
+          ),
+          const SizedBox(height: 3),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: const Color(0xFFBFDBFE)),
+            ),
+            child: Text(
+              percentile,
+              style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
             ),
           ),
         ],

@@ -1316,22 +1316,62 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
               onTap: () => context.push('/product/${item.id}'),
               child: Stack(
                 children: [
-                  Container(
-                    height: 150,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      gradient: _getCardBannerGradient(item),
+                  Hero(
+                    tag: 'test_series_banner_${item.id}',
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: Container(
+                        height: 150,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: _getCardBannerGradient(item),
+                        ),
+                        child: item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty
+                            ? Image.network(
+                                item.bannerImageUrl!,
+                                fit: item.imageBoxFit,
+                                errorBuilder: (ctx, err, st) => _buildBannerGraphic(item),
+                              )
+                            : _buildBannerGraphic(item),
+                      ),
                     ),
-                    child: item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty
-                        ? Image.network(
-                            item.bannerImageUrl!,
-                            fit: item.imageBoxFit,
-                            errorBuilder: (ctx, err, st) => _buildBannerGraphic(item),
-                          )
-                        : _buildBannerGraphic(item),
                   ),
 
-                  // Top-Right Favorite Heart Icon
+                  // Top-Left Glassmorphic Tag Badge
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            item.dynamicTagColor.withValues(alpha: 0.95),
+                            item.dynamicTagColor.withValues(alpha: 0.8),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                        boxShadow: [
+                          BoxShadow(
+                            color: item.dynamicTagColor.withValues(alpha: 0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        item.dynamicTag,
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Top-Right Favorite Heart Icon with Glass Backdrop
                   Positioned(
                     top: 10,
                     right: 10,
@@ -1342,6 +1382,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.35),
                           shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                         ),
                         child: Icon(
                           isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -1569,19 +1610,59 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
               onTap: () => _showProductDetailsModal(item),
               child: Stack(
                 children: [
-                  Container(
-                    height: 135,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      gradient: _getCardBannerGradient(item),
+                  Hero(
+                    tag: 'test_series_banner_${item.id}',
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: Container(
+                        height: 135,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: _getCardBannerGradient(item),
+                        ),
+                        child: item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty
+                            ? Image.network(
+                                item.bannerImageUrl!,
+                                fit: item.imageBoxFit,
+                                errorBuilder: (ctx, err, st) => _buildBannerGraphic(item),
+                              )
+                            : _buildBannerGraphic(item),
+                      ),
                     ),
-                    child: item.bannerImageUrl != null && item.bannerImageUrl!.isNotEmpty
-                        ? Image.network(
-                            item.bannerImageUrl!,
-                            fit: item.imageBoxFit,
-                            errorBuilder: (ctx, err, st) => _buildBannerGraphic(item),
-                          )
-                        : _buildBannerGraphic(item),
+                  ),
+
+                  // Top-Left Glass Tag
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            item.dynamicTagColor.withValues(alpha: 0.95),
+                            item.dynamicTagColor.withValues(alpha: 0.8),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                        boxShadow: [
+                          BoxShadow(
+                            color: item.dynamicTagColor.withValues(alpha: 0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        item.dynamicTag,
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
                   ),
 
                   Positioned(
@@ -1594,6 +1675,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.35),
                           shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                         ),
                         child: Icon(
                           isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
