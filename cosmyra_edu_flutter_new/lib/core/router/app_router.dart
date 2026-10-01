@@ -38,6 +38,8 @@ import '../../features/admin/admin_questions_bank_dashboard.dart';
 import '../../features/admin/admin_bulk_upload_step1_screen.dart';
 import '../../features/admin/admin_bulk_upload_step2_screen.dart';
 import '../../features/admin/admin_pricing_screen.dart';
+import '../../features/updates/updates_screen.dart';
+import '../../features/admin/admin_updates_manager_screen.dart';
 import '../../features/admin/admin_hierarchy_screen.dart';
 import '../../features/admin/admin_leaderboard_screen.dart';
 import '../../features/admin/admin_predictions_screen.dart';
@@ -283,6 +285,14 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => OAuthCallbackScreen(
         rawUri: state.uri,
       ),
+    ),
+    GoRoute(
+      path: '/updates',
+      builder: (context, state) => const UpdatesScreen(),
+    ),
+    GoRoute(
+      path: '/admin/updates',
+      builder: (context, state) => const AdminUpdatesManagerScreen(),
     ),
     GoRoute(
       path: '/privacy-policy',

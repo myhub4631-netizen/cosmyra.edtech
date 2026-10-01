@@ -9603,6 +9603,171 @@ class SupabaseService {
       'payment_link': 'https://neet-jee.in/checkout?id=${match['product_id']}',
     };
   }
+
+  // ==========================================
+  // APP UPDATES & RELEASE NOTES ENGINE
+  // ==========================================
+  static final List<Map<String, dynamic>> _defaultAppUpdates = [
+    {
+      'id': 'upd_v1_1_6',
+      'version': 'v1.1.6',
+      'date': '2026-10-02',
+      'title': 'Mobile Layout Optimization & Dynamic Test Engine',
+      'tag': 'Release',
+      'highlights': [
+        'Eliminated Unnecessary Side Gaps & Reclaimed 52px+ width on mobile screens',
+        'Fixed AppBar title truncation with titleSpacing: 0 in product detail view',
+        'Streamlined subject icon & test index badges into single stacked elements',
+        'Enabled multi-line (maxLines: 2) auto-wrapping for long test paper titles',
+        'Responsive metadata chips (Qs, Hrs, Marks) formatted for all mobile screens',
+        'Released version v1.1.6 with Android APK and Web release builds'
+      ],
+      'isLatest': true,
+      'created_at': '2026-10-02T00:00:00.000Z',
+    },
+    {
+      'id': 'upd_v1_1_5',
+      'version': 'v1.1.5',
+      'date': '2026-10-01',
+      'title': 'Dynamic Test Count Resolution Engine',
+      'tag': 'Feature',
+      'highlights': [
+        'Dynamic test resolution aggregating papers across database stores',
+        'Multi-line feature highlight green strip with line-height tuning',
+        'Version v1.1.5 release sync across Android and Web'
+      ],
+      'isLatest': false,
+      'created_at': '2026-10-01T00:00:00.000Z',
+    },
+    {
+      'id': 'upd_v1_1_4',
+      'version': 'v1.1.4',
+      'date': '2026-09-30',
+      'title': 'Lottie Animations & Material 3 Interface',
+      'tag': 'Design',
+      'highlights': [
+        'Integrated interactive Lottie vector animations across mock test screens',
+        'Upgraded Material 3 UI design system with fluid page transitions',
+        'Enhanced user dashboard performance and streak tracking'
+      ],
+      'isLatest': false,
+      'created_at': '2026-09-30T00:00:00.000Z',
+    },
+  ];
+
+  /// Fetch all app updates from Supabase system_config / cache
+  static Future<List<Map<String, dynamic>>> fetchAppUpdates() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final localStr = prefs.getString('cosmyra_app_updates');
+
+      // 1. Fetch from Supabase system_config table ('app_updates_data')
+      try {
+        final res = await client
+            .from('system_config')
+            .select('value')
+            .eq('key', 'app_updates_data')
+            .maybeSingle();
+
+        if (res != null && res['value'] != null) {
+          final List cloudList = res['value'] is String ? jsonDecode(res['value']) : res['value'];
+          if (cloudList.isNotEmpty) {
+            final formatted = cloudList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+            await prefs.setString('cosmyra_app_updates', jsonEncode(formatted));
+            return formatted;
+          }
+        }
+      } catch (e) {
+        debugPrint('Notice querying system_config for app_updates_data: $e');
+      }
+
+      // 2. Cache fallback
+      if (localStr != null && localStr.isNotEmpty) {
+        final List localList = jsonDecode(localStr);
+        if (localList.isNotEmpty) {
+          return localList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice reading app updates: $e');
+    }
+
+    return _defaultAppUpdates;
+  }
+
+  /// Add or Update an App Release Entry (Admin)
+  static Future<bool> saveAppUpdate(Map<String, dynamic> updateItem) async {
+    try {
+      final currentList = await fetchAppUpdates();
+      final id = (updateItem['id'] ?? 'upd_${DateTime.now().millisecondsSinceEpoch}').toString();
+      updateItem['id'] = id;
+      updateItem['created_at'] ??= DateTime.now().toIso8601String();
+
+      final existingIndex = currentList.indexWhere((u) => u['id'] == id || u['version'] == updateItem['version']);
+      if (existingIndex >= 0) {
+        currentList[existingIndex] = updateItem;
+      } else {
+        currentList.insert(0, updateItem);
+      }
+
+      // Update isLatest tag
+      for (int i = 0; i < currentList.length; i++) {
+        currentList[i]['isLatest'] = (i == 0);
+      }
+
+      // 1. Cache to local
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_app_updates', jsonEncode(currentList));
+
+      // 2. Save to Supabase system_config table ('app_updates_data')
+      try {
+        await client.from('system_config').upsert({
+          'key': 'app_updates_data',
+          'value': currentList,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint('Notice persisting app_updates_data to system_config: $e');
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error saving app update: $e');
+      return false;
+    }
+  }
+
+  /// Delete an App Release Entry (Admin) - Releases Supabase Storage & Cache
+  static Future<bool> deleteAppUpdate(String id) async {
+    try {
+      final currentList = await fetchAppUpdates();
+      currentList.removeWhere((u) => u['id'] == id || u['version'] == id);
+
+      // Re-assign isLatest tag
+      for (int i = 0; i < currentList.length; i++) {
+        currentList[i]['isLatest'] = (i == 0);
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_app_updates', jsonEncode(currentList));
+
+      // Update Supabase system_config
+      try {
+        await client.from('system_config').upsert({
+          'key': 'app_updates_data',
+          'value': currentList,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint('Notice deleting app_updates_data entry from system_config: $e');
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting app update: $e');
+      return false;
+    }
+  }
 }
 
 
