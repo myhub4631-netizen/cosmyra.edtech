@@ -1046,7 +1046,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             ],
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 100),
       ],
     );
   }
@@ -1100,14 +1100,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF059669)),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF065F46)),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF059669), Color(0xFF10B981)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Icon(icon, size: 16, color: Colors.white),
+          ),
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF065F46)),
+              maxLines: 2,
+            ),
           ),
         ],
       ),
@@ -1762,15 +1782,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               children: [
                 _buildReviewFilterPill('All', 'All (${reviews.length})'),
                 const SizedBox(width: 8),
-                _buildReviewFilterPill('5 ⭐', '5 ★ ($count5)'),
+                _buildReviewFilterPill('5 Stars', '5 ★ ($count5)'),
                 const SizedBox(width: 8),
-                _buildReviewFilterPill('4 ⭐', '4 ★ ($count4)'),
+                _buildReviewFilterPill('4 Stars', '4 ★ ($count4)'),
                 const SizedBox(width: 8),
-                _buildReviewFilterPill('3 ⭐', '3 ★ ($count3)'),
+                _buildReviewFilterPill('3 Stars', '3 ★ ($count3)'),
                 const SizedBox(width: 8),
-                _buildReviewFilterPill('2 ⭐', '2 ★ ($count2)'),
+                _buildReviewFilterPill('2 Stars', '2 ★ ($count2)'),
                 const SizedBox(width: 8),
-                _buildReviewFilterPill('1 ⭐', '1 ★ ($count1)'),
+                _buildReviewFilterPill('1 Star', '1 ★ ($count1)'),
               ],
             ),
           ),
@@ -2424,7 +2444,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Expanded(child: _buildPodiumTile(rankings[1], 2, const Color(0xFF475569), 'AIR 2')),
-                    Expanded(child: _buildPodiumTile(rankings[0], 1, const Color(0xFFD97706), 'AIR 1 🏆', isFirst: true)),
+                    Expanded(child: _buildPodiumTile(rankings[0], 1, const Color(0xFFD97706), 'AIR 1', isFirst: true)),
                     Expanded(child: _buildPodiumTile(rankings[2], 3, const Color(0xFFC2410C), 'AIR 3')),
                   ],
                 ),
@@ -2779,28 +2799,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
   Widget _buildTopScoreMetricCard(String label, String value, Color bgColor, Color borderColor, Color textColor) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: borderColor.withValues(alpha: 0.12),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            label,
-            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: textColor.withValues(alpha: 0.85)),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              label,
+              style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w700, color: textColor.withValues(alpha: 0.85)),
+              maxLines: 1,
+            ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
               value,
-              style: GoogleFonts.inter(fontSize: 15.5, fontWeight: FontWeight.w900, color: textColor),
+              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w900, color: textColor),
             ),
           ),
         ],
