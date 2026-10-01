@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../models/pyq_models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../shared/widgets/app_sidebar.dart';
+import '../../shared/widgets/app_header.dart';
 
 class ChapterItem {
   final String id;
@@ -329,84 +331,109 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 992;
+    final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+
     return Scaffold(
+      key: scaffoldKey,
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF7C3AED)),
-          onPressed: () {
-            if (_currentStep == 2) {
-              setState(() => _currentStep = 1);
-            } else {
-              if (widget.onBack != null) {
-                widget.onBack!();
-              } else {
-                Navigator.maybePop(context);
-              }
-            }
-          },
-        ),
-        title: const Text(
-          'PYQ Practice',
-          style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        centerTitle: true,
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 12),
-            child: OutlinedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Preset saved successfully!')),
-                );
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF7C3AED),
-                side: const BorderSide(color: Color(0xFF7C3AED), width: 1.2),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              icon: const Icon(Icons.bookmark_border_rounded, size: 14, color: Color(0xFF7C3AED)),
-              label: const Text('Save Preset', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            ),
-          ),
-        ],
+      drawer: const Drawer(
+        child: AppSidebar(selectedIndex: 4),
       ),
-      body: Column(
-        children: [
-          // Subtitle & 2-Step Progress Indicator Header
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Column(
-              children: [
-                Text(
-                  _currentStep == 1
-                      ? 'Practice previous year questions chapter-wise and year-wise to ace NEET'
-                      : 'Practice previous year questions chapter-wise and topic-wise',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
-                ),
-                const SizedBox(height: 14),
-                _buildProgressIndicator(),
-              ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            AppHeader(
+              activeExam: _selectedExam,
+              onOpenDrawer: () => scaffoldKey.currentState?.openDrawer(),
             ),
-          ),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+            Expanded(
+              child: Row(
+                children: [
+                  if (isDesktop)
+                    const AppSidebar(selectedIndex: 4),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        // Subtitle & 2-Step Progress Indicator Header
+                        Container(
+                          color: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.arrow_back, color: Color(0xFF7C3AED)),
+                                    onPressed: () {
+                                      if (_currentStep == 2) {
+                                        setState(() => _currentStep = 1);
+                                      } else {
+                                        if (widget.onBack != null) {
+                                          widget.onBack!();
+                                        } else {
+                                          Navigator.maybePop(context);
+                                        }
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'PYQ Practice Engine',
+                                    style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                  const Spacer(),
+                                  OutlinedButton.icon(
+                                    onPressed: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Preset saved successfully!')),
+                                      );
+                                    },
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF7C3AED),
+                                      side: const BorderSide(color: Color(0xFF7C3AED), width: 1.2),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    icon: const Icon(Icons.bookmark_border_rounded, size: 14, color: Color(0xFF7C3AED)),
+                                    label: const Text('Save Preset', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _currentStep == 1
+                                    ? 'Practice previous year questions chapter-wise and year-wise to ace NEET'
+                                    : 'Practice previous year questions chapter-wise and topic-wise',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
+                              ),
+                              const SizedBox(height: 14),
+                              _buildProgressIndicator(),
+                            ],
+                          ),
+                        ),
+                        const Divider(height: 1, color: Color(0xFFE2E8F0)),
 
-          // Scrollable Body (Step 1 or Step 2)
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(18),
-              child: _currentStep == 1 ? _buildStep1View() : _buildStep2View(),
+                        // Scrollable Body (Step 1 or Step 2)
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(18),
+                            child: _currentStep == 1 ? _buildStep1View() : _buildStep2View(),
+                          ),
+                        ),
+
+                        // Sticky Bottom Action Bar (Only on Step 2)
+                        if (_currentStep == 2) _buildStickyBottomBarStep2(),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-
-          // Sticky Bottom Action Bar (Only on Step 2)
-          if (_currentStep == 2) _buildStickyBottomBarStep2(),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/app_sidebar.dart';
+import '../../shared/widgets/app_header.dart';
 import '../auth/login_screen.dart';
 import 'widgets/recommended_test_series_section.dart';
 
@@ -599,7 +600,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 child: Column(
                   children: [
                     // Top Header Navbar
-                    _buildTopNavbar(displayName),
+                    AppHeader(
+                      userProfile: profileToUse,
+                      activeExam: widget.activeExam,
+                    ),
 
                     // Main Scrollable Content Body
                     Expanded(

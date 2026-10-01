@@ -665,12 +665,13 @@ class _NtaPaperWiseScreenState extends State<NtaPaperWiseScreen> {
 
   // Bottom Navigation Bar
   Widget _buildBottomNavigationBar() {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Color(0xFFF1F5F9), width: 1.0)),
       ),
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      padding: EdgeInsets.only(top: 8, bottom: 8 + bottomPadding, left: 12, right: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [

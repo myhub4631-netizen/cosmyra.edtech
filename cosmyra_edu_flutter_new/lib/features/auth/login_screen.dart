@@ -32,10 +32,32 @@ class _LoginScreenState extends State<LoginScreen> {
   UserProfileModel? _loggedInProfile;
 
   @override
+  void initState() {
+    super.initState();
+    SupabaseService.authNotifier.addListener(_onAuthNotifierChanged);
+  }
+
+  @override
   void dispose() {
+    SupabaseService.authNotifier.removeListener(_onAuthNotifierChanged);
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _onAuthNotifierChanged() {
+    final profile = SupabaseService.authNotifier.value;
+    if (profile != null && mounted) {
+      widget.onLoginSuccess?.call(profile);
+      final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
+      if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
+        context.go(redirect);
+      } else if (profile.isAdmin || profile.isSuperAdmin) {
+        context.go('/admin');
+      } else {
+        context.go('/dashboard');
+      }
+    }
   }
 
   Future<void> _handleLogin() async {
@@ -63,7 +85,10 @@ class _LoginScreenState extends State<LoginScreen> {
         if (widget.onLoginSuccess != null) {
           widget.onLoginSuccess!(userProfile);
         } else {
-          if (userProfile.isSuperAdmin) {
+          final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
+          if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
+            context.go(redirect);
+          } else if (userProfile.isSuperAdmin) {
             context.go('/superadmin');
           } else if (userProfile.isAdmin) {
             context.go('/admin');
@@ -86,6 +111,35 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _isLoading = false;
         });
+      }
+    }
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    try {
+      final success = await SupabaseService.signInWithGoogle();
+      if (success && mounted) {
+        final profile = SupabaseService.activeUserSession;
+        if (profile != null) {
+          widget.onLoginSuccess?.call(profile);
+        }
+        final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
+        if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
+          context.go(redirect);
+        } else if (profile != null && (profile.isAdmin || profile.isSuperAdmin)) {
+          context.go('/admin');
+        } else {
+          context.go('/dashboard');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google Sign In: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
       }
     }
   }
@@ -188,7 +242,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     _buildSocialButton(
                       label: 'Continue with Google',
                       iconWidget: _buildGoogleLogo(),
-                      onTap: () {},
+                      onTap: _handleGoogleSignIn,
                     ),
                     const SizedBox(height: 12),
                     _buildSocialButton(
@@ -350,31 +404,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     _buildSocialButton(
                       label: 'Continue with Google',
                       iconWidget: _buildGoogleLogo(),
-                      onTap: () async {
-                        try {
-                          final success = await SupabaseService.signInWithGoogle();
-                          if (success && mounted) {
-                            final profile = SupabaseService.activeUserSession;
-                            if (profile != null) {
-                              widget.onLoginSuccess?.call(profile);
-                            }
-                            if (profile != null && (profile.isAdmin || profile.isSuperAdmin)) {
-                              context.go('/admin');
-                            } else {
-                              context.go('/dashboard');
-                            }
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Google Sign In: $e'),
-                                backgroundColor: const Color(0xFFDC2626),
-                              ),
-                            );
-                          }
-                        }
-                      },
+                      onTap: _handleGoogleSignIn,
                     ),
                   ],
                 ),

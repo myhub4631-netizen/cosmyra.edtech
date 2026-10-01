@@ -20,9 +20,8 @@ class SmartImage extends StatelessWidget {
     this.fallback,
   });
 
-  /// On Flutter Web, external image hosts (like Google CDN lh3.googleusercontent.com)
-  /// block direct XHR/fetch requests via CORS when rendered with CanvasKit/Skwasm.
-  /// We route external images on Web through the high-speed, CORS-compliant Cloudflare CDN proxy.
+  /// On Flutter Web, external image hosts block direct XHR/fetch requests via CORS when rendered with CanvasKit/Skwasm.
+  /// Google avatar CDN URLs (lh3.googleusercontent.com, etc.) require stripping trailing query strings like `=s96-c` before proxying through images.weserv.nl.
   static String resolveWebSafeUrl(String rawUrl) {
     final clean = rawUrl.trim();
     if (clean.isEmpty || clean.startsWith('data:image/') || clean.startsWith('blob:')) {
@@ -30,8 +29,12 @@ class SmartImage extends StatelessWidget {
     }
     if (kIsWeb) {
       if (clean.contains('googleusercontent.com') ||
-          clean.contains('googleapis.com') ||
-          (!clean.contains('wsrv.nl') && !clean.contains('images.weserv.nl') && clean.startsWith('http'))) {
+          clean.contains('ggpht.com') ||
+          clean.contains('google.com')) {
+        final baseGoogleUrl = clean.replaceAll(RegExp(r'=s\d+.*$'), '');
+        return 'https://images.weserv.nl/?url=${Uri.encodeComponent(baseGoogleUrl)}';
+      }
+      if (!clean.contains('wsrv.nl') && !clean.contains('images.weserv.nl') && clean.startsWith('http')) {
         return 'https://images.weserv.nl/?url=${Uri.encodeComponent(clean)}';
       }
     }
@@ -109,31 +112,37 @@ class SmartImage extends StatelessWidget {
       }
     }
 
-    // Standard Network Raster Image with web CORS safety
+    // Standard Network Raster Image with web CORS safety & Stack fallback to prevent blank holes
     final effectiveNetworkUrl = resolveWebSafeUrl(cleanUrl);
 
-    return Image.network(
-      effectiveNetworkUrl,
-      key: widgetKey,
-      height: height,
-      width: width,
-      fit: fit,
-      gaplessPlayback: true,
-      errorBuilder: (context, error, stackTrace) {
-        // Fallback retry direct URL if proxy fails, or fallback widget
-        if (effectiveNetworkUrl != cleanUrl) {
-          return Image.network(
-            cleanUrl,
-            key: ValueKey('${cleanUrl}_direct'),
-            height: height,
-            width: width,
-            fit: fit,
-            gaplessPlayback: true,
-            errorBuilder: (_, __, ___) => defaultFallback,
-          );
-        }
-        return defaultFallback;
-      },
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        defaultFallback,
+        Image.network(
+          effectiveNetworkUrl,
+          key: widgetKey,
+          height: height,
+          width: width,
+          fit: fit,
+          gaplessPlayback: true,
+          errorBuilder: (context, error, stackTrace) {
+            // Fallback retry direct URL if proxy fails, or fallback widget
+            if (effectiveNetworkUrl != cleanUrl) {
+              return Image.network(
+                cleanUrl,
+                key: ValueKey('${cleanUrl}_direct'),
+                height: height,
+                width: width,
+                fit: fit,
+                gaplessPlayback: true,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+      ],
     );
   }
 }

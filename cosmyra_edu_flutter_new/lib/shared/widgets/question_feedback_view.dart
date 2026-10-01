@@ -6,6 +6,7 @@ import '../../models/models.dart';
 import '../services/audio_feedback_service.dart';
 import 'latex_view.dart';
 import 'smart_image.dart';
+import 'solution_video_player.dart';
 
 class QuestionFeedbackView extends StatefulWidget {
   final QuestionModel question;
@@ -547,6 +548,19 @@ class _QuestionFeedbackViewState extends State<QuestionFeedbackView> with Single
             ),
             const SizedBox(height: 4),
             LaTeXView(text: question.solution!),
+          ],
+
+          if (question.solutionVideoUrl != null && question.solutionVideoUrl!.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Video Solution:',
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF334155)),
+            ),
+            const SizedBox(height: 6),
+            SolutionVideoPlayerWidget(
+              videoUrl: question.solutionVideoUrl!,
+              height: 220,
+            ),
           ],
         ],
       ),

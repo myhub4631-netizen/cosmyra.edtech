@@ -6,6 +6,8 @@ import 'package:file_picker/file_picker.dart';
 
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/smart_image.dart';
+import '../../shared/widgets/solution_video_player.dart';
+import '../../shared/widgets/latex_view.dart';
 import 'admin_bulk_upload_step1_screen.dart';
 
 class AdminBulkUploadStep2Screen extends StatefulWidget {
@@ -50,9 +52,14 @@ class QuestionItemData {
   bool isMarkedForReview;
   bool isCollapsed;
   bool isSaved;
+  bool showLivePreview;
   bool isUploadingQuestionImage;
   List<bool> isUploadingOptionImage;
+  String? solutionVideoUrl;
+  bool isUploadingSolutionVideo;
   List<String> availableIn;
+
+  String get uniqueId => id.isNotEmpty ? id : 'temp_q_$number';
 
   QuestionItemData({
     this.id = '',
@@ -78,8 +85,11 @@ class QuestionItemData {
     this.isMarkedForReview = false,
     this.isCollapsed = false,
     this.isSaved = false,
+    this.showLivePreview = false,
     this.isUploadingQuestionImage = false,
     List<bool>? isUploadingOptionImage,
+    this.solutionVideoUrl,
+    this.isUploadingSolutionVideo = false,
     List<String>? availableIn,
   })  : options = options != null ? List<String>.from(options) : ['', '', '', ''],
         optionImages = optionImages != null ? List<String?>.from(optionImages) : [null, null, null, null],
@@ -99,6 +109,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   String _paperId = '';
   bool _isLoading = true;
   bool _isSavingBatch = false;
+  List<String> _paperDefaultAvailableIn = ['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
 
   bool _hasEssentialDetails(QuestionItemData q) {
     // 1. Question text or image must be provided
@@ -110,14 +121,20 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     final int filledImgs = q.optionImages.where((img) => img != null && img.isNotEmpty).length;
     if ((filledOpts + filledImgs) < 2) return false;
 
-    // 3. Correct Answer: Must have selected a valid option index (0..options.length-1)
-    if (q.correctOptionIndex < 0 || q.correctOptionIndex >= q.options.length) return false;
+    // 3. Correct Option Index: MUST be selected by admin (>= 0 and < options.length)
+    if (q.correctOptionIndex < 0 || q.correctOptionIndex >= q.options.length) {
+      return false;
+    }
 
-    // 4. Chapter / Topic: Must have a chapter assigned
-    if (q.chapterId.isEmpty && q.chapter.isEmpty && q.chapterTopic.isEmpty) return false;
+    // 4. Chapter & Topic: MUST be selected by admin from dropdown
+    if (q.chapterId.trim().isEmpty && q.chapter.trim().isEmpty && q.chapterTopic.trim().isEmpty) {
+      return false;
+    }
 
-    // 5. Visibility / Available In *: Must have at least 1 visibility tag selected
-    if (q.availableIn.isEmpty) return false;
+    // Auto-fix visibility if empty (use the test series' default visibility configured in Step 1)
+    if (q.availableIn.isEmpty) {
+      q.availableIn = List<String>.from(_paperDefaultAvailableIn);
+    }
 
     return true;
   }
@@ -147,7 +164,10 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     super.initState();
     _questionsList = List.generate(
       widget.totalQuestionsCount,
-      (index) => QuestionItemData(number: index + 1),
+      (index) => QuestionItemData(
+        id: 'q_temp_${index + 1}',
+        number: index + 1,
+      ),
     );
     _loadPaperAndSavedQuestions();
   }
@@ -198,8 +218,28 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     }
 
     final int qCount = (int.tryParse(_paperData?['question_count']?.toString() ?? '') ?? widget.totalQuestionsCount).clamp(1, 1000);
+
+    final dynamic paperAvailRaw = widget.paperRecord?['available_in'] ?? widget.paperRecord?['availableIn'] ?? _paperData?['available_in'] ?? _paperData?['availableIn'];
+    final List<String> defaultAvailableIn = (paperAvailRaw is List && paperAvailRaw.isNotEmpty)
+        ? List<String>.from(paperAvailRaw)
+        : <String>['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
+    _paperDefaultAvailableIn = List<String>.from(defaultAvailableIn);
+
+    final String optionPresetKey = widget.paperRecord?['defaultOptionPreset'] ?? widget.paperRecord?['default_option_preset'] ?? _paperData?['defaultOptionPreset'] ?? _paperData?['default_option_preset'] ?? '1_2_3_4';
+    final List<String> defaultPresetOpts = _getPresetOptions(optionPresetKey);
+
     if (_questionsList.length != qCount) {
-      _questionsList = List.generate(qCount, (index) => QuestionItemData(number: index + 1));
+      _questionsList = List.generate(
+        qCount,
+        (index) => QuestionItemData(
+          id: 'q_${_paperId}_${index + 1}',
+          number: index + 1,
+          options: List<String>.from(defaultPresetOpts),
+          availableIn: List<String>.from(defaultAvailableIn),
+          positiveMarks: '4',
+          negativeMarks: '-1',
+        ),
+      );
     }
 
     final savedQList = await SupabaseService.fetchQuestionsForPaper(_paperId);
@@ -230,7 +270,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         opts = List<String>.from(parsed['options'] as List);
         while (opts.length < 4) opts.add('');
 
-        int correctIdx = 0;
+        int correctIdx = -1;
         if (savedMatch['correct_option_index'] != null) {
           correctIdx = (savedMatch['correct_option_index'] as num).toInt();
         } else if (savedMatch['correctOptionIndex'] != null) {
@@ -238,8 +278,10 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         } else {
           String correctOptText = (savedMatch['correct_answer'] ?? savedMatch['correctAnswer'] ?? '').toString().trim();
           if (correctOptText.startsWith('Option ')) {
-            int optNum = int.tryParse(correctOptText.replaceAll('Option ', '')) ?? 1;
-            correctIdx = (optNum - 1).clamp(0, opts.length > 0 ? opts.length - 1 : 0);
+            int optNum = int.tryParse(correctOptText.replaceAll('Option ', '')) ?? -1;
+            if (optNum > 0) {
+              correctIdx = (optNum - 1).clamp(0, opts.length > 0 ? opts.length - 1 : 0);
+            }
           } else if (correctOptText.isNotEmpty) {
             int foundIdx = opts.indexOf(correctOptText);
             if (foundIdx != -1) {
@@ -285,19 +327,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         } else if (chapNameFromMatch.isNotEmpty || chapIdFromMatch.isNotEmpty) {
           finalChapId = chapIdFromMatch;
           finalChapName = chapNameFromMatch.isNotEmpty ? chapNameFromMatch : chapIdFromMatch;
-        } else if (qSubject.isNotEmpty && _loadedDbChapters.any((c) => c['subject_name']?.toString().toLowerCase() == qSubject.toLowerCase() || c['subject']?.toString().toLowerCase() == qSubject.toLowerCase())) {
-          final matchedC = _loadedDbChapters.firstWhere((c) => c['subject_name']?.toString().toLowerCase() == qSubject.toLowerCase() || c['subject']?.toString().toLowerCase() == qSubject.toLowerCase());
-          finalChapId = matchedC['id'].toString();
-          finalChapName = matchedC['name'].toString();
-        } else if (_loadedDbChapters.isNotEmpty) {
-          finalChapId = _loadedDbChapters.first['id'].toString();
-          finalChapName = _loadedDbChapters.first['name'].toString();
         }
 
         final dynamic availInRaw = savedMatch['available_in'] ?? savedMatch['availableIn'];
-        final List<String> availInList = availInRaw is List
+        final List<String> availInList = (availInRaw is List && availInRaw.isNotEmpty)
             ? List<String>.from(availInRaw)
-            : <String>[];
+            : List<String>.from(defaultAvailableIn);
 
         _questionsList[i] = QuestionItemData(
           id: savedMatch['id'] ?? 'q_${_paperId}_$qNum',
@@ -306,8 +341,9 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           questionImage: savedMatch['question_image'] ?? savedMatch['questionImage'],
           options: opts,
           optionImages: optImgs,
-          correctOptionIndex: correctIdx >= 0 ? correctIdx : 0,
+          correctOptionIndex: correctIdx,
           explanation: savedMatch['explanation'] ?? savedMatch['solution'] ?? '',
+          solutionVideoUrl: savedMatch['solution_video_url'] ?? savedMatch['solutionVideoUrl'] ?? savedMatch['video_url'],
           difficulty: normDiff,
           positiveMarks: savedMatch['marks']?.toString() ?? savedMatch['positiveMarks']?.toString() ?? '4',
           negativeMarks: savedMatch['negative_marks']?.toString() ?? savedMatch['negativeMarks']?.toString() ?? '-1',
@@ -318,12 +354,20 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           chapterTopic: finalChapName,
           chapterId: finalChapId,
           availableIn: availInList,
-          isSaved: true,
+          isSaved: savedMatch.isNotEmpty && correctIdx >= 0 && finalChapName.isNotEmpty,
         );
       } else {
         if (firstUnsavedIndex == -1) {
           firstUnsavedIndex = i;
         }
+        _questionsList[i] = QuestionItemData(
+          id: 'q_${_paperId}_$qNum',
+          number: qNum,
+          options: List<String>.from(defaultPresetOpts),
+          availableIn: List<String>.from(defaultAvailableIn),
+          positiveMarks: '4',
+          negativeMarks: '-1',
+        );
       }
     }
 
@@ -370,6 +414,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           'correct_option_index': correctIdx,
           'correctText': correctAnsText,
           'explanation': q.explanation,
+          'solution_video_url': q.solutionVideoUrl ?? '',
+          'solutionVideoUrl': q.solutionVideoUrl ?? '',
           'difficulty': q.difficulty,
           'marks': double.tryParse(q.positiveMarks) ?? 4.0,
           'negativeMarks': double.tryParse(q.negativeMarks) ?? 1.0,
@@ -378,6 +424,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           'chapter': q.chapter,
           'topic': q.topic,
           'sourceType': _paperData?['source_category'] ?? _paperData?['sourceCategory'] ?? 'PYQ',
+          'available_in': q.availableIn,
+          'availableIn': q.availableIn,
           'exam': _paperData?['exam'] ?? _paperData?['exam_name'] ?? 'NEET',
           'year': _paperData?['year']?.toString() ?? '2026',
           'paperName': _paperData?['paper_name'] ?? _paperData?['paperName'] ?? widget.paperName,
@@ -488,6 +536,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       'correct_option_index': correctIdx,
       'correctText': correctAnsText,
       'explanation': q.explanation,
+      'solution_video_url': q.solutionVideoUrl ?? '',
+      'solutionVideoUrl': q.solutionVideoUrl ?? '',
       'difficulty': q.difficulty,
       'marks': double.tryParse(q.positiveMarks) ?? 4.0,
       'negativeMarks': double.tryParse(q.negativeMarks) ?? 1.0,
@@ -595,6 +645,48 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     }
   }
 
+  Future<void> _pickAndUploadSolutionVideo(QuestionItemData q) async {
+    try {
+      setState(() => q.isUploadingSolutionVideo = true);
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['mp4', 'webm', 'mov', 'm4v', 'avi', 'mkv'],
+        withData: true,
+      );
+      if (result != null && result.files.single.bytes != null) {
+        final bytes = result.files.single.bytes!;
+        final filename = result.files.single.name;
+        final ext = result.files.single.extension?.toLowerCase() ?? 'mp4';
+        final mimeType = ext == 'webm' ? 'video/webm' : (ext == 'mov' ? 'video/quicktime' : 'video/mp4');
+        final url = await SupabaseService.uploadMediaFile(
+          fileBytes: bytes,
+          fileName: 'solution_vid_${DateTime.now().millisecondsSinceEpoch}_$filename',
+          mimeType: mimeType,
+        );
+        if (url != null && url.isNotEmpty) {
+          setState(() {
+            q.solutionVideoUrl = url;
+            _scheduleAutoSave(q);
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Solution video uploaded successfully!')),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error uploading solution video: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading video: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => q.isUploadingSolutionVideo = false);
+    }
+  }
+
   void _addOptionToQuestion(QuestionItemData q) {
     if (q.options.length < 6) {
       setState(() {
@@ -612,6 +704,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         options: List.from(source.options),
         correctOptionIndex: source.correctOptionIndex,
         explanation: source.explanation,
+        solutionVideoUrl: source.solutionVideoUrl,
         difficulty: source.difficulty,
         positiveMarks: source.positiveMarks,
         negativeMarks: source.negativeMarks,
@@ -636,6 +729,418 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     for (int i = 0; i < _questionsList.length; i++) {
       _questionsList[i].number = i + 1;
     }
+  }
+
+  List<String> _getPresetOptions(String presetKey) {
+    switch (presetKey) {
+      case '1_2_3_4':
+        return ['1', '2', '3', '4'];
+      case 'A_B_C_D':
+        return ['A', 'B', 'C', 'D'];
+      case '(1)_(2)_(3)_(4)':
+        return ['(1)', '(2)', '(3)', '(4)'];
+      case '(A)_(B)_(C)_(D)':
+        return ['(A)', '(B)', '(C)', '(D)'];
+      case 'blank':
+        return ['', '', '', ''];
+      default:
+        return ['1', '2', '3', '4'];
+    }
+  }
+
+  void _applyOptionPresetToAllQuestions(String presetKey) {
+    if (presetKey == 'sync_visibility') {
+      setState(() {
+        for (var q in _questionsList) {
+          q.availableIn = List<String>.from(_paperDefaultAvailableIn);
+        }
+      });
+      _saveAllQuestions(showToast: false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('⚡ Synced visibility to paper default across all ${_questionsList.length} questions!'),
+          backgroundColor: const Color(0xFF4F46E5),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final newOpts = _getPresetOptions(presetKey);
+    setState(() {
+      for (var q in _questionsList) {
+        for (int i = 0; i < newOpts.length; i++) {
+          if (i < q.options.length) {
+            q.options[i] = newOpts[i];
+          }
+        }
+      }
+    });
+    _saveAllQuestions(showToast: false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          presetKey == 'blank'
+              ? 'Cleared options text across all ${_questionsList.length} questions.'
+              : '⚡ Applied option preset [${newOpts.join(', ')}] across all ${_questionsList.length} questions!',
+        ),
+        backgroundColor: const Color(0xFF4F46E5),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Widget _buildQuickOptionPresetPill(QuestionItemData q, List<String> presetOpts, String label) {
+    return InkWell(
+      onTap: () {
+        setState(() {
+          for (int i = 0; i < presetOpts.length; i++) {
+            if (i < q.options.length) {
+              q.options[i] = presetOpts[i];
+            }
+          }
+        });
+        _scheduleAutoSave(q);
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEEF2FF),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFC7D2FE)),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF4F46E5)),
+        ),
+      ),
+    );
+  }
+
+  void _showQuestionLivePreviewDialog(QuestionItemData q) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 820, maxHeight: 750),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEEF2FF),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.remove_red_eye_rounded, color: Color(0xFF4F46E5), size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Student View Live Preview — Question ${q.number}',
+                              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                            ),
+                            Text(
+                              'Authentic student renderer for LaTeX, KaTeX equations, images, and options.',
+                              style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24, thickness: 1, color: Color(0xFFE2E8F0)),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: _buildStudentLivePreviewContent(q),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStudentLivePreviewContent(QuestionItemData q) {
+    final optionLetters = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Meta Badges Bar
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: Text(
+                'Q${q.number} • ${q.subject}',
+                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF1D4ED8)),
+              ),
+            ),
+            if (q.chapter.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Text(
+                  q.chapter,
+                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
+                ),
+              ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: q.difficulty == 'Hard'
+                    ? const Color(0xFFFEF2F2)
+                    : q.difficulty == 'Easy'
+                        ? const Color(0xFFECFDF5)
+                        : const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: q.difficulty == 'Hard'
+                      ? const Color(0xFFFCA5A5)
+                      : q.difficulty == 'Easy'
+                          ? const Color(0xFFA7F3D0)
+                          : const Color(0xFFFDE68A),
+                ),
+              ),
+              child: Text(
+                '${q.difficulty} Difficulty',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: q.difficulty == 'Hard'
+                      ? const Color(0xFF991B1B)
+                      : q.difficulty == 'Easy'
+                          ? const Color(0xFF065F46)
+                          : const Color(0xFF92400E),
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'Marks: +${q.positiveMarks} / ${q.negativeMarks}',
+                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF475569)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Question Statement Card with LaTeXView
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (q.text.trim().isNotEmpty)
+                LaTeXView(
+                  text: q.text,
+                  style: GoogleFonts.inter(fontSize: 14.5, height: 1.5, color: const Color(0xFF0F172A), fontWeight: FontWeight.w500),
+                )
+              else
+                Text(
+                  '*(No text provided for this question)*',
+                  style: GoogleFonts.inter(fontSize: 13, fontStyle: FontStyle.italic, color: const Color(0xFF94A3B8)),
+                ),
+
+              if (q.questionImage != null && q.questionImage!.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SmartImage(
+                    url: q.questionImage,
+                    height: 260,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Options List (Rendered with LaTeXView)
+        Text('Options:', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF334155))),
+        const SizedBox(height: 8),
+
+        ...List.generate(q.options.length, (optIdx) {
+          final letter = optionLetters[optIdx];
+          final isCorrect = (q.correctOptionIndex == optIdx);
+          final optText = q.options[optIdx];
+          final optImg = (optIdx < q.optionImages.length) ? q.optionImages[optIdx] : null;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: isCorrect ? const Color(0xFFECFDF5) : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isCorrect ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+                width: isCorrect ? 1.5 : 1.0,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Radio Letter Badge
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isCorrect ? const Color(0xFF10B981) : const Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      letter,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isCorrect ? Colors.white : const Color(0xFF475569),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Option Text with LaTeXView
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (optText.trim().isNotEmpty)
+                        LaTeXView(
+                          text: optText,
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            color: isCorrect ? const Color(0xFF065F46) : const Color(0xFF1E293B),
+                            fontWeight: isCorrect ? FontWeight.bold : FontWeight.w500,
+                          ),
+                        )
+                      else if (optImg == null || optImg.isEmpty)
+                        Text('(Option $letter)', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8))),
+
+                      if (optImg != null && optImg.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        SmartImage(
+                          url: optImg,
+                          height: 120,
+                          fit: BoxFit.contain,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                if (isCorrect) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Correct Answer',
+                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        }),
+
+        // Solution & Explanation Preview Section (If Provided)
+        if (q.explanation.trim().isNotEmpty || (q.solutionVideoUrl != null && q.solutionVideoUrl!.trim().isNotEmpty)) ...[
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.lightbulb_rounded, size: 18, color: Color(0xFF4F46E5)),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Explanation & Solution',
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF1E1B4B)),
+                    ),
+                  ],
+                ),
+                if (q.explanation.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  LaTeXView(
+                    text: q.explanation,
+                    style: GoogleFonts.inter(fontSize: 13, height: 1.5, color: const Color(0xFF334155)),
+                  ),
+                ],
+                if (q.solutionVideoUrl != null && q.solutionVideoUrl!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  SolutionVideoPlayerWidget(
+                    videoUrl: q.solutionVideoUrl!,
+                    height: 200,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   @override
@@ -962,10 +1467,32 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     );
   }
 
+  List<int> get _pendingQuestionNumbers {
+    return _questionsList.where((q) => !q.isSaved).map((q) => q.number).toList();
+  }
+
+  void _jumpToQuestion(int qNum) {
+    if (qNum < 1 || qNum > _questionsList.length) return;
+    final targetPage = ((qNum - 1) ~/ _itemsPerPage) + 1;
+    setState(() {
+      _jumpToQuestionNumber = qNum;
+      _currentPageIndex = targetPage;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Jumped to Question $qNum (Page $targetPage)'),
+        backgroundColor: const Color(0xFF4F46E5),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
   // ===========================================================================
   // 5. KPI SUMMARY METRIC CARD
   // ===========================================================================
   Widget _buildKPISummaryCard(int remainingCount, double progressPercent) {
+    final pendingNums = _pendingQuestionNumbers;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -973,81 +1500,182 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
-          BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Total Questions
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Total Questions', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-                const SizedBox(height: 4),
-                Text('${widget.totalQuestionsCount}', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
-              ],
-            ),
-          ),
-          Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
-
-          // Added
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Added', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-                  const SizedBox(height: 4),
-                  Text('$_addedCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
-                ],
+          Row(
+            children: [
+              // Total Questions
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Total Questions', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                    const SizedBox(height: 4),
+                    Text('${widget.totalQuestionsCount}', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
+                  ],
+                ),
               ),
-            ),
-          ),
-          Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
+              Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
 
-          // Remaining
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Remaining', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-                  const SizedBox(height: 4),
-                  Text('$remainingCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
-                ],
+              // Added
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Added', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                      const SizedBox(height: 4),
+                      Text('$_addedCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-          Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
+              Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
 
-          // Progress
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 20),
+              // Remaining
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Remaining', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                      const SizedBox(height: 4),
+                      Text('$remainingCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: remainingCount > 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A))),
+                    ],
+                  ),
+                ),
+              ),
+              Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
+
+              // Progress
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Progress', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                      const SizedBox(height: 4),
+                      Text('${(progressPercent * 100).toInt()}%', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: progressPercent,
+                          minHeight: 6,
+                          backgroundColor: const Color(0xFFF1F5F9),
+                          valueColor: AlwaysStoppedAnimation<Color>(remainingCount == 0 ? const Color(0xFF10B981) : const Color(0xFF4F46E5)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Pending Question Numbers Section
+          if (pendingNums.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Progress', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
-                  const SizedBox(height: 4),
-                  Text('${(progressPercent * 100).toInt()}%', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progressPercent,
-                      minHeight: 6,
-                      backgroundColor: const Color(0xFFF1F5F9),
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4F46E5)),
-                    ),
+                  Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Questions Still Pending Upload (${pendingNums.length}):',
+                        style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF991B1B)),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Click any question number to jump directly to it ➔',
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFB91C1C)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      ...pendingNums.take(30).map((qNum) {
+                        return InkWell(
+                          onTap: () => _jumpToQuestion(qNum),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFEF4444)),
+                              boxShadow: const [
+                                BoxShadow(color: Color(0x1AEF4444), blurRadius: 4, offset: Offset(0, 1)),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Q$qNum',
+                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626)),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.arrow_forward_rounded, size: 12, color: Color(0xFFDC2626)),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                      if (pendingNums.length > 30)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6, top: 4),
+                          child: Text(
+                            '+${pendingNums.length - 30} more pending...',
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF991B1B)),
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
             ),
-          ),
+          ] else ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFA7F3D0)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    '✓ Great job! All ${widget.totalQuestionsCount} questions have been successfully filled and saved!',
+                    style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF065F46)),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1057,6 +1685,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   // 6. FILTER / JUMP TOOLBAR BAR
   // ===========================================================================
   Widget _buildFilterToolbarBar() {
+    final pendingNums = _pendingQuestionNumbers;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -1098,10 +1728,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
               ),
               const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: () {
-                  final targetPage = ((_jumpToQuestionNumber - 1) ~/ _itemsPerPage) + 1;
-                  setState(() => _currentPageIndex = targetPage);
-                },
+                onPressed: () => _jumpToQuestion(_jumpToQuestionNumber),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEEF2FF),
                   foregroundColor: const Color(0xFF4F46E5),
@@ -1111,6 +1738,23 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                 ),
                 child: Text('Go to', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
               ),
+              if (pendingNums.isNotEmpty) ...[
+                const SizedBox(width: 10),
+                ElevatedButton.icon(
+                  onPressed: () => _jumpToQuestion(pendingNums.first),
+                  icon: const Icon(Icons.bolt_rounded, size: 14, color: Colors.white),
+                  label: Text(
+                    '⚡ Next Pending: Q${pendingNums.first}',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ],
             ],
           ),
 
@@ -1162,6 +1806,59 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                     onChanged: (val) {},
                   ),
                 ),
+              ),
+              const SizedBox(width: 10),
+
+              // ⚡ 1-Click Bulk Option Set Popup Menu Button
+              PopupMenuButton<String>(
+                tooltip: 'Bulk set options for all questions in 1-click',
+                child: Container(
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFC7D2FE)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.bolt_rounded, size: 16, color: Color(0xFF4F46E5)),
+                      const SizedBox(width: 6),
+                      Text(
+                        '⚡ 1-Click Options (All)',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5)),
+                      ),
+                      const Icon(Icons.arrow_drop_down_rounded, size: 18, color: Color(0xFF4F46E5)),
+                    ],
+                  ),
+                ),
+                onSelected: (val) => _applyOptionPresetToAllQuestions(val),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: '1_2_3_4',
+                    child: Text('⚡ Set All Questions: A=1, B=2, C=3, D=4'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'A_B_C_D',
+                    child: Text('⚡ Set All Questions: A=A, B=B, C=C, D=D'),
+                  ),
+                  const PopupMenuItem(
+                    value: '(1)_(2)_(3)_(4)',
+                    child: Text('⚡ Set All Questions: A=(1), B=(2), C=(3), D=(4)'),
+                  ),
+                  const PopupMenuItem(
+                    value: '(A)_(B)_(C)_(D)',
+                    child: Text('⚡ Set All Questions: A=(A), B=(B), C=(C), D=(D)'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'sync_visibility',
+                    child: Text('⚡ Sync All Questions Visibility to Test Series Default'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'blank',
+                    child: Text('Clear All Option Text'),
+                  ),
+                ],
               ),
               const SizedBox(width: 16),
 
@@ -1217,6 +1914,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
   Widget _buildQuestionCard(QuestionItemData q, int index, bool isDesktop) {
     return Container(
+      key: ValueKey('q_card_${q.number}_${q.uniqueId}'),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
@@ -1271,6 +1969,48 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                 ),
                 Row(
                   children: [
+                    // 👁️ Live Student View Button
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          q.showLivePreview = !q.showLivePreview;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: q.showLivePreview ? const Color(0xFF4F46E5) : const Color(0xFFEEF2FF),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: q.showLivePreview ? const Color(0xFF4F46E5) : const Color(0xFFC7D2FE)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              q.showLivePreview ? Icons.edit_note_rounded : Icons.remove_red_eye_rounded,
+                              size: 14,
+                              color: q.showLivePreview ? Colors.white : const Color(0xFF4F46E5),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              q.showLivePreview ? 'Edit Question' : '👁️ Student View',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: q.showLivePreview ? Colors.white : const Color(0xFF4F46E5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      icon: const Icon(Icons.open_in_new_rounded, color: Color(0xFF4F46E5), size: 18),
+                      onPressed: () => _showQuestionLivePreviewDialog(q),
+                      tooltip: 'Open Full Student Preview Modal',
+                    ),
                     IconButton(
                       icon: Icon(
                         q.isCollapsed ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_up_rounded,
@@ -1299,48 +2039,50 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           if (!q.isCollapsed)
             Padding(
               padding: const EdgeInsets.all(20),
-              child: isDesktop
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Left Column (~65%)
-                        Expanded(
-                          flex: 65,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildQuestionRichTextInput(q),
-                              const SizedBox(height: 24),
-                              _buildOptionsListSection(q),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 24),
-                        Container(width: 1, height: 520, color: const Color(0xFFF1F5F9)),
-                        const SizedBox(width: 24),
+              child: q.showLivePreview
+                  ? _buildStudentLivePreviewContent(q)
+                  : isDesktop
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Left Column (~65%)
+                            Expanded(
+                              flex: 65,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildQuestionRichTextInput(q),
+                                  const SizedBox(height: 24),
+                                  _buildOptionsListSection(q),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Container(width: 1, height: 520, color: const Color(0xFFF1F5F9)),
+                            const SizedBox(width: 24),
 
-                        // Right Column (~35%)
-                        Expanded(
-                          flex: 35,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildRightColumnDetails(q),
-                            ],
-                          ),
+                            // Right Column (~35%)
+                            Expanded(
+                              flex: 35,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildRightColumnDetails(q),
+                                ],
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildQuestionRichTextInput(q),
+                            const SizedBox(height: 24),
+                            _buildOptionsListSection(q),
+                            const Divider(height: 32),
+                            _buildRightColumnDetails(q),
+                          ],
                         ),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildQuestionRichTextInput(q),
-                        const SizedBox(height: 24),
-                        _buildOptionsListSection(q),
-                        const Divider(height: 32),
-                        _buildRightColumnDetails(q),
-                      ],
-                    ),
             ),
 
           // Footer Bar of Question Card
@@ -1554,7 +2296,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: TextFormField(
-                  key: ValueKey('q_text_${q.id}'),
+                  key: ValueKey('q_text_${q.number}_${q.uniqueId}'),
                   initialValue: q.text,
                   maxLines: 4,
                   onChanged: (val) {
@@ -1619,10 +2361,18 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 6,
+              runSpacing: 4,
               children: [
                 Text('2. Options ', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
                 Text('*', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red)),
+                const SizedBox(width: 4),
+                _buildQuickOptionPresetPill(q, ['1', '2', '3', '4'], '1,2,3,4'),
+                _buildQuickOptionPresetPill(q, ['A', 'B', 'C', 'D'], 'A,B,C,D'),
+                _buildQuickOptionPresetPill(q, ['(1)', '(2)', '(3)', '(4)'], '(1),(2),(3),(4)'),
+                _buildQuickOptionPresetPill(q, ['(A)', '(B)', '(C)', '(D)'], '(A),(B),(C),(D)'),
               ],
             ),
             Text('Is Correct?', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
@@ -1671,7 +2421,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                           border: Border.all(color: const Color(0xFFCBD5E1)),
                         ),
                         child: TextFormField(
-                          key: ValueKey('q_opt_${q.id}_$optIdx'),
+                          key: ValueKey('q_opt_${q.number}_${q.uniqueId}_$optIdx'),
                           initialValue: q.options[optIdx],
                           onChanged: (val) {
                             q.options[optIdx] = val;
@@ -1826,11 +2576,37 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         ),
         const SizedBox(height: 16),
 
-        // 4. Explanation (Optional)
+        // 4. Explanation (Optional) & Solution Video
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('4. Explanation ', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
-            Text('(Optional)', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: const Color(0xFF64748B))),
+            Row(
+              children: [
+                Text('4. Explanation & Video Solution ', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                Text('(Optional)', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: const Color(0xFF64748B))),
+              ],
+            ),
+            OutlinedButton.icon(
+              onPressed: () => _pickAndUploadSolutionVideo(q),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF4F46E5),
+                backgroundColor: const Color(0xFFEEF2FF),
+                side: const BorderSide(color: Color(0xFFC7D2FE)),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              ),
+              icon: q.isUploadingSolutionVideo
+                  ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFF4F46E5)))
+                  : const Icon(Icons.video_call_rounded, size: 15, color: Color(0xFF4F46E5)),
+              label: Text(
+                q.isUploadingSolutionVideo
+                    ? 'Uploading...'
+                    : (q.solutionVideoUrl != null && q.solutionVideoUrl!.isNotEmpty ? 'Change Video File' : 'Upload Video File'),
+                style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF4F46E5)),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 6),
@@ -1843,7 +2619,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           child: Padding(
             padding: const EdgeInsets.all(10),
             child: TextFormField(
-              key: ValueKey('q_exp_${q.id}'),
+              key: ValueKey('q_exp_${q.number}_${q.uniqueId}'),
               initialValue: q.explanation,
               maxLines: 3,
               onChanged: (val) {
@@ -1860,6 +2636,101 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
             ),
           ),
         ),
+        const SizedBox(height: 8),
+
+        // Video URL Input Field
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.link_rounded, size: 16, color: Color(0xFF64748B)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextFormField(
+                    key: ValueKey('q_vidurl_${q.number}_${q.uniqueId}'),
+                    initialValue: q.solutionVideoUrl ?? '',
+                    onChanged: (val) {
+                      setState(() {
+                        q.solutionVideoUrl = val.trim();
+                      });
+                      _scheduleAutoSave(q);
+                    },
+                    decoration: const InputDecoration(
+                      hintText: 'Or enter Solution Video URL (MP4, YouTube, Vimeo, Supabase)...',
+                      hintStyle: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8)),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF0F172A)),
+                  ),
+                ),
+                if (q.solutionVideoUrl != null && q.solutionVideoUrl!.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFEF4444)),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Remove video',
+                    onPressed: () {
+                      setState(() {
+                        q.solutionVideoUrl = null;
+                      });
+                      _scheduleAutoSave(q);
+                    },
+                  ),
+              ],
+            ),
+          ),
+        ),
+
+        // Live Video Player Preview
+        if (q.solutionVideoUrl != null && q.solutionVideoUrl!.trim().isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.play_circle_fill, color: Color(0xFF4F46E5), size: 16),
+                        SizedBox(width: 6),
+                        Text('Video Solution Preview', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                      ],
+                    ),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          q.solutionVideoUrl = null;
+                        });
+                        _scheduleAutoSave(q);
+                      },
+                      child: const Text('Delete Video', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFEF4444))),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SolutionVideoPlayerWidget(
+                  videoUrl: q.solutionVideoUrl!,
+                  height: 200,
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
 
         // 5. Difficulty / Toughness
@@ -1911,7 +2782,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       border: Border.all(color: const Color(0xFFCBD5E1)),
                     ),
                     child: TextFormField(
-                      key: ValueKey('q_pos_${q.id}'),
+                      key: ValueKey('q_pos_${q.number}_${q.uniqueId}'),
                       initialValue: q.positiveMarks,
                       onChanged: (val) {
                         q.positiveMarks = val;
@@ -1940,7 +2811,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       border: Border.all(color: const Color(0xFFCBD5E1)),
                     ),
                     child: TextFormField(
-                      key: ValueKey('q_neg_${q.id}'),
+                      key: ValueKey('q_neg_${q.number}_${q.uniqueId}'),
                       initialValue: q.negativeMarks,
                       onChanged: (val) {
                         q.negativeMarks = val;
@@ -2046,7 +2917,30 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         const SizedBox(height: 16),
 
         // 9. Visibility / Available In *
-        Text('9. Visibility / Available In *', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('9. Visibility / Available In *', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+            InkWell(
+              onTap: () {
+                setState(() {
+                  q.availableIn = List<String>.from(_paperDefaultAvailableIn);
+                });
+                _scheduleAutoSave(q);
+              },
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFC7D2FE)),
+                ),
+                child: Text('⚡ Use Test Series Default', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5))),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 6),
         Container(
           width: double.infinity,
@@ -2113,6 +3007,16 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       setState(() => _currentPageIndex = pageNum);
     }
 
+    final List<int> pagesToShow = [];
+    int startPage = (_currentPageIndex - 2).clamp(1, totalPages);
+    int endPage = (startPage + 4).clamp(1, totalPages);
+    if (endPage - startPage < 4) {
+      startPage = (endPage - 4).clamp(1, totalPages);
+    }
+    for (int p = startPage; p <= endPage; p++) {
+      pagesToShow.add(p);
+    }
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -2122,8 +3026,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         ),
         const SizedBox(width: 8),
 
-        ...List.generate(5, (idx) {
-          final pageNum = idx + 1;
+        ...pagesToShow.map((pageNum) {
           final isSelected = (_currentPageIndex == pageNum);
 
           return Padding(
@@ -2154,31 +3057,32 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           );
         }),
 
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8),
-          child: Text('...', style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold)),
-        ),
+        if (pagesToShow.isNotEmpty && pagesToShow.last < totalPages) ...[
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: Text('...', style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.bold)),
+          ),
 
-        // Page 20 / Total Pages
-        InkWell(
-          onTap: () => goToPage(totalPages),
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFCBD5E1)),
-            ),
-            child: Center(
-              child: Text(
-                '$totalPages',
-                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
+          InkWell(
+            onTap: () => goToPage(totalPages),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+              ),
+              child: Center(
+                child: Text(
+                  '$totalPages',
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
+                ),
               ),
             ),
           ),
-        ),
+        ],
         const SizedBox(width: 8),
 
         IconButton(

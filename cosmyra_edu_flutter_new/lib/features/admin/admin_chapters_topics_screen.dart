@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/services/supabase_service.dart';
+import '../../shared/widgets/app_avatar.dart';
 
 class AdminChaptersTopicsScreen extends StatefulWidget {
   const AdminChaptersTopicsScreen({Key? key}) : super(key: key);
@@ -433,18 +434,23 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
             ),
             child: Row(
               children: [
-                const CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Color(0xFF7C3AED),
-                  child: Text('A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                AppAvatar.fromProfile(
+                  SupabaseService.activeUserSession,
+                  size: 32,
+                  backgroundColor: const Color(0xFF7C3AED),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('Admin User', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                      Text('Super Admin', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
+                    children: [
+                      Text(
+                        SupabaseService.activeUserSession?.fullName.isNotEmpty == true
+                            ? SupabaseService.activeUserSession!.fullName
+                            : 'Admin User',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                      const Text('Super Admin', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
                     ],
                   ),
                 ),

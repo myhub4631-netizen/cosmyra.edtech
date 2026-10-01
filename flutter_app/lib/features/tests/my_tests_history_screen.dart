@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/app_sidebar.dart';
+import '../../shared/widgets/app_header.dart';
 
 enum TestCategoryFilter { all, customTest, customPractice, neetPyq, ntaQuestions, testSeries }
 enum TestStatusFilter { all, completed, attempted, saved, inProgress }
@@ -336,11 +337,16 @@ class _MyTestsHistoryScreenState extends State<MyTestsHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 992;
+    final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+
     return Scaffold(
+      key: scaffoldKey,
       backgroundColor: const Color(0xFFF8FAFC),
       drawer: Drawer(
         child: AppSidebar(
-          selectedIndex: 7,
+          selectedIndex: 8,
           onOpenPractice: widget.onOpenCustomPractice,
           onOpenCustomPractice: widget.onOpenCustomPractice,
           onOpenCustomTest: widget.onOpenCustomTest,
@@ -348,16 +354,34 @@ class _MyTestsHistoryScreenState extends State<MyTestsHistoryScreen> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1000),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Column(
+          children: [
+            AppHeader(
+              userProfile: widget.userProfile,
+              onOpenDrawer: () => scaffoldKey.currentState?.openDrawer(),
+            ),
+            Expanded(
+              child: Row(
                 children: [
-                  // 1. HEADER BAR
-                  _buildHeaderBar(context),
+                  if (isDesktop)
+                    AppSidebar(
+                      selectedIndex: 8,
+                      onOpenPractice: widget.onOpenCustomPractice,
+                      onOpenCustomPractice: widget.onOpenCustomPractice,
+                      onOpenCustomTest: widget.onOpenCustomTest,
+                      onOpenPyqs: widget.onOpenPyqs,
+                    ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1000),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // 1. HEADER BAR
+                              _buildHeaderBar(context),
 
                   const SizedBox(height: 16),
 
@@ -401,7 +425,12 @@ class _MyTestsHistoryScreenState extends State<MyTestsHistoryScreen> {
           ),
         ),
       ),
-
+    ],
+  ),
+),
+],
+),
+),
       // 9. FLOATING ACTION BUTTON (+)
       floatingActionButton: FloatingActionButton(
         onPressed: widget.onOpenCustomTest ?? widget.onOpenCustomPractice,

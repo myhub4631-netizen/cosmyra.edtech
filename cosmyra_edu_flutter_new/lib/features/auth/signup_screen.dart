@@ -36,13 +36,35 @@ class _SignUpScreenState extends State<SignUpScreen> {
   UserProfileModel? _signedUpProfile;
 
   @override
+  void initState() {
+    super.initState();
+    SupabaseService.authNotifier.addListener(_onAuthNotifierChanged);
+  }
+
+  @override
   void dispose() {
+    SupabaseService.authNotifier.removeListener(_onAuthNotifierChanged);
     _fullNameController.dispose();
     _emailController.dispose();
     _mobileController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  void _onAuthNotifierChanged() {
+    final profile = SupabaseService.authNotifier.value;
+    if (profile != null && mounted) {
+      widget.onSignUpSuccess?.call(profile);
+      final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
+      if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
+        context.go(redirect);
+      } else if (profile.isAdmin || profile.isSuperAdmin) {
+        context.go('/admin');
+      } else {
+        context.go('/dashboard');
+      }
+    }
   }
 
   // Password validation checks
@@ -91,7 +113,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Account created successfully! Welcome to ExamPrep.'),
+            content: Text('Account created successfully! Welcome to Cosmyra NEET | JEE.'),
             backgroundColor: Color(0xFF10B981),
           ),
         );
@@ -118,7 +140,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Account created successfully! Welcome to ExamPrep.'),
+              content: Text('Account created successfully! Welcome to Cosmyra NEET | JEE.'),
               backgroundColor: Color(0xFF10B981),
             ),
           );
@@ -332,7 +354,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         ),
         const SizedBox(height: 14),
         const Text(
-          'Join thousands of aspirants who are preparing smarter every day with ExamPrep.',
+          'Join thousands of aspirants who are preparing smarter every day with Cosmyra NEET | JEE.',
           style: TextStyle(fontSize: 15, color: Color(0xFF475569), height: 1.4),
         ),
         const SizedBox(height: 32),

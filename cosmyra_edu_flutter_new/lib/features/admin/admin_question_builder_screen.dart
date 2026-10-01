@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../shared/widgets/solution_video_player.dart';
 
 class AdminQuestionBuilderScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -55,8 +57,51 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
   // Section 4: Correct Answer
   String _correctAnswerOption = 'A';
 
-  // Section 5: Explanation
+  // Section 5: Explanation & Video Solution
   final TextEditingController _explanationController = TextEditingController();
+  final TextEditingController _solutionVideoUrlController = TextEditingController();
+  bool _isUploadingSolutionVideo = false;
+
+  Future<void> _pickAndUploadSolutionVideo() async {
+    try {
+      setState(() => _isUploadingSolutionVideo = true);
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['mp4', 'webm', 'mov', 'm4v', 'avi', 'mkv'],
+        withData: true,
+      );
+      if (result != null && result.files.single.bytes != null) {
+        final bytes = result.files.single.bytes!;
+        final filename = result.files.single.name;
+        final ext = result.files.single.extension?.toLowerCase() ?? 'mp4';
+        final mimeType = ext == 'webm' ? 'video/webm' : (ext == 'mov' ? 'video/quicktime' : 'video/mp4');
+        final url = await SupabaseService.uploadMediaFile(
+          fileBytes: bytes,
+          fileName: 'solution_vid_${DateTime.now().millisecondsSinceEpoch}_$filename',
+          mimeType: mimeType,
+        );
+        if (url != null && url.isNotEmpty) {
+          setState(() {
+            _solutionVideoUrlController.text = url;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Solution video uploaded successfully!')),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error uploading solution video: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading video: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingSolutionVideo = false);
+    }
+  }
 
   // Section 6: Tags
   final List<String> _tags = ['Kinematics', 'Formula'];
@@ -81,6 +126,7 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
       _selectedDifficulty = q['difficulty'] ?? 'Medium';
       _questionTextController.text = q['questionText'] ?? q['question_text'] ?? '';
       _explanationController.text = q['explanation'] ?? '';
+      _solutionVideoUrlController.text = q['solution_video_url'] ?? q['solutionVideoUrl'] ?? q['video_url'] ?? '';
 
       List<String> avail = [];
       if (q['available_in'] is List) {
@@ -104,6 +150,7 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
     _negativeMarksController.dispose();
     _questionTextController.dispose();
     _explanationController.dispose();
+    _solutionVideoUrlController.dispose();
     _tagInputController.dispose();
     for (var opt in _optionsList) {
       (opt['controller'] as TextEditingController).dispose();
@@ -205,6 +252,8 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
       'correctAnswer': 'Option $_correctAnswerOption',
       'correctText': correctVal,
       'explanation': _explanationController.text,
+      'solution_video_url': _solutionVideoUrlController.text.trim(),
+      'solutionVideoUrl': _solutionVideoUrlController.text.trim(),
       'isActive': _isActive,
       'isDraft': isDraft,
     };
@@ -1317,9 +1366,40 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('5. Explanation (Optional)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-          const SizedBox(height: 2),
-          const Text('Add explanation for the correct answer.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text('5. Explanation & Video Solution (Optional)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                    SizedBox(height: 2),
+                    Text('Add text explanation and video solution for this question.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  ],
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: _pickAndUploadSolutionVideo,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF4F46E5),
+                  backgroundColor: const Color(0xFFEEF2FF),
+                  side: const BorderSide(color: Color(0xFFC7D2FE)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: _isUploadingSolutionVideo
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFF4F46E5)))
+                    : const Icon(Icons.video_call_rounded, size: 16, color: Color(0xFF4F46E5)),
+                label: Text(
+                  _isUploadingSolutionVideo
+                      ? 'Uploading...'
+                      : (_solutionVideoUrlController.text.isNotEmpty ? 'Change Video' : 'Upload Video'),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF4F46E5)),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 14),
 
           TextField(
@@ -1335,6 +1415,66 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
               contentPadding: const EdgeInsets.all(12),
             ),
           ),
+          const SizedBox(height: 10),
+
+          // Video URL input field
+          TextField(
+            controller: _solutionVideoUrlController,
+            onChanged: (_) => setState(() {}),
+            style: const TextStyle(fontSize: 13, color: Color(0xFF0F172A)),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.link_rounded, size: 18, color: Color(0xFF64748B)),
+              suffixIcon: _solutionVideoUrlController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFFEF4444)),
+                      onPressed: () => setState(() => _solutionVideoUrlController.clear()),
+                    )
+                  : null,
+              hintText: 'Or enter Video Solution URL (MP4, YouTube, Vimeo, Supabase)...',
+              hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+          ),
+
+          // Live Video Solution Native Player Preview
+          if (_solutionVideoUrlController.text.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: const [
+                          Icon(Icons.play_circle_fill, color: Color(0xFF4F46E5), size: 16),
+                          SizedBox(width: 6),
+                          Text('Video Solution Preview', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                        ],
+                      ),
+                      InkWell(
+                        onTap: () => setState(() => _solutionVideoUrlController.clear()),
+                        child: const Text('Delete Video', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFEF4444))),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SolutionVideoPlayerWidget(
+                    videoUrl: _solutionVideoUrlController.text.trim(),
+                    height: 200,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

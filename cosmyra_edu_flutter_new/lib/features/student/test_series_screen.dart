@@ -10,6 +10,8 @@ import 'widgets/ecommerce_checkout_dialog.dart';
 import 'widgets/ecommerce_cart_modal.dart';
 import '../tests/test_screen.dart';
 import '../../shared/widgets/app_avatar.dart';
+import '../../shared/widgets/app_sidebar.dart';
+import '../../shared/widgets/app_header.dart';
 
 class TestSeriesScreen extends StatefulWidget {
   final VoidCallback? onBackToDashboard;
@@ -695,14 +697,24 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
 
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isWideDesktop = screenWidth >= 992;
+    final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
 
     return Scaffold(
+      key: scaffoldKey,
       backgroundColor: const Color(0xFFF8FAFC),
+      drawer: const Drawer(
+        child: AppSidebar(
+          selectedIndex: 9,
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar Header matching Reference UI
-            _buildTopHeaderBar(screenWidth),
+            // Standard App Header with Search, Cart, Profile & Logout
+            AppHeader(
+              onOpenDrawer: () => scaffoldKey.currentState?.openDrawer(),
+              onSearch: (query) => setState(() => _searchQuery = query),
+            ),
 
             // Body Layout (Sidebar + Main Content Grid)
             Expanded(
@@ -710,7 +722,10 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Left Navigation Sidebar (Desktop > 992px)
-                  if (isWideDesktop) _buildLeftSidebar(),
+                  if (isWideDesktop)
+                    const AppSidebar(
+                      selectedIndex: 9,
+                    ),
 
                   // Main Content Scrollable View
                   Expanded(

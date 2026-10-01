@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/app_sidebar.dart';
+import '../../shared/widgets/app_header.dart';
 
 class ProfileScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -178,11 +179,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 992;
+    final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+
     return Scaffold(
+      key: scaffoldKey,
       backgroundColor: const Color(0xFFF8FAFC),
       drawer: Drawer(
         child: AppSidebar(
-          selectedIndex: 7,
+          selectedIndex: 13,
           onOpenPractice: widget.onOpenCustomPractice,
           onOpenCustomPractice: widget.onOpenCustomPractice,
           onOpenCustomTest: widget.onOpenCustomTest,
@@ -190,16 +196,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1000),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Column(
+          children: [
+            AppHeader(
+              userProfile: _currentProfile,
+              activeExam: widget.activeExam,
+              onOpenDrawer: () => scaffoldKey.currentState?.openDrawer(),
+            ),
+            Expanded(
+              child: Row(
                 children: [
-                  // 1. HEADER BAR
-                  _buildHeaderBar(context),
+                  if (isDesktop)
+                    AppSidebar(
+                      selectedIndex: 13,
+                      onOpenPractice: widget.onOpenCustomPractice,
+                      onOpenCustomPractice: widget.onOpenCustomPractice,
+                      onOpenCustomTest: widget.onOpenCustomTest,
+                      onOpenPyqs: widget.onOpenPyqs,
+                    ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1000),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // 1. HEADER BAR
+                              _buildHeaderBar(context),
 
                   const SizedBox(height: 16),
 
@@ -250,7 +275,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   // 9. MOTIVATIONAL CTA CARD
                   _buildMotivationalCtaCard(),
-
                   const SizedBox(height: 32),
                 ],
               ),
@@ -258,8 +282,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
-    );
-  }
+    ],
+  ),
+),
+],
+),
+),
+);
+}
 
   // 1. HEADER BAR
   Widget _buildHeaderBar(BuildContext context) {
