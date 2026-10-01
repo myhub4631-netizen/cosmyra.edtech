@@ -1,7 +1,8 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Cosmyra Edu World-Class Design System Tokens
+/// Cosmyra Edu Phase 1 Design System Tokens & Theme Architecture
 class AppColors {
   // Brand Primaries
   static const Color primary = Color(0xFF4F46E5); // Electric Indigo
@@ -9,7 +10,7 @@ class AppColors {
   static const Color primaryLight = Color(0xFFEEF2FF);
   static const Color primaryBorder = Color(0xFFC7D2FE);
 
-  // Accents
+  // Accents & Badges
   static const Color emerald = Color(0xFF10B981); // Emerald Green
   static const Color emeraldLight = Color(0xFFECFDF5);
   static const Color emeraldBorder = Color(0xFFA7F3D0);
@@ -132,6 +133,77 @@ class AppTypography {
   }
 }
 
+class AppButtonStyles {
+  static ButtonStyle primary({double borderRadius = 10}) {
+    return ElevatedButton.styleFrom(
+      backgroundColor: AppColors.primary,
+      foregroundColor: Colors.white,
+      elevation: 0,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(borderRadius)),
+      textStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+    );
+  }
+
+  static ButtonStyle success({double borderRadius = 10}) {
+    return ElevatedButton.styleFrom(
+      backgroundColor: AppColors.emerald,
+      foregroundColor: Colors.white,
+      elevation: 0,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(borderRadius)),
+      textStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+    );
+  }
+
+  static ButtonStyle secondary({double borderRadius = 10}) {
+    return ElevatedButton.styleFrom(
+      backgroundColor: AppColors.primaryLight,
+      foregroundColor: AppColors.primary,
+      elevation: 0,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(borderRadius)),
+      textStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+    );
+  }
+
+  static ButtonStyle outline({double borderRadius = 10, Color color = AppColors.primary}) {
+    return OutlinedButton.styleFrom(
+      foregroundColor: color,
+      side: BorderSide(color: color, width: 1.5),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(borderRadius)),
+      textStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+    );
+  }
+}
+
+class AppGlass {
+  static Widget blurContainer({
+    required Widget child,
+    double blur = 12.0,
+    Color color = Colors.white,
+    double opacity = 0.85,
+    BorderRadius? borderRadius,
+    Border? border,
+  }) {
+    return ClipRRect(
+      borderRadius: borderRadius ?? BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+        child: Container(
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: opacity),
+            borderRadius: borderRadius ?? BorderRadius.circular(16),
+            border: border ?? Border.all(color: Colors.white.withValues(alpha: 0.3)),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
 class AppWidgets {
   static Widget buildPillBadge({
     required String label,
@@ -186,6 +258,31 @@ class AppWidgets {
         boxShadow: shadows ?? AppShadows.soft,
       ),
       child: child,
+    );
+  }
+}
+
+class AppDesignSystem {
+  static ThemeData get themeData {
+    return ThemeData(
+      useMaterial3: true,
+      scaffoldBackgroundColor: AppColors.background,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: AppColors.primary,
+        primary: AppColors.primary,
+        secondary: AppColors.emerald,
+        surface: AppColors.surface,
+      ),
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.border),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(style: AppButtonStyles.primary()),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: AppButtonStyles.outline()),
     );
   }
 }
