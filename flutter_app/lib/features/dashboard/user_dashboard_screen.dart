@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:lottie/lottie.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/theme/app_design_system.dart';
@@ -802,7 +803,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.local_fire_department_rounded, size: 14, color: Color(0xFFEA580C)),
+                  Lottie.network(
+                    'https://assets3.lottiefiles.com/packages/lf20_6aYx4t.json',
+                    width: 18,
+                    height: 18,
+                    fit: BoxFit.contain,
+                    errorBuilder: (ctx, err, stack) => const Icon(Icons.local_fire_department_rounded, size: 14, color: Color(0xFFEA580C)),
+                  ),
                   const SizedBox(width: 3),
                   Text('12', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w900, color: const Color(0xFFEA580C))),
                 ],
@@ -859,6 +866,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         'value': '${_userRealStats['questionsAttempted']}',
         'sub': 'Real stats',
         'icon': Icons.auto_stories_rounded,
+        'lottie': 'https://assets2.lottiefiles.com/packages/lf20_w51pcehl.json',
         'gradient': const LinearGradient(colors: [Color(0xFFEFF6FF), Color(0xFFDBEAFE)]),
         'iconBg': const Color(0xFF2563EB),
         'borderColor': const Color(0xFFBFDBFE),
@@ -868,6 +876,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         'value': '${_userRealStats['accuracy']}%',
         'sub': 'Overall accuracy',
         'icon': Icons.track_changes_rounded,
+        'lottie': 'https://assets10.lottiefiles.com/packages/lf20_49rdyysj.json',
         'gradient': const LinearGradient(colors: [Color(0xFFF0FDF4), Color(0xFFDCFCE7)]),
         'iconBg': const Color(0xFF16A34A),
         'borderColor': const Color(0xFFBBF7D0),
@@ -877,6 +886,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         'value': '${_userRealStats['testsCompleted']}',
         'sub': 'Completed',
         'icon': Icons.verified_rounded,
+        'lottie': 'https://assets5.lottiefiles.com/packages/lf20_touohx80.json',
         'gradient': const LinearGradient(colors: [Color(0xFFF5F3FF), Color(0xFFDDD6FE)]),
         'iconBg': const Color(0xFF7C3AED),
         'borderColor': const Color(0xFFC4B5FD),
@@ -886,6 +896,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         'value': '${_userRealStats['studyStreak']} Days',
         'sub': 'Active Streak',
         'icon': Icons.local_fire_department_rounded,
+        'lottie': 'https://assets3.lottiefiles.com/packages/lf20_6aYx4t.json',
         'gradient': const LinearGradient(colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)]),
         'iconBg': const Color(0xFFEA580C),
         'borderColor': const Color(0xFFFDBA74),
@@ -919,7 +930,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     color: m['iconBg'] as Color,
                     shape: BoxShape.circle,
@@ -931,7 +942,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                       ),
                     ],
                   ),
-                  child: Icon(m['icon'] as IconData, color: Colors.white, size: 12),
+                  child: Lottie.network(
+                    m['lottie'] as String,
+                    width: 16,
+                    height: 16,
+                    fit: BoxFit.contain,
+                    errorBuilder: (ctx, err, stack) => Icon(m['icon'] as IconData, color: Colors.white, size: 12),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 FittedBox(
@@ -1133,11 +1150,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   // 5. Mobile Quick Actions Horizontal Row
   Widget _buildMobileQuickActions() {
     final actions = [
-      {'label': 'Custom Practice', 'icon': Icons.track_changes_rounded, 'color': const Color(0xFF16A34A), 'bg': const Color(0xFFDCFCE7), 'tap': () => context.go('/custom-practice')},
-      {'label': 'Custom Test', 'icon': Icons.assignment_outlined, 'color': const Color(0xFF2563EB), 'bg': const Color(0xFFDBEAFE), 'tap': () => context.go('/custom-test')},
-      {'label': 'PYQ Practice', 'icon': Icons.menu_book_rounded, 'color': const Color(0xFF7C3AED), 'bg': const Color(0xFFDDD6FE), 'tap': () => context.go('/pyq')},
-      {'label': 'NTA Questions', 'icon': Icons.shield_outlined, 'color': const Color(0xFFEA580C), 'bg': const Color(0xFFFFEDD5), 'tap': () => context.go('/nta-practice')},
-      {'label': 'Test Series', 'icon': Icons.calendar_today_outlined, 'color': const Color(0xFFDB2777), 'bg': const Color(0xFFFCE7F3), 'tap': () {
+      {'label': 'Custom Practice', 'icon': Icons.track_changes_rounded, 'lottie': 'https://assets10.lottiefiles.com/packages/lf20_49rdyysj.json', 'color': const Color(0xFF16A34A), 'bg': const Color(0xFFDCFCE7), 'tap': () => context.go('/custom-practice')},
+      {'label': 'Custom Test', 'icon': Icons.assignment_outlined, 'lottie': 'https://assets5.lottiefiles.com/packages/lf20_touohx80.json', 'color': const Color(0xFF2563EB), 'bg': const Color(0xFFDBEAFE), 'tap': () => context.go('/custom-test')},
+      {'label': 'PYQ Practice', 'icon': Icons.menu_book_rounded, 'lottie': 'https://assets2.lottiefiles.com/packages/lf20_w51pcehl.json', 'color': const Color(0xFF7C3AED), 'bg': const Color(0xFFDDD6FE), 'tap': () => context.go('/pyq')},
+      {'label': 'NTA Questions', 'icon': Icons.shield_outlined, 'lottie': 'https://assets3.lottiefiles.com/packages/lf20_6aYx4t.json', 'color': const Color(0xFFEA580C), 'bg': const Color(0xFFFFEDD5), 'tap': () => context.go('/nta-practice')},
+      {'label': 'Test Series', 'icon': Icons.calendar_today_outlined, 'lottie': 'https://assets5.lottiefiles.com/packages/lf20_touohx80.json', 'color': const Color(0xFFDB2777), 'bg': const Color(0xFFFCE7F3), 'tap': () {
         if (widget.onOpenTestSeries != null) {
           widget.onOpenTestSeries!();
         } else {
@@ -1172,6 +1189,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                       Container(
                         width: 48,
                         height: 48,
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: act['bg'] as Color,
                           shape: BoxShape.circle,
@@ -1183,7 +1201,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                             ),
                           ],
                         ),
-                        child: Icon(act['icon'] as IconData, color: act['color'] as Color, size: 22),
+                        child: Lottie.network(
+                          act['lottie'] as String,
+                          width: 28,
+                          height: 28,
+                          fit: BoxFit.contain,
+                          errorBuilder: (ctx, err, stack) => Icon(act['icon'] as IconData, color: act['color'] as Color, size: 22),
+                        ),
                       ),
                       const SizedBox(height: 6),
                       FittedBox(
