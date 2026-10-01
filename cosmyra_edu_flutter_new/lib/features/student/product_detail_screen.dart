@@ -247,9 +247,51 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       owns = await SupabaseService.hasActiveEntitlement(user.id, widget.productId);
     }
 
+    _product = loadedProduct;
+    final resolvedTests = _resolveSeriesTests();
+    final int realCount = resolvedTests.isNotEmpty ? resolvedTests.length : testCount;
+
+    String cleanDesc = loadedProduct.description;
+    cleanDesc = cleanDesc.replaceAll(RegExp(r'\b\d+\s+full-syllabus', caseSensitive: false), '$realCount full-syllabus');
+    cleanDesc = cleanDesc.replaceAll(RegExp(r'\b\d+\s+progressive', caseSensitive: false), '$realCount progressive');
+    cleanDesc = cleanDesc.replaceAll(RegExp(r'\b\d+\s+tests', caseSensitive: false), '$realCount tests');
+
+    final finalProduct = TestSeriesCardData(
+      id: loadedProduct.id,
+      title: loadedProduct.title,
+      exam: loadedProduct.exam,
+      targetYear: loadedProduct.targetYear,
+      subtitle: loadedProduct.subtitle,
+      description: cleanDesc,
+      longDescription: loadedProduct.longDescription,
+      features: loadedProduct.features,
+      tests: loadedProduct.tests,
+      reviews: loadedProduct.reviews,
+      topScores: loadedProduct.topScores,
+      testCount: realCount,
+      durationMinutes: loadedProduct.durationMinutes,
+      difficulty: loadedProduct.difficulty,
+      testType: loadedProduct.testType,
+      category: loadedProduct.category,
+      validity: loadedProduct.validity,
+      attemptStatus: loadedProduct.attemptStatus,
+      syllabusUrl: loadedProduct.syllabusUrl,
+      status: loadedProduct.status,
+      nextTestName: loadedProduct.nextTestName,
+      iconBgColor: loadedProduct.iconBgColor,
+      icon: loadedProduct.icon,
+      bannerImageUrl: loadedProduct.bannerImageUrl,
+      isFree: loadedProduct.isFree,
+      price: loadedProduct.price,
+      originalPrice: loadedProduct.originalPrice,
+      purchaseLink: loadedProduct.purchaseLink,
+      purchaseButtonText: loadedProduct.purchaseButtonText,
+      showPurchaseButton: loadedProduct.showPurchaseButton,
+    );
+
     if (mounted) {
       setState(() {
-        _product = loadedProduct;
+        _product = finalProduct;
         _dynamicReviews = rawReviews;
         _hasPurchased = owns;
         _isLoading = false;
