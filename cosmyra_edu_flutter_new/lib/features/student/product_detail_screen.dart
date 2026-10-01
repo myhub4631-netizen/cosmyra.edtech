@@ -1611,112 +1611,46 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   }
 
   // ==========================================
-  // SYLLABUS SECTION (INSIDE OVERVIEW)
+  // SYLLABUS SECTION (INSIDE OVERVIEW - COMPACT)
   // ==========================================
   Widget _buildSyllabusSection(TestSeriesCardData item) {
-    final isJee = item.exam.contains('JEE');
-
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(color: Color(0xFFEEF2FF), shape: BoxShape.circle),
-                child: const Icon(Icons.school_rounded, color: Color(0xFF2563EB), size: 20),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'Syllabus & Exam Pattern',
-                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFBFDBFE)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.picture_as_pdf_outlined, color: Color(0xFF2563EB), size: 26),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Official Test Schedule & Syllabus Blueprint',
-                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A)),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Download the detailed PDF mapping for chapter & unit tests.',
-                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF3B82F6)),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  onPressed: _downloadSyllabus,
-                  icon: const Icon(Icons.download_rounded, size: 14),
-                  label: const Text('Download PDF', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          Text(
-            'Curriculum Topics Covered:',
-            style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-          ),
-          const SizedBox(height: 10),
-
-          _buildSyllabusTopicRow('Physics', 'Kinematics, Laws of Motion, Work Energy, Thermodynamics, Optics, Electrostatics & Modern Physics'),
-          _buildSyllabusTopicRow('Chemistry', 'Physical Chemistry, Organic Mechanisms, Periodic Table, Coordination Compounds & Hydrocarbons'),
-          if (isJee) ...[
-            _buildSyllabusTopicRow('Mathematics', 'Calculus, Algebra, Vectors & 3D Geometry, Trigonometry & Matrices'),
-          ] else ...[
-            _buildSyllabusTopicRow('Botany', 'Cell Biology, Plant Physiology, Genetics, Diversity & Ecology'),
-            _buildSyllabusTopicRow('Zoology', 'Human Physiology, Reproduction, Evolution & Biotechnology'),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSyllabusTopicRow(String title, String desc) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(6)),
-            child: Text(title, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFF2563EB), size: 20),
           ),
           const SizedBox(width: 10),
-          Expanded(child: Text(desc, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF475569)))),
+          Expanded(
+            child: Text(
+              'Schedule & Syllabus PDF',
+              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A)),
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: _downloadSyllabus,
+            icon: const Icon(Icons.download_rounded, size: 15),
+            label: const Text('Download PDF', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          ),
         ],
       ),
     );
