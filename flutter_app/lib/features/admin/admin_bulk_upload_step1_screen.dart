@@ -248,6 +248,36 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     final String seriesId = seriesObj['id']?.toString() ?? '';
     final String seriesPaperId = seriesObj['paper_id']?.toString() ?? '';
 
+    // 1. Extract embedded tests created inside Test Series Manager dialog
+    final List<Map<String, dynamic>> embeddedTests = [];
+    if (seriesObj['tests'] is List) {
+      int testCounter = 1;
+      for (var t in (seriesObj['tests'] as List)) {
+        if (t is Map) {
+          final tMap = Map<String, dynamic>.from(t);
+          final tTitle = (tMap['title'] ?? tMap['name'] ?? '').toString().trim();
+          if (tTitle.isNotEmpty) {
+            embeddedTests.add({
+              'id': tMap['id'] ?? tMap['paper_id'] ?? 'test_${DateTime.now().millisecondsSinceEpoch}',
+              'paper_name': tTitle,
+              'paperName': tTitle,
+              'paper_code': tMap['code'] ?? 'P$testCounter',
+              'question_count': tMap['questions'] ?? tMap['question_count'] ?? 180,
+              'total_marks': tMap['marks'] ?? tMap['total_marks'] ?? 720,
+              'duration_minutes': tMap['duration'] ?? tMap['duration_minutes'] ?? 180,
+              'exam': seriesObj['exam'] ?? _examName,
+              'year': seriesObj['year'] ?? _year,
+              'test_series_title': seriesTitle,
+              'test_series_id': seriesId,
+              'is_embedded': true,
+            });
+            testCounter++;
+          }
+        }
+      }
+    }
+
+    // 2. Extract matched papers from papers database table
     final matched = _loadedPapersList.where((p) {
       final pTsTitle = (p['test_series_title'] ?? p['existing_test_series'] ?? p['new_test_series_name'] ?? '').toString().trim().toLowerCase();
       final pTsId = (p['test_series_id'] ?? '').toString().trim();
@@ -259,10 +289,27 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       return false;
     }).toList();
 
-    final titles = matched
+    // 3. Combine both sources safely
+    final Map<String, Map<String, dynamic>> combinedMap = {};
+    for (var et in embeddedTests) {
+      final key = (et['paper_name'] ?? '').toString().trim().toLowerCase();
+      if (key.isNotEmpty) combinedMap[key] = et;
+    }
+    for (var mp in matched) {
+      final key = (mp['paper_name'] ?? mp['paperName'] ?? '').toString().trim().toLowerCase();
+      if (key.isNotEmpty) {
+        if (combinedMap.containsKey(key)) {
+          combinedMap[key] = {...combinedMap[key]!, ...mp};
+        } else {
+          combinedMap[key] = mp;
+        }
+      }
+    }
+
+    final allCombined = combinedMap.values.toList();
+    final titles = allCombined
         .map((p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim())
         .where((t) => t.isNotEmpty)
-        .toSet()
         .toList();
 
     setState(() {
@@ -270,7 +317,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       if (titles.isNotEmpty) {
         _paperOption = 'existing';
         _existingPaper = titles.first;
-        _onExistingPaperSelected(_existingPaper);
+        _onExistingPaperSelected(_existingPaper, customPaperMapList: allCombined);
       } else {
         _paperOption = 'new';
         _existingPaper = '';
@@ -319,17 +366,57 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     }
   }
 
-  void _onExistingPaperSelected(String paperTitle) {
+  void _onExistingPaperSelected(String paperTitle, {List<Map<String, dynamic>>? customPaperMapList}) {
     setState(() {
       _existingPaper = paperTitle;
-      final foundPaper = _loadedPapersList.firstWhere(
-        (p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim().toLowerCase() == paperTitle.trim().toLowerCase(),
-        orElse: () => {},
-      );
+      final targetTitleLower = paperTitle.trim().toLowerCase();
+
+      Map<String, dynamic> foundPaper = {};
+      if (customPaperMapList != null && customPaperMapList.isNotEmpty) {
+        foundPaper = customPaperMapList.firstWhere(
+          (p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim().toLowerCase() == targetTitleLower,
+          orElse: () => {},
+        );
+      }
+
+      if (foundPaper.isEmpty) {
+        foundPaper = _loadedPapersList.firstWhere(
+          (p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim().toLowerCase() == targetTitleLower,
+          orElse: () => {},
+        );
+      }
+
+      if (foundPaper.isEmpty && _existingTestSeries.isNotEmpty) {
+        final seriesObj = _loadedSeriesObjects.firstWhere(
+          (s) => (s['title'] ?? s['name'] ?? '').toString().trim().toLowerCase() == _existingTestSeries.trim().toLowerCase(),
+          orElse: () => {},
+        );
+        if (seriesObj['tests'] is List) {
+          for (var t in (seriesObj['tests'] as List)) {
+            if (t is Map) {
+              final tMap = Map<String, dynamic>.from(t);
+              final tTitle = (tMap['title'] ?? tMap['name'] ?? '').toString().trim();
+              if (tTitle.toLowerCase() == targetTitleLower) {
+                foundPaper = {
+                  'id': tMap['id'] ?? tMap['paper_id'] ?? 'test_${DateTime.now().millisecondsSinceEpoch}',
+                  'paper_name': tTitle,
+                  'paperName': tTitle,
+                  'question_count': tMap['questions'] ?? tMap['question_count'] ?? 180,
+                  'total_marks': tMap['marks'] ?? tMap['total_marks'] ?? 720,
+                  'duration_minutes': tMap['duration'] ?? tMap['duration_minutes'] ?? 180,
+                  'exam': seriesObj['exam'] ?? _examName,
+                  'year': seriesObj['year'] ?? _year,
+                };
+                break;
+              }
+            }
+          }
+        }
+      }
 
       if (foundPaper.isNotEmpty) {
         _paperNameCtrl.text = foundPaper['paper_name'] ?? foundPaper['paperName'] ?? paperTitle;
-        _paperCodeCtrl.text = foundPaper['paper_code'] ?? foundPaper['paperCode'] ?? '';
+        _paperCodeCtrl.text = foundPaper['paper_code'] ?? foundPaper['paperCode'] ?? 'P1';
 
         if (foundPaper['exam'] != null && foundPaper['exam'].toString().isNotEmpty) {
           _examName = foundPaper['exam'].toString();
@@ -350,11 +437,11 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           _conductingBody = (foundPaper['conducting_body'] ?? foundPaper['conductingBody']).toString();
         }
 
-        if (foundPaper['total_marks'] != null || foundPaper['totalMarks'] != null) {
-          _totalMarksCtrl.text = (foundPaper['total_marks'] ?? foundPaper['totalMarks']).toString();
+        if (foundPaper['total_marks'] != null || foundPaper['totalMarks'] != null || foundPaper['marks'] != null) {
+          _totalMarksCtrl.text = (foundPaper['total_marks'] ?? foundPaper['totalMarks'] ?? foundPaper['marks']).toString();
         }
-        if (foundPaper['question_count'] != null || foundPaper['questionCount'] != null) {
-          _questionCountCtrl.text = (foundPaper['question_count'] ?? foundPaper['questionCount']).toString();
+        if (foundPaper['question_count'] != null || foundPaper['questionCount'] != null || foundPaper['questions'] != null) {
+          _questionCountCtrl.text = (foundPaper['question_count'] ?? foundPaper['questionCount'] ?? foundPaper['questions']).toString();
         }
         if (foundPaper['duration_minutes'] != null || foundPaper['duration'] != null) {
           _durationCtrl.text = (foundPaper['duration_minutes'] ?? foundPaper['duration']).toString();
@@ -385,7 +472,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
         }
 
         final String paperId = foundPaper['id']?.toString() ?? '';
-        final int totalQ = int.tryParse(foundPaper['question_count']?.toString() ?? '') ?? 180;
+        final int totalQ = int.tryParse(foundPaper['question_count']?.toString() ?? foundPaper['questions']?.toString() ?? '') ?? 180;
         _checkPaperPendingQuestions(paperId, totalQ);
       }
     });
@@ -452,12 +539,30 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     // If existing paper was selected, reuse its exact ID so Step 2 loads its existing questions
     String paperId = SupabaseService.toValidUuid('paper_${_examName}_${_year}_${_phaseSession}_$pName');
     if (_sourceCategory == 'Test Series' && _paperOption == 'existing' && _existingPaper.isNotEmpty) {
-      final foundExisting = _loadedPapersList.firstWhere(
+      Map<String, dynamic> foundExisting = _loadedPapersList.firstWhere(
         (p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim().toLowerCase() == _existingPaper.trim().toLowerCase(),
         orElse: () => {},
       );
-      if (foundExisting.isNotEmpty && foundExisting['id'] != null) {
-        paperId = foundExisting['id'].toString();
+      if (foundExisting.isEmpty && _existingTestSeries.isNotEmpty) {
+        final seriesObj = _loadedSeriesObjects.firstWhere(
+          (s) => (s['title'] ?? s['name'] ?? '').toString().trim().toLowerCase() == _existingTestSeries.trim().toLowerCase(),
+          orElse: () => {},
+        );
+        if (seriesObj['tests'] is List) {
+          for (var t in (seriesObj['tests'] as List)) {
+            if (t is Map) {
+              final tMap = Map<String, dynamic>.from(t);
+              final tTitle = (tMap['title'] ?? tMap['name'] ?? '').toString().trim();
+              if (tTitle.toLowerCase() == _existingPaper.trim().toLowerCase()) {
+                foundExisting = tMap;
+                break;
+              }
+            }
+          }
+        }
+      }
+      if (foundExisting.isNotEmpty && foundExisting['id'] != null && foundExisting['id'].toString().isNotEmpty) {
+        paperId = SupabaseService.toValidUuid(foundExisting['id'].toString());
       }
     }
 

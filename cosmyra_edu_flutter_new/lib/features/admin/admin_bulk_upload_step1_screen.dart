@@ -91,6 +91,9 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   // Toggle Switch
   bool _showSectionBreaks = true;
 
+  // Option Bulk Preset State
+  String _defaultOptionPreset = '1_2_3_4'; // '1_2_3_4', 'A_B_C_D', '(1)_(2)_(3)_(4)', '(A)_(B)_(C)_(D)', 'blank'
+
   // Active Sidebar Item tracking
   String _activeSidebarItem = 'Question & Paper Bank';
 
@@ -99,10 +102,10 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     super.initState();
     _paperNameCtrl = TextEditingController(text: 'NEET 2026 Phase 1');
     _paperCodeCtrl = TextEditingController(text: 'N26P1');
-    _questionCountCtrl = TextEditingController(text: '200');
+    _questionCountCtrl = TextEditingController(text: '180');
     _totalMarksCtrl = TextEditingController(text: '720');
     _durationCtrl = TextEditingController(text: '180');
-    _negativeMarksCtrl = TextEditingController(text: '-4');
+    _negativeMarksCtrl = TextEditingController(text: '-1');
     _positiveMarksCtrl = TextEditingController(text: '+4');
     _instructionsCtrl = TextEditingController();
     _newTestSeriesCtrl = TextEditingController();
@@ -163,11 +166,11 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       _conductingBody = 'NTA';
       _paperType = 'Medical (UG)';
       if (!preserveMarks) {
-        _questionCountCtrl.text = '200';
+        _questionCountCtrl.text = '180';
         _totalMarksCtrl.text = '720';
         _durationCtrl.text = '180';
         _positiveMarksCtrl.text = '+4';
-        _negativeMarksCtrl.text = '-4';
+        _negativeMarksCtrl.text = '-1';
       }
       _subjectPhysics = true;
       _subjectChemistry = true;
@@ -245,6 +248,36 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     final String seriesId = seriesObj['id']?.toString() ?? '';
     final String seriesPaperId = seriesObj['paper_id']?.toString() ?? '';
 
+    // 1. Extract embedded tests created inside Test Series Manager dialog
+    final List<Map<String, dynamic>> embeddedTests = [];
+    if (seriesObj['tests'] is List) {
+      int testCounter = 1;
+      for (var t in (seriesObj['tests'] as List)) {
+        if (t is Map) {
+          final tMap = Map<String, dynamic>.from(t);
+          final tTitle = (tMap['title'] ?? tMap['name'] ?? '').toString().trim();
+          if (tTitle.isNotEmpty) {
+            embeddedTests.add({
+              'id': tMap['id'] ?? tMap['paper_id'] ?? 'test_${DateTime.now().millisecondsSinceEpoch}',
+              'paper_name': tTitle,
+              'paperName': tTitle,
+              'paper_code': tMap['code'] ?? 'P$testCounter',
+              'question_count': tMap['questions'] ?? tMap['question_count'] ?? 180,
+              'total_marks': tMap['marks'] ?? tMap['total_marks'] ?? 720,
+              'duration_minutes': tMap['duration'] ?? tMap['duration_minutes'] ?? 180,
+              'exam': seriesObj['exam'] ?? _examName,
+              'year': seriesObj['year'] ?? _year,
+              'test_series_title': seriesTitle,
+              'test_series_id': seriesId,
+              'is_embedded': true,
+            });
+            testCounter++;
+          }
+        }
+      }
+    }
+
+    // 2. Extract matched papers from papers database table
     final matched = _loadedPapersList.where((p) {
       final pTsTitle = (p['test_series_title'] ?? p['existing_test_series'] ?? p['new_test_series_name'] ?? '').toString().trim().toLowerCase();
       final pTsId = (p['test_series_id'] ?? '').toString().trim();
@@ -256,10 +289,27 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       return false;
     }).toList();
 
-    final titles = matched
+    // 3. Combine both sources safely
+    final Map<String, Map<String, dynamic>> combinedMap = {};
+    for (var et in embeddedTests) {
+      final key = (et['paper_name'] ?? '').toString().trim().toLowerCase();
+      if (key.isNotEmpty) combinedMap[key] = et;
+    }
+    for (var mp in matched) {
+      final key = (mp['paper_name'] ?? mp['paperName'] ?? '').toString().trim().toLowerCase();
+      if (key.isNotEmpty) {
+        if (combinedMap.containsKey(key)) {
+          combinedMap[key] = {...combinedMap[key]!, ...mp};
+        } else {
+          combinedMap[key] = mp;
+        }
+      }
+    }
+
+    final allCombined = combinedMap.values.toList();
+    final titles = allCombined
         .map((p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim())
         .where((t) => t.isNotEmpty)
-        .toSet()
         .toList();
 
     setState(() {
@@ -267,7 +317,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       if (titles.isNotEmpty) {
         _paperOption = 'existing';
         _existingPaper = titles.first;
-        _onExistingPaperSelected(_existingPaper);
+        _onExistingPaperSelected(_existingPaper, customPaperMapList: allCombined);
       } else {
         _paperOption = 'new';
         _existingPaper = '';
@@ -277,17 +327,96 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     });
   }
 
-  void _onExistingPaperSelected(String paperTitle) {
+  List<int> _selectedPaperPendingQNumbers = [];
+  int _selectedPaperSavedCount = 0;
+  bool _isLoadingPaperPendingStatus = false;
+
+  Future<void> _checkPaperPendingQuestions(String paperId, int totalQCount) async {
+    if (paperId.isEmpty) return;
+    setState(() => _isLoadingPaperPendingStatus = true);
+    try {
+      final savedQuestions = await SupabaseService.fetchQuestionsForPaper(paperId);
+      final Set<int> savedNumSet = {};
+      for (var sq in savedQuestions) {
+        final rawNum = sq['question_number'] ?? sq['questionNumber'];
+        final int? parsedNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum?.toString() ?? '');
+        final hasCorrect = (sq['correct_option_index'] != null || sq['correctOptionIndex'] != null || (sq['correct_answer'] ?? '').toString().isNotEmpty);
+        final hasChap = (sq['chapter'] ?? sq['chapterTopic'] ?? '').toString().isNotEmpty;
+        if (parsedNum != null && hasCorrect && hasChap) {
+          savedNumSet.add(parsedNum);
+        }
+      }
+
+      final List<int> pending = [];
+      for (int i = 1; i <= totalQCount; i++) {
+        if (!savedNumSet.contains(i)) {
+          pending.add(i);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _selectedPaperSavedCount = savedNumSet.length;
+          _selectedPaperPendingQNumbers = pending;
+          _isLoadingPaperPendingStatus = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingPaperPendingStatus = false);
+    }
+  }
+
+  void _onExistingPaperSelected(String paperTitle, {List<Map<String, dynamic>>? customPaperMapList}) {
     setState(() {
       _existingPaper = paperTitle;
-      final foundPaper = _loadedPapersList.firstWhere(
-        (p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim().toLowerCase() == paperTitle.trim().toLowerCase(),
-        orElse: () => {},
-      );
+      final targetTitleLower = paperTitle.trim().toLowerCase();
+
+      Map<String, dynamic> foundPaper = {};
+      if (customPaperMapList != null && customPaperMapList.isNotEmpty) {
+        foundPaper = customPaperMapList.firstWhere(
+          (p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim().toLowerCase() == targetTitleLower,
+          orElse: () => {},
+        );
+      }
+
+      if (foundPaper.isEmpty) {
+        foundPaper = _loadedPapersList.firstWhere(
+          (p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim().toLowerCase() == targetTitleLower,
+          orElse: () => {},
+        );
+      }
+
+      if (foundPaper.isEmpty && _existingTestSeries.isNotEmpty) {
+        final seriesObj = _loadedSeriesObjects.firstWhere(
+          (s) => (s['title'] ?? s['name'] ?? '').toString().trim().toLowerCase() == _existingTestSeries.trim().toLowerCase(),
+          orElse: () => {},
+        );
+        if (seriesObj['tests'] is List) {
+          for (var t in (seriesObj['tests'] as List)) {
+            if (t is Map) {
+              final tMap = Map<String, dynamic>.from(t);
+              final tTitle = (tMap['title'] ?? tMap['name'] ?? '').toString().trim();
+              if (tTitle.toLowerCase() == targetTitleLower) {
+                foundPaper = {
+                  'id': tMap['id'] ?? tMap['paper_id'] ?? 'test_${DateTime.now().millisecondsSinceEpoch}',
+                  'paper_name': tTitle,
+                  'paperName': tTitle,
+                  'question_count': tMap['questions'] ?? tMap['question_count'] ?? 180,
+                  'total_marks': tMap['marks'] ?? tMap['total_marks'] ?? 720,
+                  'duration_minutes': tMap['duration'] ?? tMap['duration_minutes'] ?? 180,
+                  'exam': seriesObj['exam'] ?? _examName,
+                  'year': seriesObj['year'] ?? _year,
+                };
+                break;
+              }
+            }
+          }
+        }
+      }
 
       if (foundPaper.isNotEmpty) {
         _paperNameCtrl.text = foundPaper['paper_name'] ?? foundPaper['paperName'] ?? paperTitle;
-        _paperCodeCtrl.text = foundPaper['paper_code'] ?? foundPaper['paperCode'] ?? '';
+        _paperCodeCtrl.text = foundPaper['paper_code'] ?? foundPaper['paperCode'] ?? 'P1';
 
         if (foundPaper['exam'] != null && foundPaper['exam'].toString().isNotEmpty) {
           _examName = foundPaper['exam'].toString();
@@ -308,11 +437,11 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           _conductingBody = (foundPaper['conducting_body'] ?? foundPaper['conductingBody']).toString();
         }
 
-        if (foundPaper['total_marks'] != null || foundPaper['totalMarks'] != null) {
-          _totalMarksCtrl.text = (foundPaper['total_marks'] ?? foundPaper['totalMarks']).toString();
+        if (foundPaper['total_marks'] != null || foundPaper['totalMarks'] != null || foundPaper['marks'] != null) {
+          _totalMarksCtrl.text = (foundPaper['total_marks'] ?? foundPaper['totalMarks'] ?? foundPaper['marks']).toString();
         }
-        if (foundPaper['question_count'] != null || foundPaper['questionCount'] != null) {
-          _questionCountCtrl.text = (foundPaper['question_count'] ?? foundPaper['questionCount']).toString();
+        if (foundPaper['question_count'] != null || foundPaper['questionCount'] != null || foundPaper['questions'] != null) {
+          _questionCountCtrl.text = (foundPaper['question_count'] ?? foundPaper['questionCount'] ?? foundPaper['questions']).toString();
         }
         if (foundPaper['duration_minutes'] != null || foundPaper['duration'] != null) {
           _durationCtrl.text = (foundPaper['duration_minutes'] ?? foundPaper['duration']).toString();
@@ -341,6 +470,10 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           _subjectBotany = subList.contains('botany') || subList.contains('biology');
           _subjectZoology = subList.contains('zoology') || subList.contains('biology');
         }
+
+        final String paperId = foundPaper['id']?.toString() ?? '';
+        final int totalQ = int.tryParse(foundPaper['question_count']?.toString() ?? foundPaper['questions']?.toString() ?? '') ?? 180;
+        _checkPaperPendingQuestions(paperId, totalQ);
       }
     });
   }
@@ -406,12 +539,30 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     // If existing paper was selected, reuse its exact ID so Step 2 loads its existing questions
     String paperId = SupabaseService.toValidUuid('paper_${_examName}_${_year}_${_phaseSession}_$pName');
     if (_sourceCategory == 'Test Series' && _paperOption == 'existing' && _existingPaper.isNotEmpty) {
-      final foundExisting = _loadedPapersList.firstWhere(
+      Map<String, dynamic> foundExisting = _loadedPapersList.firstWhere(
         (p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim().toLowerCase() == _existingPaper.trim().toLowerCase(),
         orElse: () => {},
       );
-      if (foundExisting.isNotEmpty && foundExisting['id'] != null) {
-        paperId = foundExisting['id'].toString();
+      if (foundExisting.isEmpty && _existingTestSeries.isNotEmpty) {
+        final seriesObj = _loadedSeriesObjects.firstWhere(
+          (s) => (s['title'] ?? s['name'] ?? '').toString().trim().toLowerCase() == _existingTestSeries.trim().toLowerCase(),
+          orElse: () => {},
+        );
+        if (seriesObj['tests'] is List) {
+          for (var t in (seriesObj['tests'] as List)) {
+            if (t is Map) {
+              final tMap = Map<String, dynamic>.from(t);
+              final tTitle = (tMap['title'] ?? tMap['name'] ?? '').toString().trim();
+              if (tTitle.toLowerCase() == _existingPaper.trim().toLowerCase()) {
+                foundExisting = tMap;
+                break;
+              }
+            }
+          }
+        }
+      }
+      if (foundExisting.isNotEmpty && foundExisting['id'] != null && foundExisting['id'].toString().isNotEmpty) {
+        paperId = SupabaseService.toValidUuid(foundExisting['id'].toString());
       }
     }
 
@@ -441,13 +592,13 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       'language': _language,
       'conductingBody': _conductingBody,
       'conducting_body': _conductingBody,
-      'questionCount': int.tryParse(_questionCountCtrl.text) ?? 200,
+      'questionCount': int.tryParse(_questionCountCtrl.text) ?? 180,
       'totalMarks': int.tryParse(_totalMarksCtrl.text) ?? 720,
       'total_marks': double.tryParse(_totalMarksCtrl.text) ?? 720.0,
       'durationMinutes': int.tryParse(_durationCtrl.text) ?? 180,
       'duration': int.tryParse(_durationCtrl.text) ?? 180,
       'negativeMarking': _negativeMarking == 'Yes',
-      'negativeMarks': double.tryParse(_negativeMarksCtrl.text) ?? -4.0,
+      'negativeMarks': double.tryParse(_negativeMarksCtrl.text) ?? -1.0,
       'positiveMarks': double.tryParse(_positiveMarksCtrl.text) ?? 4.0,
       'subjects': [
         if (_subjectPhysics) 'Physics',
@@ -474,6 +625,8 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       'existingPaper': _existingPaper,
       'existing_paper': _existingPaper,
       'is_test_series': _sourceCategory == 'Test Series' || availableInModules.contains('test_series'),
+      'defaultOptionPreset': _defaultOptionPreset,
+      'default_option_preset': _defaultOptionPreset,
     };
 
     // Immediately persist created Test Series so it shows up in Test Series section
@@ -496,12 +649,25 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           'purchase_link': _testSeriesPurchaseLinkCtrl.text.trim(),
           'purchase_button_text': _testSeriesButtonTextCtrl.text.trim(),
           'show_purchase_button': _testSeriesShowButton,
-          'question_count': int.tryParse(_questionCountCtrl.text) ?? 200,
+          'question_count': int.tryParse(_questionCountCtrl.text) ?? 180,
           'total_marks': double.tryParse(_totalMarksCtrl.text) ?? (_examName.contains('JEE') ? 300.0 : 720.0),
           'conducting_body': _conductingBody,
           'duration_minutes': int.tryParse(_durationCtrl.text) ?? 180,
           'difficulty': 'High',
           'status': 'Published',
+          'tests': [
+            {
+              'id': paperId,
+              'paper_id': paperId,
+              'title': pName,
+              'questions': int.tryParse(_questionCountCtrl.text) ?? 180,
+              'marks': double.tryParse(_totalMarksCtrl.text) ?? (_examName.contains('JEE') ? 300.0 : 720.0),
+              'duration': int.tryParse(_durationCtrl.text) ?? 180,
+              'type': 'Full',
+              'status': 'Published',
+            }
+          ],
+          'test_count': 1,
         });
       } catch (e) {
         debugPrint('Notice persisting test series in step 1: $e');
@@ -524,7 +690,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
             userProfile: widget.userProfile,
             paperRecord: paperDetails,
             paperName: pName,
-            totalQuestionsCount: paperDetails['questionCount'] as int? ?? 200,
+            totalQuestionsCount: paperDetails['questionCount'] as int? ?? 180,
           ),
         ),
       );
@@ -1450,18 +1616,83 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                       ),
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
-                        child: Row(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _selectedPaperPendingQNumbers.isEmpty ? const Color(0xFFDCFCE7) : const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: _selectedPaperPendingQNumbers.isEmpty ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF16A34A), size: 16),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '✓ Auto-fetched parameters for "$_existingPaper": Total Marks: ${_totalMarksCtrl.text} | Questions: ${_questionCountCtrl.text} | Conducting Body: $_conductingBody | Duration: ${_durationCtrl.text}m | Marking: ${_positiveMarksCtrl.text}/${_negativeMarksCtrl.text}',
-                                style: const TextStyle(fontSize: 11, color: Color(0xFF15803D), fontWeight: FontWeight.bold),
-                              ),
+                            Row(
+                              children: [
+                                Icon(
+                                  _selectedPaperPendingQNumbers.isEmpty ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
+                                  color: _selectedPaperPendingQNumbers.isEmpty ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '✓ Auto-fetched parameters for "$_existingPaper": Total Marks: ${_totalMarksCtrl.text} | Questions: ${_questionCountCtrl.text} | Duration: ${_durationCtrl.text}m | Marking: ${_positiveMarksCtrl.text}/${_negativeMarksCtrl.text}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: _selectedPaperPendingQNumbers.isEmpty ? const Color(0xFF15803D) : const Color(0xFF991B1B),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Text(
+                                  _isLoadingPaperPendingStatus
+                                      ? 'Checking pending question status...'
+                                      : (_selectedPaperPendingQNumbers.isEmpty
+                                          ? '✓ Upload Status: All ${_questionCountCtrl.text} questions saved!'
+                                          : '⚠️ Upload Status: $_selectedPaperSavedCount / ${_questionCountCtrl.text} Saved | Pending (${_selectedPaperPendingQNumbers.length}):'),
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: _selectedPaperPendingQNumbers.isEmpty ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (!_isLoadingPaperPendingStatus && _selectedPaperPendingQNumbers.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 4,
+                                runSpacing: 4,
+                                children: [
+                                  ..._selectedPaperPendingQNumbers.take(25).map((qNum) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: const Color(0xFFEF4444)),
+                                      ),
+                                      child: Text(
+                                        'Q$qNum',
+                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+                                      ),
+                                    );
+                                  }),
+                                  if (_selectedPaperPendingQNumbers.length > 25)
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 4, top: 2),
+                                      child: Text(
+                                        '+${_selectedPaperPendingQNumbers.length - 25} more pending...',
+                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF991B1B)),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -1670,6 +1901,79 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                 borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
               ),
             ),
+          ),
+
+          const SizedBox(height: 24),
+          _buildQuickOptionsPresetCard(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickOptionsPresetCard() {
+    final List<Map<String, String>> presets = [
+      {'key': '1_2_3_4', 'badge': '1, 2, 3, 4', 'label': 'Option A=1, B=2, C=3, D=4'},
+      {'key': 'A_B_C_D', 'badge': 'A, B, C, D', 'label': 'Option A=A, B=B, C=C, D=D'},
+      {'key': '(1)_(2)_(3)_(4)', 'badge': '(1), (2), (3), (4)', 'label': 'Option A=(1), B=(2), C=(3), D=(4)'},
+      {'key': '(A)_(B)_(C)_(D)', 'badge': '(A), (B), (C), (D)', 'label': 'Option A=(A), B=(B), C=(C), D=(D)'},
+      {'key': 'blank', 'badge': 'Blank', 'label': 'Manual Custom Text'},
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.bolt_rounded, size: 20, color: Color(0xFF2563EB)),
+              SizedBox(width: 8),
+              Text(
+                '⚡ 1-Click Bulk Option Set (Fast Question Upload)',
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Select a default option preset for all questions in this paper so option text is pre-filled automatically.',
+            style: TextStyle(fontSize: 11.5, color: Color(0xFF1E40AF)),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: presets.map((p) {
+              final isSel = (_defaultOptionPreset == p['key']);
+              return ChoiceChip(
+                label: Text(
+                  '${p['badge']}  (${p['label']})',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSel ? FontWeight.bold : FontWeight.w600,
+                    color: isSel ? const Color(0xFF1E40AF) : const Color(0xFF334155),
+                  ),
+                ),
+                selected: isSel,
+                onSelected: (val) {
+                  if (val) setState(() => _defaultOptionPreset = p['key']!);
+                },
+                selectedColor: const Color(0xFFDBEAFE),
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(
+                    color: isSel ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
+                    width: isSel ? 1.5 : 1.0,
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),
