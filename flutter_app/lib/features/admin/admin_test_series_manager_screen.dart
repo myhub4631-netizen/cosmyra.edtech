@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
+import '../tests/test_screen.dart';
+import '../tests/test_result_screen.dart';
 
 class AdminTestSeriesManagerScreen extends StatefulWidget {
   final UserProfileModel? userProfile;
@@ -1463,6 +1465,64 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     }
   }
 
+  Future<void> _launchAdminPreviewTest(Map<String, dynamic> testItem) async {
+    final title = (testItem['title'] ?? 'Test Paper').toString();
+    final pId = (testItem['paper_id'] ?? testItem['id'] ?? '').toString();
+    final duration = int.tryParse(testItem['duration']?.toString() ?? '') ?? 180;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+            const SizedBox(width: 10),
+            Expanded(child: Text('Loading "$title" in Admin Preview Mode...')),
+          ],
+        ),
+        backgroundColor: const Color(0xFF312E81),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    List<QuestionModel> questions = [];
+    if (pId.isNotEmpty) {
+      questions = await SupabaseService.fetchTestSeriesQuestions(paperId: pId, exam: _exam);
+    }
+    if (questions.isEmpty) {
+      final allRaw = await SupabaseService.fetchAllQuestionsFromSupabase();
+      if (allRaw.isNotEmpty) {
+        questions = allRaw.take(200).map((q) => QuestionModel.fromJson(q)).toList();
+      } else {
+        questions = SupabaseService.getSampleQuestions(20);
+      }
+    }
+
+    if (!mounted) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CustomTestScreen(
+          questions: questions,
+          durationMinutes: duration,
+          isPreview: true, // Admin Preview Mode — Bypasses data logging
+          onTestSubmitted: (attempt, answers) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => TestResultScreen(
+                  attempt: attempt,
+                  questions: questions,
+                  userAnswers: answers,
+                  onRetryTest: () => Navigator.of(context).pop(),
+                  onBackToDashboard: () => Navigator.of(context).pop(),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   // --- SUB DIALOG: LINK PUBLISHED PAPER ---
   void _showLinkPaperDialog() {
     if (widget.availablePapers.isEmpty) {
@@ -2654,6 +2714,18 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF10B981),
+                              side: const BorderSide(color: Color(0xFF10B981)),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                            onPressed: () => _launchAdminPreviewTest(t),
+                            icon: const Icon(Icons.visibility_rounded, size: 14),
+                            label: const Text('Admin Preview', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(width: 6),
                           IconButton(
                             icon: const Icon(Icons.arrow_upward_rounded, size: 18),
                             color: idx > 0 ? const Color(0xFF475569) : const Color(0xFFCBD5E1),

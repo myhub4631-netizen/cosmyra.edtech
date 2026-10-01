@@ -12,6 +12,7 @@ class CustomTestScreen extends StatefulWidget {
   final int durationMinutes;
   final String? sessionId;
   final bool isNewSession;
+  final bool isPreview;
   final Function(TestAttemptModel attempt, Map<int, String> answers) onTestSubmitted;
 
   const CustomTestScreen({
@@ -20,6 +21,7 @@ class CustomTestScreen extends StatefulWidget {
     this.durationMinutes = 60,
     this.sessionId,
     this.isNewSession = false,
+    this.isPreview = false,
     required this.onTestSubmitted,
   });
 
@@ -47,10 +49,12 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
     _startedAt = DateTime.now();
     _secondsRemaining = widget.durationMinutes > 0 ? widget.durationMinutes * 60 : 3600;
     _expiresAt = _startedAt.add(Duration(seconds: _secondsRemaining));
-    if (widget.isNewSession) {
-      SupabaseService.clearActiveTestSession();
-    } else {
-      _restoreActiveSession();
+    if (!widget.isPreview) {
+      if (widget.isNewSession) {
+        SupabaseService.clearActiveTestSession();
+      } else {
+        _restoreActiveSession();
+      }
     }
     _startTimer();
   }
@@ -82,6 +86,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
   }
 
   void _persistCurrentSession() {
+    if (widget.isPreview) return;
     SupabaseService.saveActiveTestSession(
       sessionId: _activeSessionId,
       questions: widget.questions,
@@ -281,13 +286,15 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
       timeSpentSeconds: timeSpent > 0 ? timeSpent : 1,
     );
 
-    // Save to Supabase and storage
-    await SupabaseService.submitTestAttempt(
-      userId: 'usr-current',
-      attempt: attempt,
-      questions: widget.questions,
-      userAnswers: _userAnswers,
-    );
+    // Save to Supabase and storage (only when NOT in preview mode)
+    if (!widget.isPreview) {
+      await SupabaseService.submitTestAttempt(
+        userId: 'usr-current',
+        attempt: attempt,
+        questions: widget.questions,
+        userAnswers: _userAnswers,
+      );
+    }
 
     if (mounted) {
       setState(() {
@@ -704,6 +711,28 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            if (widget.isPreview)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFFD97706), Color(0xFFB45309)],
+                  ),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.visibility_rounded, color: Colors.white, size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'ADMIN PREVIEW MODE — Testing interface in preview mode. Scores, attempt data, or analytics will NOT be logged as user data.',
+                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // 1. TOP HEADER BAR (Timer + Subject Title + Submit Button)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
