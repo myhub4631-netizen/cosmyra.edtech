@@ -331,18 +331,19 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   int _selectedPaperSavedCount = 0;
   bool _isLoadingPaperPendingStatus = false;
 
-  Future<void> _checkPaperPendingQuestions(String paperId, int totalQCount) async {
-    if (paperId.isEmpty) return;
+  Future<void> _checkPaperPendingQuestions(String paperId, int totalQCount, {String? paperName}) async {
+    if (paperId.isEmpty && (paperName == null || paperName.isEmpty)) return;
     setState(() => _isLoadingPaperPendingStatus = true);
     try {
-      final savedQuestions = await SupabaseService.fetchQuestionsForPaper(paperId);
+      final savedQuestions = await SupabaseService.fetchQuestionsForPaper(
+        paperId,
+        paperName: paperName ?? _existingPaper,
+      );
       final Set<int> savedNumSet = {};
       for (var sq in savedQuestions) {
         final rawNum = sq['question_number'] ?? sq['questionNumber'];
         final int? parsedNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum?.toString() ?? '');
-        final hasCorrect = (sq['correct_option_index'] != null || sq['correctOptionIndex'] != null || (sq['correct_answer'] ?? '').toString().isNotEmpty);
-        final hasChap = (sq['chapter'] ?? sq['chapterTopic'] ?? '').toString().isNotEmpty;
-        if (parsedNum != null && hasCorrect && hasChap) {
+        if (parsedNum != null && parsedNum > 0) {
           savedNumSet.add(parsedNum);
         }
       }
@@ -473,7 +474,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
 
         final String paperId = foundPaper['id']?.toString() ?? '';
         final int totalQ = int.tryParse(foundPaper['question_count']?.toString() ?? foundPaper['questions']?.toString() ?? '') ?? 180;
-        _checkPaperPendingQuestions(paperId, totalQ);
+        _checkPaperPendingQuestions(paperId, totalQ, paperName: paperTitle);
       }
     });
   }

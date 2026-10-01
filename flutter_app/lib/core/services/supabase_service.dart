@@ -6435,14 +6435,20 @@ class SupabaseService {
   }
 
   /// Fetch saved questions for a given paper ID
-  static Future<List<Map<String, dynamic>>> fetchQuestionsForPaper(String paperId) async {
+  /// Fetch saved questions for a given paper ID or paper name
+  static Future<List<Map<String, dynamic>>> fetchQuestionsForPaper(String paperId, {String? paperName}) async {
     final List<Map<String, dynamic>> results = [];
     final String paperUuid = toValidUuid(paperId);
+    final String targetName = (paperName ?? paperId).trim();
 
-    // 1. Check SharedPreferences by paperId & paperUuid
+    // 1. Check SharedPreferences by paperId, paperUuid, and targetName
     try {
       final prefs = await SharedPreferences.getInstance();
-      for (final key in ['cosmyra_paper_questions_$paperId', 'cosmyra_paper_questions_$paperUuid']) {
+      for (final key in [
+        'cosmyra_paper_questions_$paperId',
+        'cosmyra_paper_questions_$paperUuid',
+        if (targetName.isNotEmpty) 'cosmyra_paper_questions_$targetName',
+      ]) {
         final str = prefs.getString(key);
         if (str != null && str.isNotEmpty) {
           final List<dynamic> decoded = jsonDecode(str);
@@ -6462,19 +6468,35 @@ class SupabaseService {
       debugPrint('Notice reading local paper questions: $e');
     }
 
-    // 2. Query Supabase DB questions table safely
+    // 2. Query Supabase DB questions table with explicit OR filters
     try {
-      final res = await client.from('questions').select().order('created_at', ascending: false).limit(500);
+      final List<String> orFilters = [];
+      if (paperId.isNotEmpty) {
+        orFilters.add('paper_id.eq.$paperId');
+        orFilters.add('paper_id.eq.$paperUuid');
+        orFilters.add('test_series_id.eq.$paperId');
+        orFilters.add('test_series_id.eq.$paperUuid');
+      }
+      if (targetName.isNotEmpty) {
+        orFilters.add('paper_name.eq.$targetName');
+      }
+
+      dynamic query = client.from('questions').select();
+      if (orFilters.isNotEmpty) {
+        query = query.or(orFilters.join(','));
+      }
+      final res = await query.order('created_at', ascending: false).limit(500);
 
       if (res != null && (res as List).isNotEmpty) {
         final dbQuestions = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         for (var dbQ in dbQuestions) {
           dbQ = processEnumerateInQuestionMap(dbQ);
           final pId = dbQ['paper_id']?.toString() ?? dbQ['paperId']?.toString() ?? dbQ['test_series_id']?.toString() ?? '';
+          final pName = dbQ['paper_name']?.toString() ?? '';
           final bool isPaperMatch = pId == paperId ||
               pId == paperUuid ||
               pId == toValidUuid(paperId) ||
-              (dbQ['paper_name']?.toString().toLowerCase().trim() == paperId.toLowerCase().trim()) ||
+              (pName.isNotEmpty && (pName.toLowerCase().trim() == paperId.toLowerCase().trim() || pName.toLowerCase().trim() == targetName.toLowerCase().trim())) ||
               (dbQ['id']?.toString().startsWith('q_${paperId}_') == true) ||
               (dbQ['id']?.toString() == toValidUuid('q_${paperId}_${dbQ['question_number'] ?? dbQ['questionNumber']}'));
 
