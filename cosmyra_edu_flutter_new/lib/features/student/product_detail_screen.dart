@@ -596,13 +596,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               backgroundColor: Colors.white,
               elevation: 0,
               scrolledUnderElevation: 0,
+              titleSpacing: 0,
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
                 onPressed: () => context.canPop() ? context.pop() : context.go('/test-series'),
               ),
               title: Text(
                 item.title,
-                style: GoogleFonts.inter(color: const Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.bold),
+                style: GoogleFonts.inter(color: const Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.bold),
+                maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               actions: [
@@ -1056,7 +1058,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
               // Smooth Tab Content
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                 child: _buildSelectedTabContent(item, tests),
               ),
             ],
@@ -2259,41 +2261,54 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               final iconGrad = testIconGradients[index % testIconGradients.length];
 
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        gradient: LinearGradient(
-                          colors: iconGrad,
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            gradient: LinearGradient(
+                              colors: iconGrad,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: iconGrad.first.withValues(alpha: 0.2),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Icon(iconData, color: Colors.white, size: 18),
+                          ),
                         ),
-                      ),
-                      child: Center(
-                        child: Icon(iconData, color: Colors.white, size: 18),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-
-                    Container(
-                      width: 26,
-                      height: 26,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Center(
-                        child: Text(
-                          numStr,
-                          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF475569)),
+                        Positioned(
+                          right: -5,
+                          top: -5,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F172A),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.white, width: 1.5),
+                            ),
+                            child: Text(
+                              numStr,
+                              style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
 
                     Expanded(
                       child: Column(
@@ -2301,14 +2316,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                         children: [
                           Text(
                             testTitle,
-                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                            maxLines: 1,
+                            style: GoogleFonts.inter(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF0F172A),
+                              height: 1.25,
+                            ),
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 4),
                           Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
+                            spacing: 6,
+                            runSpacing: 3,
                             children: [
                               _buildMetaChip(Icons.description_outlined, '$qCount Qs'),
                               _buildMetaChip(Icons.access_time_rounded, '${(durationMins / 60).toStringAsFixed(0)} Hrs'),
@@ -2322,10 +2342,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFECFDF5),
-                        foregroundColor: const Color(0xFF059669),
+                        backgroundColor: isUnlocked ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                        foregroundColor: isUnlocked ? const Color(0xFF059669) : const Color(0xFF64748B),
                         elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       onPressed: () {
@@ -2350,11 +2372,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'Start',
-                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
+                            isUnlocked ? 'Start' : 'Unlock',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              color: isUnlocked ? const Color(0xFF059669) : const Color(0xFF64748B),
+                            ),
                           ),
                           const SizedBox(width: 2),
-                          const Icon(Icons.chevron_right_rounded, size: 14, color: Color(0xFF059669)),
+                          Icon(
+                            isUnlocked ? Icons.chevron_right_rounded : Icons.lock_outline_rounded,
+                            size: 13,
+                            color: isUnlocked ? const Color(0xFF059669) : const Color(0xFF64748B),
+                          ),
                         ],
                       ),
                     ),
