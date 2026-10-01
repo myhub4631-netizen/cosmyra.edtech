@@ -2120,12 +2120,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               textColor: const Color(0xFF1E40AF),
               btnBgColor: const Color(0xFFDBEAFE),
               btnTextColor: const Color(0xFF2563EB),
-              testIconData: [Icons.science_rounded, Icons.functions_rounded, Icons.track_changes_rounded],
-              testIconGradients: [
-                [const Color(0xFF1E1B4B), const Color(0xFF312E81)],
-                [const Color(0xFF0F172A), const Color(0xFF1E293B)],
-                [const Color(0xFF064E3B), const Color(0xFF047857)],
-              ],
               tests: fAll,
               item: item,
             ),
@@ -2140,12 +2134,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               textColor: const Color(0xFF065F46),
               btnBgColor: const Color(0xFFDCFCE7),
               btnTextColor: const Color(0xFF059669),
-              testIconData: [Icons.public_rounded, Icons.science_rounded, Icons.balance_rounded],
-              testIconGradients: [
-                [const Color(0xFF1E1B4B), const Color(0xFF312E81)],
-                [const Color(0xFF4C0519), const Color(0xFF881337)],
-                [const Color(0xFF451A03), const Color(0xFF78350F)],
-              ],
               tests: fChapter,
               item: item,
             ),
@@ -2160,12 +2148,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               textColor: const Color(0xFF5B21B6),
               btnBgColor: const Color(0xFFF3E8FF),
               btnTextColor: const Color(0xFF7C3AED),
-              testIconData: [Icons.settings_rounded, Icons.settings_rounded, Icons.local_fire_department_rounded],
-              testIconGradients: [
-                [const Color(0xFF0F172A), const Color(0xFF1E293B)],
-                [const Color(0xFF0F172A), const Color(0xFF1E293B)],
-                [const Color(0xFF0F172A), const Color(0xFF1E293B)],
-              ],
               tests: fPart,
               item: item,
             ),
@@ -2180,11 +2162,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               textColor: const Color(0xFF92400E),
               btnBgColor: const Color(0xFFFEF3C7),
               btnTextColor: const Color(0xFFD97706),
-              testIconData: [Icons.grid_view_rounded, Icons.center_focus_strong_rounded],
-              testIconGradients: [
-                [const Color(0xFF064E3B), const Color(0xFF047857)],
-                [const Color(0xFF064E3B), const Color(0xFF047857)],
-              ],
               tests: fUnit,
               item: item,
             ),
@@ -2199,11 +2176,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               textColor: const Color(0xFF1E40AF),
               btnBgColor: const Color(0xFFDBEAFE),
               btnTextColor: const Color(0xFF2563EB),
-              testIconData: [Icons.stars_rounded, Icons.military_tech_rounded],
-              testIconGradients: [
-                [const Color(0xFF1E3A8A), const Color(0xFF2563EB)],
-                [const Color(0xFF1E3A8A), const Color(0xFF2563EB)],
-              ],
               tests: fFull,
               item: item,
             ),
@@ -2243,8 +2215,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     required Color textColor,
     required Color btnBgColor,
     required Color btnTextColor,
-    required List<IconData> testIconData,
-    required List<List<Color>> testIconGradients,
     required List<Map<String, dynamic>> tests,
     required TestSeriesCardData item,
   }) {
@@ -2292,64 +2262,52 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
             itemBuilder: (context, index) {
               final t = tests[index];
-              final testTitle = (t['title'] ?? 'Mock Test').toString();
+              final testTitle = (t['title'] ?? t['paper_name'] ?? t['paperName'] ?? 'Mock Test').toString();
               final testId = (t['id'] ?? 'test_${index}').toString();
               final numStr = (t['number'] ?? '${index + 1 < 10 ? '0${index + 1}' : '${index + 1}'}').toString();
-              final durationMins = (t['duration'] is num) ? (t['duration'] as num).toInt() : 180;
-              final qCount = (t['questions'] is num) ? (t['questions'] as num).toInt() : 200;
-              final marks = (t['marks'] is num) ? (t['marks'] as num).toInt() : 720;
+              final durationMins = (t['duration'] is num) ? (t['duration'] as num).toInt() : (t['duration_minutes'] is num ? (t['duration_minutes'] as num).toInt() : 180);
+              final qCount = (t['questions'] is num) ? (t['questions'] as num).toInt() : (t['saved_questions_count'] is num ? (t['saved_questions_count'] as num).toInt() : 200);
+              final marks = (t['marks'] is num) ? (t['marks'] as num).toInt() : (t['total_marks'] is num ? (t['total_marks'] as num).toInt() : 720);
               final isUnlocked = item.isFree || _hasPurchased;
 
-              final iconData = testIconData[index % testIconData.length];
-              final iconGrad = testIconGradients[index % testIconGradients.length];
+              // Parse test date & time
+              final rawDateTime = t['test_date_time'] ?? t['scheduled_at'] ?? t['test_date'] ?? t['start_time'] ?? t['date_time'];
+              DateTime? dt;
+              if (rawDateTime != null) {
+                if (rawDateTime is DateTime) {
+                  dt = rawDateTime;
+                } else {
+                  dt = DateTime.tryParse(rawDateTime.toString().trim());
+                }
+              }
+              final bool isUpcoming = dt != null && dt.isAfter(DateTime.now());
+              final String formattedDateTime = dt != null
+                  ? DateFormat('dd MMM yyyy, hh:mm a').format(dt)
+                  : '';
 
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(10),
-                            gradient: LinearGradient(
-                              colors: iconGrad,
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: iconGrad.first.withValues(alpha: 0.2),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Icon(iconData, color: Colors.white, size: 18),
-                          ),
+                    // Clean Serial Number Badge (Removed test icon container per user request)
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        numStr,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF334155),
                         ),
-                        Positioned(
-                          right: -5,
-                          top: -5,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0F172A),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.white, width: 1.5),
-                            ),
-                            child: Text(
-                              numStr,
-                              style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                     const SizedBox(width: 12),
 
@@ -2374,8 +2332,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                             runSpacing: 3,
                             children: [
                               _buildMetaChip(Icons.description_outlined, '$qCount Qs'),
-                              _buildMetaChip(Icons.access_time_rounded, '${(durationMins / 60).toStringAsFixed(0)} Hrs'),
+                              _buildMetaChip(Icons.access_time_rounded, '${durationMins >= 60 ? '${(durationMins / 60).toStringAsFixed(0)} Hrs' : '$durationMins Mins'}'),
                               _buildMetaChip(Icons.bar_chart_rounded, '$marks Marks'),
+                              if (formattedDateTime.isNotEmpty)
+                                _buildMetaChip(Icons.event_rounded, formattedDateTime),
                             ],
                           ),
                         ],
@@ -2383,54 +2343,80 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                     ),
                     const SizedBox(width: 8),
 
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isUnlocked ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
-                        foregroundColor: isUnlocked ? const Color(0xFF059669) : const Color(0xFF64748B),
-                        elevation: 0,
+                    if (isUpcoming) ...[
+                      Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.schedule_rounded, size: 13, color: Color(0xFFD97706)),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Upcoming',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFFD97706),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      onPressed: () {
-                        if (isUnlocked) {
-                          _startTest(testId, testTitle, durationMins);
-                        } else {
-                          final cartItem = CartItem(
-                            id: item.id,
-                            title: item.title,
-                            description: item.description,
-                            price: item.price,
-                            originalPrice: item.originalPrice,
-                            bannerImageUrl: item.bannerImageUrl ?? '',
-                            exam: item.exam,
-                            validity: item.validity,
-                            testCount: item.testCount,
-                          );
-                          context.push('/checkout', extra: cartItem);
-                        }
-                      },
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            isUnlocked ? 'Start' : 'Unlock',
-                            style: GoogleFonts.inter(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.bold,
+                    ] else ...[
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isUnlocked ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                          foregroundColor: isUnlocked ? const Color(0xFF059669) : const Color(0xFF64748B),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () {
+                          if (isUnlocked) {
+                            _startTest(testId, testTitle, durationMins);
+                          } else {
+                            final cartItem = CartItem(
+                              id: item.id,
+                              title: item.title,
+                              description: item.description,
+                              price: item.price,
+                              originalPrice: item.originalPrice,
+                              bannerImageUrl: item.bannerImageUrl ?? '',
+                              exam: item.exam,
+                              validity: item.validity,
+                              testCount: item.testCount,
+                            );
+                            context.push('/checkout', extra: cartItem);
+                          }
+                        },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              isUnlocked ? 'Start' : 'Unlock',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: isUnlocked ? const Color(0xFF059669) : const Color(0xFF64748B),
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Icon(
+                              isUnlocked ? Icons.chevron_right_rounded : Icons.lock_outline_rounded,
+                              size: 13,
                               color: isUnlocked ? const Color(0xFF059669) : const Color(0xFF64748B),
                             ),
-                          ),
-                          const SizedBox(width: 2),
-                          Icon(
-                            isUnlocked ? Icons.chevron_right_rounded : Icons.lock_outline_rounded,
-                            size: 13,
-                            color: isUnlocked ? const Color(0xFF059669) : const Color(0xFF64748B),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               );

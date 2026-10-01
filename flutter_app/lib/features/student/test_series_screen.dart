@@ -2747,12 +2747,30 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
         final testTitle = test['title'] ?? 'Mock Test ${index + 1}';
         final qCount = test['questions'] ?? 200;
         final marks = test['marks'] ?? 720;
-        final duration = test['duration'] ?? 180;
+        final duration = test['duration'] ?? test['duration_minutes'] ?? 180;
         final status = test['status'] ?? 'Not Attempted';
+
+        // Parse test date & time
+        final rawDateTime = test['test_date_time'] ?? test['scheduled_at'] ?? test['test_date'] ?? test['start_time'] ?? test['date_time'];
+        DateTime? dt;
+        if (rawDateTime != null) {
+          if (rawDateTime is DateTime) {
+            dt = rawDateTime;
+          } else {
+            dt = DateTime.tryParse(rawDateTime.toString().trim());
+          }
+        }
+        final bool isUpcoming = dt != null && dt.isAfter(DateTime.now());
+        final String formattedDateTime = dt != null
+            ? DateFormat('dd MMM yyyy, hh:mm a').format(dt)
+            : '';
 
         Color statusBg = const Color(0xFFF1F5F9);
         Color statusColor = const Color(0xFF475569);
-        if (status == 'Completed') {
+        if (isUpcoming) {
+          statusBg = const Color(0xFFFFFBEB);
+          statusColor = const Color(0xFFD97706);
+        } else if (status == 'Completed') {
           statusBg = const Color(0xFFDCFCE7);
           statusColor = const Color(0xFF15803D);
         } else if (status == 'In Progress') {
@@ -2806,7 +2824,7 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(color: statusBg, borderRadius: BorderRadius.circular(6)),
                           child: Text(
-                            status,
+                            isUpcoming ? 'Upcoming' : status,
                             style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold, color: statusColor),
                           ),
                         ),
@@ -2815,6 +2833,7 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 8,
+                      runSpacing: 4,
                       children: [
                         Text('$qCount Questions', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
                         const Text('•', style: TextStyle(color: Color(0xFFCBD5E1))),
@@ -2823,6 +2842,10 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
                         Text('$duration Mins', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
                         const Text('•', style: TextStyle(color: Color(0xFFCBD5E1))),
                         Text('Type: ${item.testType}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB))),
+                        if (formattedDateTime.isNotEmpty) ...[
+                          const Text('•', style: TextStyle(color: Color(0xFFCBD5E1))),
+                          Text('📅 $formattedDateTime', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF059669))),
+                        ],
                       ],
                     ),
                   ],
@@ -2831,22 +2854,37 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
               const SizedBox(width: 16),
 
               // Action Button
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: status == 'Completed' ? const Color(0xFF0F172A) : const Color(0xFF2563EB),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              if (isUpcoming) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Text(
+                    'Upcoming',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFD97706)),
+                  ),
                 ),
-                onPressed: () {
-                  Navigator.pop(context);
-                  widget.onStartTest(test['id'], testTitle, duration);
-                },
-                child: Text(
-                  status == 'In Progress' ? 'Resume' : (status == 'Completed' ? 'Retake' : 'Start Test'),
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ] else ...[
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: status == 'Completed' ? const Color(0xFF0F172A) : const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    widget.onStartTest(test['id'], testTitle, duration);
+                  },
+                  child: Text(
+                    status == 'In Progress' ? 'Resume' : (status == 'Completed' ? 'Retake' : 'Start Test'),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         );

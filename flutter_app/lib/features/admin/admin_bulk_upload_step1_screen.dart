@@ -50,6 +50,9 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   String? _difficultyDistribution;
   String _questionOrdering = 'Subject-wise';
 
+  late TextEditingController _testDateTimeCtrl;
+  DateTime? _selectedTestDateTime;
+
   // Test Series Selection State
   String _testSeriesOption = 'existing'; // 'existing' or 'new'
   String _existingTestSeries = '';
@@ -115,7 +118,32 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     _testSeriesOrigPriceCtrl = TextEditingController(text: '999');
     _testSeriesPurchaseLinkCtrl = TextEditingController(text: 'https://neet-jee.in/test-series');
     _testSeriesButtonTextCtrl = TextEditingController(text: 'Enroll Now - ₹299');
+    _selectedTestDateTime = DateTime.now();
+    _testDateTimeCtrl = TextEditingController(text: DateFormat('yyyy-MM-dd HH:mm').format(_selectedTestDateTime!));
     _loadCustomTestSeries();
+  }
+
+  Future<void> _pickTestDateTime() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _selectedTestDateTime ?? now,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2030),
+    );
+    if (date != null) {
+      final time = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(_selectedTestDateTime ?? now),
+      );
+      if (time != null) {
+        final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+        setState(() {
+          _selectedTestDateTime = dt;
+          _testDateTimeCtrl.text = DateFormat('yyyy-MM-dd HH:mm').format(dt);
+        });
+      }
+    }
   }
 
   Future<void> _loadCustomTestSeries() async {
@@ -573,6 +601,10 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
             : _existingTestSeries)
         : '';
 
+    final String formattedIsoDateTime = _selectedTestDateTime != null
+        ? _selectedTestDateTime!.toIso8601String()
+        : DateTime.now().toIso8601String();
+
     final Map<String, dynamic> paperDetails = {
       'id': paperId,
       'sourceCategory': _sourceCategory,
@@ -598,6 +630,9 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       'total_marks': double.tryParse(_totalMarksCtrl.text) ?? 720.0,
       'durationMinutes': int.tryParse(_durationCtrl.text) ?? 180,
       'duration': int.tryParse(_durationCtrl.text) ?? 180,
+      'test_date_time': formattedIsoDateTime,
+      'test_date': formattedIsoDateTime,
+      'scheduled_at': formattedIsoDateTime,
       'negativeMarking': _negativeMarking == 'Yes',
       'negativeMarks': double.tryParse(_negativeMarksCtrl.text) ?? -1.0,
       'positiveMarks': double.tryParse(_positiveMarksCtrl.text) ?? 4.0,
@@ -656,6 +691,8 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           'duration_minutes': int.tryParse(_durationCtrl.text) ?? 180,
           'difficulty': 'High',
           'status': 'Published',
+          'test_date_time': formattedIsoDateTime,
+          'scheduled_at': formattedIsoDateTime,
           'tests': [
             {
               'id': paperId,
@@ -666,6 +703,8 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
               'duration': int.tryParse(_durationCtrl.text) ?? 180,
               'type': 'Full',
               'status': 'Published',
+              'test_date_time': formattedIsoDateTime,
+              'scheduled_at': formattedIsoDateTime,
             }
           ],
           'test_count': 1,
@@ -1819,12 +1858,12 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
 
           const SizedBox(height: 20),
 
-          // Row 3 (5 Fields)
+          // Row 3 (6 Fields including Test Date & Time)
           LayoutBuilder(
             builder: (context, constraints) {
               return _buildResponsiveGrid(
                 constraints: constraints,
-                columns: 5,
+                columns: 6,
                 children: [
                   _buildTextField(
                     label: 'Total Marks *',
@@ -1835,6 +1874,15 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                     label: 'Duration (Minutes) *',
                     controller: _durationCtrl,
                     keyboardType: TextInputType.number,
+                  ),
+                  GestureDetector(
+                    onTap: _pickTestDateTime,
+                    child: AbsorbPointer(
+                      child: _buildTextField(
+                        label: 'Test Date & Time *',
+                        controller: _testDateTimeCtrl,
+                      ),
+                    ),
                   ),
                   _buildDropdownField(
                     label: 'Negative Marking *',
