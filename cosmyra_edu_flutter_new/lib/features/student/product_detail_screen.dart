@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/services/cart_service.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
@@ -1092,7 +1093,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           ),
         ],
       ),
-    );
+    ).animate().fadeIn(duration: 300.ms).scale(begin: const Offset(0.95, 0.95));
   }
 
   Widget _buildGreenHighlightItem(IconData icon, String label) {
@@ -1131,7 +1132,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           ),
         ],
       ),
-    );
+    ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.15, end: 0);
   }
 
   Widget _buildMobileStickyBottomBar(TestSeriesCardData item) {
@@ -2836,7 +2837,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           ),
         ],
       ),
-    );
+    ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.1, end: 0);
   }
 
   Widget _buildLeaderboardScopeChip(String scope) {

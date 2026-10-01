@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/services/supabase_service.dart';
 
 class LandingPageScreen extends StatefulWidget {
@@ -220,7 +221,7 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
           'assets/images/cosmyra_logo.png',
           height: 38,
           fit: BoxFit.contain,
-        ),
+        ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.2, end: 0),
         const SizedBox(height: 14),
 
         // Hero Titles
@@ -250,7 +251,7 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
               ),
             ],
           ),
-        ),
+        ).animate().fadeIn(duration: 500.ms, delay: 100.ms).slideY(begin: 0.15, end: 0),
 
         const SizedBox(height: 10),
 
@@ -284,7 +285,7 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
               child: Icon(Icons.school_rounded, size: 64, color: Color(0xFF0D7A53)),
             ),
           ),
-        ),
+        ).animate().fadeIn(duration: 500.ms, delay: 200.ms).scale(begin: const Offset(0.92, 0.92)),
 
         const SizedBox(height: 24),
 
