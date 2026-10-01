@@ -5383,12 +5383,15 @@ class SupabaseService {
 
           for (var p in allPapers) {
             final pId = (p['id'] ?? '').toString().toLowerCase().trim();
-            final pTsOption = (p['existing_test_series'] ?? p['test_series_title'] ?? p['new_test_series_name'] ?? '').toString().toLowerCase().trim();
+            final pTsOption = (p['existing_test_series'] ?? p['test_series_title'] ?? p['new_test_series_name'] ?? p['test_series'] ?? p['testSeriesTitle'] ?? '').toString().toLowerCase().trim();
+            final pSeriesId = (p['test_series_id'] ?? p['series_id'] ?? '').toString().toLowerCase().trim();
             final pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toLowerCase().trim();
 
             bool isMatch = false;
             if (pId.isNotEmpty && sPaperId.isNotEmpty && pId == sPaperId) isMatch = true;
-            if (pTsOption.isNotEmpty && (pTsOption == sId || pTsOption == sTitle)) isMatch = true;
+            if (pSeriesId.isNotEmpty && (pSeriesId == sId || sId.contains(pSeriesId) || pSeriesId.contains(sId))) isMatch = true;
+            if (pTsOption.isNotEmpty && (pTsOption == sId || pTsOption == sTitle || sTitle.contains(pTsOption) || pTsOption.contains(sTitle))) isMatch = true;
+            if (pName.isNotEmpty && (pName == sTitle || sTitle.contains(pName) || pName.contains(sTitle))) isMatch = true;
             if (p['is_test_series'] == true && pName.isNotEmpty && (pName == sTitle || sTitle.contains(pName) || pName.contains(sTitle))) isMatch = true;
 
             if (isMatch) {

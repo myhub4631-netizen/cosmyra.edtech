@@ -290,50 +290,86 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     final item = _product;
     if (item == null) return [];
 
-    if (item.tests.isNotEmpty) {
-      return item.tests.map((t) {
-        final m = Map<String, dynamic>.from(t);
-        m['id'] = (m['id'] ?? 'test_${item.id}_${m['title']}').toString();
-        m['title'] = (m['title'] ?? 'Mock Test').toString();
-        m['type'] = (m['type'] ?? item.testType).toString();
-        m['questions'] = m['questions'] ?? (item.exam.contains('JEE') ? 90 : 200);
-        m['marks'] = m['marks'] ?? (item.exam.contains('JEE') ? 300 : 720);
-        m['duration'] = m['duration'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180);
-        m['status'] = (m['status'] ?? 'Not Attempted').toString();
-        return m;
-      }).toList();
+    final Map<String, Map<String, dynamic>> testMap = {};
+
+    // 1. Add embedded tests from item.tests
+    for (var t in item.tests) {
+      final m = Map<String, dynamic>.from(t);
+      final id = (m['id'] ?? m['paper_id'] ?? '').toString().trim();
+      final title = (m['title'] ?? m['paper_name'] ?? 'Mock Test ${testMap.length + 1}').toString().trim();
+      final key = id.isNotEmpty ? id.toLowerCase() : title.toLowerCase();
+
+      testMap[key] = {
+        'id': id.isNotEmpty ? id : 'test_${testMap.length + 1}',
+        'number': (m['number'] ?? '${testMap.length + 1 < 10 ? '0${testMap.length + 1}' : '${testMap.length + 1}'}').toString(),
+        'title': title,
+        'type': (m['type'] ?? m['paper_type'] ?? item.testType).toString(),
+        'questions': m['questions'] ?? m['saved_questions_count'] ?? m['question_count'] ?? (item.exam.contains('JEE') ? 90 : 200),
+        'marks': m['marks'] ?? m['total_marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
+        'duration': m['duration'] ?? m['duration_minutes'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
+        'status': (m['status'] ?? 'Not Attempted').toString(),
+      };
     }
 
-    final List<Map<String, dynamic>> tests = [];
+    // 2. Scan all papers in _dbPapers to find any created papers matching this test series
     final itemTitleLower = item.title.trim().toLowerCase();
     final itemIdLower = item.id.trim().toLowerCase();
+    final itemExamLower = item.exam.trim().toLowerCase();
 
     for (var p in _dbPapers) {
-      final pSeriesTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? p['test_series'] ?? '').toString().trim().toLowerCase();
-      final pPaperName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().trim().toLowerCase();
-      final pSeriesId = (p['test_series_id'] ?? '').toString().trim().toLowerCase();
       final pId = (p['id'] ?? '').toString().trim();
+      final pSeriesId = (p['test_series_id'] ?? p['series_id'] ?? '').toString().trim().toLowerCase();
+      final pSeriesTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? p['test_series'] ?? p['testSeriesTitle'] ?? '').toString().trim().toLowerCase();
+      final pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().trim().toLowerCase();
+      final pExam = (p['target_exam'] ?? p['exam'] ?? '').toString().trim().toLowerCase();
+      final isTs = p['is_test_series'] == true || (p['available_in'] is List && (p['available_in'] as List).contains('test_series'));
 
       bool isMatch = false;
-      if (pSeriesId.isNotEmpty && (pSeriesId == itemIdLower || itemIdLower.contains(pSeriesId) || pSeriesId.contains(pSeriesId))) isMatch = true;
-      if (pSeriesTitle.isNotEmpty && (pSeriesTitle == itemTitleLower || itemTitleLower.contains(pSeriesTitle) || pSeriesTitle.contains(itemTitleLower))) isMatch = true;
-      if (pPaperName.isNotEmpty && (pPaperName == itemTitleLower || itemTitleLower.contains(pPaperName) || pPaperName.contains(itemTitleLower))) isMatch = true;
+      if (pSeriesId.isNotEmpty && (pSeriesId == itemIdLower || itemIdLower.contains(pSeriesId) || pSeriesId.contains(itemIdLower))) {
+        isMatch = true;
+      }
+      if (pSeriesTitle.isNotEmpty && (pSeriesTitle == itemTitleLower || itemTitleLower.contains(pSeriesTitle) || pSeriesTitle.contains(itemTitleLower))) {
+        isMatch = true;
+      }
+      if (pName.isNotEmpty && (pName == itemTitleLower || itemTitleLower.contains(pName) || pName.contains(itemTitleLower))) {
+        isMatch = true;
+      }
+      if (isTs && pExam.isNotEmpty && itemExamLower.isNotEmpty && pExam.contains(itemExamLower)) {
+        if (pSeriesTitle.isEmpty || pSeriesTitle == itemTitleLower || itemTitleLower.contains(pSeriesTitle) || pSeriesTitle.contains(itemTitleLower)) {
+          isMatch = true;
+        }
+      }
 
       if (isMatch) {
-        tests.add({
-          'id': pId.isNotEmpty ? pId : 'test_${tests.length + 1}',
-          'number': '${tests.length + 1 < 10 ? '0${tests.length + 1}' : '${tests.length + 1}'}',
-          'title': (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? 'Test Paper ${tests.length + 1}').toString(),
-          'type': p['paper_type'] ?? p['type'] ?? item.testType,
-          'questions': p['saved_questions_count'] ?? p['question_count'] ?? p['total_questions'] ?? (item.exam.contains('JEE') ? 90 : 200),
-          'marks': p['total_marks'] ?? p['marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
-          'duration': p['duration_minutes'] ?? p['duration'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
-          'status': p['status'] ?? 'Not Attempted',
-        });
+        final paperTitleStr = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? 'Test Paper ${testMap.length + 1}').toString().trim();
+        final key = pId.isNotEmpty ? pId.toLowerCase() : paperTitleStr.toLowerCase();
+
+        if (!testMap.containsKey(key)) {
+          testMap[key] = {
+            'id': pId.isNotEmpty ? pId : 'test_${testMap.length + 1}',
+            'number': '${testMap.length + 1 < 10 ? '0${testMap.length + 1}' : '${testMap.length + 1}'}',
+            'title': paperTitleStr,
+            'type': p['paper_type'] ?? p['type'] ?? item.testType,
+            'questions': p['saved_questions_count'] ?? p['question_count'] ?? p['total_questions'] ?? (item.exam.contains('JEE') ? 90 : 200),
+            'marks': p['total_marks'] ?? p['marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
+            'duration': p['duration_minutes'] ?? p['duration'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
+            'status': p['status'] ?? 'Not Attempted',
+          };
+        } else {
+          final existing = testMap[key]!;
+          if (pId.isNotEmpty) existing['id'] = pId;
+          if (p['saved_questions_count'] != null) existing['questions'] = p['saved_questions_count'];
+          if (p['total_marks'] != null) existing['marks'] = p['total_marks'];
+          if (p['duration_minutes'] != null) existing['duration'] = p['duration_minutes'];
+        }
       }
     }
 
-    return tests;
+    final result = testMap.values.toList();
+    for (int i = 0; i < result.length; i++) {
+      result[i]['number'] = '${i + 1 < 10 ? '0${i + 1}' : '${i + 1}'}';
+    }
+    return result;
   }
 
   void _downloadSyllabus() async {
