@@ -1346,54 +1346,54 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                         child: TextFormField(
                           controller: durCtrl,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Duration (Minutes) *'),
+                          decoration: const InputDecoration(labelText: 'Duration (Mins) *'),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: 'Not Attempted',
-                          decoration: const InputDecoration(labelText: 'Initial Status *'),
-                          items: const [
-                            DropdownMenuItem(value: 'Not Attempted', child: Text('Not Attempted')),
-                            DropdownMenuItem(value: 'In Progress', child: Text('In Progress')),
-                            DropdownMenuItem(value: 'Completed', child: Text('Completed')),
-                          ],
-                          onChanged: (_) {},
+                        child: TextFormField(
+                          controller: addTestDateCtrl,
+                          readOnly: true,
+                          onTap: () async {
+                            final date = await showDatePicker(
+                              context: context,
+                              initialDate: addTestDateTime,
+                              firstDate: DateTime(2024),
+                              lastDate: DateTime(2030),
+                            );
+                            if (date != null) {
+                              final time = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay.fromDateTime(addTestDateTime),
+                              );
+                              if (time != null) {
+                                final newDt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                                setDlgState(() {
+                                  addTestDateTime = newDt;
+                                  addTestDateCtrl.text = DateFormat('yyyy-MM-dd HH:mm').format(newDt);
+                                });
+                              }
+                            }
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Test Date & Time *',
+                            hintText: 'Select schedule',
+                            suffixIcon: Icon(Icons.event_available_rounded, color: Color(0xFF4F46E5), size: 18),
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
-                  TextFormField(
-                    controller: addTestDateCtrl,
-                    readOnly: true,
-                    onTap: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: addTestDateTime,
-                        firstDate: DateTime(2024),
-                        lastDate: DateTime(2030),
-                      );
-                      if (date != null) {
-                        final time = await showTimePicker(
-                          context: context,
-                          initialTime: TimeOfDay.fromDateTime(addTestDateTime),
-                        );
-                        if (time != null) {
-                          final newDt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-                          setDlgState(() {
-                            addTestDateTime = newDt;
-                            addTestDateCtrl.text = DateFormat('yyyy-MM-dd HH:mm').format(newDt);
-                          });
-                        }
-                      }
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Test Date & Time * (Select Schedule)',
-                      hintText: 'Select test start date & time',
-                      suffixIcon: Icon(Icons.event_available_rounded, color: Color(0xFF4F46E5)),
-                    ),
+                  DropdownButtonFormField<String>(
+                    value: 'Not Attempted',
+                    decoration: const InputDecoration(labelText: 'Initial Status *'),
+                    items: const [
+                      DropdownMenuItem(value: 'Not Attempted', child: Text('Not Attempted')),
+                      DropdownMenuItem(value: 'In Progress', child: Text('In Progress')),
+                      DropdownMenuItem(value: 'Completed', child: Text('Completed')),
+                    ],
+                    onChanged: (_) {},
                   ),
                 ],
               ),
@@ -1532,54 +1532,54 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                         child: TextFormField(
                           controller: durCtrl,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Duration (Minutes) *'),
+                          decoration: const InputDecoration(labelText: 'Duration (Mins) *'),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: status,
-                          decoration: const InputDecoration(labelText: 'Attempt Status *'),
-                          items: const [
-                            DropdownMenuItem(value: 'Not Attempted', child: Text('Not Attempted')),
-                            DropdownMenuItem(value: 'In Progress', child: Text('In Progress')),
-                            DropdownMenuItem(value: 'Completed', child: Text('Completed')),
-                          ],
-                          onChanged: (v) => setDlgState(() => status = v!),
+                        child: TextFormField(
+                          controller: editTestDateCtrl,
+                          readOnly: true,
+                          onTap: () async {
+                            final date = await showDatePicker(
+                              context: context,
+                              initialDate: editTestDateTime,
+                              firstDate: DateTime(2024),
+                              lastDate: DateTime(2030),
+                            );
+                            if (date != null) {
+                              final time = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay.fromDateTime(editTestDateTime),
+                              );
+                              if (time != null) {
+                                final newDt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                                setDlgState(() {
+                                  editTestDateTime = newDt;
+                                  editTestDateCtrl.text = DateFormat('yyyy-MM-dd HH:mm').format(newDt);
+                                });
+                              }
+                            }
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Test Date & Time *',
+                            hintText: 'Select schedule',
+                            suffixIcon: Icon(Icons.event_available_rounded, color: Color(0xFF4F46E5), size: 18),
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
-                  TextFormField(
-                    controller: editTestDateCtrl,
-                    readOnly: true,
-                    onTap: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: editTestDateTime,
-                        firstDate: DateTime(2024),
-                        lastDate: DateTime(2030),
-                      );
-                      if (date != null) {
-                        final time = await showTimePicker(
-                          context: context,
-                          initialTime: TimeOfDay.fromDateTime(editTestDateTime),
-                        );
-                        if (time != null) {
-                          final newDt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-                          setDlgState(() {
-                            editTestDateTime = newDt;
-                            editTestDateCtrl.text = DateFormat('yyyy-MM-dd HH:mm').format(newDt);
-                          });
-                        }
-                      }
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Test Date & Time * (Select Schedule)',
-                      hintText: 'Select test start date & time',
-                      suffixIcon: Icon(Icons.event_available_rounded, color: Color(0xFF4F46E5)),
-                    ),
+                  DropdownButtonFormField<String>(
+                    value: status,
+                    decoration: const InputDecoration(labelText: 'Attempt Status *'),
+                    items: const [
+                      DropdownMenuItem(value: 'Not Attempted', child: Text('Not Attempted')),
+                      DropdownMenuItem(value: 'In Progress', child: Text('In Progress')),
+                      DropdownMenuItem(value: 'Completed', child: Text('Completed')),
+                    ],
+                    onChanged: (v) => setDlgState(() => status = v!),
                   ),
                 ],
               ),
