@@ -852,6 +852,52 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
   late TextEditingController _ratingScoreCtrl;
   late TextEditingController _ratingsCountCtrl;
 
+  // SEO & Google Ranking Controllers
+  late TextEditingController _slugCtrl;
+  late TextEditingController _seoTitleCtrl;
+  late TextEditingController _seoDescCtrl;
+  late TextEditingController _focusKeywordsCtrl;
+  late TextEditingController _canonicalUrlCtrl;
+  late TextEditingController _ogImageUrlCtrl;
+  late String _schemaType;
+  bool _autoSyncSlug = true;
+
+  String _slugify(String text) {
+    if (text.trim().isEmpty) return '';
+    return text
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9\s-]'), '')
+        .replaceAll(RegExp(r'\s+'), '-')
+        .replaceAll(RegExp(r'-+'), '-')
+        .replaceAll(RegExp(r'^-|-$'), '');
+  }
+
+  int _calculateSeoScore() {
+    int score = 0;
+    final slug = _slugCtrl.text.trim();
+    final title = _seoTitleCtrl.text.trim();
+    final desc = _seoDescCtrl.text.trim();
+    final keywords = _focusKeywordsCtrl.text.trim();
+    final ogImg = _ogImageUrlCtrl.text.trim();
+
+    if (slug.isNotEmpty && RegExp(r'^[a-z0-9-]+$').hasMatch(slug)) score += 20;
+    if (title.length >= 25 && title.length <= 65) {
+      score += 20;
+    } else if (title.isNotEmpty) {
+      score += 10;
+    }
+    if (desc.length >= 100 && desc.length <= 170) {
+      score += 20;
+    } else if (desc.isNotEmpty) {
+      score += 10;
+    }
+    if (keywords.isNotEmpty) score += 15;
+    if (ogImg.isNotEmpty && ogImg.startsWith('http')) score += 15;
+    if (_schemaType.isNotEmpty) score += 10;
+
+    return score.clamp(0, 100);
+  }
+
   // Tab 5: Top Scores & Leaderboard Rankers
   late TextEditingController _highestScoreCtrl;
   late TextEditingController _avgScoreCtrl;
@@ -885,10 +931,23 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     }
   }
 
+  void _onTitleChanged() {
+    if (_autoSyncSlug) {
+      final generatedSlug = _slugify(_titleCtrl.text);
+      if (_slugCtrl.text != generatedSlug) {
+        _slugCtrl.text = generatedSlug;
+        _canonicalUrlCtrl.text = 'https://neet-jee.in/product/$generatedSlug';
+        if (_seoTitleCtrl.text.isEmpty || _seoTitleCtrl.text.endsWith('| NEET JEE')) {
+          _seoTitleCtrl.text = _titleCtrl.text.isNotEmpty ? '${_titleCtrl.text} | NEET JEE' : '';
+        }
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
 
     final d = widget.initialData ?? {};
     _seriesId = (d['id'] != null && d['id'].toString().isNotEmpty)
@@ -934,6 +993,29 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     _status = d['status'] ?? 'Published';
     _isFree = d['is_free'] == true;
     _showPurchaseButton = d['show_purchase_button'] != false;
+
+    // SEO & Google Rankings init
+    final initialSlug = (d['slug'] ?? d['product_slug'] ?? _slugify(_titleCtrl.text)).toString();
+    _slugCtrl = TextEditingController(text: initialSlug.isNotEmpty ? initialSlug : _slugify(_titleCtrl.text));
+    _seoTitleCtrl = TextEditingController(
+      text: (d['seo_title'] ?? d['meta_title'] ?? (_titleCtrl.text.isNotEmpty ? '${_titleCtrl.text} | NEET JEE' : '')).toString(),
+    );
+    _seoDescCtrl = TextEditingController(
+      text: (d['seo_description'] ?? d['meta_description'] ?? _descCtrl.text).toString(),
+    );
+    _focusKeywordsCtrl = TextEditingController(
+      text: (d['focus_keywords'] ?? d['keywords'] ?? 'NEET Test Series, Online Mock Tests, NTA Pattern').toString(),
+    );
+    _canonicalUrlCtrl = TextEditingController(
+      text: (d['canonical_url'] ?? 'https://neet-jee.in/product/${_slugCtrl.text.isNotEmpty ? _slugCtrl.text : _seriesId}').toString(),
+    );
+    _ogImageUrlCtrl = TextEditingController(
+      text: (d['og_image_url'] ?? d['banner_image_url'] ?? _bannerCtrl.text).toString(),
+    );
+    _schemaType = (d['schema_type'] ?? 'Course').toString();
+    _autoSyncSlug = (d['slug'] == null && d['product_slug'] == null);
+
+    _titleCtrl.addListener(_onTitleChanged);
 
     // Overview & Key Features init
     _longDescCtrl = TextEditingController(
@@ -1044,6 +1126,7 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
 
   @override
   void dispose() {
+    _titleCtrl.removeListener(_onTitleChanged);
     _tabController.dispose();
     _titleCtrl.dispose();
     _descCtrl.dispose();
@@ -1058,6 +1141,13 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     _durationCtrl.dispose();
     _validityCtrl.dispose();
     _syllabusCtrl.dispose();
+
+    _slugCtrl.dispose();
+    _seoTitleCtrl.dispose();
+    _seoDescCtrl.dispose();
+    _focusKeywordsCtrl.dispose();
+    _canonicalUrlCtrl.dispose();
+    _ogImageUrlCtrl.dispose();
 
     _f1TitleCtrl.dispose();
     _f1DescCtrl.dispose();
@@ -1086,7 +1176,8 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
 
     final isEdit = widget.initialData != null && widget.initialData!['id'] != null;
     final seriesId = isEdit ? widget.initialData!['id'].toString() : _seriesId;
-    final productUrl = 'https://neet-jee.in/product/$seriesId';
+    final slug = _slugCtrl.text.trim().isNotEmpty ? _slugCtrl.text.trim() : _slugify(_titleCtrl.text);
+    final productUrl = 'https://neet-jee.in/product/$slug';
     final checkoutUrl = 'https://neet-jee.in/checkout?productId=$seriesId';
     final purchaseLink = (_linkCtrl.text.trim().isNotEmpty && _linkCtrl.text.trim() != 'https://neet-jee.in/test-series')
         ? _linkCtrl.text.trim()
@@ -1094,6 +1185,8 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
 
     final data = {
       'id': seriesId,
+      'slug': slug,
+      'product_slug': slug,
       'title': _titleCtrl.text.trim(),
       'name': _titleCtrl.text.trim(),
       'description': _descCtrl.text.trim(),
@@ -1120,6 +1213,17 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
       'syllabus_url': _syllabusCtrl.text.trim(),
       'attempt_status': _attemptStatus,
       'status': _status,
+      // SEO & Google Ranking Meta Data
+      'seo_title': _seoTitleCtrl.text.trim().isNotEmpty ? _seoTitleCtrl.text.trim() : '${_titleCtrl.text.trim()} | NEET JEE',
+      'meta_title': _seoTitleCtrl.text.trim().isNotEmpty ? _seoTitleCtrl.text.trim() : '${_titleCtrl.text.trim()} | NEET JEE',
+      'seo_description': _seoDescCtrl.text.trim().isNotEmpty ? _seoDescCtrl.text.trim() : _descCtrl.text.trim(),
+      'meta_description': _seoDescCtrl.text.trim().isNotEmpty ? _seoDescCtrl.text.trim() : _descCtrl.text.trim(),
+      'focus_keywords': _focusKeywordsCtrl.text.trim(),
+      'keywords': _focusKeywordsCtrl.text.trim(),
+      'canonical_url': _canonicalUrlCtrl.text.trim().isNotEmpty ? _canonicalUrlCtrl.text.trim() : productUrl,
+      'og_image_url': _ogImageUrlCtrl.text.trim().isNotEmpty ? _ogImageUrlCtrl.text.trim() : _bannerCtrl.text.trim(),
+      'schema_type': _schemaType,
+      'seo_score': _calculateSeoScore(),
       'features': [
         {'title': _f1TitleCtrl.text.trim(), 'description': _f1DescCtrl.text.trim()},
         {'title': _f2TitleCtrl.text.trim(), 'description': _f2DescCtrl.text.trim()},
@@ -1903,8 +2007,9 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                   const Tab(icon: Icon(Icons.tune_rounded, size: 16), text: '1. Basic & Pricing'),
                   const Tab(icon: Icon(Icons.article_outlined, size: 16), text: '2. Product Overview'),
                   Tab(icon: const Icon(Icons.format_list_bulleted_rounded, size: 16), text: '3. All Tests (${_tests.length})'),
-                  Tab(icon: const Icon(Icons.star_rate_rounded, size: 16), text: '4. Reviews (${_reviews.length})'),
-                  Tab(icon: const Icon(Icons.emoji_events_outlined, size: 16), text: '5. Top Scores (${_rankers.length})'),
+                  const Tab(icon: Icon(Icons.rocket_launch_rounded, size: 16), text: '4. SEO & Google Rankings 🚀'),
+                  Tab(icon: const Icon(Icons.star_rate_rounded, size: 16), text: '5. Reviews (${_reviews.length})'),
+                  Tab(icon: const Icon(Icons.emoji_events_outlined, size: 16), text: '6. Top Scores (${_rankers.length})'),
                 ],
               ),
             ),
@@ -1925,10 +2030,13 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                     // TAB 3: ALL TESTS IN SERIES
                     _buildTab3AllTests(),
 
-                    // TAB 4: REVIEWS & RATINGS
+                    // TAB 4: SEO & GOOGLE RANKINGS 🚀
+                    _buildTab4SeoAndRankings(),
+
+                    // TAB 5: REVIEWS & RATINGS
                     _buildTab4Reviews(),
 
-                    // TAB 5: TOP SCORES & RANKERS
+                    // TAB 6: TOP SCORES & RANKERS
                     _buildTab5TopScores(),
                   ],
                 ),
@@ -2000,6 +2108,44 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
               hintText: 'e.g. NEET 2026 Full Syllabus Master Test Series',
             ),
             validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter a title' : null,
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.link_rounded, size: 16, color: Color(0xFF4F46E5)),
+                const SizedBox(width: 8),
+                const Text('Product Slug URL: ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                Expanded(
+                  child: Text(
+                    'https://neet-jee.in/product/${_slugCtrl.text.isNotEmpty ? _slugCtrl.text : _slugify(_titleCtrl.text)}',
+                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF10B981), fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _autoSyncSlug ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    _autoSyncSlug ? '⚡ Auto-Syncing with Title' : '✏️ Custom Slug',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: _autoSyncSlug ? const Color(0xFF059669) : const Color(0xFFD97706),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 14),
           TextFormField(
@@ -2839,7 +2985,446 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
   }
 
   // ===========================================================================
-  // TAB 4: REVIEWS & RATINGS
+  // TAB 4: SEO & GOOGLE RANKINGS 🚀
+  // ===========================================================================
+  Widget _buildTab4SeoAndRankings() {
+    final seoScore = _calculateSeoScore();
+    Color scoreColor = const Color(0xFFEF4444);
+    String scoreText = 'Needs Optimization';
+    if (seoScore >= 80) {
+      scoreColor = const Color(0xFF10B981);
+      scoreText = 'Excellent (Google Rank Optimized)';
+    } else if (seoScore >= 50) {
+      scoreColor = const Color(0xFFF59E0B);
+      scoreText = 'Good (Moderate Indexability)';
+    }
+
+    final slug = _slugCtrl.text.trim();
+    final metaTitle = _seoTitleCtrl.text.trim().isNotEmpty
+        ? _seoTitleCtrl.text.trim()
+        : (_titleCtrl.text.isNotEmpty ? '${_titleCtrl.text.trim()} | NEET JEE' : 'Product Title | NEET JEE');
+    final metaDesc = _seoDescCtrl.text.trim().isNotEmpty
+        ? _seoDescCtrl.text.trim()
+        : (_descCtrl.text.isNotEmpty ? _descCtrl.text.trim() : 'Curated test series and mock tests for NEET & JEE exam preparation.');
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Banner
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF4F46E5).withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Google SEO & Product Ranking Engine 🚀',
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Customize clean URLs, search metadata, social open-graph banners, and Schema.org rich snippets to rank higher on Google Search.',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // SEO Health Score Card & Google SERP Preview Row
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Score Meter
+              Expanded(
+                flex: 1,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'SEO Health Score',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                      ),
+                      const SizedBox(height: 12),
+                      Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox(
+                            width: 84,
+                            height: 84,
+                            child: CircularProgressIndicator(
+                              value: seoScore / 100.0,
+                              strokeWidth: 8,
+                              backgroundColor: const Color(0xFFF1F5F9),
+                              valueColor: AlwaysStoppedAnimation<Color>(scoreColor),
+                            ),
+                          ),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$seoScore%',
+                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: scoreColor),
+                              ),
+                              const Text('Score', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: scoreColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          scoreText,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: scoreColor),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+
+              // Live Google SERP Preview Card
+              Expanded(
+                flex: 2,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: const [
+                          Icon(Icons.search_rounded, color: Color(0xFF4285F4), size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'Live Google SERP Snippet Preview',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20),
+                      Text(
+                        'https://neet-jee.in › product › ${slug.isNotEmpty ? slug : 'product-slug'}',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF202124)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        metaTitle,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A0DAB),
+                          decoration: TextDecoration.underline,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        metaDesc,
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF4D5156), height: 1.4),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Form Controls
+          _buildSectionHeading('2. URL Slug & Meta Configuration'),
+          const SizedBox(height: 12),
+
+          // Slug URL Field + Auto Sync Toggle
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _slugCtrl,
+                  onChanged: (v) {
+                    setState(() {
+                      _autoSyncSlug = false;
+                      _canonicalUrlCtrl.text = 'https://neet-jee.in/product/${v.trim()}';
+                    });
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Product Slug URL *',
+                    hintText: 'e.g. neet-2026-full-syllabus-master-test-series',
+                    prefixIcon: const Icon(Icons.link_rounded, size: 18),
+                    helperText: 'Live URL: https://neet-jee.in/product/${_slugCtrl.text}',
+                    helperStyle: const TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w600),
+                  ),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Product slug is required' : null,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Column(
+                  children: [
+                    const Text('Auto-Sync Title', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                    Switch(
+                      value: _autoSyncSlug,
+                      activeColor: const Color(0xFF4F46E5),
+                      onChanged: (val) {
+                        setState(() {
+                          _autoSyncSlug = val;
+                          if (val) {
+                            final generated = _slugify(_titleCtrl.text);
+                            _slugCtrl.text = generated;
+                            _canonicalUrlCtrl.text = 'https://neet-jee.in/product/$generated';
+                          }
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // SEO Title Field with Counter
+          TextFormField(
+            controller: _seoTitleCtrl,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              labelText: 'SEO Meta Title (Google Page Title)',
+              hintText: 'e.g. NEET 2026 Full Syllabus Master Test Series | NEET JEE',
+              prefixIcon: const Icon(Icons.title_rounded, size: 18),
+              suffixText: '${_seoTitleCtrl.text.length} / 60 chars',
+              suffixStyle: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: (_seoTitleCtrl.text.length >= 25 && _seoTitleCtrl.text.length <= 65)
+                    ? const Color(0xFF10B981)
+                    : const Color(0xFFF59E0B),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // SEO Description Field with Counter
+          TextFormField(
+            controller: _seoDescCtrl,
+            onChanged: (_) => setState(() {}),
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: 'SEO Meta Description (Google Snippet Text)',
+              hintText: 'Provide a concise, high-converting summary for search engine snippet listings...',
+              prefixIcon: const Icon(Icons.description_outlined, size: 18),
+              suffixText: '${_seoDescCtrl.text.length} / 160 chars',
+              suffixStyle: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: (_seoDescCtrl.text.length >= 100 && _seoDescCtrl.text.length <= 170)
+                    ? const Color(0xFF10B981)
+                    : const Color(0xFFF59E0B),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Focus Keywords Field
+          TextFormField(
+            controller: _focusKeywordsCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Focus Keywords & Tags (Comma Separated)',
+              hintText: 'e.g. NEET Test Series, NEET Mock Test 2026, NTA Physics Practice, Online Test',
+              prefixIcon: Icon(Icons.tag_rounded, size: 18),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Advanced Technical SEO Section
+          _buildSectionHeading('3. Schema.org & OpenGraph Social Sharing'),
+          const SizedBox(height: 12),
+
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _schemaType,
+                  decoration: const InputDecoration(
+                    labelText: 'Schema.org Structured Data Type *',
+                    prefixIcon: Icon(Icons.schema_outlined, size: 18),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Course', child: Text('Course (Recommended for Test Series)')),
+                    DropdownMenuItem(value: 'Product', child: Text('Product (E-commerce Product)')),
+                    DropdownMenuItem(value: 'EducationalOccupationalCredential', child: Text('Educational Credential')),
+                    DropdownMenuItem(value: 'LearningResource', child: Text('Learning Resource')),
+                  ],
+                  onChanged: (v) => setState(() => _schemaType = v!),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: TextFormField(
+                  controller: _canonicalUrlCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Canonical Web URL',
+                    hintText: 'https://neet-jee.in/product/your-slug-here',
+                    prefixIcon: Icon(Icons.bookmark_border_rounded, size: 18),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          TextFormField(
+            controller: _ogImageUrlCtrl,
+            decoration: const InputDecoration(
+              labelText: 'OpenGraph Image URL (WhatsApp, Telegram, Twitter Preview)',
+              hintText: 'https://images.unsplash.com/... or hosted banner image',
+              prefixIcon: Icon(Icons.image_outlined, size: 18),
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // SEO Audit Checklist
+          _buildSectionHeading('4. Live SEO Optimization Checklist'),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                _buildSeoCheckItem(
+                  isPassed: slug.isNotEmpty && RegExp(r'^[a-z0-9-]+$').hasMatch(slug),
+                  title: 'Clean & Hyphenated URL Slug',
+                  desc: slug.isNotEmpty
+                      ? 'Valid URL slug format: "/product/$slug"'
+                      : 'Please enter a valid slug containing lowercase letters, numbers, and hyphens.',
+                ),
+                const Divider(height: 16),
+                _buildSeoCheckItem(
+                  isPassed: _seoTitleCtrl.text.trim().length >= 25 && _seoTitleCtrl.text.trim().length <= 65,
+                  title: 'SEO Title Length (25 - 65 Chars)',
+                  desc: 'Current length: ${_seoTitleCtrl.text.trim().length} chars. Keeps title readable without Google truncation.',
+                ),
+                const Divider(height: 16),
+                _buildSeoCheckItem(
+                  isPassed: _seoDescCtrl.text.trim().length >= 100 && _seoDescCtrl.text.trim().length <= 170,
+                  title: 'Meta Description Length (100 - 170 Chars)',
+                  desc: 'Current length: ${_seoDescCtrl.text.trim().length} chars. Optimal for Google desktop & mobile snippet display.',
+                ),
+                const Divider(height: 16),
+                _buildSeoCheckItem(
+                  isPassed: _focusKeywordsCtrl.text.trim().isNotEmpty,
+                  title: 'Focus Keywords Added',
+                  desc: _focusKeywordsCtrl.text.trim().isNotEmpty
+                      ? 'Keywords set for search index tagging.'
+                      : 'Add comma separated keywords to boost topical relevance.',
+                ),
+                const Divider(height: 16),
+                _buildSeoCheckItem(
+                  isPassed: _ogImageUrlCtrl.text.trim().isNotEmpty && _ogImageUrlCtrl.text.trim().startsWith('http'),
+                  title: 'OpenGraph Banner Image Set',
+                  desc: 'Social share image ready for WhatsApp, Twitter, and LinkedIn rich link cards.',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSeoCheckItem({required bool isPassed, required String title, required String desc}) {
+    return Row(
+      children: [
+        Icon(
+          isPassed ? Icons.check_circle_rounded : Icons.error_outline_rounded,
+          color: isPassed ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+          size: 20,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: isPassed ? const Color(0xFF0F172A) : const Color(0xFFB45309),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                desc,
+                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // TAB 5: REVIEWS & RATINGS
   // ===========================================================================
   Widget _buildTab4Reviews() {
     return SingleChildScrollView(
