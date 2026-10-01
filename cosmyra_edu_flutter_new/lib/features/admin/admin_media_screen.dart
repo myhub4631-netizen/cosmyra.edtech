@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/cloudflare_r2_service.dart';
+import '../../core/theme/app_design_system.dart';
 
 class AdminMediaScreen extends StatefulWidget {
   const AdminMediaScreen({Key? key}) : super(key: key);
@@ -1201,87 +1202,135 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
 
   Widget _buildAssetTableView(List<Map<String, dynamic>> assets) {
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: AppShadows.md,
       ),
-      child: DataTable(
-        columns: const [
-          DataColumn(label: Text('Type')),
-          DataColumn(label: Text('Title / Name')),
-          DataColumn(label: Text('Category')),
-          DataColumn(label: Text('Size')),
-          DataColumn(label: Text('Uploader')),
-          DataColumn(label: Text('Date')),
-          DataColumn(label: Text('Actions')),
-        ],
-        rows: assets.map((a) {
-          final type = (a['file_type'] ?? 'image').toString();
-          final sizeKb = (a['file_size_kb'] as num?)?.toInt() ?? 0;
-          final dateStr = a['created_at'] != null ? DateFormat('dd MMM, yyyy').format(DateTime.parse(a['created_at'])) : '-';
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+            headingRowHeight: 46,
+            dataRowMaxHeight: 64,
+            columns: [
+              DataColumn(label: Text('TYPE', style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF475569), letterSpacing: 0.5))),
+              DataColumn(label: Text('TITLE / NAME', style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF475569), letterSpacing: 0.5))),
+              DataColumn(label: Text('CATEGORY', style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF475569), letterSpacing: 0.5))),
+              DataColumn(label: Text('SIZE', style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF475569), letterSpacing: 0.5))),
+              DataColumn(label: Text('UPLOADER', style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF475569), letterSpacing: 0.5))),
+              DataColumn(label: Text('DATE', style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF475569), letterSpacing: 0.5))),
+              DataColumn(label: Text('ACTIONS', style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF475569), letterSpacing: 0.5))),
+            ],
+            rows: assets.map((a) {
+              final type = (a['file_type'] ?? 'image').toString();
+              final sizeKb = (a['file_size_kb'] as num?)?.toInt() ?? 0;
+              final dateStr = a['created_at'] != null ? DateFormat('dd MMM, yyyy').format(DateTime.parse(a['created_at'])) : '-';
 
-          return DataRow(cells: [
-            DataCell(
-              Icon(
-                type == 'pdf'
-                    ? Icons.picture_as_pdf_rounded
-                    : type == 'svg'
-                        ? Icons.polyline_rounded
-                        : Icons.image_rounded,
-                color: type == 'pdf'
-                    ? const Color(0xFFEF4444)
-                    : type == 'svg'
-                        ? const Color(0xFF8B5CF6)
-                        : const Color(0xFF10B981),
-                size: 20,
-              ),
-            ),
-            DataCell(
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(a['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  Text(
-                    (a['file_name'] ?? '').toString().length > 30
-                        ? '${(a['file_name'] ?? '').toString().substring(0, 27)}...'
-                        : (a['file_name'] ?? '').toString(),
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              final typeColor = type == 'pdf'
+                  ? const Color(0xFFEF4444)
+                  : (type == 'svg' ? const Color(0xFF8B5CF6) : const Color(0xFF10B981));
+
+              return DataRow(cells: [
+                DataCell(
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: typeColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          type == 'pdf'
+                              ? Icons.picture_as_pdf_rounded
+                              : (type == 'svg' ? Icons.polyline_rounded : Icons.image_rounded),
+                          color: typeColor,
+                          size: 15,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          type.toUpperCase(),
+                          style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: typeColor),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
-            ),
-            DataCell(Text(a['category'] ?? '-')),
-            DataCell(Text('$sizeKb KB')),
-            DataCell(Text(a['uploader_name'] ?? 'Admin')),
-            DataCell(Text(dateStr)),
-            DataCell(
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF4F46E5)),
-                    onPressed: () => _previewAsset(a),
+                ),
+                DataCell(
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(a['title'] ?? '', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF0F172A))),
+                      Text(
+                        (a['file_name'] ?? '').toString().length > 30
+                            ? '${(a['file_name'] ?? '').toString().substring(0, 27)}...'
+                            : (a['file_name'] ?? '').toString(),
+                        style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.copy_rounded, size: 18, color: Color(0xFF10B981)),
-                    onPressed: () => _copyToClipboard(_getShortWebUrl(a), 'Short Web URL'),
-                    tooltip: 'Copy Short Web URL',
+                ),
+                DataCell(
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Text(
+                      a['category'] ?? '-',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
+                    ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
-                    onPressed: () => _openEditAssetDialog(a),
+                ),
+                DataCell(
+                  Text('$sizeKb KB', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF475569))),
+                ),
+                DataCell(
+                  Text(a['uploader_name'] ?? 'Admin', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                ),
+                DataCell(
+                  Text(dateStr, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                ),
+                DataCell(
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF4F46E5)),
+                        onPressed: () => _previewAsset(a),
+                        tooltip: 'Preview',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.copy_rounded, size: 18, color: Color(0xFF10B981)),
+                        onPressed: () => _copyToClipboard(_getShortWebUrl(a), 'Short Web URL'),
+                        tooltip: 'Copy Short Web URL',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
+                        onPressed: () => _openEditAssetDialog(a),
+                        tooltip: 'Edit Metadata',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
+                        onPressed: () => _confirmDeleteAsset(a),
+                        tooltip: 'Delete Asset',
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
-                    onPressed: () => _confirmDeleteAsset(a),
-                  ),
-                ],
-              ),
-            ),
-          ]);
-        }).toList(),
+                ),
+              ]);
+            }).toList(),
+          ),
+        ),
       ),
     );
   }
