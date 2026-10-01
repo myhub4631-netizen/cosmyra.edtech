@@ -305,46 +305,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     }
 
     final List<Map<String, dynamic>> tests = [];
+    final itemTitleLower = item.title.trim().toLowerCase();
+    final itemIdLower = item.id.trim().toLowerCase();
+
     for (var p in _dbPapers) {
-      final pTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? '').toString().trim();
-      final name = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().trim();
-      if (pTitle.toLowerCase() == item.title.toLowerCase() ||
-          (name.isNotEmpty && name.toLowerCase() == item.title.toLowerCase()) ||
-          p['test_series_id']?.toString() == item.id) {
+      final pSeriesTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? p['test_series'] ?? '').toString().trim().toLowerCase();
+      final pPaperName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().trim().toLowerCase();
+      final pSeriesId = (p['test_series_id'] ?? '').toString().trim().toLowerCase();
+      final pId = (p['id'] ?? '').toString().trim();
+
+      bool isMatch = false;
+      if (pSeriesId.isNotEmpty && (pSeriesId == itemIdLower || itemIdLower.contains(pSeriesId) || pSeriesId.contains(pSeriesId))) isMatch = true;
+      if (pSeriesTitle.isNotEmpty && (pSeriesTitle == itemTitleLower || itemTitleLower.contains(pSeriesTitle) || pSeriesTitle.contains(itemTitleLower))) isMatch = true;
+      if (pPaperName.isNotEmpty && (pPaperName == itemTitleLower || itemTitleLower.contains(pPaperName) || pPaperName.contains(itemTitleLower))) isMatch = true;
+
+      if (isMatch) {
         tests.add({
-          'id': p['id']?.toString() ?? 'test_${tests.length + 1}',
-          'title': name.isNotEmpty ? name : 'Mock Test ${tests.length + 1}',
-          'type': p['paper_type'] ?? item.testType,
-          'questions': p['saved_questions_count'] ?? p['question_count'] ?? (item.exam.contains('JEE') ? 90 : 200),
-          'marks': p['total_marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
-          'duration': p['duration_minutes'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
+          'id': pId.isNotEmpty ? pId : 'test_${tests.length + 1}',
+          'number': '${tests.length + 1 < 10 ? '0${tests.length + 1}' : '${tests.length + 1}'}',
+          'title': (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? 'Test Paper ${tests.length + 1}').toString(),
+          'type': p['paper_type'] ?? p['type'] ?? item.testType,
+          'questions': p['saved_questions_count'] ?? p['question_count'] ?? p['total_questions'] ?? (item.exam.contains('JEE') ? 90 : 200),
+          'marks': p['total_marks'] ?? p['marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
+          'duration': p['duration_minutes'] ?? p['duration'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
           'status': p['status'] ?? 'Not Attempted',
         });
       }
-    }
-
-    if (tests.isNotEmpty) {
-      return tests;
-    }
-
-    final targetTotal = item.testCount > 0 ? item.testCount : 10;
-    final int isJee = item.exam.contains('JEE') ? 1 : 0;
-
-    for (int i = 0; i < targetTotal; i++) {
-      final String testType = i < (targetTotal * 0.4).ceil()
-          ? 'Chapter Test'
-          : (i < (targetTotal * 0.7).ceil() ? 'Part Test' : 'Full Syllabus Test');
-
-      tests.add({
-        'id': '${item.id}_test_${i + 1}',
-        'number': '${i + 1 < 10 ? '0${i + 1}' : '${i + 1}'}',
-        'title': '${item.title} Paper ${i + 1}',
-        'type': testType,
-        'questions': isJee == 1 ? 90 : 200,
-        'marks': isJee == 1 ? 300 : 720,
-        'duration': 180,
-        'status': i == 0 ? item.attemptStatus : 'Not Attempted',
-      });
     }
 
     return tests;
@@ -1965,103 +1951,141 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         ),
         const SizedBox(height: 16),
 
-        if (_selectedCategoryFilter == 'All')
-          _buildCategorySection(
-            title: 'All Available Papers (${fAll.length})',
-            subtitle: 'Complete list of created test papers',
-            icon: Icons.assignment_rounded,
-            headerBgColor: const Color(0xFFEFF6FF),
-            iconBgColor: const Color(0xFF2563EB),
-            textColor: const Color(0xFF1E40AF),
-            btnBgColor: const Color(0xFFDBEAFE),
-            btnTextColor: const Color(0xFF2563EB),
-            testIconData: [Icons.science_rounded, Icons.functions_rounded, Icons.track_changes_rounded],
-            testIconGradients: [
-              [const Color(0xFF1E1B4B), const Color(0xFF312E81)],
-              [const Color(0xFF0F172A), const Color(0xFF1E293B)],
-              [const Color(0xFF064E3B), const Color(0xFF047857)],
-            ],
-            tests: fAll,
-            item: item,
-          ),
+        if (fAll.isEmpty)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFEFF6FF),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.assignment_late_outlined, size: 36, color: Color(0xFF2563EB)),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  tests.isEmpty ? 'No Test Papers Added Yet' : 'No Matching Papers Found',
+                  style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  tests.isEmpty
+                      ? 'Test papers for ${item.title} are currently being added by the admin. Check back soon!'
+                      : 'Try adjusting your search query or category filters.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+                ),
+              ],
+            ),
+          )
+        else ...[
+          if (_selectedCategoryFilter == 'All' && fAll.isNotEmpty)
+            _buildCategorySection(
+              title: 'All Available Papers (${fAll.length})',
+              subtitle: 'Complete list of created test papers',
+              icon: Icons.assignment_rounded,
+              headerBgColor: const Color(0xFFEFF6FF),
+              iconBgColor: const Color(0xFF2563EB),
+              textColor: const Color(0xFF1E40AF),
+              btnBgColor: const Color(0xFFDBEAFE),
+              btnTextColor: const Color(0xFF2563EB),
+              testIconData: [Icons.science_rounded, Icons.functions_rounded, Icons.track_changes_rounded],
+              testIconGradients: [
+                [const Color(0xFF1E1B4B), const Color(0xFF312E81)],
+                [const Color(0xFF0F172A), const Color(0xFF1E293B)],
+                [const Color(0xFF064E3B), const Color(0xFF047857)],
+              ],
+              tests: fAll,
+              item: item,
+            ),
 
-        if (_selectedCategoryFilter == 'Chapter' && fChapter.isNotEmpty)
-          _buildCategorySection(
-            title: 'Chapter Tests (${fChapter.length})',
-            subtitle: 'Topic-wise tests for concept clarity',
-            icon: Icons.menu_book_rounded,
-            headerBgColor: const Color(0xFFECFDF5),
-            iconBgColor: const Color(0xFF059669),
-            textColor: const Color(0xFF065F46),
-            btnBgColor: const Color(0xFFDCFCE7),
-            btnTextColor: const Color(0xFF059669),
-            testIconData: [Icons.public_rounded, Icons.science_rounded, Icons.balance_rounded],
-            testIconGradients: [
-              [const Color(0xFF1E1B4B), const Color(0xFF312E81)],
-              [const Color(0xFF4C0519), const Color(0xFF881337)],
-              [const Color(0xFF451A03), const Color(0xFF78350F)],
-            ],
-            tests: fChapter,
-            item: item,
-          ),
+          if (_selectedCategoryFilter == 'Chapter' && fChapter.isNotEmpty)
+            _buildCategorySection(
+              title: 'Chapter Tests (${fChapter.length})',
+              subtitle: 'Topic-wise tests for concept clarity',
+              icon: Icons.menu_book_rounded,
+              headerBgColor: const Color(0xFFECFDF5),
+              iconBgColor: const Color(0xFF059669),
+              textColor: const Color(0xFF065F46),
+              btnBgColor: const Color(0xFFDCFCE7),
+              btnTextColor: const Color(0xFF059669),
+              testIconData: [Icons.public_rounded, Icons.science_rounded, Icons.balance_rounded],
+              testIconGradients: [
+                [const Color(0xFF1E1B4B), const Color(0xFF312E81)],
+                [const Color(0xFF4C0519), const Color(0xFF881337)],
+                [const Color(0xFF451A03), const Color(0xFF78350F)],
+              ],
+              tests: fChapter,
+              item: item,
+            ),
 
-        if (_selectedCategoryFilter == 'Part' && fPart.isNotEmpty)
-          _buildCategorySection(
-            title: 'Part Tests (${fPart.length})',
-            subtitle: 'Combination of multiple chapters',
-            icon: Icons.description_rounded,
-            headerBgColor: const Color(0xFFF5F3FF),
-            iconBgColor: const Color(0xFF7C3AED),
-            textColor: const Color(0xFF5B21B6),
-            btnBgColor: const Color(0xFFF3E8FF),
-            btnTextColor: const Color(0xFF7C3AED),
-            testIconData: [Icons.settings_rounded, Icons.settings_rounded, Icons.local_fire_department_rounded],
-            testIconGradients: [
-              [const Color(0xFF0F172A), const Color(0xFF1E293B)],
-              [const Color(0xFF0F172A), const Color(0xFF1E293B)],
-              [const Color(0xFF0F172A), const Color(0xFF1E293B)],
-            ],
-            tests: fPart,
-            item: item,
-          ),
+          if (_selectedCategoryFilter == 'Part' && fPart.isNotEmpty)
+            _buildCategorySection(
+              title: 'Part Tests (${fPart.length})',
+              subtitle: 'Combination of multiple chapters',
+              icon: Icons.description_rounded,
+              headerBgColor: const Color(0xFFF5F3FF),
+              iconBgColor: const Color(0xFF7C3AED),
+              textColor: const Color(0xFF5B21B6),
+              btnBgColor: const Color(0xFFF3E8FF),
+              btnTextColor: const Color(0xFF7C3AED),
+              testIconData: [Icons.settings_rounded, Icons.settings_rounded, Icons.local_fire_department_rounded],
+              testIconGradients: [
+                [const Color(0xFF0F172A), const Color(0xFF1E293B)],
+                [const Color(0xFF0F172A), const Color(0xFF1E293B)],
+                [const Color(0xFF0F172A), const Color(0xFF1E293B)],
+              ],
+              tests: fPart,
+              item: item,
+            ),
 
-        if (_selectedCategoryFilter == 'Unit' && fUnit.isNotEmpty)
-          _buildCategorySection(
-            title: 'Unit Tests (${fUnit.length})',
-            subtitle: 'Full unit coverage tests',
-            icon: Icons.inventory_2_rounded,
-            headerBgColor: const Color(0xFFFFFBEB),
-            iconBgColor: const Color(0xFFD97706),
-            textColor: const Color(0xFF92400E),
-            btnBgColor: const Color(0xFFFEF3C7),
-            btnTextColor: const Color(0xFFD97706),
-            testIconData: [Icons.grid_view_rounded, Icons.center_focus_strong_rounded],
-            testIconGradients: [
-              [const Color(0xFF064E3B), const Color(0xFF047857)],
-              [const Color(0xFF064E3B), const Color(0xFF047857)],
-            ],
-            tests: fUnit,
-            item: item,
-          ),
+          if (_selectedCategoryFilter == 'Unit' && fUnit.isNotEmpty)
+            _buildCategorySection(
+              title: 'Unit Tests (${fUnit.length})',
+              subtitle: 'Full unit coverage tests',
+              icon: Icons.inventory_2_rounded,
+              headerBgColor: const Color(0xFFFFFBEB),
+              iconBgColor: const Color(0xFFD97706),
+              textColor: const Color(0xFF92400E),
+              btnBgColor: const Color(0xFFFEF3C7),
+              btnTextColor: const Color(0xFFD97706),
+              testIconData: [Icons.grid_view_rounded, Icons.center_focus_strong_rounded],
+              testIconGradients: [
+                [const Color(0xFF064E3B), const Color(0xFF047857)],
+                [const Color(0xFF064E3B), const Color(0xFF047857)],
+              ],
+              tests: fUnit,
+              item: item,
+            ),
 
-        if (_selectedCategoryFilter == 'Full Syllabus' && fFull.isNotEmpty)
-          _buildCategorySection(
-            title: 'Full Syllabus Tests (${fFull.length})',
-            subtitle: 'Full length exam pattern tests',
-            icon: Icons.track_changes_rounded,
-            headerBgColor: const Color(0xFFEFF6FF),
-            iconBgColor: const Color(0xFF2563EB),
-            textColor: const Color(0xFF1E40AF),
-            btnBgColor: const Color(0xFFDBEAFE),
-            btnTextColor: const Color(0xFF2563EB),
-            testIconData: [Icons.stars_rounded, Icons.military_tech_rounded],
-            testIconGradients: [
-              [const Color(0xFF1E3A8A), const Color(0xFF2563EB)],
-              [const Color(0xFF1E3A8A), const Color(0xFF2563EB)],
-            ],
-            tests: fFull,
-            item: item,
-          ),
+          if (_selectedCategoryFilter == 'Full Syllabus' && fFull.isNotEmpty)
+            _buildCategorySection(
+              title: 'Full Syllabus Tests (${fFull.length})',
+              subtitle: 'Full length exam pattern tests',
+              icon: Icons.track_changes_rounded,
+              headerBgColor: const Color(0xFFEFF6FF),
+              iconBgColor: const Color(0xFF2563EB),
+              textColor: const Color(0xFF1E40AF),
+              btnBgColor: const Color(0xFFDBEAFE),
+              btnTextColor: const Color(0xFF2563EB),
+              testIconData: [Icons.stars_rounded, Icons.military_tech_rounded],
+              testIconGradients: [
+                [const Color(0xFF1E3A8A), const Color(0xFF2563EB)],
+                [const Color(0xFF1E3A8A), const Color(0xFF2563EB)],
+              ],
+              tests: fFull,
+              item: item,
+            ),
+        ],
       ],
     );
   }
