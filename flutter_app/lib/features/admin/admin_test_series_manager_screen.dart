@@ -2872,6 +2872,24 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                             label: const Text('Admin Preview', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                           ),
                           const SizedBox(width: 6),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4F46E5),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              elevation: 0,
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              try {
+                                GoRouter.of(context).go('/admin/questions/upload');
+                              } catch (_) {}
+                            },
+                            icon: const Icon(Icons.upload_file_rounded, size: 14),
+                            label: const Text('Upload Questions', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(width: 6),
                           IconButton(
                             icon: const Icon(Icons.arrow_upward_rounded, size: 18),
                             color: idx > 0 ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
