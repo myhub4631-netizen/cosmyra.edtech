@@ -1365,7 +1365,9 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                     ],
                   ),
                   const SizedBox(height: 14),
-                  GestureDetector(
+                  TextFormField(
+                    controller: addTestDateCtrl,
+                    readOnly: true,
                     onTap: () async {
                       final date = await showDatePicker(
                         context: context,
@@ -1387,15 +1389,10 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                         }
                       }
                     },
-                    child: AbsorbPointer(
-                      child: TextFormField(
-                        controller: addTestDateCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Test Date & Time * (Select Schedule)',
-                          hintText: 'Select test start date & time',
-                          suffixIcon: Icon(Icons.event_available_rounded, color: Color(0xFF4F46E5)),
-                        ),
-                      ),
+                    decoration: const InputDecoration(
+                      labelText: 'Test Date & Time * (Select Schedule)',
+                      hintText: 'Select test start date & time',
+                      suffixIcon: Icon(Icons.event_available_rounded, color: Color(0xFF4F46E5)),
                     ),
                   ),
                 ],
@@ -1554,7 +1551,9 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                     ],
                   ),
                   const SizedBox(height: 14),
-                  GestureDetector(
+                  TextFormField(
+                    controller: editTestDateCtrl,
+                    readOnly: true,
                     onTap: () async {
                       final date = await showDatePicker(
                         context: context,
@@ -1576,15 +1575,10 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                         }
                       }
                     },
-                    child: AbsorbPointer(
-                      child: TextFormField(
-                        controller: editTestDateCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Test Date & Time * (Select Schedule)',
-                          hintText: 'Select test start date & time',
-                          suffixIcon: Icon(Icons.event_available_rounded, color: Color(0xFF4F46E5)),
-                        ),
-                      ),
+                    decoration: const InputDecoration(
+                      labelText: 'Test Date & Time * (Select Schedule)',
+                      hintText: 'Select test start date & time',
+                      suffixIcon: Icon(Icons.event_available_rounded, color: Color(0xFF4F46E5)),
                     ),
                   ),
                 ],
