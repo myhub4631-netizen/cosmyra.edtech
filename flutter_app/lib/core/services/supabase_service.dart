@@ -6603,27 +6603,108 @@ class SupabaseService {
   /// Fetch all saved papers/test series records from DB and local cache
   static Future<List<Map<String, dynamic>>> fetchAllPapersAndTestSeries() async {
     final List<Map<String, dynamic>> papers = [];
+    final Set<String> seenIds = {};
 
+    // 1. SharedPreferences local cache
     try {
       final prefs = await SharedPreferences.getInstance();
       final str = prefs.getString('cosmyra_saved_papers');
       if (str != null && str.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(str);
-        papers.addAll(decoded.map((e) => Map<String, dynamic>.from(e as Map)));
+        for (var e in decoded) {
+          final map = Map<String, dynamic>.from(e as Map);
+          final id = (map['id'] ?? map['paper_id'] ?? '').toString();
+          if (id.isNotEmpty && !seenIds.contains(id)) {
+            seenIds.add(id);
+            papers.add(map);
+          }
+        }
       }
     } catch (e) {
       debugPrint('Notice reading local saved papers: $e');
     }
 
+    // 2. Query Supabase system_config table for 'admin_custom_test_series' & 'admin_custom_papers'
+    try {
+      final res = await client
+          .from('system_config')
+          .select('key, value')
+          .inFilter('key', ['admin_custom_test_series', 'admin_custom_papers', 'created_test_papers']);
+
+      if (res != null && (res as List).isNotEmpty) {
+        for (var row in res) {
+          final val = row['value'];
+          List<dynamic> items = [];
+          if (val is List) {
+            items = val;
+          } else if (val is String && val.trim().isNotEmpty) {
+            try {
+              items = jsonDecode(val) as List;
+            } catch (_) {}
+          }
+          for (var item in items) {
+            if (item is Map) {
+              final map = Map<String, dynamic>.from(item);
+              // Extract embedded tests list if test series contains embedded created tests
+              if (map['tests'] is List) {
+                final embeddedTests = (map['tests'] as List).whereType<Map>().toList();
+                for (var et in embeddedTests) {
+                  final etMap = Map<String, dynamic>.from(et);
+                  etMap['test_series_id'] ??= map['id'];
+                  etMap['test_series_title'] ??= map['title'] ?? map['name'];
+                  etMap['target_exam'] ??= map['exam'];
+                  final etId = (etMap['id'] ?? etMap['paper_id'] ?? '').toString();
+                  if (etId.isNotEmpty && !seenIds.contains(etId)) {
+                    seenIds.add(etId);
+                    papers.add(etMap);
+                  } else if (etId.isEmpty) {
+                    papers.add(etMap);
+                  }
+                }
+              }
+
+              final id = (map['id'] ?? map['paper_id'] ?? '').toString();
+              if (id.isNotEmpty && !seenIds.contains(id)) {
+                seenIds.add(id);
+                papers.add(map);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice reading system_config papers & test series: $e');
+    }
+
+    // 3. Query Supabase tests table
+    try {
+      final res = await client.from('tests').select().order('created_at', ascending: false);
+      if (res != null && (res as List).isNotEmpty) {
+        for (var row in res) {
+          final map = Map<String, dynamic>.from(row as Map);
+          final id = (map['id'] ?? map['paper_id'] ?? '').toString();
+          if (id.isNotEmpty && !seenIds.contains(id)) {
+            seenIds.add(id);
+            papers.add(map);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice reading tests table: $e');
+    }
+
+    // 4. Query Supabase papers table
     try {
       final res = await client.from('papers').select().order('created_at', ascending: false);
       if (res != null && (res as List).isNotEmpty) {
         final dbPapers = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         for (var dbP in dbPapers) {
-          final idx = papers.indexWhere((p) => p['id'] == dbP['id']);
+          final id = (dbP['id'] ?? dbP['paper_id'] ?? '').toString();
+          final idx = papers.indexWhere((p) => p['id'] == id);
           if (idx != -1) {
             papers[idx] = dbP;
           } else {
+            if (id.isNotEmpty) seenIds.add(id);
             papers.add(dbP);
           }
         }
@@ -9602,6 +9683,171 @@ class SupabaseService {
       'reminder_text': message,
       'payment_link': 'https://neet-jee.in/checkout?id=${match['product_id']}',
     };
+  }
+
+  // ==========================================
+  // APP UPDATES & RELEASE NOTES ENGINE
+  // ==========================================
+  static final List<Map<String, dynamic>> _defaultAppUpdates = [
+    {
+      'id': 'upd_v1_1_6',
+      'version': 'v1.1.6',
+      'date': '2026-10-02',
+      'title': 'Mobile Layout Optimization & Dynamic Test Engine',
+      'tag': 'Release',
+      'highlights': [
+        'Eliminated Unnecessary Side Gaps & Reclaimed 52px+ width on mobile screens',
+        'Fixed AppBar title truncation with titleSpacing: 0 in product detail view',
+        'Streamlined subject icon & test index badges into single stacked elements',
+        'Enabled multi-line (maxLines: 2) auto-wrapping for long test paper titles',
+        'Responsive metadata chips (Qs, Hrs, Marks) formatted for all mobile screens',
+        'Released version v1.1.6 with Android APK and Web release builds'
+      ],
+      'isLatest': true,
+      'created_at': '2026-10-02T00:00:00.000Z',
+    },
+    {
+      'id': 'upd_v1_1_5',
+      'version': 'v1.1.5',
+      'date': '2026-10-01',
+      'title': 'Dynamic Test Count Resolution Engine',
+      'tag': 'Feature',
+      'highlights': [
+        'Dynamic test resolution aggregating papers across database stores',
+        'Multi-line feature highlight green strip with line-height tuning',
+        'Version v1.1.5 release sync across Android and Web'
+      ],
+      'isLatest': false,
+      'created_at': '2026-10-01T00:00:00.000Z',
+    },
+    {
+      'id': 'upd_v1_1_4',
+      'version': 'v1.1.4',
+      'date': '2026-09-30',
+      'title': 'Lottie Animations & Material 3 Interface',
+      'tag': 'Design',
+      'highlights': [
+        'Integrated interactive Lottie vector animations across mock test screens',
+        'Upgraded Material 3 UI design system with fluid page transitions',
+        'Enhanced user dashboard performance and streak tracking'
+      ],
+      'isLatest': false,
+      'created_at': '2026-09-30T00:00:00.000Z',
+    },
+  ];
+
+  /// Fetch all app updates from Supabase system_config / cache
+  static Future<List<Map<String, dynamic>>> fetchAppUpdates() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final localStr = prefs.getString('cosmyra_app_updates');
+
+      // 1. Fetch from Supabase system_config table ('app_updates_data')
+      try {
+        final res = await client
+            .from('system_config')
+            .select('value')
+            .eq('key', 'app_updates_data')
+            .maybeSingle();
+
+        if (res != null && res['value'] != null) {
+          final List cloudList = res['value'] is String ? jsonDecode(res['value']) : res['value'];
+          if (cloudList.isNotEmpty) {
+            final formatted = cloudList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+            await prefs.setString('cosmyra_app_updates', jsonEncode(formatted));
+            return formatted;
+          }
+        }
+      } catch (e) {
+        debugPrint('Notice querying system_config for app_updates_data: $e');
+      }
+
+      // 2. Cache fallback
+      if (localStr != null && localStr.isNotEmpty) {
+        final List localList = jsonDecode(localStr);
+        if (localList.isNotEmpty) {
+          return localList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice reading app updates: $e');
+    }
+
+    return _defaultAppUpdates;
+  }
+
+  /// Add or Update an App Release Entry (Admin)
+  static Future<bool> saveAppUpdate(Map<String, dynamic> updateItem) async {
+    try {
+      final currentList = await fetchAppUpdates();
+      final id = (updateItem['id'] ?? 'upd_${DateTime.now().millisecondsSinceEpoch}').toString();
+      updateItem['id'] = id;
+      updateItem['created_at'] ??= DateTime.now().toIso8601String();
+
+      final existingIndex = currentList.indexWhere((u) => u['id'] == id || u['version'] == updateItem['version']);
+      if (existingIndex >= 0) {
+        currentList[existingIndex] = updateItem;
+      } else {
+        currentList.insert(0, updateItem);
+      }
+
+      // Update isLatest tag
+      for (int i = 0; i < currentList.length; i++) {
+        currentList[i]['isLatest'] = (i == 0);
+      }
+
+      // 1. Cache to local
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_app_updates', jsonEncode(currentList));
+
+      // 2. Save to Supabase system_config table ('app_updates_data')
+      try {
+        await client.from('system_config').upsert({
+          'key': 'app_updates_data',
+          'value': currentList,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint('Notice persisting app_updates_data to system_config: $e');
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error saving app update: $e');
+      return false;
+    }
+  }
+
+  /// Delete an App Release Entry (Admin) - Releases Supabase Storage & Cache
+  static Future<bool> deleteAppUpdate(String id) async {
+    try {
+      final currentList = await fetchAppUpdates();
+      currentList.removeWhere((u) => u['id'] == id || u['version'] == id);
+
+      // Re-assign isLatest tag
+      for (int i = 0; i < currentList.length; i++) {
+        currentList[i]['isLatest'] = (i == 0);
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_app_updates', jsonEncode(currentList));
+
+      // Update Supabase system_config
+      try {
+        await client.from('system_config').upsert({
+          'key': 'app_updates_data',
+          'value': currentList,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+      } catch (e) {
+        debugPrint('Notice deleting app_updates_data entry from system_config: $e');
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting app update: $e');
+      return false;
+    }
   }
 }
 

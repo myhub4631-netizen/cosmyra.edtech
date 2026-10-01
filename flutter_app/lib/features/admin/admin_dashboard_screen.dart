@@ -500,6 +500,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('SYSTEM & SETTINGS'),
+                _buildSidebarTile('App Updates & Changelog', Icons.new_releases_outlined, false, onTap: () => context.go('/admin/updates')),
                 _buildSidebarTile('System Settings', Icons.settings_outlined, false, onTap: () => context.go('/admin/settings')),
                 _buildSidebarTile('Notification Center', Icons.notifications_none_rounded, false, onTap: () => context.go('/admin/notifications')),
                 _buildSidebarTile('Backup & Restore', Icons.cloud_sync_outlined, false),

@@ -361,7 +361,43 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         final year = (cs['year'] ?? '2027').toString();
         final qCount = (cs['question_count'] is num) ? (cs['question_count'] as num).toInt() : 200;
         final duration = (cs['duration_minutes'] is num) ? (cs['duration_minutes'] as num).toInt() : 180;
-        final testCount = (cs['test_count'] is num) ? (cs['test_count'] as num).toInt() : 10;
+
+        final rawTestsList = (cs['tests'] is List)
+            ? (cs['tests'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+            : <Map<String, dynamic>>[];
+
+        // Count matching papers in _dbPapers
+        final String sIdLower = sId.toLowerCase();
+        final String titleLower = title.toLowerCase();
+        int matchingDbCount = 0;
+        for (var p in _dbPapers) {
+          final pSeriesId = (p['test_series_id'] ?? p['series_id'] ?? p['testSeriesId'] ?? '').toString().trim().toLowerCase();
+          final pSeriesTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? p['test_series'] ?? p['testSeriesTitle'] ?? p['test_series_name'] ?? '').toString().trim().toLowerCase();
+          final pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? p['name'] ?? '').toString().trim().toLowerCase();
+
+          if ((pSeriesId.isNotEmpty && (pSeriesId == sIdLower || sIdLower.contains(pSeriesId))) ||
+              (pSeriesTitle.isNotEmpty && (pSeriesTitle == titleLower || titleLower.contains(pSeriesTitle) || pSeriesTitle.contains(titleLower))) ||
+              (pName.isNotEmpty && (pName == titleLower || titleLower.contains(pName)))) {
+            matchingDbCount++;
+          }
+        }
+
+        final int resolvedTestCount = rawTestsList.isNotEmpty
+            ? rawTestsList.length
+            : (matchingDbCount > 0
+                ? matchingDbCount
+                : ((cs['test_count'] is num) ? (cs['test_count'] as num).toInt() : 5));
+
+        String cleanDesc = (cs['description'] ?? '').toString().trim();
+        if (cleanDesc.isEmpty) {
+          cleanDesc = '$resolvedTestCount full-syllabus $exam mock tests covering complete syllabus with step-by-step solutions.';
+        } else {
+          cleanDesc = cleanDesc.replaceAll(RegExp(r'\b\d+\s+full-syllabus', caseSensitive: false), '$resolvedTestCount full-syllabus');
+          cleanDesc = cleanDesc.replaceAll(RegExp(r'\b\d+\s+progressive', caseSensitive: false), '$resolvedTestCount progressive');
+          cleanDesc = cleanDesc.replaceAll(RegExp(r'\b\d+\s+tests', caseSensitive: false), '$resolvedTestCount tests');
+          cleanDesc = cleanDesc.replaceAll(RegExp(r'\b\d+\s+mock tests', caseSensitive: false), '$resolvedTestCount mock tests');
+        }
+
         final difficulty = (cs['difficulty'] ?? 'Moderate').toString();
         final testType = (cs['test_type'] ?? cs['testType'] ?? 'Full').toString();
         final validity = (cs['validity'] ?? 'Valid until exam').toString();
@@ -381,21 +417,17 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             exam: exam,
             targetYear: year,
             subtitle: '$exam $year Series ($qCount Qs)',
-            description: (cs['description'] ?? '').toString().trim().isNotEmpty
-                ? cs['description'].toString().trim()
-                : 'Comprehensive mock tests covering full syllabus with step-by-step solutions.',
+            description: cleanDesc,
             longDescription: (cs['long_description'] ?? cs['longDescription'] ?? '').toString(),
             features: (cs['features'] is List) ? List<dynamic>.from(cs['features']) : const [],
-            tests: (cs['tests'] is List)
-                ? (cs['tests'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
-                : const [],
+            tests: rawTestsList,
             reviews: (cs['reviews'] is List)
                 ? (cs['reviews'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
                 : const [],
             topScores: (cs['top_scores'] is Map)
                 ? Map<String, dynamic>.from(cs['top_scores'])
                 : ((cs['topScores'] is Map) ? Map<String, dynamic>.from(cs['topScores']) : const {}),
-            testCount: testCount,
+            testCount: resolvedTestCount,
             durationMinutes: duration,
             difficulty: difficulty,
             testType: testType,
