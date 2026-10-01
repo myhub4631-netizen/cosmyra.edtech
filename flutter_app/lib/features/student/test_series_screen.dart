@@ -2843,10 +2843,11 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
                         Text('$duration Mins', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
                         const Text('•', style: TextStyle(color: Color(0xFFCBD5E1))),
                         Text('Type: ${item.testType}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB))),
-                        if (formattedDateTime.isNotEmpty) ...[
-                          const Text('•', style: TextStyle(color: Color(0xFFCBD5E1))),
-                          Text('📅 $formattedDateTime', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF059669))),
-                        ],
+                        const Text('•', style: TextStyle(color: Color(0xFFCBD5E1))),
+                        Text(
+                          '📅 ${formattedDateTime.isNotEmpty ? formattedDateTime : 'Schedule: Available'}',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF059669)),
+                        ),
                       ],
                     ),
                   ],

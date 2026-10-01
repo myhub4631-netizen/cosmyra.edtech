@@ -2335,8 +2335,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                               _buildMetaChip(Icons.description_outlined, '$qCount Qs'),
                               _buildMetaChip(Icons.access_time_rounded, '${durationMins >= 60 ? '${(durationMins / 60).toStringAsFixed(0)} Hrs' : '$durationMins Mins'}'),
                               _buildMetaChip(Icons.bar_chart_rounded, '$marks Marks'),
-                              if (formattedDateTime.isNotEmpty)
-                                _buildMetaChip(Icons.event_rounded, formattedDateTime),
+                              _buildMetaChip(
+                                Icons.event_rounded,
+                                formattedDateTime.isNotEmpty ? formattedDateTime : 'Schedule: Available',
+                              ),
                             ],
                           ),
                         ],
