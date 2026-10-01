@@ -760,37 +760,18 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       child: Row(
         children: [
           // Logo (if mobile or small screen)
-          // Logo (if mobile or small screen)
           if (screenWidth < 992) ...[
-            Row(
-              children: [
-                Image.asset(
-                  'assets/images/cosmyra_logo.png',
-                  height: 32,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Image.network(
-                    'https://neet-jee.in/assets/images/cosmyra_logo.png',
-                    height: 32,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(colors: [Color(0xFF00C6FF), Color(0xFF0072FF)]),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(child: Icon(Icons.bolt, color: Colors.white, size: 20)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'COSMYRA',
-                  style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A), letterSpacing: 0.5),
-                ),
-                const SizedBox(width: 16),
-              ],
+            Image.asset(
+              'assets/images/cosmyra_logo.png',
+              height: 32,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => Image.network(
+                'https://neet-jee.in/assets/images/cosmyra_logo.png',
+                height: 32,
+                fit: BoxFit.contain,
+              ),
             ),
+            const SizedBox(width: 16),
           ],
 
           // Search Bar Input (Center)
@@ -914,39 +895,15 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
           // Logo Header
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-            child: Row(
-              children: [
-                Image.asset(
-                  'assets/images/cosmyra_logo.png',
-                  height: 34,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => Image.network(
-                    'https://neet-jee.in/assets/images/cosmyra_logo.png',
-                    height: 34,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(colors: [Color(0xFF00C6FF), Color(0xFF0072FF)]),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(child: Icon(Icons.bolt, color: Colors.white, size: 20)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'COSMYRA',
-                      style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A), letterSpacing: 0.5),
-                    ),
-                    Text('NEET | JEE', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: const Color(0xFF64748B))),
-                  ],
-                ),
-              ],
+            child: Image.asset(
+              'assets/images/cosmyra_logo.png',
+              height: 38,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => Image.network(
+                'https://neet-jee.in/assets/images/cosmyra_logo.png',
+                height: 38,
+                fit: BoxFit.contain,
+              ),
             ),
           ),
 

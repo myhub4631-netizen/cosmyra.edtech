@@ -1482,22 +1482,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 height: 34,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
-                  return Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.school_rounded, color: Colors.white, size: 20),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Cosmyra NEET | JEE',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                      ),
-                    ],
+                  return Image.network(
+                    'https://neet-jee.in/assets/images/cosmyra_logo.png',
+                    height: 34,
+                    fit: BoxFit.contain,
                   );
                 },
               ),
@@ -1741,56 +1729,36 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
             ),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Image.asset(
-                    'assets/images/cosmyra_logo.png',
-                    height: 34,
-                    width: 34,
+                Image.asset(
+                  'assets/images/cosmyra_logo.png',
+                  height: 38,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Image.network(
+                    'https://neet-jee.in/assets/images/cosmyra_logo.png',
+                    height: 38,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.school, color: Color(0xFF4F46E5), size: 24),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Cosmyra NEET | JEE',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'v1.1.2',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF2563EB),
-                          ),
-                        ),
-                      ),
-                    ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'v1.1.2',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF2563EB),
+                    ),
                   ),
                 ),
               ],

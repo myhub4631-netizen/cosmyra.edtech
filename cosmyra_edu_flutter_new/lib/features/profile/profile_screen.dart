@@ -1,6 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/app_sidebar.dart';
@@ -229,6 +233,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   const SizedBox(height: 16),
 
+                  // 7.5. MY PURCHASES & SUBSCRIPTIONS SECTION
+                  _buildMyPurchasesSection(),
+
+                  const SizedBox(height: 16),
+
+                  // 7.6. ORDER HISTORY SECTION
+                  _buildOrderHistorySection(),
+
+                  const SizedBox(height: 16),
+
                   // 8. QUICK ACTIONS SECTION
                   _buildQuickActionsSection(),
 
@@ -254,20 +268,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         Row(
           children: [
-            Builder(
-              builder: (ctx) => InkWell(
-                onTap: () => Scaffold.of(ctx).openDrawer(),
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.all(6.0),
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: const Icon(Icons.menu_rounded, size: 20, color: Color(0xFF0F172A)),
+            InkWell(
+              onTap: () => context.canPop() ? context.pop() : context.go('/dashboard'),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.all(6.0),
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
+                child: const Icon(Icons.arrow_back_rounded, size: 20, color: Color(0xFF0F172A)),
               ),
             ),
             Column(
@@ -323,140 +335,164 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 2. PROFILE CARD
   Widget _buildProfileCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 4))],
-      ),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Avatar with camera button overlay
-              Stack(
-                children: [
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF4F46E5)]),
-                      boxShadow: [BoxShadow(color: const Color(0xFF4F46E5).withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 4))],
-                    ),
-                    child: Center(
-                      child: Text(
-                        _currentProfile.fullName.isNotEmpty ? _currentProfile.fullName[0].toUpperCase() : 'M',
-                        style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: InkWell(
-                      onTap: () => _showEditProfileBottomSheet(context),
-                      child: Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4F46E5),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: const Icon(Icons.camera_alt_rounded, size: 13, color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 16),
-              // Student identity info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            _currentProfile.fullName,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.verified_rounded, size: 18, color: Color(0xFF3B82F6)),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text(
-                          '$_selectedExamDisplay ${_currentProfile.targetYear} Aspirant',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
-                        ),
-                        const SizedBox(width: 4),
-                        const Text('🎯', style: TextStyle(fontSize: 12)),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF94A3B8)),
-                        const SizedBox(width: 2),
-                        Text(
-                          '${_currentProfile.city}, ${_currentProfile.state}',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              // Edit Profile Button
-              OutlinedButton.icon(
-                onPressed: () => _showEditProfileBottomSheet(context),
-                icon: const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF4F46E5)),
-                label: const Text('Edit Profile', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFC7D2FE)),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 460;
+        return Container(
+          padding: EdgeInsets.all(isMobile ? 16 : 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 4))],
           ),
-
-          const SizedBox(height: 16),
-
-          // Profile completion progress bar
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('Profile 85% complete', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
-                  Text('85%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF4F46E5))),
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Avatar with camera button overlay
+                  Stack(
+                    children: [
+                      _buildAvatarWidget(isMobile ? 68 : 76),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: InkWell(
+                          onTap: () => _showAvatarPickerModal(context),
+                          child: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4F46E5),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              boxShadow: [
+                                BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 4, offset: const Offset(0, 2)),
+                              ],
+                            ),
+                            child: const Icon(Icons.camera_alt_rounded, size: 13, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 14),
+                  // Student identity info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _currentProfile.fullName,
+                                style: TextStyle(
+                                  fontSize: isMobile ? 17 : 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(Icons.verified_rounded, size: 17, color: Color(0xFF3B82F6)),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '$_selectedExamDisplay ${_currentProfile.targetYear} Aspirant 🎯',
+                          style: TextStyle(
+                            fontSize: isMobile ? 12 : 13,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on_outlined, size: 13, color: Color(0xFF94A3B8)),
+                            const SizedBox(width: 2),
+                            Flexible(
+                              child: Text(
+                                '${_currentProfile.city}, ${_currentProfile.state}',
+                                style: TextStyle(fontSize: isMobile ? 11 : 12, color: const Color(0xFF94A3B8)),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!isMobile) ...[
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      onPressed: () => _showEditProfileBottomSheet(context),
+                      icon: const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF4F46E5)),
+                      label: const Text('Edit Profile', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFC7D2FE)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 6),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: 0.85,
-                  minHeight: 8,
-                  backgroundColor: const Color(0xFFEEF2FF),
-                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4F46E5)),
+
+              if (isMobile) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 36,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showEditProfileBottomSheet(context),
+                    icon: const Icon(Icons.edit_outlined, size: 14, color: Color(0xFF4F46E5)),
+                    label: const Text('Edit Profile & Goals', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFC7D2FE)),
+                      backgroundColor: const Color(0xFFF8FAFC),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
                 ),
+              ],
+
+              const SizedBox(height: 14),
+
+              // Profile completion progress bar
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: const [
+                      Text('Profile 85% complete', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                      Text('85%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF4F46E5))),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: 0.85,
+                      minHeight: 8,
+                      backgroundColor: const Color(0xFFEEF2FF),
+                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4F46E5)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -492,7 +528,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                 decoration: BoxDecoration(
                   color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
@@ -502,15 +538,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(exam['icon'], size: 16, color: isSelected ? Colors.white : const Color(0xFF64748B)),
-                    const SizedBox(width: 6),
-                    Text(
-                      exam['label'],
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        color: isSelected ? Colors.white : const Color(0xFF64748B),
+                    Icon(exam['icon'], size: 14, color: isSelected ? Colors.white : const Color(0xFF64748B)),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        exam['label'],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                          color: isSelected ? Colors.white : const Color(0xFF64748B),
+                        ),
                       ),
                     ),
                   ],
@@ -1063,6 +1104,531 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // 7.5 MY PURCHASES & SUBSCRIPTIONS SECTION
+  Widget _buildMyPurchasesSection() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: SupabaseService.fetchUserEntitlements(_currentProfile.id),
+      builder: (context, snapshot) {
+        final entitlements = snapshot.data ?? [];
+        final hasPurchases = entitlements.isNotEmpty;
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 4))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEEF2FF),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.shopping_bag_outlined, size: 18, color: Color(0xFF4F46E5)),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'My Purchases & Subscriptions',
+                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                      ),
+                      Text(
+                        hasPurchases ? '${entitlements.length} Active test series and suites enrolled' : 'Manage your subscribed packages & test suites',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () => context.go('/test-series'),
+                    icon: const Icon(Icons.storefront_outlined, size: 15, color: Color(0xFF4F46E5)),
+                    label: const Text('Store', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (!hasPurchases) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEEF2FF),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.quiz_outlined, color: Color(0xFF4F46E5), size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'No Active Test Series Yet',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Enroll in NTA-standard NEET & JEE test series with instant CBT access.',
+                              style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () => context.go('/test-series'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4F46E5),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('Browse', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: entitlements.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (ctx, idx) {
+                    final ent = entitlements[idx];
+                    final title = ent['product_title']?.toString() ?? 'Test Series';
+                    final validUntil = ent['valid_until']?.toString() ?? '';
+                    final validDateStr = validUntil.length >= 10 ? validUntil.substring(0, 10) : 'Active';
+
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFECFDF5),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 20),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      title,
+                                      style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A), height: 1.3),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(4)),
+                                          child: const Text('ACTIVE', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF64748B)),
+                                        const SizedBox(width: 3),
+                                        Flexible(
+                                          child: Text(
+                                            'Valid until $validDateStr',
+                                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.check_circle_outline, size: 12, color: Color(0xFF6366F1)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Full CBT Access',
+                                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF4F46E5)),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(
+                                height: 32,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2563EB),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  onPressed: () => context.go('/test-series'),
+                                  icon: const Icon(Icons.play_arrow_rounded, size: 14),
+                                  label: const Text('Continue', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 7.6 ORDER HISTORY SECTION
+  Widget _buildOrderHistorySection() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: SupabaseService.fetchUserOrders(_currentProfile.id),
+      builder: (context, snapshot) {
+        final orders = snapshot.data ?? [];
+        final hasOrders = orders.isNotEmpty;
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 4))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.receipt_long_rounded, size: 18, color: Color(0xFF334155)),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Order History & Invoices',
+                        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                      ),
+                      Text(
+                        hasOrders ? '${orders.length} Past transactions & billing records' : 'All your purchase receipts will appear here',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded, size: 18, color: Color(0xFF64748B)),
+                    tooltip: 'Refresh Orders',
+                    onPressed: () => setState(() {}),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (!hasOrders) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: const Center(
+                    child: Text('No previous purchases or orders found.', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
+                  ),
+                ),
+              ] else ...[
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: orders.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (ctx, idx) {
+                    final ord = orders[idx];
+                    final rawId = (ord['order_number'] ?? ord['order_id'] ?? ord['id'] ?? '').toString();
+                    final created = ord['created_at'] != null ? DateTime.tryParse(ord['created_at'].toString()) : null;
+                    final orderId = SupabaseService.formatOrderId(
+                      rawId: rawId,
+                      userId: _currentProfile.id,
+                      date: created,
+                      index: orders.length - idx,
+                    );
+                    final productName = (ord['product_name'] ?? 'Test Series Package').toString();
+                    final amount = (ord['amount'] ?? ord['total_amount'] ?? 0);
+                    final paymentMethod = (ord['payment_method'] ?? 'Online UPI').toString();
+                    final status = (ord['payment_status'] ?? ord['status'] ?? 'completed').toString().toLowerCase();
+                    final dateStr = created != null ? DateFormat('dd MMM yyyy, hh:mm a').format(created) : 'Recently';
+
+                    final isPaid = status == 'completed';
+                    final isPending = status == 'pending';
+                    final isIncomplete = status == 'incomplete';
+
+                    Color statusBg = const Color(0xFFDCFCE7);
+                    Color statusColor = const Color(0xFF15803D);
+                    String statusLabel = 'PAID';
+
+                    if (isPending) {
+                      statusBg = const Color(0xFFFEF3C7);
+                      statusColor = const Color(0xFFB45309);
+                      statusLabel = 'PENDING';
+                    } else if (isIncomplete) {
+                      statusBg = const Color(0xFFFFEDD5);
+                      statusColor = const Color(0xFFC2410C);
+                      statusLabel = 'INCOMPLETE';
+                    } else if (status == 'cancelled') {
+                      statusBg = const Color(0xFFFEE2E2);
+                      statusColor = const Color(0xFFB91C1C);
+                      statusLabel = 'CANCELLED';
+                    }
+
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '#$orderId',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: Color(0xFF4F46E5), fontFamily: 'monospace'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(color: statusBg, borderRadius: BorderRadius.circular(6)),
+                                child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            productName,
+                            style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Text('₹$amount', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: Color(0xFF0F172A))),
+                              Flexible(
+                                child: Text(' • $paymentMethod', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(dateStr, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                            ],
+                          ),
+                          const Divider(height: 18),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () => _showInvoiceDialog(ord, formattedOrderId: orderId),
+                                icon: const Icon(Icons.receipt_outlined, size: 14),
+                                label: const Text('View Invoice', style: TextStyle(fontSize: 11.5)),
+                              ),
+                              const SizedBox(width: 8),
+                              if (isPaid)
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF10B981),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  onPressed: () => context.go('/test-series'),
+                                  icon: const Icon(Icons.check_circle_outline, size: 14),
+                                  label: const Text('Access Tests', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                )
+                              else if (isPending || isIncomplete)
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFD97706),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  onPressed: () => context.go('/checkout?id=${ord['product_id'] ?? ''}&title=${Uri.encodeComponent(productName)}&price=$amount'),
+                                  icon: const Icon(Icons.payment_rounded, size: 14),
+                                  label: const Text('Complete Payment', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showInvoiceDialog(Map<String, dynamic> order, {String? formattedOrderId}) {
+    final rawId = (order['order_number'] ?? order['order_id'] ?? order['id'] ?? 'ORD').toString();
+    final created = order['created_at'] != null ? DateTime.tryParse(order['created_at'].toString()) : null;
+    final orderId = formattedOrderId ?? SupabaseService.formatOrderId(
+      rawId: rawId,
+      userId: _currentProfile.id,
+      date: created,
+    );
+    final productName = (order['product_name'] ?? 'Test Package').toString();
+    final amount = (order['amount'] ?? order['total_amount'] ?? 0);
+    final paymentMethod = (order['payment_method'] ?? 'UPI').toString();
+    final status = (order['payment_status'] ?? order['status'] ?? 'completed').toString().toUpperCase();
+    final dateStr = created != null ? DateFormat('dd MMM yyyy, hh:mm a').format(created) : 'Recently';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 460),
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Image.asset(
+                        'assets/images/cosmyra_logo.png',
+                        height: 32,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Image.network(
+                          'https://neet-jee.in/assets/images/cosmyra_logo.png',
+                          height: 32,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text('Official Tax Invoice & Receipt', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
+                    child: Text(status, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF15803D))),
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              _buildInvoiceRow('Order ID', '#$orderId'),
+              _buildInvoiceRow('Customer', _currentProfile.fullName),
+              _buildInvoiceRow('Email', _currentProfile.email),
+              _buildInvoiceRow('Mobile', _currentProfile.phoneNumber ?? '-'),
+              _buildInvoiceRow('Item Purchased', productName),
+              _buildInvoiceRow('Date & Time', dateStr),
+              _buildInvoiceRow('Payment Mode', paymentMethod),
+              const Divider(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Total Paid Amount:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  Text('₹$amount', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF10B981))),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Done'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInvoiceRow(String label, String val) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          Flexible(child: Text(val, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
+        ],
+      ),
+    );
+  }
+
   // 8. QUICK ACTIONS SECTION
   Widget _buildQuickActionsSection() {
     final actions = [
@@ -1420,6 +1986,236 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       },
     );
+  }
+
+  Widget _buildAvatarWidget(double size) {
+    final avatar = _currentProfile.avatarUrl ?? '';
+    if (avatar.startsWith('avatar:')) {
+      final emoji = avatar.replaceFirst('avatar:', '');
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xFFF1F5F9),
+          border: Border.all(color: const Color(0xFFCBD5E1), width: 2),
+        ),
+        child: Center(
+          child: Text(emoji, style: TextStyle(fontSize: size * 0.48)),
+        ),
+      );
+    } else if (avatar.startsWith('data:image') || avatar.startsWith('http')) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFF4F46E5), width: 2),
+          image: DecorationImage(
+            image: avatar.startsWith('data:image')
+                ? MemoryImage(base64Decode(avatar.split(',').last))
+                : NetworkImage(avatar) as ImageProvider,
+            fit: BoxFit.cover,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF4F46E5)]),
+        boxShadow: [BoxShadow(color: const Color(0xFF4F46E5).withOpacity(0.25), blurRadius: 8, offset: const Offset(0, 4))],
+      ),
+      child: Center(
+        child: Text(
+          _currentProfile.fullName.isNotEmpty ? _currentProfile.fullName[0].toUpperCase() : 'M',
+          style: TextStyle(fontSize: size * 0.42, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+      ),
+    );
+  }
+
+  void _showAvatarPickerModal(BuildContext context) {
+    final presetAvatars = [
+      {'label': 'Future Doctor', 'emoji': '🩺', 'color': 0xFF2563EB},
+      {'label': 'Aspirant Scholar', 'emoji': '🤓', 'color': 0xFF7C3AED},
+      {'label': 'Top Ranker', 'emoji': '🎓', 'color': 0xFF059669},
+      {'label': 'Surgeon Specialist', 'emoji': '👨‍⚕️', 'color': 0xFF0891B2},
+      {'label': 'Medical Expert', 'emoji': '👩‍⚕️', 'color': 0xFFDB2777},
+      {'label': 'Science Chemist', 'emoji': '🔬', 'color': 0xFFEA580C},
+      {'label': 'Gold Medalist', 'emoji': '🏆', 'color': 0xFFD97706},
+      {'label': 'Focused Ninja', 'emoji': '🥷', 'color': 0xFF475569},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Choose Your Avatar or Photo',
+                    style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+                  ),
+                  IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Select an aspirant avatar or upload a custom photo (Max 100 KB)',
+                style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 18),
+
+              // Upload Custom Button (Max 100 KB)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
+                    side: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  icon: const Icon(Icons.cloud_upload_rounded, color: Color(0xFF4F46E5)),
+                  label: Text(
+                    'Upload Custom Profile Photo (Max 100 KB)',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF4F46E5)),
+                  ),
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    await _pickAndUploadProfilePic();
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 20),
+              Text('Preset Aspirant Avatars', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF334155))),
+              const SizedBox(height: 12),
+
+              // Preset Avatars Grid
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.9,
+                ),
+                itemCount: presetAvatars.length,
+                itemBuilder: (context, idx) {
+                  final av = presetAvatars[idx];
+                  final emoji = av['emoji'] as String;
+                  final label = av['label'] as String;
+                  final color = Color(av['color'] as int);
+                  final isSelected = _currentProfile.avatarUrl == 'avatar:$emoji';
+
+                  return InkWell(
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final updated = _currentProfile.copyWith(avatarUrl: 'avatar:$emoji');
+                      await _saveProfileData(updated);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('✓ Selected $label avatar!'), backgroundColor: const Color(0xFF10B981)),
+                        );
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: isSelected ? color.withOpacity(0.15) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? color : const Color(0xFFE2E8F0),
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(emoji, style: const TextStyle(fontSize: 28)),
+                          const SizedBox(height: 4),
+                          Text(
+                            label,
+                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndUploadProfilePic() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      final bytes = file.bytes;
+
+      if (bytes == null || bytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not read image file.'), backgroundColor: Color(0xFFEF4444)),
+          );
+        }
+        return;
+      }
+
+      // Convert image bytes to compressed base64 Data URL
+      final ext = file.extension?.toLowerCase() ?? 'jpeg';
+      final mime = ext == 'png' ? 'image/png' : (ext == 'webp' ? 'image/webp' : 'image/jpeg');
+      final base64String = base64Encode(bytes);
+      final dataUrl = 'data:$mime;base64,$base64String';
+
+      final newAvatar = await SupabaseService.updateUserAvatar(
+        userId: _currentProfile.id,
+        avatarUrlOrData: dataUrl,
+      );
+
+      final updated = _currentProfile.copyWith(avatarUrl: newAvatar ?? dataUrl);
+      await _saveProfileData(updated);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✓ Profile picture updated successfully!'), backgroundColor: Color(0xFF10B981)),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error uploading profile picture: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: $e'), backgroundColor: const Color(0xFFEF4444)),
+        );
+      }
+    }
   }
 }
 

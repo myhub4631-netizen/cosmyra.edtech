@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/app_sidebar.dart';
 import '../auth/login_screen.dart';
+import 'widgets/recommended_test_series_section.dart';
 
 class UserDashboardScreen extends StatefulWidget {
   final UserProfileModel userProfile;
@@ -50,6 +52,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   int _mobileBottomNavIndex = 0;
 
   late UserProfileModel _currentUserProfile;
+  Map<String, dynamic>? _activeAbortedSession;
+  Map<String, dynamic> _userRealStats = {
+    'questionsAttempted': 1248,
+    'accuracy': 72.4,
+    'testsCompleted': 28,
+    'studyStreak': 12,
+  };
+
   @override
   void initState() {
     super.initState();
@@ -61,11 +71,420 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
   Future<void> _loadCurrentUser() async {
     final currentUser = await SupabaseService.getCurrentUser();
-    if (currentUser != null && mounted) {
+    final stats = await SupabaseService.fetchUserRealStats();
+    final activeSession = await SupabaseService.loadActiveTestSession(isExplicitResume: true);
+
+    if (mounted) {
       setState(() {
-        _currentUserProfile = currentUser;
+        if (currentUser != null) _currentUserProfile = currentUser;
+        _userRealStats = stats;
+        _activeAbortedSession = activeSession;
       });
     }
+    _checkAndShowCohortOnboarding();
+  }
+
+  Future<void> _checkAndShowCohortOnboarding() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = _currentUserProfile.id;
+      final bool alreadyCompleted = prefs.getBool('cohort_onboarding_completed_$userId') ?? false;
+
+      final phoneStr = _currentUserProfile.phoneNumber ?? '';
+      final bool missingPhone = phoneStr.trim().isEmpty || phoneStr.contains('0000000000');
+      final bool missingCohort = _currentUserProfile.targetExam.trim().isEmpty || _currentUserProfile.targetExam == 'NEET & JEE';
+
+      if (!alreadyCompleted && (missingPhone || missingCohort) && mounted) {
+        Future.delayed(const Duration(milliseconds: 600), () {
+          if (mounted) _showCohortSelectionModal();
+        });
+      }
+    } catch (e) {
+      debugPrint('Notice checking cohort onboarding: $e');
+    }
+  }
+
+  void _showCohortSelectionModal() {
+    final rawPhone = _currentUserProfile.phoneNumber ?? '';
+    final phoneCtrl = TextEditingController(
+      text: rawPhone.replaceAll('+91', '').replaceAll('-', '').trim(),
+    );
+    String primaryExam = _currentUserProfile.targetExam.toUpperCase().contains('JEE') ? 'JEE' : 'NEET';
+    String jeeSubtype = _currentUserProfile.targetExam.toUpperCase().contains('ADV') ? 'JEE Advanced' : 'JEE Main';
+    int targetYear = (_currentUserProfile.targetYear >= 2025 && _currentUserProfile.targetYear <= 2028) ? _currentUserProfile.targetYear : 2026;
+    String? phoneErrorText;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          clipBehavior: Clip.antiAlias,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 460),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEEF2FF),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.phone_iphone_rounded, color: Color(0xFF4F46E5), size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Enter Your Mobile Number',
+                              style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                            ),
+                            Text(
+                              'Provide your verified mobile number and academic goal',
+                              style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // 1. Mobile Number
+                  Text('Enter Your Mobile Number', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    maxLength: 10,
+                    onChanged: (val) {
+                      if (phoneErrorText != null) {
+                        setDialogState(() => phoneErrorText = null);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        child: Text('+91', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                      ),
+                      hintText: 'e.g. 9812345678',
+                      counterText: '',
+                      errorText: phoneErrorText,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 2. Exam Goal: NEET vs JEE
+                  Text('What examination are you preparing for?', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setDialogState(() => primaryExam = 'NEET'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: primaryExam == 'NEET' ? const Color(0xFFEEF2FF) : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: primaryExam == 'NEET' ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
+                                width: primaryExam == 'NEET' ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('🩺', style: TextStyle(fontSize: 22)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'NEET',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: primaryExam == 'NEET' ? const Color(0xFF4F46E5) : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                Text(
+                                  'Medical',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: primaryExam == 'NEET' ? const Color(0xFF6366F1) : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setDialogState(() => primaryExam = 'JEE'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: primaryExam == 'JEE' ? const Color(0xFFEEF2FF) : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: primaryExam == 'JEE' ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
+                                width: primaryExam == 'JEE' ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('⚡', style: TextStyle(fontSize: 22)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'JEE',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: primaryExam == 'JEE' ? const Color(0xFF4F46E5) : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                Text(
+                                  'Engineering',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: primaryExam == 'JEE' ? const Color(0xFF6366F1) : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // 3. Sub-selection for JEE: Main vs Advanced
+                  if (primaryExam == 'JEE') ...[
+                    const SizedBox(height: 14),
+                    Text('Select JEE Target Track:', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setDialogState(() => jeeSubtype = 'JEE Main'),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: jeeSubtype == 'JEE Main' ? const Color(0xFF4F46E5) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: jeeSubtype == 'JEE Main' ? const Color(0xFF4338CA) : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'JEE Main',
+                                  style: TextStyle(
+                                    color: jeeSubtype == 'JEE Main' ? Colors.white : const Color(0xFF334155),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setDialogState(() => jeeSubtype = 'JEE Advanced'),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: jeeSubtype == 'JEE Advanced' ? const Color(0xFF4F46E5) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: jeeSubtype == 'JEE Advanced' ? const Color(0xFF4338CA) : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'JEE Advanced',
+                                  style: TextStyle(
+                                    color: jeeSubtype == 'JEE Advanced' ? Colors.white : const Color(0xFF334155),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  // 4. Target Year
+                  const SizedBox(height: 16),
+                  Text('Target Exam Year:', style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [2025, 2026, 2027, 2028].map((yr) {
+                      final isSel = targetYear == yr;
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3.0),
+                          child: InkWell(
+                            onTap: () => setDialogState(() => targetYear = yr),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isSel ? const Color(0xFF10B981) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isSel ? const Color(0xFF059669) : const Color(0xFFE2E8F0),
+                                  width: isSel ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (isSel) ...[
+                                    const Icon(Icons.check_rounded, size: 13, color: Colors.white),
+                                    const SizedBox(width: 2),
+                                  ],
+                                  Text(
+                                    '$yr',
+                                    style: TextStyle(
+                                      color: isSel ? Colors.white : const Color(0xFF334155),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Submit Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4F46E5),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () async {
+                        final rawPhone = phoneCtrl.text.replaceAll(RegExp(r'\D'), '').trim();
+
+                        // Strict Indian Mobile Validation
+                        if (rawPhone.length != 10) {
+                          setDialogState(() {
+                            phoneErrorText = 'Mobile number must be exactly 10 digits.';
+                          });
+                          return;
+                        }
+                        if (!RegExp(r'^[6-9]\d{9}$').hasMatch(rawPhone)) {
+                          setDialogState(() {
+                            phoneErrorText = 'Invalid mobile number. Must start with 6, 7, 8, or 9.';
+                          });
+                          return;
+                        }
+
+                        // Blacklist known dummy/test numbers
+                        const dummyList = [
+                          '9988776655', '9876543210', '0123456789', '1234567890',
+                          '9898989898', '9191919191', '9090909090', '9988998899',
+                          '9999999999', '8888888888', '7777777777', '6666666666',
+                          '9876598765', '9123456789', '9000000000', '9800000000',
+                        ];
+                        if (dummyList.contains(rawPhone)) {
+                          setDialogState(() {
+                            phoneErrorText = 'Dummy/fake numbers like $rawPhone are not permitted. Enter a real active number.';
+                          });
+                          return;
+                        }
+
+                        // Reject numbers with fewer than 4 unique digits (e.g. 9988998899)
+                        if (rawPhone.split('').toSet().length < 4) {
+                          setDialogState(() {
+                            phoneErrorText = 'Please enter a genuine 10-digit mobile number.';
+                          });
+                          return;
+                        }
+
+                        // Reject more than 5 consecutive repeating digits
+                        if (RegExp(r'(\d)\1{5,}').hasMatch(rawPhone)) {
+                          setDialogState(() {
+                            phoneErrorText = 'Repetitive sequences like 000000 or 999999 are not allowed.';
+                          });
+                          return;
+                        }
+
+                        final chosenExam = primaryExam == 'NEET' ? 'NEET' : jeeSubtype;
+                        final fullPhone = '+91$rawPhone';
+
+                        final updated = _currentUserProfile.copyWith(
+                          phoneNumber: fullPhone,
+                          targetExam: chosenExam,
+                          targetYear: targetYear,
+                        );
+
+                        // Save to Supabase and cache
+                        await SupabaseService.updateProfile(updated);
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('cohort_onboarding_completed_${updated.id}', true);
+
+                        if (mounted) {
+                          setState(() {
+                            _currentUserProfile = updated;
+                          });
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('✓ Profile verified! Set goal to $chosenExam $targetYear'),
+                              backgroundColor: const Color(0xFF10B981),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Save & Continue to Dashboard', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -102,7 +521,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             ),
             body: SafeArea(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(14.0, 8.0, 14.0, 96.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -136,7 +556,15 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     // 5. Quick Actions Row
                     if (_isSectionVisible('quick_actions')) ...[
                       _buildMobileQuickActions(),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // 6. Recommended Test Series Section & Go Premium Banner
+                    if (_isSectionVisible('recommended_section')) ...[
+                      RecommendedTestSeriesSection(
+                        onViewAll: () => context.go('/test-series'),
+                      ),
+                      const SizedBox(height: 16),
                     ],
                   ],
                 ),
@@ -176,6 +604,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                     // Main Scrollable Content Body
                     Expanded(
                       child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
                         padding: const EdgeInsets.all(28.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,6 +639,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                             // Quick Start Section Header + 5 Cards Grid Row
                             if (_isSectionVisible('quick_actions')) ...[
                               _buildQuickStartSection(),
+                              const SizedBox(height: 28),
+                            ],
+
+                            // Recommended Test Series Section & Go Premium Banner
+                            if (_isSectionVisible('recommended_section')) ...[
+                              RecommendedTestSeriesSection(
+                                onViewAll: () => context.go('/test-series'),
+                              ),
                               const SizedBox(height: 28),
                             ],
 
@@ -286,7 +723,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text(
-                        'v1.1.1',
+                        'v1.1.2',
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
@@ -301,9 +738,41 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           ],
         ),
 
-        // Right Streak & Notification Bell
+        // Right Streak, Store & Notification Bell
         Row(
           children: [
+            InkWell(
+              onTap: () => context.go('/test-series'),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF4F46E5), Color(0xFF7C3AED), Color(0xFFE11D48)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.storefront_rounded, color: Colors.white, size: 14),
+                    SizedBox(width: 3),
+                    Text(
+                      'Store',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -399,32 +868,32 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     final metrics = [
       {
         'title': 'Questions Attempted',
-        'value': '1,248',
-        'sub': '↑ 18% vs 7d',
+        'value': '${_userRealStats['questionsAttempted']}',
+        'sub': 'Real stats',
         'icon': Icons.edit_document,
         'iconBg': const Color(0xFFEFF6FF),
         'iconColor': const Color(0xFF2563EB),
       },
       {
         'title': 'Accuracy',
-        'value': '72.4%',
-        'sub': '↑ 6.3% vs 7d',
+        'value': '${_userRealStats['accuracy']}%',
+        'sub': 'Overall accuracy',
         'icon': Icons.track_changes_rounded,
         'iconBg': const Color(0xFFDCFCE7),
         'iconColor': const Color(0xFF16A34A),
       },
       {
         'title': 'Tests Completed',
-        'value': '28',
-        'sub': '↑ 4 vs 7d',
+        'value': '${_userRealStats['testsCompleted']}',
+        'sub': 'Completed',
         'icon': Icons.assignment_turned_in_rounded,
         'iconBg': const Color(0xFFF5F3FF),
         'iconColor': const Color(0xFF7C3AED),
       },
       {
         'title': 'Study Streak',
-        'value': '12 Days',
-        'sub': 'Best: 32d',
+        'value': '${_userRealStats['studyStreak']} Days',
+        'sub': 'Active Streak',
         'icon': Icons.local_fire_department_rounded,
         'iconBg': const Color(0xFFFFF7ED),
         'iconColor': const Color(0xFFEA580C),
@@ -508,7 +977,31 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   }
 
   // 4. Mobile Continue Where You Left Off Card
+  // 4. Continue Where You Left Off Card (Dynamic Aborted/Active Session)
   Widget _buildMobileContinueCard() {
+    if (_activeAbortedSession == null) {
+      return const SizedBox.shrink();
+    }
+
+    final session = _activeAbortedSession!;
+    final String sessionId = session['sessionId']?.toString() ?? '';
+    final List questions = session['questions'] is List ? session['questions'] as List : [];
+    final Map userAnswers = session['userAnswers'] is Map ? session['userAnswers'] as Map : {};
+    final int secsRemaining = (session['secondsRemaining'] as num? ?? 0).toInt();
+
+    final int totalQ = questions.isNotEmpty ? questions.length : 1;
+    final int answeredCount = userAnswers.length;
+    final double progress = (answeredCount / totalQ).clamp(0.0, 1.0);
+
+    final int mins = secsRemaining ~/ 60;
+    final int secs = secsRemaining % 60;
+    final String timeStr = '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+
+    final String sessionTitle = session['testTitle']?.toString() ??
+        (sessionId.contains('pyq')
+            ? 'PYQ Practice Session'
+            : (sessionId.contains('practice') ? 'Custom Practice Session' : 'Custom Test Session'));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -516,13 +1009,16 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text('Continue Where You Left Off', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-            GestureDetector(
-              onTap: widget.onOpenPractice,
+            InkWell(
+              onTap: () async {
+                await SupabaseService.clearActiveTestSession();
+                setState(() => _activeAbortedSession = null);
+              },
               child: const Row(
                 children: [
-                  Text('View All', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF2563EB))),
-                  SizedBox(width: 1),
-                  Icon(Icons.chevron_right_rounded, size: 12, color: Color(0xFF2563EB)),
+                  Text('Discard', style: TextStyle(fontSize: 10, color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
+                  SizedBox(width: 2),
+                  Icon(Icons.close_rounded, size: 12, color: Color(0xFFEF4444)),
                 ],
               ),
             ),
@@ -530,13 +1026,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         ),
         const SizedBox(height: 6),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFF1F5F9)),
+            border: Border.all(color: const Color(0xFF2563EB), width: 1.5),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+              BoxShadow(color: const Color(0xFF2563EB).withOpacity(0.06), blurRadius: 6, offset: const Offset(0, 2)),
             ],
           ),
           child: Column(
@@ -545,26 +1041,15 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               Row(
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(10),
+                      color: const Color(0xFFEEF2FF),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        const Icon(Icons.show_chart_rounded, size: 20, color: Color(0xFF16A34A)),
-                        Positioned(
-                          top: 3,
-                          left: 3,
-                          child: Text('V₀', style: TextStyle(fontSize: 6.5, fontWeight: FontWeight.bold, color: Colors.green.shade800)),
-                        ),
-                      ],
-                    ),
+                    child: const Icon(Icons.play_circle_fill_rounded, size: 22, color: Color(0xFF2563EB)),
                   ),
                   const SizedBox(width: 10),
-
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -575,53 +1060,59 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                             color: const Color(0xFFDCFCE7),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text('Custom Practice', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF166534))),
+                          child: const Text('In-Progress Session', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Color(0xFF166534))),
                         ),
                         const SizedBox(height: 2),
-                        const Text('Physics • Kinematics', style: TextStyle(fontSize: 9, color: Color(0xFF64748B))),
-                        const SizedBox(height: 1),
-                        const Text(
-                          'Motion in a Straight Line',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        Text(
+                          sessionTitle,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                           overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          '$answeredCount of $totalQ Questions Answered ${secsRemaining > 0 ? "• ⏱ $timeStr remaining" : ""}',
+                          style: const TextStyle(fontSize: 9.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                         ),
                       ],
                     ),
                   ),
-
                   const SizedBox(width: 8),
-
                   ElevatedButton.icon(
-                    onPressed: widget.onOpenPractice,
-                    icon: const Icon(Icons.play_arrow_rounded, size: 12, color: Color(0xFF4F46E5)),
-                    label: const Text('Continue', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                    onPressed: () {
+                      if (sessionId.contains('pyq')) {
+                        context.go('/pyq/test');
+                      } else if (sessionId.contains('practice')) {
+                        context.go('/practice/session');
+                      } else {
+                        context.go('/custom-test/attempt/$sessionId');
+                      }
+                    },
+                    icon: const Icon(Icons.play_arrow_rounded, size: 14, color: Colors.white),
+                    label: const Text('Resume', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFEEF2FF),
+                      backgroundColor: const Color(0xFF2563EB),
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-
-              // Progress Bar
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(3),
-                      child: const LinearProgressIndicator(
-                        value: 0.6,
-                        minHeight: 4,
-                        backgroundColor: Color(0xFFE2E8F0),
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 5,
+                        backgroundColor: const Color(0xFFE2E8F0),
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF22C55E)),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text('60% Completed', style: TextStyle(fontSize: 8.5, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
+                  Text('${(progress * 100).toInt()}% Completed', style: const TextStyle(fontSize: 9, color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
                 ],
               ),
             ],
@@ -891,65 +1382,83 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       {'icon': Icons.person_outline_rounded, 'label': 'Profile'},
     ];
 
-    return Container(
-      height: 64,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: List.generate(navs.length, (idx) {
-          final isSelected = _mobileBottomNavIndex == idx;
-          final item = navs[idx];
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-          return InkWell(
-            onTap: () {
-              setState(() => _mobileBottomNavIndex = idx);
-              if (idx == 1) widget.onOpenPractice();
-              if (idx == 2) {
-                if (widget.onOpenMyTests != null) {
-                  widget.onOpenMyTests!();
-                } else {
-                  widget.onOpenMockTests();
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, -3),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.only(bottom: bottomPadding),
+      child: SizedBox(
+        height: 60,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: List.generate(navs.length, (idx) {
+            final isSelected = _mobileBottomNavIndex == idx;
+            final item = navs[idx];
+
+            return InkWell(
+              onTap: () {
+                setState(() => _mobileBottomNavIndex = idx);
+                if (idx == 0) {
+                  // Already on home
+                } else if (idx == 1) {
+                  widget.onOpenPractice();
+                } else if (idx == 2) {
+                  if (widget.onOpenMyTests != null) {
+                    widget.onOpenMyTests!();
+                  } else {
+                    widget.onOpenMockTests();
+                  }
+                } else if (idx == 3) {
+                  if (widget.onOpenLeaderboard != null) {
+                    widget.onOpenLeaderboard!();
+                  } else {
+                    context.push('/leaderboard');
+                  }
+                } else if (idx == 4) {
+                  // Direct navigation to Profile Screen
+                  context.push('/profile');
                 }
-              }
-              if (idx == 3) {
-                if (widget.onOpenLeaderboard != null) {
-                  widget.onOpenLeaderboard!();
-                } else {
-                  context.go('/leaderboard');
-                }
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFFF3E8FF) : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    item['icon'] as IconData,
-                    size: 20,
-                    color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item['label'] as String,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFFF3E8FF) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      item['icon'] as IconData,
+                      size: 20,
                       color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      item['label'] as String,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        }),
+            );
+          }),
+        ),
       ),
     );
   }
@@ -973,22 +1482,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 height: 34,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
-                  return Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.school_rounded, color: Colors.white, size: 20),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'Cosmyra NEET | JEE',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                      ),
-                    ],
+                  return Image.network(
+                    'https://neet-jee.in/assets/images/cosmyra_logo.png',
+                    height: 34,
+                    fit: BoxFit.contain,
                   );
                 },
               ),
@@ -1039,7 +1536,62 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 24),
+          // Eye-catching Store Button in Desktop Header
+          InkWell(
+            onTap: () => context.go('/test-series'),
+            borderRadius: BorderRadius.circular(22),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF4F46E5), Color(0xFF7C3AED), Color(0xFFE11D48)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6366F1).withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.storefront_rounded, color: Colors.white, size: 18),
+                  const SizedBox(width: 7),
+                  Text(
+                    'Store',
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF08A),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      '🔥 SALE',
+                      style: TextStyle(
+                        color: Color(0xFF854D0E),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
 
           Row(
             children: [
@@ -1177,49 +1729,36 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
             ),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2563EB),
-                    borderRadius: BorderRadius.circular(10),
+                Image.asset(
+                  'assets/images/cosmyra_logo.png',
+                  height: 38,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Image.network(
+                    'https://neet-jee.in/assets/images/cosmyra_logo.png',
+                    height: 38,
+                    fit: BoxFit.contain,
                   ),
-                  child: const Icon(Icons.school, color: Colors.white, size: 22),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Cosmyra Edu',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'v1.1.1',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF2563EB),
-                          ),
-                        ),
-                      ),
-                    ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'v1.1.2',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF2563EB),
+                    ),
                   ),
                 ),
               ],
@@ -1447,8 +1986,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     final metrics = [
       {
         'title': 'Questions Attempted',
-        'value': '1,248',
-        'sub': '↑ 18% vs last week',
+        'value': '${_userRealStats['questionsAttempted']}',
+        'sub': 'Real cumulative attempts',
         'icon': Icons.edit_document,
         'cardBg': const Color(0xFFF0FDF4),
         'borderColor': const Color(0xFFDCFCE7),
@@ -1458,8 +1997,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       },
       {
         'title': 'Accuracy',
-        'value': '72.4%',
-        'sub': '↑ 6.3% vs last week',
+        'value': '${_userRealStats['accuracy']}%',
+        'sub': 'Overall performance',
         'icon': Icons.track_changes_rounded,
         'cardBg': const Color(0xFFEFF6FF),
         'borderColor': const Color(0xFFDBEAFE),
@@ -1469,8 +2008,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       },
       {
         'title': 'Tests Completed',
-        'value': '28',
-        'sub': '↑ 4 vs last week',
+        'value': '${_userRealStats['testsCompleted']}',
+        'sub': 'Completed sessions',
         'icon': Icons.assignment_turned_in_rounded,
         'cardBg': const Color(0xFFF5F3FF),
         'borderColor': const Color(0xFFDDD6FE),
@@ -1480,8 +2019,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
       },
       {
         'title': 'Study Streak',
-        'value': '12 Days',
-        'sub': 'Best: 32 Days',
+        'value': '${_userRealStats['studyStreak']} Days',
+        'sub': 'Active Streak',
         'icon': Icons.local_fire_department_rounded,
         'cardBg': const Color(0xFFFFF7ED),
         'borderColor': const Color(0xFFFFEDD5),

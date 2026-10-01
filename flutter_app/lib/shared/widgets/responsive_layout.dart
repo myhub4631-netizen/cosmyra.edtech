@@ -45,31 +45,15 @@ class _ResponsiveLayoutShellState extends State<ResponsiveLayoutShell> {
                   // Logo / App Title
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.school_rounded, color: Colors.white, size: 24),
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Cosmyra Neet Jee',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              'Cosmyra • NEET & JEE',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      ],
+                    child: Image.asset(
+                      'assets/images/cosmyra_logo.png',
+                      height: 38,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Image.network(
+                        'https://neet-jee.in/assets/images/cosmyra_logo.png',
+                        height: 38,
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),

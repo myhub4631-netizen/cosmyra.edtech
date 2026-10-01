@@ -92,37 +92,17 @@ class _AppSidebarState extends State<AppSidebar> {
               decoration: const BoxDecoration(
                 border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
               ),
-              child: Row(
-                children: [
-                  Image.asset(
-                    'assets/images/cosmyra_logo.png',
+              child: Image.asset(
+                'assets/images/cosmyra_logo.png',
+                height: 38,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Image.network(
+                    'https://neet-jee.in/assets/images/cosmyra_logo.png',
                     height: 38,
                     fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE8F5E9),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.school_rounded, color: Color(0xFF0D7A53), size: 22),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Cosmyra Neet Jee',
-                            style: GoogleFonts.inter(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF0F172A),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                ],
+                  );
+                },
               ),
             ),
             const SizedBox(height: 6),

@@ -1561,7 +1561,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('COSMYRA NEET JEE', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5))),
+                      Image.asset(
+                        'assets/images/cosmyra_logo.png',
+                        height: 32,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Image.network(
+                          'https://neet-jee.in/assets/images/cosmyra_logo.png',
+                          height: 32,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       const Text('Official Tax Invoice & Receipt', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                     ],
                   ),
