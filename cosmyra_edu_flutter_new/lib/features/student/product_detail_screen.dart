@@ -2359,7 +2359,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                 const Color(0xFF059669),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: _buildTopScoreMetricCard(
                 'Average Score',
@@ -2369,7 +2369,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                 const Color(0xFF2563EB),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Expanded(
               child: _buildTopScoreMetricCard(
                 'Top Percentile',
@@ -2385,15 +2385,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
         if (rankings.length >= 3)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFFEF3C7), Color(0xFFFFFBEB)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+                colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFFFDE68A)),
+              boxShadow: const [
+                BoxShadow(color: Color(0x0F000000), blurRadius: 8, offset: Offset(0, 3)),
+              ],
             ),
             child: Column(
               children: [
@@ -2403,8 +2406,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                     const Icon(Icons.emoji_events_rounded, color: Color(0xFFD97706), size: 22),
                     const SizedBox(width: 8),
                     Text(
-                      'Hall of Fame - Top 3 Performers',
-                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF92400E)),
+                      'Hall of Fame - Top Performers',
+                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: const Color(0xFF92400E)),
                     ),
                   ],
                 ),
@@ -2413,9 +2416,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Expanded(child: _buildPodiumTile(rankings[1], 2, const Color(0xFF64748B), 'AIR 2')),
+                    Expanded(child: _buildPodiumTile(rankings[1], 2, const Color(0xFF475569), 'AIR 2')),
                     Expanded(child: _buildPodiumTile(rankings[0], 1, const Color(0xFFD97706), 'AIR 1 🏆', isFirst: true)),
-                    Expanded(child: _buildPodiumTile(rankings[2], 3, const Color(0xFFB45309), 'AIR 3')),
+                    Expanded(child: _buildPodiumTile(rankings[2], 3, const Color(0xFFC2410C), 'AIR 3')),
                   ],
                 ),
               ],
@@ -2428,31 +2431,49 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [
+              BoxShadow(color: Color(0x08000000), blurRadius: 6, offset: Offset(0, 2)),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.leaderboard_rounded, color: Color(0xFF2563EB), size: 20),
-                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFEFF6FF),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.leaderboard_rounded, color: Color(0xFF2563EB), size: 18),
+                        ),
+                        const SizedBox(width: 10),
                         Text(
                           'All India Leaderboard',
-                          style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                          style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
                         ),
                       ],
                     ),
-                    Row(
-                      children: [
-                        _buildLeaderboardScopeChip('All India'),
-                        const SizedBox(width: 4),
-                        _buildLeaderboardScopeChip('State'),
-                      ],
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildLeaderboardScopeChip('All India'),
+                          const SizedBox(width: 2),
+                          _buildLeaderboardScopeChip('State'),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -2461,7 +2482,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
               _loadingLeaderboard
                   ? const Padding(
-                      padding: EdgeInsets.all(32),
+                      padding: EdgeInsets.all(36),
                       child: Center(child: CircularProgressIndicator(color: Color(0xFF2563EB))),
                     )
                   : ListView.separated(
@@ -2476,89 +2497,131 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                         final score = r['score'] ?? (maxScore - (idx * 6));
                         final accuracy = r['accuracy'] ?? (98.0 - (idx * 0.5));
                         final percentile = (r['percentile'] ?? '${(99.9 - (idx * 0.08)).toStringAsFixed(2)}%ile').toString();
-                        final badge = (r['badge'] ?? 'AIR ${rankNum}').toString();
+                        final badge = (r['badge'] ?? 'AIR $rankNum').toString();
+
+                        final rankColor = rankNum == 1
+                            ? const Color(0xFFD97706)
+                            : (rankNum == 2 ? const Color(0xFF475569) : (rankNum == 3 ? const Color(0xFFC2410C) : const Color(0xFF64748B)));
 
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           color: rankNum == 1
                               ? const Color(0xFFFFFBEB)
                               : (idx % 2 == 0 ? Colors.white : const Color(0xFFF8FAFC)),
                           child: Row(
                             children: [
-                              SizedBox(
+                              // Rank Number Badge
+                              Container(
                                 width: 32,
-                                child: Text(
-                                  '#$rankNum',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: rankNum <= 3 ? const Color(0xFFD97706) : const Color(0xFF64748B),
+                                height: 32,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: rankNum == 1
+                                      ? const Color(0xFFFEF3C7)
+                                      : (rankNum == 2
+                                          ? const Color(0xFFF1F5F9)
+                                          : (rankNum == 3 ? const Color(0xFFFFF7ED) : const Color(0xFFF8FAFC))),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: rankNum == 1
+                                        ? const Color(0xFFFDE68A)
+                                        : (rankNum == 2 ? const Color(0xFFCBD5E1) : (rankNum == 3 ? const Color(0xFFFFEDD5) : const Color(0xFFE2E8F0))),
                                   ),
                                 ),
-                              ),
-
-                              CircleAvatar(
-                                radius: 14,
-                                backgroundColor: rankNum == 1
-                                    ? const Color(0xFFD97706)
-                                    : (rankNum == 2 ? const Color(0xFF64748B) : const Color(0xFF2563EB)),
                                 child: Text(
-                                  name.isNotEmpty ? name[0] : 'A',
-                                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                  '#$rankNum',
+                                  style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w800, color: rankColor),
                                 ),
                               ),
                               const SizedBox(width: 10),
 
-                              Expanded(
-                                flex: 4,
+                              // Avatar
+                              CircleAvatar(
+                                radius: 15,
+                                backgroundColor: rankColor,
                                 child: Text(
-                                  name,
-                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                                  overflow: TextOverflow.ellipsis,
+                                  name.isNotEmpty ? name[0].toUpperCase() : 'A',
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                                 ),
                               ),
+                              const SizedBox(width: 10),
 
+                              // Student Info Column
                               Expanded(
-                                flex: 3,
-                                child: Text(
-                                  '$score / $maxScore',
-                                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF059669)),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            name,
+                                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (badge.isNotEmpty) ...[
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: rankNum <= 3 ? const Color(0xFFFEF3C7) : const Color(0xFFEEF2FF),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              badge,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 9.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: rankNum <= 3 ? const Color(0xFFD97706) : const Color(0xFF4338CA),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Accuracy: ${accuracy.toStringAsFixed(1)}%',
+                                      style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                                    ),
+                                  ],
                                 ),
                               ),
+                              const SizedBox(width: 10),
 
-                              Expanded(
-                                flex: 2,
-                                child: Text(
-                                  '${accuracy.toStringAsFixed(1)}%',
-                                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
-                                ),
-                              ),
-
-                              Expanded(
-                                flex: 3,
-                                child: Text(
-                                  percentile,
-                                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF2563EB)),
-                                ),
-                              ),
-
-                              SizedBox(
-                                width: 70,
-                                child: Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              // Score & Percentile Column (Right Aligned)
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        '$score',
+                                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w900, color: const Color(0xFF059669)),
+                                      ),
+                                      Text(
+                                        ' / $maxScore',
+                                        style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w600, color: const Color(0xFF94A3B8)),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: rankNum <= 3 ? const Color(0xFFFEF3C7) : const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: rankNum <= 3 ? const Color(0xFFFDE68A) : const Color(0xFFE2E8F0)),
+                                      color: const Color(0xFFEFF6FF),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: const Color(0xFFBFDBFE)),
                                     ),
                                     child: Text(
-                                      badge,
-                                      style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold, color: rankNum <= 3 ? const Color(0xFFD97706) : const Color(0xFF475569)),
+                                      percentile,
+                                      style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
                                     ),
                                   ),
-                                ),
+                                ],
                               ),
                             ],
                           ),
@@ -2709,20 +2772,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
   Widget _buildTopScoreMetricCard(String label, String value, Color bgColor, Color borderColor, Color textColor) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600, color: textColor.withValues(alpha: 0.8))),
-          const SizedBox(height: 6),
           Text(
-            value,
-            style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w900, color: textColor),
+            label,
+            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: textColor.withValues(alpha: 0.85)),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 5),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: GoogleFonts.inter(fontSize: 15.5, fontWeight: FontWeight.w900, color: textColor),
+            ),
           ),
         ],
       ),
@@ -2753,36 +2825,44 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
   }
 
   Widget _buildPodiumTile(Map<String, dynamic> r, int rank, Color color, String badge, {bool isFirst = false}) {
+    final nameStr = (r['name'] ?? 'Aspirant').toString();
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.symmetric(horizontal: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
-        color: isFirst ? Colors.white : Colors.white.withValues(alpha: 0.85),
+        color: isFirst ? Colors.white : Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: isFirst ? color : color.withValues(alpha: 0.3), width: isFirst ? 2 : 1),
-        boxShadow: isFirst ? [BoxShadow(color: color.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 3))] : null,
+        boxShadow: isFirst ? [BoxShadow(color: color.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))] : null,
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(badge, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w900, color: color)),
-          const SizedBox(height: 6),
+          Text(badge, style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w900, color: color)),
+          const SizedBox(height: 5),
           CircleAvatar(
-            radius: isFirst ? 20 : 16,
+            radius: isFirst ? 19 : 15,
             backgroundColor: color,
             child: Text(
-              (r['name'] ?? 'A')[0],
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+              nameStr.isNotEmpty ? nameStr[0].toUpperCase() : 'A',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 5),
           Text(
-            (r['name'] ?? 'Aspirant').toString(),
-            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+            nameStr,
+            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
           ),
-          Text(
-            '${r['score']} Marks',
-            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w800, color: color),
+          const SizedBox(height: 2),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '${r['score']} Marks',
+              style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: color),
+            ),
           ),
         ],
       ),
