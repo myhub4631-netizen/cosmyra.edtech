@@ -12,6 +12,7 @@ import '../tests/test_screen.dart';
 import '../../shared/widgets/app_avatar.dart';
 import '../../shared/widgets/app_sidebar.dart';
 import '../../shared/widgets/app_header.dart';
+import '../../core/theme/app_design_system.dart';
 
 class TestSeriesScreen extends StatefulWidget {
   final VoidCallback? onBackToDashboard;

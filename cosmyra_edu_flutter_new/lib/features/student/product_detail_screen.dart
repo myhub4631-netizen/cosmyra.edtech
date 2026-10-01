@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/services/cart_service.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
+import '../../core/theme/app_design_system.dart';
 import 'test_series_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
