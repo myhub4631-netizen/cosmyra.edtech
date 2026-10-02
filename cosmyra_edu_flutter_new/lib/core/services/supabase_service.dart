@@ -4761,7 +4761,8 @@ class SupabaseService {
   static Future<Map<String, dynamic>> submitUpiPaymentVerification({
     required UserProfileModel user,
     required List<Map<String, dynamic>> items,
-    required String utrNumber,
+    String utrNumber = '',
+    String? paymentScreenshotUrl,
     required String couponCode,
     required double totalAmount,
   }) async {
@@ -4772,6 +4773,16 @@ class SupabaseService {
 
     final pTitle = items.isNotEmpty ? (items.first['title'] ?? 'Test Series') : 'Cosmyra NEET/JEE Course';
     final pId = items.isNotEmpty ? (items.first['id']?.toString() ?? 'ts_neet_all_india_2026') : 'ts_neet_all_india_2026';
+
+    final cleanUtr = utrNumber.trim();
+    final effectiveUtr = cleanUtr.isNotEmpty ? cleanUtr : 'N/A';
+    final screenshotUrl = paymentScreenshotUrl?.trim() ?? '';
+
+    final notesText = [
+      if (cleanUtr.isNotEmpty) 'UTR: $cleanUtr',
+      if (screenshotUrl.isNotEmpty) 'Screenshot: $screenshotUrl',
+      'Product: $pTitle',
+    ].join(' | ');
 
     final orderData = {
       'id': validOrderId,
@@ -4788,11 +4799,13 @@ class SupabaseService {
       'status': 'pending_verification',
       'payment_status': 'pending_verification',
       'payment_method': 'UPI',
-      'payment_id': 'UTR_$utrNumber',
-      'payment_reference': utrNumber,
-      'payment_utr': utrNumber,
-      'utr_number': utrNumber,
-      'notes': 'UPI Payment submitted with UTR: $utrNumber. Awaiting admin approval.',
+      'payment_id': cleanUtr.isNotEmpty ? 'UTR_$cleanUtr' : (screenshotUrl.isNotEmpty ? 'SCREENSHOT_${timeMs.substring(timeMs.length - 6)}' : 'PENDING'),
+      'payment_reference': cleanUtr.isNotEmpty ? cleanUtr : (screenshotUrl.isNotEmpty ? screenshotUrl : 'PENDING'),
+      'payment_utr': effectiveUtr,
+      'utr_number': effectiveUtr,
+      'payment_screenshot_url': screenshotUrl,
+      'screenshot_url': screenshotUrl,
+      'notes': 'UPI Payment. $notesText. Awaiting admin approval.',
       'product_name': pTitle,
       'product_id': pId,
       'created_at': DateTime.now().toIso8601String(),
@@ -4818,11 +4831,13 @@ class SupabaseService {
         'coupon_code': couponCode.trim().toUpperCase(),
         'status': 'pending_verification',
         'payment_method': 'UPI',
-        'payment_id': 'UTR_$utrNumber',
-        'payment_reference': utrNumber,
-        'payment_utr': utrNumber,
-        'utr_number': utrNumber,
-        'notes': 'UPI Payment UTR: $utrNumber | Product: $pTitle',
+        'payment_id': cleanUtr.isNotEmpty ? 'UTR_$cleanUtr' : (screenshotUrl.isNotEmpty ? 'SCREENSHOT_${timeMs.substring(timeMs.length - 6)}' : 'PENDING'),
+        'payment_reference': cleanUtr.isNotEmpty ? cleanUtr : (screenshotUrl.isNotEmpty ? screenshotUrl : 'PENDING'),
+        'payment_utr': effectiveUtr,
+        'utr_number': effectiveUtr,
+        'payment_screenshot_url': screenshotUrl,
+        'screenshot_url': screenshotUrl,
+        'notes': 'UPI Payment. $notesText',
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       });
@@ -4846,11 +4861,13 @@ class SupabaseService {
           'coupon_code': couponCode.trim().toUpperCase(),
           'status': 'pending_verification',
           'payment_method': 'UPI',
-          'payment_id': 'UTR_$utrNumber',
-          'payment_reference': utrNumber,
-          'payment_utr': utrNumber,
-          'utr_number': utrNumber,
-          'notes': 'UPI Payment UTR: $utrNumber | Product: $pTitle',
+          'payment_id': cleanUtr.isNotEmpty ? 'UTR_$cleanUtr' : (screenshotUrl.isNotEmpty ? 'SCREENSHOT_${timeMs.substring(timeMs.length - 6)}' : 'PENDING'),
+          'payment_reference': cleanUtr.isNotEmpty ? cleanUtr : (screenshotUrl.isNotEmpty ? screenshotUrl : 'PENDING'),
+          'payment_utr': effectiveUtr,
+          'utr_number': effectiveUtr,
+          'payment_screenshot_url': screenshotUrl,
+          'screenshot_url': screenshotUrl,
+          'notes': 'UPI Payment. $notesText',
           'created_at': DateTime.now().toIso8601String(),
           'updated_at': DateTime.now().toIso8601String(),
         });
@@ -8799,6 +8816,23 @@ class SupabaseService {
     }
 
     return 'N/A (Direct Online)';
+  }
+
+  /// Extract Payment Screenshot URL from order record
+  static String? extractPaymentScreenshotUrl(Map<String, dynamic> o) {
+    final direct = (o['payment_screenshot_url'] ?? o['screenshot_url'] ?? o['screenshot'] ?? '').toString().trim();
+    if (direct.isNotEmpty && (direct.startsWith('http://') || direct.startsWith('https://'))) {
+      return direct;
+    }
+
+    // Try extracting from notes string or JSON fields
+    final notes = (o['notes'] ?? '').toString();
+    final match = RegExp(r'(?:Screenshot|Receipt|Image)[:\s]+(https?://[^\s]+)', caseSensitive: false).firstMatch(notes);
+    if (match != null && match.group(1) != null) {
+      return match.group(1)!.trim();
+    }
+
+    return null;
   }
 
   /// Verify payment & grant access in entitlements and subscriptions

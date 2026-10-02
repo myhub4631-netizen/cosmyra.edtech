@@ -345,6 +345,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     final coupon = (o['coupon_code'] ?? '').toString();
     final method = (o['payment_method'] ?? 'Online Payment').toString();
     final ref = SupabaseService.extractUtrNumber(o);
+    final screenshotUrl = SupabaseService.extractPaymentScreenshotUrl(o);
     final status = (o['payment_status'] ?? o['status'] ?? 'pending_verification').toString().toLowerCase();
     final notes = (o['notes'] ?? '').toString();
     final createdAt = (o['created_at'] ?? '').toString();
@@ -431,9 +432,61 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 _buildModalSectionTitle('Payment & Transaction'),
                 _buildInfoRow('Payment Method', method),
                 _buildInfoRow('UTR / Ref Number', ref, copyable: true),
+                _buildInfoRow('Payment Screenshot', screenshotUrl != null ? 'Uploaded to Cloudflare S3' : 'None'),
                 _buildInfoRow('Package Product', product),
                 if (createdAt.isNotEmpty) _buildInfoRow('Order Date', createdAt),
                 if (validUuid.isNotEmpty) _buildInfoRow('Record ID', validUuid, copyable: true),
+
+                if (screenshotUrl != null && screenshotUrl.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  _buildModalSectionTitle('Payment Receipt Screenshot'),
+                  const SizedBox(height: 6),
+                  InkWell(
+                    onTap: () => _showScreenshotLightboxDialog(context, screenshotUrl),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        children: [
+                          Image.network(
+                            screenshotUrl,
+                            height: 180,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (ctx, err, st) => Container(
+                              padding: const EdgeInsets.all(16),
+                              color: const Color(0xFFF1F5F9),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.broken_image_rounded, color: Color(0xFF94A3B8)),
+                                  SizedBox(width: 8),
+                                  Text('Failed to load image preview'),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            color: const Color(0xFFF8FAFC),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.zoom_in_rounded, size: 16, color: Color(0xFF2563EB)),
+                                SizedBox(width: 6),
+                                Text('Click to View Full-Size Screenshot', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: 14),
                 _buildModalSectionTitle('Financial Breakdown'),
@@ -691,6 +744,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                                 final product = (o['product_name'] ?? 'NEET / JEE Package').toString();
                                 final method = (o['payment_method'] ?? 'UPI').toString();
                                 final ref = SupabaseService.extractUtrNumber(o);
+                                final screenshotUrl = SupabaseService.extractPaymentScreenshotUrl(o);
                                 final amount = (o['total_amount'] ?? o['amount'] as num?)?.toDouble() ?? 299.0;
                                 final status = (o['payment_status'] ?? o['status'] ?? 'pending_verification').toString().toLowerCase();
                                 final dateStr = (o['created_at'] ?? '').toString();
@@ -730,6 +784,29 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                                             )
                                           else
                                             Text(ref, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
+                                          if (screenshotUrl != null && screenshotUrl.isNotEmpty)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 2),
+                                              child: InkWell(
+                                                onTap: () => _showScreenshotLightboxDialog(context, screenshotUrl),
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFEFF6FF),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                                                  ),
+                                                  child: const Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(Icons.image_rounded, size: 12, color: Color(0xFF2563EB)),
+                                                      SizedBox(width: 4),
+                                                      Text('📷 Receipt', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2563EB))),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
                                         ],
                                       ),
                                     ),
@@ -817,5 +894,79 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
 
     if (isMobile) return card;
     return Expanded(child: card);
+  }
+
+  void _showScreenshotLightboxDialog(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Align(
+              alignment: Alignment.topRight,
+              child: Container(
+                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (ctx, child, progress) {
+                      if (progress == null) return child;
+                      return const SizedBox(
+                        height: 250,
+                        child: Center(child: CircularProgressIndicator(color: Colors.white)),
+                      );
+                    },
+                    errorBuilder: (ctx, err, st) => Container(
+                      padding: const EdgeInsets.all(32),
+                      color: Colors.white,
+                      child: const Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.broken_image, size: 48, color: Colors.red),
+                          SizedBox(height: 8),
+                          Text('Unable to load payment screenshot.', style: TextStyle(color: Colors.black)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: imageUrl));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Screenshot URL copied to clipboard!'), duration: Duration(seconds: 2)),
+                );
+              },
+              icon: const Icon(Icons.copy_rounded, size: 16),
+              label: const Text('Copy Screenshot URL'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

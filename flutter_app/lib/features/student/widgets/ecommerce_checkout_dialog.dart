@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,6 +6,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/cart_service.dart';
+import '../../../core/services/cloudflare_r2_service.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../models/models.dart';
 
@@ -257,6 +259,9 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
   }) async {
     final utrCtrl = TextEditingController();
     bool isSubmitting = false;
+    String? paymentScreenshotUrl;
+    bool isUploadingScreenshot = false;
+    String? screenshotFileName;
 
     final qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${Uri.encodeComponent(upiUrl)}';
 
@@ -291,14 +296,17 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
               color: Colors.transparent,
               child: InkWell(
                 borderRadius: BorderRadius.circular(14),
-                onTap: isSubmitting
+                onTap: isSubmitting || isUploadingScreenshot
                     ? null
                     : () async {
                         final utr = utrCtrl.text.trim();
-                        if (utr.isEmpty || utr.length < 6) {
+                        final hasUtr = utr.isNotEmpty && utr.length >= 6;
+                        final hasScreenshot = paymentScreenshotUrl != null && paymentScreenshotUrl!.isNotEmpty;
+
+                        if (!hasUtr && !hasScreenshot) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Please enter valid 12-digit UTR or Transaction Ref number.'),
+                              content: Text('Please enter a valid 12-digit UTR number OR attach a payment screenshot (or both).'),
                               backgroundColor: Color(0xFFEF4444),
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -312,6 +320,7 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
                           user: user,
                           items: items,
                           utrNumber: utr,
+                          paymentScreenshotUrl: paymentScreenshotUrl,
                           couponCode: CartService.instance.appliedCoupon?['code']?.toString() ?? '',
                           totalAmount: _totalPayable,
                         );
@@ -328,8 +337,8 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
                             _isSuccess = true;
                             _isPendingVerification = true;
                             _orderId = res['order_number'] ?? 'ORD-${DateTime.now().millisecondsSinceEpoch}';
-                            _submittedUtr = utr;
-                            _successMessage = 'UPI Payment request submitted with UTR: $utr. Pending Admin approval.';
+                            _submittedUtr = utr.isNotEmpty ? utr : 'Screenshot Attached';
+                            _successMessage = 'UPI Payment request submitted (${utr.isNotEmpty ? "UTR: $utr" : "Screenshot attached"}). Pending Admin approval.';
                           });
                         }
                       },
@@ -605,7 +614,7 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
                             ),
                             const SizedBox(height: 16),
 
-                            // STEP 2: Instructions & UTR Entry
+                            // STEP 2: Instructions & Verification Submission (UTR or Screenshot or Both)
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
@@ -631,14 +640,14 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
-                                        'Enter 12-Digit UTR / Ref Number',
+                                        'Verify Payment (UTR, Screenshot or Both)',
                                         style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800, color: const Color(0xFF92400E)),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'After payment in GPay / PhonePe / Paytm, copy the 12-digit UTR/Ref No. from transaction details and paste below:',
+                                    'Copy 12-digit UTR/Ref No. from GPay/PhonePe/Paytm OR upload payment screenshot receipt below (or provide both):',
                                     style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF78350F), height: 1.35),
                                   ),
                                 ],
@@ -651,7 +660,7 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
                               maxLength: 12,
                               style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A), letterSpacing: 1.0),
                               decoration: InputDecoration(
-                                hintText: 'e.g. 429182736410',
+                                hintText: 'e.g. 429182736410 (UTR / Ref No.)',
                                 hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8), letterSpacing: 0.0),
                                 counterText: '',
                                 isDense: true,
@@ -663,6 +672,180 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
                                 focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
                               ),
                             ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                const Expanded(child: Divider(color: Color(0xFFCBD5E1))),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  child: Text('OR / AND ATTACH SCREENSHOT', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF64748B))),
+                                ),
+                                const Expanded(child: Divider(color: Color(0xFFCBD5E1))),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+
+                            // Screenshot Upload Card
+                            if (isUploadingScreenshot) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFF93C5FD)),
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(color: Color(0xFF2563EB), strokeWidth: 2.5),
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      'Uploading Receipt Screenshot to Cloudflare S3...',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ] else if (paymentScreenshotUrl != null && paymentScreenshotUrl!.isNotEmpty) ...[
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFECFDF5),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.network(
+                                        paymentScreenshotUrl!,
+                                        width: 48,
+                                        height: 48,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (c, e, s) => Container(width: 48, height: 48, color: const Color(0xFFD1FAE5), child: const Icon(Icons.image, color: Color(0xFF059669))),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF059669)),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Screenshot Uploaded to S3',
+                                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, color: const Color(0xFF065F46)),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            screenshotFileName ?? 'payment_receipt.png',
+                                            style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF047857)),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20),
+                                      tooltip: 'Remove Screenshot',
+                                      onPressed: () {
+                                        setDialogState(() {
+                                          paymentScreenshotUrl = null;
+                                          screenshotFileName = null;
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ] else ...[
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () async {
+                                    try {
+                                      final result = await FilePicker.platform.pickFiles(
+                                        type: FileType.custom,
+                                        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+                                        withData: true,
+                                      );
+                                      if (result != null && result.files.isNotEmpty) {
+                                        final file = result.files.first;
+                                        final bytes = file.bytes;
+                                        if (bytes != null) {
+                                          setDialogState(() => isUploadingScreenshot = true);
+                                          final ext = (file.extension ?? 'png').toLowerCase();
+                                          final mimeType = ext == 'jpg' || ext == 'jpeg' ? 'image/jpeg' : (ext == 'webp' ? 'image/webp' : 'image/png');
+                                          final url = await CloudflareR2Service.uploadFile(
+                                            fileBytes: bytes,
+                                            fileName: file.name,
+                                            mimeType: mimeType,
+                                          );
+                                          setDialogState(() {
+                                            paymentScreenshotUrl = url;
+                                            screenshotFileName = file.name;
+                                            isUploadingScreenshot = false;
+                                          });
+                                        }
+                                      }
+                                    } catch (e) {
+                                      setDialogState(() => isUploadingScreenshot = false);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Screenshot upload note: $e'), backgroundColor: const Color(0xFFEF4444)),
+                                      );
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8FAFC),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFEFF6FF),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(Icons.add_a_photo_rounded, size: 20, color: Color(0xFF2563EB)),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Upload Payment Screenshot',
+                                                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B)),
+                                              ),
+                                              Text(
+                                                'Tap to select GPay / PhonePe / Paytm receipt image',
+                                                style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const Icon(Icons.file_upload_outlined, color: Color(0xFF2563EB), size: 20),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 18),
 
                             // Shaking Vibrant Red Gradient Submit Button
