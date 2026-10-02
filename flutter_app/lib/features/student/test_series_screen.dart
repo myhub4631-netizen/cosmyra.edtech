@@ -88,6 +88,7 @@ class TestSeriesCardData {
   final bool isFavorite;
 
   final String bannerImageFit;
+  final String leaderboardType; // 'realtime' or 'marketing'
 
   TestSeriesCardData({
     required this.id,
@@ -114,6 +115,7 @@ class TestSeriesCardData {
     required this.icon,
     this.bannerImageUrl,
     this.bannerImageFit = 'contain',
+    this.leaderboardType = 'realtime',
     this.isFree = false,
     this.price = 299.0,
     this.originalPrice = 999.0,

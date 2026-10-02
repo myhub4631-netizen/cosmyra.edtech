@@ -900,6 +900,7 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
   }
 
   // Tab 5: Top Scores & Leaderboard Rankers
+  late String _leaderboardType; // 'realtime' or 'marketing'
   late TextEditingController _highestScoreCtrl;
   late TextEditingController _avgScoreCtrl;
   late TextEditingController _activeAspirantsCtrl;
@@ -1108,6 +1109,13 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     }
 
     // Top Scores & Rankers init
+    final rawType = (d['leaderboard_type'] ?? d['leaderboard_mode'] ?? d['leaderboardType'] ?? 'realtime').toString();
+    if (rawType == 'marketing' || rawType == 'demo' || rawType == 'custom') {
+      _leaderboardType = 'marketing';
+    } else {
+      _leaderboardType = 'realtime';
+    }
+
     final ts = (d['top_scores'] is Map)
         ? Map<String, dynamic>.from(d['top_scores'])
         : ((d['topScores'] is Map) ? Map<String, dynamic>.from(d['topScores']) : {});
@@ -1197,6 +1205,8 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
       'category': _category,
       'banner_image_url': _bannerCtrl.text.trim(),
       'banner_image_fit': _bannerImageFit,
+      'leaderboard_type': _leaderboardType,
+      'leaderboard_mode': _leaderboardType,
       'is_free': _isFree,
       'price': double.tryParse(_priceCtrl.text) ?? 299.0,
       'original_price': double.tryParse(_origPriceCtrl.text) ?? 999.0,
@@ -3735,6 +3745,160 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Leaderboard Display Type Selection Card
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [
+                BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.emoji_events_rounded, color: Color(0xFF4F46E5), size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Test Series Leaderboard Display Type',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _leaderboardType == 'realtime' ? const Color(0xFFDCFCE7) : const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        _leaderboardType == 'realtime' ? '⚡ REALTIME MODE' : '📢 MARKETING MODE',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: _leaderboardType == 'realtime' ? const Color(0xFF15803D) : const Color(0xFF4338CA),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _leaderboardType = 'realtime'),
+                        borderRadius: BorderRadius.circular(10),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _leaderboardType == 'realtime' ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _leaderboardType == 'realtime' ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+                              width: _leaderboardType == 'realtime' ? 2.0 : 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Radio<String>(
+                                value: 'realtime',
+                                groupValue: _leaderboardType,
+                                activeColor: const Color(0xFF10B981),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _leaderboardType = val);
+                                },
+                              ),
+                              const SizedBox(width: 4),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '1. Realtime Leaderboard',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                                    ),
+                                    SizedBox(height: 3),
+                                    Text(
+                                      'Shows only real students who either attempted tests in this series or platform and ranks them live accordingly.',
+                                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B), height: 1.3),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _leaderboardType = 'marketing'),
+                        borderRadius: BorderRadius.circular(10),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _leaderboardType == 'marketing' ? const Color(0xFFEEF2FF) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _leaderboardType == 'marketing' ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
+                              width: _leaderboardType == 'marketing' ? 2.0 : 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Radio<String>(
+                                value: 'marketing',
+                                groupValue: _leaderboardType,
+                                activeColor: const Color(0xFF4F46E5),
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _leaderboardType = val);
+                                },
+                              ),
+                              const SizedBox(width: 4),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '2. Marketing Leaderboard',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                                    ),
+                                    SizedBox(height: 3),
+                                    Text(
+                                      'A leaderboard created by admin to showcase on new test series, so users can understand how it looks and details.',
+                                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B), height: 1.3),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

@@ -199,6 +199,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     final purchaseLink = (match['purchase_link'] ?? '').toString();
     final buttonText = (match['purchase_button_text'] ?? 'Join').toString();
     final showPurchaseButton = match['show_purchase_button'] != false;
+    final leaderboardType = (match['leaderboard_type'] ?? match['leaderboard_mode'] ?? match['leaderboardType'] ?? 'realtime').toString();
 
     final rawReviews = (match['reviews'] is List)
         ? (match['reviews'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
@@ -235,6 +236,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       iconBgColor: const Color(0xFF4F46E5),
       icon: Icons.track_changes_rounded,
       bannerImageUrl: match['banner_image_url'] ?? match['bannerImageUrl'],
+      leaderboardType: leaderboardType,
       isFree: isFree,
       price: price,
       originalPrice: origPrice,
@@ -294,6 +296,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       iconBgColor: loadedProduct.iconBgColor,
       icon: loadedProduct.icon,
       bannerImageUrl: loadedProduct.bannerImageUrl,
+      leaderboardType: loadedProduct.leaderboardType,
       isFree: loadedProduct.isFree,
       price: loadedProduct.price,
       originalPrice: loadedProduct.originalPrice,
@@ -319,6 +322,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     if (!mounted) return;
     setState(() => _loadingLeaderboard = true);
 
+    final String mode = _product?.leaderboardType ?? 'realtime';
+
+    // If marketing mode, show admin curated marketing rankers showcase if available
+    if (mode == 'marketing' || mode == 'demo') {
+      final rawRankers = _product?.topScores['rankers'];
+      if (rawRankers is List && rawRankers.isNotEmpty) {
+        final List<Map<String, dynamic>> marketingList =
+            rawRankers.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        if (mounted) {
+          setState(() {
+            _leaderboardRankings = marketingList;
+            _loadingLeaderboard = false;
+          });
+        }
+        return;
+      }
+    }
+
+    // Realtime Leaderboard mode: fetch real student attempts
     final user = SupabaseService.activeUserSession;
     final result = await SupabaseService.fetchRealLeaderboardRankings(
       exam: _product?.exam ?? 'NEET',
@@ -330,8 +352,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     final List<Map<String, dynamic>> rankings = (result['rankings'] is List)
         ? List<Map<String, dynamic>>.from(result['rankings'])
         : <Map<String, dynamic>>[];
-
-    final maxScore = (_product?.exam.contains('JEE') ?? false) ? 300 : 720;
 
     if (mounted) {
       setState(() {

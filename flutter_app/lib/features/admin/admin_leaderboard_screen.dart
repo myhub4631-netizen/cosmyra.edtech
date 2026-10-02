@@ -279,7 +279,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                   style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
                 ),
                 Text(
-                  'Manage Demo, Custom, or Real test series rankings & anti-cheating controls',
+                  'Manage Realtime and Marketing test series rankings',
                   style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                 ),
               ],
@@ -358,19 +358,15 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _activeMode == 'real'
-                      ? const Color(0xFFDCFCE7)
-                      : (_activeMode == 'custom' ? const Color(0xFFFEF3C7) : const Color(0xFFEFF6FF)),
+                  color: _activeMode == 'real' ? const Color(0xFFDCFCE7) : const Color(0xFFEFF6FF),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'Active: ${_activeMode.toUpperCase()} MODE',
+                  'Active: ${_activeMode == 'real' ? 'REALTIME' : 'MARKETING'} MODE',
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
-                    color: _activeMode == 'real'
-                        ? const Color(0xFF15803D)
-                        : (_activeMode == 'custom' ? const Color(0xFFB45309) : const Color(0xFF1D4ED8)),
+                    color: _activeMode == 'real' ? const Color(0xFF15803D) : const Color(0xFF1D4ED8),
                   ),
                 ),
               ),
@@ -382,21 +378,45 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
               if (constraints.maxWidth >= 750) {
                 return Row(
                   children: [
-                    Expanded(child: _buildModeOptionTile('real', 'Realtime Leaderboard', 'Shows real live student test attempts fetched directly from Supabase database.', Icons.bolt_rounded, const Color(0xFF10B981))),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildModeOptionTile('custom', 'Custom Override Mode', 'Manually curated scores & anti-cheating score overrides set by Admin.', Icons.admin_panel_settings_rounded, const Color(0xFFD97706))),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildModeOptionTile('demo', 'Demo / Marketing Mode', 'Pre-populated realistic top rankers for promotional test series displays.', Icons.campaign_rounded, const Color(0xFF2563EB))),
+                    Expanded(
+                      child: _buildModeOptionTile(
+                        'real',
+                        '1. Realtime Leaderboard',
+                        'Shows only real students who either attempted tests in this series or platform and ranks them live accordingly.',
+                        Icons.bolt_rounded,
+                        const Color(0xFF10B981),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildModeOptionTile(
+                        'demo',
+                        '2. Marketing Leaderboard',
+                        'A leaderboard created by admin to showcase on new test series, so users can understand how it looks and details.',
+                        Icons.campaign_rounded,
+                        const Color(0xFF2563EB),
+                      ),
+                    ),
                   ],
                 );
               } else {
                 return Column(
                   children: [
-                    _buildModeOptionTile('real', 'Realtime Leaderboard', 'Shows real live student test attempts fetched directly from Supabase database.', Icons.bolt_rounded, const Color(0xFF10B981)),
-                    const SizedBox(height: 10),
-                    _buildModeOptionTile('custom', 'Custom Override Mode', 'Manually curated scores & anti-cheating score overrides set by Admin.', Icons.admin_panel_settings_rounded, const Color(0xFFD97706)),
-                    const SizedBox(height: 10),
-                    _buildModeOptionTile('demo', 'Demo / Marketing Mode', 'Pre-populated realistic top rankers for promotional test series displays.', Icons.campaign_rounded, const Color(0xFF2563EB)),
+                    _buildModeOptionTile(
+                      'real',
+                      '1. Realtime Leaderboard',
+                      'Shows only real students who either attempted tests in this series or platform and ranks them live accordingly.',
+                      Icons.bolt_rounded,
+                      const Color(0xFF10B981),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildModeOptionTile(
+                      'demo',
+                      '2. Marketing Leaderboard',
+                      'A leaderboard created by admin to showcase on new test series, so users can understand how it looks and details.',
+                      Icons.campaign_rounded,
+                      const Color(0xFF2563EB),
+                    ),
                   ],
                 );
               }

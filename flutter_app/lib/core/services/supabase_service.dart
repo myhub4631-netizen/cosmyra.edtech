@@ -9167,8 +9167,8 @@ class SupabaseService {
       final mode = adminSettings['mode'] as String? ?? 'real';
       final customEntries = adminSettings['entries'] as List<Map<String, dynamic>>? ?? [];
 
-      // CUSTOM MODE: Return admin-configured custom leaderboard entries
-      if (mode == 'custom' && customEntries.isNotEmpty) {
+      // MARKETING MODE: Return admin-configured marketing leaderboard entries
+      if ((mode == 'marketing' || mode == 'demo' || mode == 'custom') && customEntries.isNotEmpty) {
         final filtered = customEntries.where((e) {
           final target = (e['target'] ?? e['exam'] ?? '').toString().toUpperCase();
           return target.isEmpty ||
