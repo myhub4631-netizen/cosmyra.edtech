@@ -151,7 +151,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           rank: rank,
           name: name,
           coaching: 'Cosmyra Aspirant',
-          avatarUrl: avatar.isNotEmpty ? avatar : 'https://i.pravatar.cc/150?img=${(rank % 70) + 1}',
+          avatarUrl: avatar,
           score: score,
           maxScore: maxS,
           percentile: (100.0 - (rank * 0.05)).clamp(50.0, 100.0),
