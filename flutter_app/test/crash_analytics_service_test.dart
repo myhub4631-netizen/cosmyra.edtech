@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cosmyra_edu_flutter/core/services/crash_analytics_service.dart';
+import 'package:cosmyra_neet_jee/core/services/crash_analytics_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

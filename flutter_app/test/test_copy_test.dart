@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cosmyra_edu_flutter/shared/utils/question_copy_helper.dart';
-import 'package:cosmyra_edu_flutter/core/services/supabase_service.dart';
+import 'package:cosmyra_neet_jee/shared/utils/question_copy_helper.dart';
+import 'package:cosmyra_neet_jee/core/services/supabase_service.dart';
 
 void main() {
   test('Test QuestionCopyHelper clean formatting matching exact user screenshot', () {

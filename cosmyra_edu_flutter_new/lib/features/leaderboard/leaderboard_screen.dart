@@ -116,21 +116,32 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       final isPoints = _selectedSystemMode == LeaderboardSystemMode.points;
       final currentUid = widget.userProfile?.id ?? SupabaseService.activeUserSession?.id;
 
+      String timePeriodStr = 'all';
+      if (_selectedTimeframe == LeaderboardTimeframe.today) {
+        timePeriodStr = 'daily';
+      } else if (_selectedTimeframe == LeaderboardTimeframe.thisWeek) {
+        timePeriodStr = 'weekly';
+      } else if (_selectedTimeframe == LeaderboardTimeframe.thisMonth) {
+        timePeriodStr = 'monthly';
+      }
+
       final result = await SupabaseService.fetchRealLeaderboardRankings(
         exam: examKey,
         isPointsMode: isPoints,
         currentUserId: currentUid,
+        timePeriod: timePeriodStr,
       );
 
       final List rawRankings = result['rankings'] as List? ?? [];
-      final Map<String, dynamic>? rawCurrentUser = result['currentUser'] as Map<String, dynamic>?;
+      final Map<String, dynamic>? rawCurrentUser = (result['currentUserRank'] ?? result['currentUser']) as Map<String, dynamic>?;
 
       final List<LeaderboardStudent> loadedStudents = [];
       for (var r in rawRankings) {
         final rank = (r['rank'] as num?)?.toInt() ?? 1;
         final score = (r['score'] as num?)?.toInt() ?? 0;
         final maxS = (r['max_score'] as num?)?.toInt() ?? 720;
-        final correct = (r['correct_count'] as num?)?.toInt() ?? (score ~/ 4);
+        final points = (r['points'] as num?)?.toInt() ?? ((r['correct_count'] as num?) != null ? ((r['correct_count'] as num).toInt() * 10) : (score * 10));
+        final correct = (r['correct_count'] as num?)?.toInt() ?? (points ~/ 10);
         final accuracy = (r['accuracy'] as num?)?.toDouble() ?? 90.0;
         final name = (r['name'] ?? 'Aspirant').toString();
         final avatar = (r['avatar'] ?? '').toString();
@@ -140,7 +151,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           rank: rank,
           name: name,
           coaching: 'Cosmyra Aspirant',
-          avatarUrl: avatar.isNotEmpty ? avatar : 'https://i.pravatar.cc/150?img=${(rank % 70) + 1}',
+          avatarUrl: avatar,
           score: score,
           maxScore: maxS,
           percentile: (100.0 - (rank * 0.05)).clamp(50.0, 100.0),
@@ -148,10 +159,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           questionsAttempted: (correct + 5).clamp(1, 180),
           correctQuestions: correct,
           wrongQuestions: 5,
+          points: points,
           rankChange: rankChange,
           isCrownWinner: rank <= 3,
           crownType: rank == 1 ? 'gold' : (rank == 2 ? 'silver' : (rank == 3 ? 'bronze' : 'none')),
-          isCurrentUser: r['is_current_user'] == true,
+          isCurrentUser: r['is_current_user'] == true || (currentUid != null && r['id'] == currentUid),
           recentSessionType: 'All India Test',
           categoryScope: _selectedCategory,
           meetsMinCriteria: true,
@@ -160,10 +172,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
       LeaderboardStudent? currentUserStudent;
       if (rawCurrentUser != null) {
-        final rank = (rawCurrentUser['rank'] as num?)?.toInt() ?? 1248;
-        final score = (rawCurrentUser['score'] as num?)?.toInt() ?? 612;
+        final rank = (rawCurrentUser['rank'] as num?)?.toInt() ?? 1;
+        final score = (rawCurrentUser['score'] as num?)?.toInt() ?? 0;
         final maxS = (rawCurrentUser['max_score'] as num?)?.toInt() ?? 720;
-        final correct = (rawCurrentUser['correct_count'] as num?)?.toInt() ?? (score ~/ 4);
+        final points = (rawCurrentUser['points'] as num?)?.toInt() ?? ((rawCurrentUser['correct_count'] as num?) != null ? ((rawCurrentUser['correct_count'] as num).toInt() * 10) : (score * 10));
+        final correct = (rawCurrentUser['correct_count'] as num?)?.toInt() ?? (points ~/ 10);
         final accuracy = (rawCurrentUser['accuracy'] as num?)?.toDouble() ?? 85.0;
 
         currentUserStudent = LeaderboardStudent(
@@ -173,17 +186,20 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           avatarUrl: widget.userProfile?.avatarUrl ?? rawCurrentUser['avatar'] ?? 'https://i.pravatar.cc/150?img=60',
           score: score,
           maxScore: maxS,
-          percentile: 85.0,
+          percentile: (100.0 - (rank * 0.05)).clamp(50.0, 100.0),
           accuracy: accuracy,
-          questionsAttempted: (correct + 8),
+          questionsAttempted: (correct + 5).clamp(1, 180),
           correctQuestions: correct,
-          wrongQuestions: 8,
-          rankChange: 156,
+          wrongQuestions: 5,
+          points: points,
+          rankChange: 0,
           isCurrentUser: true,
           recentSessionType: 'Custom Practice',
           categoryScope: _selectedCategory,
           meetsMinCriteria: true,
         );
+      } else if (loadedStudents.isNotEmpty) {
+        currentUserStudent = loadedStudents.firstWhere((s) => s.isCurrentUser, orElse: () => loadedStudents.first);
       }
 
       if (mounted) {
@@ -1971,51 +1987,38 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     final isPoints = _selectedSystemMode == LeaderboardSystemMode.points;
 
     // Use real students from Supabase service, or fallback to real-looking active cohort aspirants
-    final List<Map<String, dynamic>> students = (_students.isNotEmpty ? _students.take(10).toList() : [
+    final List<Map<String, dynamic>> students = (_students.isNotEmpty ? _students.take(30).toList() : [
       LeaderboardStudent(
-        rank: 1, name: 'Aarav Sharma', coaching: 'Cosmyra', avatarUrl: '',
+        rank: 1, name: 'Aarav Sharma', coaching: 'Cosmyra', avatarUrl: 'https://i.pravatar.cc/150?img=11',
         score: cohort.contains('JEE') ? 295 : 720, maxScore: cohort.contains('JEE') ? 300 : 720,
-        percentile: 100.0, accuracy: 99.2, questionsAttempted: 180, correctQuestions: 178, wrongQuestions: 2,
+        percentile: 100.0, accuracy: 99.2, questionsAttempted: 180, correctQuestions: 178, wrongQuestions: 2, points: 7200,
         rankChange: 0, isCrownWinner: true, crownType: 'gold',
       ),
       LeaderboardStudent(
-        rank: 2, name: 'Ananya Verma', coaching: 'Cosmyra', avatarUrl: '',
+        rank: 2, name: 'Ananya Verma', coaching: 'Cosmyra', avatarUrl: 'https://i.pravatar.cc/150?img=47',
         score: cohort.contains('JEE') ? 288 : 711, maxScore: cohort.contains('JEE') ? 300 : 720,
-        percentile: 98.75, accuracy: 97.5, questionsAttempted: 180, correctQuestions: 175, wrongQuestions: 5,
+        percentile: 98.75, accuracy: 97.5, questionsAttempted: 180, correctQuestions: 175, wrongQuestions: 5, points: 7110,
         rankChange: 2, isCrownWinner: true, crownType: 'silver',
       ),
       LeaderboardStudent(
-        rank: 3, name: 'Rohan Gupta', coaching: 'Cosmyra', avatarUrl: '',
+        rank: 3, name: 'Rohan Gupta', coaching: 'Cosmyra', avatarUrl: 'https://i.pravatar.cc/150?img=12',
         score: cohort.contains('JEE') ? 281 : 705, maxScore: cohort.contains('JEE') ? 300 : 720,
-        percentile: 97.92, accuracy: 96.8, questionsAttempted: 180, correctQuestions: 172, wrongQuestions: 8,
+        percentile: 97.92, accuracy: 96.8, questionsAttempted: 180, correctQuestions: 172, wrongQuestions: 8, points: 7050,
         rankChange: -1, isCrownWinner: true, crownType: 'bronze',
       ),
-      LeaderboardStudent(
-        rank: 4, name: 'Ishita Singh', coaching: 'Cosmyra', avatarUrl: '',
-        score: cohort.contains('JEE') ? 274 : 698, maxScore: cohort.contains('JEE') ? 300 : 720,
-        percentile: 96.94, accuracy: 95.5, questionsAttempted: 180, correctQuestions: 170, wrongQuestions: 10,
-        rankChange: 1,
-      ),
-      LeaderboardStudent(
-        rank: 5, name: 'Aditya Raj', coaching: 'Cosmyra', avatarUrl: '',
-        score: cohort.contains('JEE') ? 268 : 689, maxScore: cohort.contains('JEE') ? 300 : 720,
-        percentile: 95.69, accuracy: 94.2, questionsAttempted: 180, correctQuestions: 168, wrongQuestions: 12,
-        rankChange: 3,
-      ),
     ]).map((st) {
-      final pts = (st.score * 10) + (st.correctQuestions * 5);
+      final pts = st.points > 0 ? st.points : (st.correctQuestions * 10 > 0 ? st.correctQuestions * 10 : (st.score * 10));
       final scoreDisplay = isPoints ? '$pts pts' : '${st.score} / ${st.maxScore}';
       final percentageDisplay = isPoints ? '${st.accuracy.toStringAsFixed(1)}% Acc' : '${st.percentile.toStringAsFixed(2)}%';
 
       return {
         'rank': st.rank,
         'name': st.name,
+        'avatarUrl': st.avatarUrl,
         'target': '$cohort Aspirant',
         'score': scoreDisplay,
         'percentage': percentageDisplay,
         'isCrown': st.rank == 1,
-        'avatar': st.rank == 1 ? '👑' : (st.rank == 2 ? '🥈' : (st.rank == 3 ? '🥉' : '🧑‍🎓')),
-        'avatarColor': st.rank == 1 ? 0xFFFDE68A : (st.rank == 2 ? 0xFFDDD6FE : (st.rank == 3 ? 0xFFBBF7D0 : 0xFFEEF2FF)),
       };
     }).toList();
 
@@ -2071,7 +2074,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     ),
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Viewing Your Rank: #1,248 in All India'), backgroundColor: Color(0xFF7C3AED)),
+                        SnackBar(content: Text('Viewing Your Rank: #${_currentUserData?.rank ?? 1} in All India'), backgroundColor: const Color(0xFF7C3AED)),
                       );
                     },
                     icon: const Icon(Icons.person_rounded, size: 16, color: Color(0xFF7C3AED)),
@@ -2263,7 +2266,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     onTap: () {
                       setState(() {
                         _mobileTimeFilter = _mobileTimeFilter == 'All Time' ? 'This Month' : 'All Time';
+                        _selectedTimeframe = _mobileTimeFilter == 'All Time' ? LeaderboardTimeframe.allTime : LeaderboardTimeframe.thisMonth;
                       });
+                      _loadLeaderboardData();
                     },
                   ),
                   const SizedBox(width: 8),
@@ -2308,16 +2313,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               ),
               const SizedBox(height: 8),
 
-              // 6. Ranked Student Rows (1 to 5)
+              // 6. Ranked Student Rows
               ...students.map((st) {
                 final rank = st['rank'] as int;
                 final name = st['name'] as String;
+                final avatarUrl = st['avatarUrl'] as String?;
                 final target = st['target'] as String;
                 final score = st['score'] as String;
                 final percentage = st['percentage'] as String;
                 final isCrown = st['isCrown'] as bool;
-                final avatarEmoji = st['avatar'] as String;
-                final avatarColor = Color(st['avatarColor'] as int);
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
@@ -2337,16 +2341,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       const SizedBox(width: 12),
 
                       // Avatar
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: avatarColor,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(avatarEmoji, style: const TextStyle(fontSize: 22)),
-                        ),
+                      AppAvatar(
+                        avatarUrl: avatarUrl,
+                        name: name,
+                        size: 40,
                       ),
                       const SizedBox(width: 12),
 
@@ -2416,27 +2414,21 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Your Rank', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A))),
-                        Text('1,248', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w900, color: const Color(0xFF15803D))),
+                        Text('#${_currentUserData?.rank ?? 1}', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w900, color: const Color(0xFF15803D))),
                       ],
                     ),
                     const SizedBox(width: 14),
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFDCFCE7),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Text('🧑‍💻', style: TextStyle(fontSize: 22)),
-                      ),
+                    AppAvatar(
+                      avatarUrl: widget.userProfile?.avatarUrl ?? _currentUserData?.avatarUrl,
+                      name: userDisplayName,
+                      size: 40,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(userDisplayName, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                          Text(widget.userProfile?.fullName ?? _currentUserData?.name ?? userDisplayName, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
                           Text('$cohort Aspirant', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
                         ],
                       ),
@@ -2447,12 +2439,20 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         Row(
                           children: [
                             const Icon(Icons.arrow_upward_rounded, size: 14, color: Color(0xFF16A34A)),
-                            Text('156', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A))),
+                            Text('${_currentUserData?.rankChange ?? 0}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A))),
                           ],
                         ),
                         const SizedBox(height: 2),
-                        Text(cohort.contains('JEE') ? '242 / 300' : '612 / 720', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF7C3AED))),
-                        Text('85.00%', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A))),
+                        Text(
+                          isPoints
+                              ? '${_currentUserData?.points ?? 0} pts'
+                              : '${_currentUserData?.score ?? 0} / ${_currentUserData?.maxScore ?? 720}',
+                          style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold, color: const Color(0xFF7C3AED)),
+                        ),
+                        Text(
+                          '${_currentUserData?.accuracy.toStringAsFixed(1) ?? "0.0"}%',
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF16A34A)),
+                        ),
                       ],
                     ),
                   ],

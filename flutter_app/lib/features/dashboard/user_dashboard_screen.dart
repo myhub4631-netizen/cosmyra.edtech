@@ -570,6 +570,12 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                       ),
                       const SizedBox(height: 16),
                     ],
+
+                    // 7. Performance Overview Line Chart + Leaderboard Preview (Synced with Web view)
+                    if (_isSectionVisible('performance_overview') || _isSectionVisible('leaderboard_preview')) ...[
+                      _buildBottomSectionRow(displayName),
+                      const SizedBox(height: 16),
+                    ],
                   ],
                 ),
               ),
@@ -2464,188 +2470,203 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   }
 
   Widget _buildBottomSectionRow(String displayName) {
-    return Row(
+    final isMobile = MediaQuery.of(context).size.width < 900;
+
+    final leftColumnContent = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          flex: 6,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Performance Overview', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Row(
                 children: [
-                  const Text('Performance Overview', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Text('Last 7 Days', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
-                        SizedBox(width: 4),
-                        Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: Color(0xFF64748B)),
-                      ],
-                    ),
-                  ),
+                  Text('Last 7 Days', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569))),
+                  SizedBox(width: 4),
+                  Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: Color(0xFF64748B)),
                 ],
               ),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFF1F5F9)),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: ['Questions', 'Accuracy', 'Time Spent', 'Tests'].map((tab) {
-                        final isSelected = _performanceTab == tab;
-                        return GestureDetector(
-                          onTap: () => setState(() => _performanceTab = tab),
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: isSelected ? const Color(0xFFEFF6FF) : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              tab,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-
-                    const SizedBox(width: 20),
-
-                    Expanded(
-                      child: SizedBox(
-                        height: 180,
-                        child: CustomPaint(
-                          painter: SmoothLineChartPainter(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+            ],
+          ),
+          child: Row(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: ['Questions', 'Accuracy', 'Time Spent', 'Tests'].map((tab) {
+                  final isSelected = _performanceTab == tab;
+                  return GestureDetector(
+                    onTap: () => setState(() => _performanceTab = tab),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFFEFF6FF) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        tab,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
                         ),
                       ),
                     ),
-                  ],
+                  );
+                }).toList(),
+              ),
+
+              const SizedBox(width: 20),
+
+              Expanded(
+                child: SizedBox(
+                  height: 180,
+                  child: CustomPaint(
+                    painter: SmoothLineChartPainter(),
+                  ),
                 ),
               ),
             ],
           ),
         ),
+      ],
+    );
 
-        const SizedBox(width: 24),
-
-        Expanded(
-          flex: 4,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final rightColumnContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Leaderboard (Daily)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            GestureDetector(
+              onTap: () {
+                if (widget.onOpenLeaderboard != null) {
+                  widget.onOpenLeaderboard!();
+                } else {
+                  context.go('/leaderboard');
+                }
+              },
+              child: const Row(
                 children: [
-                  const Text('Leaderboard (Daily)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                  GestureDetector(
-                    onTap: () {
-                      if (widget.onOpenLeaderboard != null) {
-                        widget.onOpenLeaderboard!();
-                      } else {
-                        context.go('/leaderboard');
-                      }
-                    },
-                    child: const Row(
-                      children: [
-                        Text('View All', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2563EB))),
-                        SizedBox(width: 4),
-                        Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF2563EB)),
-                      ],
-                    ),
-                  ),
+                  Text('View All', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2563EB))),
+                  SizedBox(width: 4),
+                  Icon(Icons.arrow_forward_rounded, size: 14, color: Color(0xFF2563EB)),
                 ],
               ),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFF1F5F9)),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: ['Daily', 'Weekly', 'Monthly'].map((t) {
-                        final isSelected = _leaderboardTab == t;
-                        return GestureDetector(
-                          onTap: () => setState(() => _leaderboardTab = t),
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 24),
-                            padding: const EdgeInsets.only(bottom: 6),
-                            decoration: BoxDecoration(
-                              border: Border(
-                                bottom: BorderSide(
-                                  color: isSelected ? const Color(0xFF2563EB) : Colors.transparent,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            child: Text(
-                              t,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 16),
-
-                    const Row(
-                      children: [
-                        SizedBox(width: 40, child: Text('Rank', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold))),
-                        Expanded(child: Text('User', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold))),
-                        SizedBox(width: 60, child: Text('Score', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold))),
-                        SizedBox(width: 50, child: Text('Accuracy', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold))),
-                      ],
-                    ),
-                    const Divider(height: 20, color: Color(0xFFF1F5F9)),
-
-                    _buildLeaderboardRow('🥇', 'Ritik Sharma', '8,420', '93.6%', false),
-                    const SizedBox(height: 10),
-
-                    _buildLeaderboardRow('🥈', 'Ananya Singh', '7,850', '91.2%', false),
-                    const SizedBox(height: 10),
-
-                    _buildLeaderboardRow('🥉', 'Karan Verma', '7,120', '89.4%', false),
-                    const SizedBox(height: 10),
-
-                    _buildLeaderboardRow('15', '$displayName (You)', '4,210', '72.4%', true),
-                  ],
-                ),
-              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFF1F5F9)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
             ],
           ),
+          child: Column(
+            children: [
+              Row(
+                children: ['Daily', 'Weekly', 'Monthly'].map((t) {
+                  final isSelected = _leaderboardTab == t;
+                  return GestureDetector(
+                    onTap: () => setState(() => _leaderboardTab = t),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 24),
+                      padding: const EdgeInsets.only(bottom: 6),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: isSelected ? const Color(0xFF2563EB) : Colors.transparent,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        t,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+
+              const Row(
+                children: [
+                  SizedBox(width: 40, child: Text('Rank', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold))),
+                  Expanded(child: Text('User', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold))),
+                  SizedBox(width: 60, child: Text('Score', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold))),
+                  SizedBox(width: 50, child: Text('Accuracy', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold))),
+                ],
+              ),
+              const Divider(height: 20, color: Color(0xFFF1F5F9)),
+
+              _buildLeaderboardRow('🥇', 'Ritik Sharma', '8,420', '93.6%', false),
+              const SizedBox(height: 10),
+
+              _buildLeaderboardRow('🥈', 'Ananya Singh', '7,850', '91.2%', false),
+              const SizedBox(height: 10),
+
+              _buildLeaderboardRow('🥉', 'Karan Verma', '7,120', '89.4%', false),
+              const SizedBox(height: 10),
+
+              _buildLeaderboardRow('15', '$displayName (You)', '4,210', '72.4%', true),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          leftColumnContent,
+          const SizedBox(height: 20),
+          rightColumnContent,
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 6,
+          child: leftColumnContent,
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          flex: 4,
+          child: rightColumnContent,
         ),
       ],
     );

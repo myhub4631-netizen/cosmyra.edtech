@@ -1140,6 +1140,58 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with TickerPr
             ],
           ),
         ),
+        const SizedBox(height: 16),
+
+        // 4. Guarantee & Trust Badges Card (Synced with Web Sidebar)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildGuaranteeItem(Icons.access_time_rounded, 'Instant Access\nafter payment'),
+              _buildGuaranteeItem(Icons.lock_outline_rounded, 'Secure\nPayment'),
+              _buildGuaranteeItem(Icons.refresh_rounded, '7 Days\nRefund Policy'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // 5. Key Highlights Card (Synced with Web Sidebar)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(8)),
+                    child: const Icon(Icons.thumb_up_alt_outlined, color: Color(0xFF2563EB), size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Text('Key Highlights', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildHighlightRow('Questions at actual ${item.exam} level'),
+              _buildHighlightRow('Detailed and easy to understand solutions'),
+              _buildHighlightRow('Helpful performance analytics'),
+              _buildHighlightRow('Great for chapter-wise & full syllabus preparation'),
+              _buildHighlightRow('Instant test result analysis'),
+            ],
+          ),
+        ),
         const SizedBox(height: 100),
       ],
     );

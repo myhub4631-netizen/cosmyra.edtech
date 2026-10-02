@@ -19,6 +19,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
   String _selectedTestSeries = 'All Test Series';
   String _searchQuery = '';
   String _statusFilter = 'All'; // 'All', 'Verified', 'Flagged', 'Disqualified'
+  String _selectedTimePeriod = 'all'; // 'all', 'daily', 'weekly', 'monthly'
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -38,6 +39,13 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
     'Physics Booster Chapter Series',
   ];
 
+  final Map<String, String> _timePeriodOptions = {
+    'all': 'All Time',
+    'daily': 'Daily (24h)',
+    'weekly': 'Weekly (7d)',
+    'monthly': 'Monthly (30d)',
+  };
+
   List<Map<String, dynamic>> _leaderboardData = [];
 
   @override
@@ -50,32 +58,36 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
     setState(() => _isLoading = true);
     try {
       final settings = await SupabaseService.getAdminLeaderboardSettings();
-      _activeMode = settings['mode'] as String? ?? 'real';
-      final entries = settings['entries'] as List<Map<String, dynamic>>? ?? [];
-
-      if (entries.isNotEmpty) {
-        _leaderboardData = List<Map<String, dynamic>>.from(entries);
-      } else {
-        _leaderboardData = _getDefaultDemoLeaderboard();
+      final savedMode = settings['mode'] as String? ?? 'real';
+      if (_activeMode.isEmpty) {
+        _activeMode = (savedMode == 'real') ? 'real' : 'demo';
       }
 
-      // Also try fetching live attempts to merge if list is empty
-      if (_leaderboardData.isEmpty) {
+      if (_activeMode == 'real') {
         final realResult = await SupabaseService.fetchRealLeaderboardRankings(
           exam: _selectedExam,
           isPointsMode: false,
+          timePeriod: _selectedTimePeriod,
+          forceRealtime: true,
         );
         final liveRankings = (realResult['rankings'] as List<dynamic>?)
                 ?.map((e) => Map<String, dynamic>.from(e as Map))
                 .toList() ??
             [];
-        if (liveRankings.isNotEmpty) {
-          _leaderboardData = liveRankings;
+        _leaderboardData = liveRankings;
+      } else {
+        final entries = settings['entries'] as List<Map<String, dynamic>>? ?? [];
+        if (entries.isNotEmpty) {
+          _leaderboardData = List<Map<String, dynamic>>.from(entries);
+        } else {
+          _leaderboardData = _getDefaultDemoLeaderboard();
         }
       }
     } catch (e) {
       debugPrint('Error loading admin leaderboard data: $e');
-      _leaderboardData = _getDefaultDemoLeaderboard();
+      if (_activeMode != 'real') {
+        _leaderboardData = _getDefaultDemoLeaderboard();
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -93,6 +105,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
         'accuracy': 99.5,
         'tests': 68,
         'points': 7200,
+        'correct_count': 180,
         'target': 'NEET 2027 Full Syllabus Test Series',
         'isVerified': true,
         'isFlagged': false,
@@ -109,6 +122,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
         'accuracy': 98.7,
         'tests': 54,
         'points': 7150,
+        'correct_count': 178,
         'target': 'NEET 2027 Full Syllabus Test Series',
         'isVerified': true,
         'isFlagged': false,
@@ -125,6 +139,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
         'accuracy': 97.9,
         'tests': 62,
         'points': 7100,
+        'correct_count': 175,
         'target': 'NEET 2027 Full Syllabus Test Series',
         'isVerified': true,
         'isFlagged': false,
@@ -141,6 +156,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
         'accuracy': 97.1,
         'tests': 49,
         'points': 7050,
+        'correct_count': 172,
         'target': 'NEET 2027 Full Syllabus Test Series',
         'isVerified': false,
         'isFlagged': false,
@@ -157,6 +173,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
         'accuracy': 96.3,
         'tests': 58,
         'points': 6950,
+        'correct_count': 168,
         'target': 'NEET 2027 Full Syllabus Test Series',
         'isVerified': true,
         'isFlagged': false,
@@ -196,25 +213,19 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       final res = await SupabaseService.fetchRealLeaderboardRankings(
         exam: _selectedExam,
         isPointsMode: false,
+        timePeriod: _selectedTimePeriod,
+        forceRealtime: true,
       );
       final liveList = (res['rankings'] as List<dynamic>?)
               ?.map((e) => Map<String, dynamic>.from(e as Map))
               .toList() ??
           [];
 
-      if (liveList.isNotEmpty) {
-        setState(() {
-          _leaderboardData = liveList;
-          _activeMode = 'real';
-        });
-        await _saveSettings();
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No live test attempts found yet. Loaded default entries.')),
-          );
-        }
-      }
+      setState(() {
+        _leaderboardData = liveList;
+        _activeMode = 'real';
+      });
+      await _saveSettings();
     } catch (e) {
       debugPrint('Error fetching live attempts: $e');
     } finally {
@@ -279,7 +290,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                   style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
                 ),
                 Text(
-                  'Manage Demo, Custom, or Real test series rankings & anti-cheating controls',
+                  'Manage Realtime and Marketing test series rankings',
                   style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                 ),
               ],
@@ -358,19 +369,15 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _activeMode == 'real'
-                      ? const Color(0xFFDCFCE7)
-                      : (_activeMode == 'custom' ? const Color(0xFFFEF3C7) : const Color(0xFFEFF6FF)),
+                  color: _activeMode == 'real' ? const Color(0xFFDCFCE7) : const Color(0xFFEFF6FF),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'Active: ${_activeMode.toUpperCase()} MODE',
+                  'Active: ${_activeMode == 'real' ? 'REALTIME' : 'MARKETING'} MODE',
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
-                    color: _activeMode == 'real'
-                        ? const Color(0xFF15803D)
-                        : (_activeMode == 'custom' ? const Color(0xFFB45309) : const Color(0xFF1D4ED8)),
+                    color: _activeMode == 'real' ? const Color(0xFF15803D) : const Color(0xFF1D4ED8),
                   ),
                 ),
               ),
@@ -382,21 +389,45 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
               if (constraints.maxWidth >= 750) {
                 return Row(
                   children: [
-                    Expanded(child: _buildModeOptionTile('real', 'Realtime Leaderboard', 'Shows real live student test attempts fetched directly from Supabase database.', Icons.bolt_rounded, const Color(0xFF10B981))),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildModeOptionTile('custom', 'Custom Override Mode', 'Manually curated scores & anti-cheating score overrides set by Admin.', Icons.admin_panel_settings_rounded, const Color(0xFFD97706))),
-                    const SizedBox(width: 12),
-                    Expanded(child: _buildModeOptionTile('demo', 'Demo / Marketing Mode', 'Pre-populated realistic top rankers for promotional test series displays.', Icons.campaign_rounded, const Color(0xFF2563EB))),
+                    Expanded(
+                      child: _buildModeOptionTile(
+                        'real',
+                        '1. Realtime Leaderboard',
+                        'Shows only real students who either attempted tests in this series or platform and ranks them live accordingly.',
+                        Icons.bolt_rounded,
+                        const Color(0xFF10B981),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildModeOptionTile(
+                        'demo',
+                        '2. Marketing Leaderboard',
+                        'A leaderboard created by admin to showcase on new test series, so users can understand how it looks and details.',
+                        Icons.campaign_rounded,
+                        const Color(0xFF2563EB),
+                      ),
+                    ),
                   ],
                 );
               } else {
                 return Column(
                   children: [
-                    _buildModeOptionTile('real', 'Realtime Leaderboard', 'Shows real live student test attempts fetched directly from Supabase database.', Icons.bolt_rounded, const Color(0xFF10B981)),
-                    const SizedBox(height: 10),
-                    _buildModeOptionTile('custom', 'Custom Override Mode', 'Manually curated scores & anti-cheating score overrides set by Admin.', Icons.admin_panel_settings_rounded, const Color(0xFFD97706)),
-                    const SizedBox(height: 10),
-                    _buildModeOptionTile('demo', 'Demo / Marketing Mode', 'Pre-populated realistic top rankers for promotional test series displays.', Icons.campaign_rounded, const Color(0xFF2563EB)),
+                    _buildModeOptionTile(
+                      'real',
+                      '1. Realtime Leaderboard',
+                      'Shows only real students who either attempted tests in this series or platform and ranks them live accordingly.',
+                      Icons.bolt_rounded,
+                      const Color(0xFF10B981),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildModeOptionTile(
+                      'demo',
+                      '2. Marketing Leaderboard',
+                      'A leaderboard created by admin to showcase on new test series, so users can understand how it looks and details.',
+                      Icons.campaign_rounded,
+                      const Color(0xFF2563EB),
+                    ),
                   ],
                 );
               }
@@ -410,9 +441,13 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
   Widget _buildModeOptionTile(String mode, String title, String desc, IconData icon, Color activeColor) {
     final isSelected = _activeMode == mode;
     return InkWell(
-      onTap: () {
+      onTap: () async {
         setState(() => _activeMode = mode);
-        _saveSettings();
+        await SupabaseService.saveAdminLeaderboardSettings(
+          mode: mode,
+          entries: _leaderboardData,
+        );
+        _loadLeaderboardSettings();
       },
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
@@ -586,7 +621,35 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                     value: _selectedTestSeries,
                     items: _testSeriesOptions.map((e) => DropdownMenuItem(value: e, child: Text(e, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B))))).toList(),
                     onChanged: (val) {
-                      if (val != null) setState(() => _selectedTestSeries = val);
+                      if (val != null) {
+                        setState(() => _selectedTestSeries = val);
+                        _loadLeaderboardSettings();
+                      }
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+
+              // Time Period Dropdown (Daily, Weekly, Monthly, All Time)
+              Text('Period: ', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFC7D2FE)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedTimePeriod,
+                    icon: const Icon(Icons.calendar_today_rounded, size: 14, color: Color(0xFF4F46E5)),
+                    items: _timePeriodOptions.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF4338CA))))).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _selectedTimePeriod = val);
+                        _loadLeaderboardSettings();
+                      }
                     },
                   ),
                 ),
@@ -661,6 +724,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                 const Expanded(flex: 3, child: Text('Student Name & ID', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
                 const Expanded(flex: 3, child: Text('Test Series / Target Exam', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
                 const SizedBox(width: 90, child: Text('Score', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+                const SizedBox(width: 100, child: Text('Points (10/Q)', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
                 const SizedBox(width: 80, child: Text('Accuracy', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
                 const SizedBox(width: 100, child: Text('Status', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
                 const SizedBox(width: 120, child: Text('Actions', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
@@ -682,6 +746,8 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
               final sId = item['id']?.toString() ?? '';
               final score = item['score'] ?? 0;
               final maxScore = item['max_score'] ?? 720;
+              final correctCount = (item['correct_count'] is num) ? (item['correct_count'] as num).toInt() : (score ~/ 4);
+              final points = (item['points'] is num) ? (item['points'] as num).toInt() : (correctCount * 10);
               final accuracy = item['accuracy'] ?? 85.0;
               final target = (item['target'] ?? 'NEET UG').toString();
               final isVerified = item['isVerified'] == true;
@@ -786,6 +852,27 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                         '$score / $maxScore',
                         textAlign: TextAlign.right,
                         style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFF059669)),
+                      ),
+                    ),
+
+                    // Total Points (10 points per correct question)
+                    SizedBox(
+                      width: 100,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '$points Pts',
+                            textAlign: TextAlign.right,
+                            style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800, color: const Color(0xFF2563EB)),
+                          ),
+                          Text(
+                            '$correctCount Correct',
+                            textAlign: TextAlign.right,
+                            style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                          ),
+                        ],
                       ),
                     ),
 

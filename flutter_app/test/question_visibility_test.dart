@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:cosmyra_edu_flutter/models/models.dart';
+import 'package:cosmyra_neet_jee/models/models.dart';
 
 void main() {
   group('Question Visibility (Available In) Unit Tests', () {
