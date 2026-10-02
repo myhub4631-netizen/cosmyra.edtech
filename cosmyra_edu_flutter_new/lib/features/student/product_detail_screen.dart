@@ -10,6 +10,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/services/cart_service.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
+import '../../shared/widgets/app_avatar.dart';
 import '../../core/theme/app_design_system.dart';
 import 'test_series_screen.dart';
 
@@ -2794,13 +2795,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                               const SizedBox(width: 10),
 
                               // Avatar
-                              CircleAvatar(
-                                radius: 15,
+                              AppAvatar(
+                                avatarUrl: r['avatar']?.toString(),
+                                name: name,
+                                size: 30,
                                 backgroundColor: rankColor,
-                                child: Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : 'A',
-                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                ),
                               ),
                               const SizedBox(width: 10),
 
@@ -3129,13 +3128,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             ),
           ),
           const SizedBox(height: 6),
-          CircleAvatar(
-            radius: isFirst ? 20 : 16,
+          AppAvatar(
+            avatarUrl: r['avatar']?.toString(),
+            name: nameStr,
+            size: isFirst ? 40 : 32,
             backgroundColor: color,
-            child: Text(
-              nameStr.isNotEmpty ? nameStr[0].toUpperCase() : 'A',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: isFirst ? 14 : 12),
-            ),
           ),
           const SizedBox(height: 6),
           Text(

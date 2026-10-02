@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../shared/widgets/app_avatar.dart';
 
 enum LeaderboardExam { neet, jeeMain, jeeAdvanced }
 enum LeaderboardTimeframe { today, thisWeek, thisMonth, allTime }
@@ -1072,10 +1073,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         Widget buildRankBlock() {
           return Row(
             children: [
-              CircleAvatar(
-                radius: isMobile ? 18 : 22,
+              AppAvatar(
+                avatarUrl: widget.userProfile?.avatarUrl ?? SupabaseService.activeUserSession?.avatarUrl,
+                name: widget.userProfile?.fullName ?? SupabaseService.activeUserSession?.fullName ?? 'You',
+                size: isMobile ? 36 : 44,
                 backgroundColor: const Color(0xFFEEF2FF),
-                child: Icon(Icons.person, color: const Color(0xFF4F46E5), size: isMobile ? 20 : 24),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -1503,9 +1505,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundImage: NetworkImage(_currentUserData!.avatarUrl),
+                        AppAvatar(
+                          avatarUrl: _currentUserData!.avatarUrl,
+                          name: _currentUserData!.name,
+                          size: 32,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -1628,9 +1631,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         children: [
           SizedBox(width: 44, child: rankBadge),
           const SizedBox(width: 8),
-          CircleAvatar(
-            radius: 16,
-            backgroundImage: NetworkImage(s.avatarUrl),
+          AppAvatar(
+            avatarUrl: s.avatarUrl,
+            name: s.name,
+            size: 32,
           ),
           const SizedBox(width: 10),
           Expanded(

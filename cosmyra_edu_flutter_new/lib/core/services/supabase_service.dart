@@ -9119,14 +9119,39 @@ class SupabaseService {
       // 2. Fetch profiles to get student names and avatars
       final allProfiles = await fetchAllProfiles();
       final profileMap = {for (var p in allProfiles) p.id: p};
+      final activeUser = client.auth.currentUser;
+      final activeUserMeta = activeUser?.userMetadata;
+      final activeGoogleAvatar = (activeUserMeta?['avatar_url'] ??
+              activeUserMeta?['picture'] ??
+              activeUserMeta?['photo_url'] ??
+              activeUserMeta?['avatar'])
+          ?.toString();
 
       if (res.isNotEmpty) {
         int rankCounter = 1;
         for (var row in res) {
           final sId = row['student_id']?.toString() ?? '';
           final profile = profileMap[sId];
-          final studentName = profile?.fullName ?? 'Aspirant ${rankCounter + 10}';
-          final avatar = profile?.avatarUrl ?? '';
+          var studentName = (profile?.fullName != null && profile!.fullName.trim().isNotEmpty) ? profile.fullName.trim() : '';
+          var avatar = profile?.avatarUrl ?? '';
+
+          if ((studentName.isEmpty || avatar.isEmpty) &&
+              (sId == currentUserId || sId == activeUserSession?.id || sId == activeUser?.id)) {
+            if (studentName.isEmpty) {
+              studentName = activeUserSession?.fullName ??
+                  (activeUserMeta?['full_name'] ?? activeUserMeta?['name'])?.toString() ??
+                  activeUser?.email?.split('@').first ??
+                  '';
+            }
+            if (avatar.isEmpty) {
+              avatar = activeUserSession?.avatarUrl ?? activeGoogleAvatar ?? '';
+            }
+          }
+
+          if (studentName.isEmpty) {
+            studentName = 'Aspirant ${rankCounter + 10}';
+          }
+
           final score = (row['total_score'] as num?)?.toInt() ?? 0;
           final maxScore = (row['max_score'] as num?)?.toInt() ?? 720;
           final correct = (row['correct_count'] as num?)?.toInt() ?? 0;
@@ -9178,13 +9203,26 @@ class SupabaseService {
         final score = seedScores[i];
         final correct = (score / 4).round();
         final points = (score * 10) + (correct * 5);
-        final name = (prof != null && prof.fullName.isNotEmpty) ? prof.fullName : (i == 0 ? 'Aarav Sharma' : (i == 1 ? 'Sneha Patel' : (i == 2 ? 'Rohan Verma' : 'Ishita Sen')));
+        var name = (prof != null && prof.fullName.isNotEmpty) ? prof.fullName : (i == 0 ? 'Aarav Sharma' : (i == 1 ? 'Sneha Patel' : (i == 2 ? 'Rohan Verma' : 'Ishita Sen')));
+        var avatar = prof?.avatarUrl ?? '';
+
+        final activeUser = client.auth.currentUser;
+        final activeUserMeta = activeUser?.userMetadata;
+        final activeGoogleAvatar = (activeUserMeta?['avatar_url'] ??
+                activeUserMeta?['picture'] ??
+                activeUserMeta?['photo_url'] ??
+                activeUserMeta?['avatar'])
+            ?.toString();
+
+        if (avatar.isEmpty && (prof?.id == currentUserId || prof?.id == activeUserSession?.id || prof?.id == activeUser?.id)) {
+          avatar = activeUserSession?.avatarUrl ?? activeGoogleAvatar ?? '';
+        }
 
         final item = {
           'rank': i + 1,
           'id': prof?.id ?? 'seed_$i',
           'name': name,
-          'avatar': prof?.avatarUrl ?? '',
+          'avatar': avatar,
           'score': score,
           'max_score': baseMax,
           'correct_count': correct,
@@ -9221,10 +9259,18 @@ class SupabaseService {
     }
 
     // Ensure currentUserRank exists
+    final activeUser = client.auth.currentUser;
+    final activeUserMeta = activeUser?.userMetadata;
+    final activeGoogleAvatar = (activeUserMeta?['avatar_url'] ??
+            activeUserMeta?['picture'] ??
+            activeUserMeta?['photo_url'] ??
+            activeUserMeta?['avatar'])
+        ?.toString();
+
     currentUserRank ??= {
       'rank': 1248,
       'name': activeUserSession?.fullName ?? 'You',
-      'avatar': activeUserSession?.avatarUrl ?? '',
+      'avatar': activeUserSession?.avatarUrl ?? activeGoogleAvatar ?? '',
       'score': 612,
       'max_score': 720,
       'points': 6120,
