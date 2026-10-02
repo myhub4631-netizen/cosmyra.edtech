@@ -9158,45 +9158,48 @@ class SupabaseService {
     String? testSeriesId,
     required bool isPointsMode,
     String? currentUserId,
+    bool forceRealtime = false,
   }) async {
     final List<Map<String, dynamic>> rankings = [];
     Map<String, dynamic>? currentUserRank;
 
     try {
-      final adminSettings = await getAdminLeaderboardSettings();
-      final mode = adminSettings['mode'] as String? ?? 'real';
-      final customEntries = adminSettings['entries'] as List<Map<String, dynamic>>? ?? [];
+      if (!forceRealtime && (testSeriesId == null || testSeriesId.isEmpty)) {
+        final adminSettings = await getAdminLeaderboardSettings();
+        final mode = adminSettings['mode'] as String? ?? 'real';
+        final customEntries = adminSettings['entries'] as List<Map<String, dynamic>>? ?? [];
 
-      // MARKETING MODE: Return admin-configured marketing leaderboard entries
-      if ((mode == 'marketing' || mode == 'demo' || mode == 'custom') && customEntries.isNotEmpty) {
-        final filtered = customEntries.where((e) {
-          final target = (e['target'] ?? e['exam'] ?? '').toString().toUpperCase();
-          return target.isEmpty ||
-              target.contains(exam.toUpperCase()) ||
-              exam.toUpperCase().contains(target) ||
-              target.contains('ALL') ||
-              (testSeriesId != null && e['test_series_id'] == testSeriesId);
-        }).toList();
+        // MARKETING MODE: Return admin-configured marketing leaderboard entries
+        if ((mode == 'marketing' || mode == 'demo' || mode == 'custom') && customEntries.isNotEmpty) {
+          final filtered = customEntries.where((e) {
+            final target = (e['target'] ?? e['exam'] ?? '').toString().toUpperCase();
+            return target.isEmpty ||
+                target.contains(exam.toUpperCase()) ||
+                exam.toUpperCase().contains(target) ||
+                target.contains('ALL') ||
+                (testSeriesId != null && e['test_series_id'] == testSeriesId);
+          }).toList();
 
-        final list = filtered.isNotEmpty ? filtered : customEntries;
-        final sorted = List<Map<String, dynamic>>.from(list);
-        if (isPointsMode) {
-          sorted.sort((a, b) => ((b['points'] as num?) ?? ((b['score'] as num? ?? 0) * 10)).compareTo((a['points'] as num?) ?? ((a['score'] as num? ?? 0) * 10)));
-        } else {
-          sorted.sort((a, b) => ((b['score'] as num?) ?? 0).compareTo((a['score'] as num?) ?? 0));
-        }
-
-        for (int i = 0; i < sorted.length; i++) {
-          sorted[i]['rank'] = i + 1;
-          if (sorted[i]['is_current_user'] == true || sorted[i]['id'] == currentUserId) {
-            currentUserRank = sorted[i];
+          final list = filtered.isNotEmpty ? filtered : customEntries;
+          final sorted = List<Map<String, dynamic>>.from(list);
+          if (isPointsMode) {
+            sorted.sort((a, b) => ((b['points'] as num?) ?? ((b['score'] as num? ?? 0) * 10)).compareTo((a['points'] as num?) ?? ((a['score'] as num? ?? 0) * 10)));
+          } else {
+            sorted.sort((a, b) => ((b['score'] as num?) ?? 0).compareTo((a['score'] as num?) ?? 0));
           }
+
+          for (int i = 0; i < sorted.length; i++) {
+            sorted[i]['rank'] = i + 1;
+            if (sorted[i]['is_current_user'] == true || sorted[i]['id'] == currentUserId) {
+              currentUserRank = sorted[i];
+            }
+          }
+          currentUserRank ??= sorted.isNotEmpty ? sorted.first : null;
+          return {
+            'rankings': sorted,
+            'currentUserRank': currentUserRank,
+          };
         }
-        currentUserRank ??= sorted.isNotEmpty ? sorted.first : null;
-        return {
-          'rankings': sorted,
-          'currentUserRank': currentUserRank,
-        };
       }
 
       // REAL MODE: Query actual test_attempts from Supabase (Strictly NO fake seed profiles!)
@@ -9215,7 +9218,7 @@ class SupabaseService {
         debugPrint('Notice filtering test_attempts by test_series_id: $e');
       }
 
-      if (res.isEmpty) {
+      if (res.isEmpty && (testSeriesId == null || testSeriesId.isEmpty)) {
         final resList = await client
             .from('test_attempts')
             .select('student_id, total_score, max_score, correct_count, accuracy_percentage, submitted_at')

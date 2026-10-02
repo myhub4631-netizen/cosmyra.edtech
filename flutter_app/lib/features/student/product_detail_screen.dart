@@ -340,13 +340,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       }
     }
 
-    // Realtime Leaderboard mode: fetch real student attempts
+    // Realtime Leaderboard mode: fetch real student attempts only (forceRealtime: true)
     final user = SupabaseService.activeUserSession;
     final result = await SupabaseService.fetchRealLeaderboardRankings(
       exam: _product?.exam ?? 'NEET',
       testSeriesId: widget.productId,
       isPointsMode: _isPointsMode,
       currentUserId: user?.id,
+      forceRealtime: true,
     );
 
     final List<Map<String, dynamic>> rankings = (result['rankings'] is List)

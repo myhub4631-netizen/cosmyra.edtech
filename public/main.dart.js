@@ -18604,67 +18604,73 @@ break
 case 6:case 1:return A.A(q,r)
 case 2:return A.z(o.at(-1),r)}})
 return A.B($async$afz,r)},
-wt(a,b,c,d){return A.cDC(a,b,c,d)},
-cDC(e0,e1,e2,e3){var s=0,r=A.C(t.P),q,p=2,o=[],n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,d0,d1,d2,d3,d4,d5,d6,d7,d8,d9
-var $async$wt=A.y(function(e4,e5){if(e4===1){o.push(e5)
+wt(a,b,c,d,e){return A.cDC(a,b,c,d,e)},
+cDC(e0,e1,e2,e3,e4){var s=0,r=A.C(t.P),q,p=2,o=[],n,m,l,k,j,i,h,g,f,e,d,c,b,a,a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,d0,d1,d2,d3,d4,d5,d6,d7,d8,d9
+var $async$wt=A.y(function(e5,e6){if(e5===1){o.push(e6)
 s=p}while(true)switch(s){case 0:d5=t.Y
 d6=A.a([],d5)
 d7=null
 p=4
-s=7
+if(!e2)b7=e4==null||e4.length===0
+else b7=!1
+s=b7?7:8
+break
+case 7:s=9
 return A.l(A.afz(),$async$wt)
-case 7:n=e5
-b7=A.bq(J.o(n,"mode"))
-m=b7==null?"real":b7
-b8=t.Fe.a(J.o(n,"entries"))
-l=b8==null?A.a([],d5):b8
-if((J.j(m,"marketing")||J.j(m,"demo")||J.j(m,"custom"))&&J.c4(l)){b=J.f4(l,new A.aZF(e1,e3))
-b9=A.N(b,b.$ti.i("Q.E"))
-k=b9
+case 9:n=e6
+b8=A.bq(J.o(n,"mode"))
+m=b8==null?"real":b8
+b9=t.Fe.a(J.o(n,"entries"))
+l=b9==null?A.a([],d5):b9
+if((J.j(m,"marketing")||J.j(m,"demo")||J.j(m,"custom"))&&J.c4(l)){b=J.f4(l,new A.aZF(e1,e4))
+c0=A.N(b,b.$ti.i("Q.E"))
+k=c0
 j=J.ag(k)!==0?k:l
 i=A.cr(j,!0,t.P)
-if(e2)J.uu(i,new A.aZG())
+if(e3)J.uu(i,new A.aZG())
 else J.uu(i,new A.aZH())
 for(h=0;h<J.ag(i);++h){J.b0(J.o(i,h),"rank",h+1)
 if(J.j(J.o(J.o(i,h),"is_current_user"),!0)||J.j(J.o(J.o(i,h),"id"),e0))d7=J.o(i,h)}if(d7==null)d7=J.ag(i)!==0?J.hv(i):null
 b=A.v(["rankings",i,"currentUserRank",d7],t.N,t.z)
 q=b
 s=1
-break}g=[]
-p=9
-s=e3!=null&&e3.length!==0?12:13
+break}case 8:g=[]
+p=11
+s=e4!=null&&e4.length!==0?14:15
 break
-case 12:d5=$.ay().b
+case 14:d5=$.ay().b
 d5===$&&A.b()
-s=14
-return A.l(d5.a2("test_attempts").c2(0,"student_id, total_score, max_score, correct_count, accuracy_percentage, submitted_at, test_series_id").ib("test_series_id.eq."+e3+",product_id.eq."+e3).eG(0,"total_score",!1).is(100),$async$wt)
-case 14:f=e5
+s=16
+return A.l(d5.a2("test_attempts").c2(0,"student_id, total_score, max_score, correct_count, accuracy_percentage, submitted_at, test_series_id").ib("test_series_id.eq."+e4+",product_id.eq."+e4).eG(0,"total_score",!1).is(100),$async$wt)
+case 16:f=e6
 g=f
-case 13:p=4
-s=11
+case 15:p=4
+s=13
 break
-case 9:p=8
+case 11:p=10
 d8=o.pop()
 e=A.R(d8)
 A.aa().$1("Notice filtering test_attempts by test_series_id: "+A.k(e))
-s=11
+s=13
 break
-case 8:s=4
+case 10:s=4
 break
-case 11:s=J.ea(g)?15:16
+case 13:if(J.ea(g))d5=e4==null||e4.length===0
+else d5=!1
+s=d5?17:18
 break
-case 15:d5=$.ay().b
+case 17:d5=$.ay().b
 d5===$&&A.b()
-s=17
+s=19
 return A.l(d5.a2("test_attempts").c2(0,"student_id, total_score, max_score, correct_count, accuracy_percentage, submitted_at").eG(0,"total_score",!1).is(100),$async$wt)
-case 17:d=e5
+case 19:d=e6
 g=d
-case 16:s=18
+case 18:s=20
 return A.l(A.zO(),$async$wt)
-case 18:c=e5
+case 20:c=e6
 d5=t.N
 b=A.O(d5,t.pc)
-for(c1=J.aK(c);c1.B();){a=c1.gO(c1)
+for(b7=J.aK(c);b7.B();){a=b7.gO(b7)
 J.b0(b,a.a,a)}a0=b
 b=$.ay().b
 b===$&&A.b()
@@ -18679,7 +18685,7 @@ b=b==null?null:J.o(b,"picture")}if(b==null){b=a2
 b=b==null?null:J.o(b,"photo_url")}if(b==null){b=a2
 b=b==null?null:J.o(b,"avatar")}a3=b==null?null:J.f(b)
 if(J.c4(g)){a4=1
-for(b=J.aK(g),c1=t.K,c2=e0!=null;b.B();){a5=b.gO(b)
+for(b=J.aK(g),b7=t.K,c2=e0!=null;b.B();){a5=b.gO(b)
 c3=J.o(a5,"student_id")
 c4=c3==null?null:J.f(c3)
 a6=c4==null?"":c4
@@ -18728,7 +18734,7 @@ d3=a7
 d3=d3==null?null:d3.f
 if(d3==null)d3=e1
 d4=c2&&J.j(a6,e0)
-b5=A.v(["rank",c3,"id",a6,"name",c5,"avatar",d2,"score",b0,"max_score",b1,"correct_count",b2,"accuracy",b3,"points",b4,"target",d3,"is_current_user",d4,"rank_change",0,"isVerified",!0],d5,c1)
+b5=A.v(["rank",c3,"id",a6,"name",c5,"avatar",d2,"score",b0,"max_score",b1,"correct_count",b2,"accuracy",b3,"points",b4,"target",d3,"is_current_user",d4,"rank_change",0,"isVerified",!0],d5,b7)
 if(J.j(J.o(b5,"is_current_user"),!0))d7=b5
 J.bO(d6,b5);++a4}}b=A.v(["rankings",d6,"currentUserRank",d7],d5,t.z)
 q=b
@@ -88478,7 +88484,7 @@ l=g==null?A.a([],t.Y):g
 s=(J.c4(l)?n.as=A.cr(l,!0,t.P):n.as=n.aaR()).length===0?7:8
 break
 case 7:s=9
-return A.l(A.wt(null,n.e,!1,null),$async$zr)
+return A.l(A.wt(null,n.e,!1,!1,null),$async$zr)
 case 9:k=b
 h=t.g.a(J.o(k,"rankings"))
 if(h==null)f=null
@@ -88522,7 +88528,7 @@ var $async$E5=A.y(function(a,b){if(a===1){p.push(b)
 s=q}while(true)switch(s){case 0:n.q(new A.bcB(n))
 q=3
 s=6
-return A.l(A.wt(null,n.e,!1,null),$async$E5)
+return A.l(A.wt(null,n.e,!1,!1,null),$async$E5)
 case 6:m=b
 j=t.g.a(J.o(m,"rankings"))
 if(j==null)i=null
@@ -104341,7 +104347,7 @@ b1=a9==null?null:a9.a
 if(b1==null){a9=$.eG
 b1=a9==null?null:a9.a}l=b1
 s=6
-return A.l(A.wt(l,n,m,null),$async$p0)
+return A.l(A.wt(l,n,!1,m,null),$async$p0)
 case 6:k=c6
 b2=t.g.a(J.o(k,"rankings"))
 j=b2==null?[]:b2
@@ -109503,7 +109509,7 @@ o=o==null?null:o.c
 if(o==null)o="NEET"
 n=p.a.c
 s=3
-return A.l(A.wt(j==null?null:j.a,o,!1,n),$async$MC)
+return A.l(A.wt(j==null?null:j.a,o,!0,!1,n),$async$MC)
 case 3:i=b
 o=J.M(i)
 h=t.j.b(o.h(i,"rankings"))?A.cr(o.h(i,"rankings"),!0,t.P):A.a([],t.Y)
