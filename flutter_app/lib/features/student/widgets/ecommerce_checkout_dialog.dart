@@ -48,18 +48,17 @@ class EcommerceCheckoutDialog extends StatefulWidget {
     final upiUrl = 'upi://pay?pa=$upiId&pn=${Uri.encodeComponent(payeeName)}&am=$amountStr&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
 
     if (context.mounted) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (ctx) => UpiPaymentVerificationScreen(
-            user: user,
-            items: items,
-            totalAmount: totalAmount,
-            couponCode: CartService.instance.appliedCoupon?['code']?.toString() ?? '',
-            upiId: upiId,
-            payeeName: payeeName,
-            upiUrl: upiUrl,
-          ),
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => UpiPaymentVerificationScreen(
+          user: user,
+          items: items,
+          totalAmount: totalAmount,
+          couponCode: CartService.instance.appliedCoupon?['code']?.toString() ?? '',
+          upiId: upiId,
+          payeeName: payeeName,
+          upiUrl: upiUrl,
         ),
       );
     }
@@ -287,17 +286,17 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
     required String payeeName,
     required String upiUrl,
   }) async {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (ctx) => UpiPaymentVerificationScreen(
-          user: user,
-          items: items,
-          totalAmount: _totalPayable,
-          couponCode: CartService.instance.appliedCoupon?['code']?.toString() ?? '',
-          upiId: upiId,
-          payeeName: payeeName,
-          upiUrl: upiUrl,
-        ),
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => UpiPaymentVerificationScreen(
+        user: user,
+        items: items,
+        totalAmount: _totalPayable,
+        couponCode: CartService.instance.appliedCoupon?['code']?.toString() ?? '',
+        upiId: upiId,
+        payeeName: payeeName,
+        upiUrl: upiUrl,
       ),
     );
   }
