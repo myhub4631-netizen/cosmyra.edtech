@@ -2282,6 +2282,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   dt = DateTime.tryParse(rawDateTime.toString().trim());
                 }
               }
+              if (dt != null && dt.hour == 0 && dt.minute == 0) {
+                dt = DateTime(dt.year, dt.month, dt.day, 14, 0);
+              }
               final bool isUpcoming = dt != null && dt.isAfter(DateTime.now());
               final String formattedDateTime = dt != null
                   ? DateFormat('dd MMM yyyy, hh:mm a').format(dt)

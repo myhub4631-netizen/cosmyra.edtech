@@ -126,24 +126,24 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
 
   Future<void> _pickTestDateTime() async {
     final now = DateTime.now();
+    final defaultDateTime = DateTime(now.year, now.month, now.day, 14, 0);
     final date = await showDatePicker(
       context: context,
-      initialDate: _selectedTestDateTime ?? now,
+      initialDate: _selectedTestDateTime ?? defaultDateTime,
       firstDate: DateTime(2024),
       lastDate: DateTime(2030),
     );
     if (date != null) {
       final time = await showTimePicker(
         context: context,
-        initialTime: TimeOfDay.fromDateTime(_selectedTestDateTime ?? now),
+        initialTime: TimeOfDay.fromDateTime(_selectedTestDateTime ?? defaultDateTime),
       );
-      if (time != null) {
-        final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-        setState(() {
-          _selectedTestDateTime = dt;
-          _testDateTimeCtrl.text = DateFormat('yyyy-MM-dd HH:mm').format(dt);
-        });
-      }
+      final selectedTime = time ?? const TimeOfDay(hour: 14, minute: 0);
+      final dt = DateTime(date.year, date.month, date.day, selectedTime.hour, selectedTime.minute);
+      setState(() {
+        _selectedTestDateTime = dt;
+        _testDateTimeCtrl.text = DateFormat('yyyy-MM-dd HH:mm').format(dt);
+      });
     }
   }
 
@@ -602,9 +602,11 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
             : _existingTestSeries)
         : '';
 
+    final now = DateTime.now();
+    final defaultDateTime = DateTime(now.year, now.month, now.day, 14, 0);
     final String formattedIsoDateTime = _selectedTestDateTime != null
         ? _selectedTestDateTime!.toIso8601String()
-        : DateTime.now().toIso8601String();
+        : defaultDateTime.toIso8601String();
 
     final Map<String, dynamic> paperDetails = {
       'id': paperId,

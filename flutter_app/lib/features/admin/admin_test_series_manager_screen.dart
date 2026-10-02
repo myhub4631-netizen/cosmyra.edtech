@@ -1277,7 +1277,8 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     final marksCtrl = TextEditingController(text: _exam.contains('JEE') ? '300' : '720');
     final durCtrl = TextEditingController(text: '180');
     String type = _normalizeTestType(_testType);
-    DateTime addTestDateTime = DateTime.now();
+    DateTime now = DateTime.now();
+    DateTime addTestDateTime = DateTime(now.year, now.month, now.day, 14, 0);
     final addTestDateCtrl = TextEditingController(
       text: DateFormat('yyyy-MM-dd HH:mm').format(addTestDateTime),
     );
@@ -1446,13 +1447,18 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     }
 
     final rawDateTime = t['test_date_time'] ?? t['scheduled_at'] ?? t['test_date'] ?? t['start_time'] ?? t['date_time'];
-    DateTime editTestDateTime = DateTime.now();
+    DateTime now = DateTime.now();
+    DateTime editTestDateTime = DateTime(now.year, now.month, now.day, 14, 0);
     if (rawDateTime != null) {
       if (rawDateTime is DateTime) {
         editTestDateTime = rawDateTime;
       } else {
-        editTestDateTime = DateTime.tryParse(rawDateTime.toString().trim()) ?? DateTime.now();
+        final parsed = DateTime.tryParse(rawDateTime.toString().trim());
+        if (parsed != null) editTestDateTime = parsed;
       }
+    }
+    if (editTestDateTime.hour == 0 && editTestDateTime.minute == 0) {
+      editTestDateTime = DateTime(editTestDateTime.year, editTestDateTime.month, editTestDateTime.day, 14, 0);
     }
     final editTestDateCtrl = TextEditingController(
       text: DateFormat('yyyy-MM-dd HH:mm').format(editTestDateTime),
@@ -2881,6 +2887,9 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                   } else {
                     dt = DateTime.tryParse(rawDateTime.toString().trim());
                   }
+                }
+                if (dt != null && dt.hour == 0 && dt.minute == 0) {
+                  dt = DateTime(dt.year, dt.month, dt.day, 14, 0);
                 }
                 final String formattedDt = dt != null ? DateFormat('dd MMM yyyy, hh:mm a').format(dt) : '';
 
