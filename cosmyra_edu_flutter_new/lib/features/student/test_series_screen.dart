@@ -15,6 +15,126 @@ import '../../shared/widgets/app_sidebar.dart';
 import '../../shared/widgets/app_header.dart';
 import '../../core/theme/app_design_system.dart';
 
+class ShakingBuyNowButton extends StatefulWidget {
+  final String label;
+  final VoidCallback onTap;
+  final bool isFree;
+  final double height;
+  final double fontSize;
+
+  const ShakingBuyNowButton({
+    Key? key,
+    required this.label,
+    required this.onTap,
+    this.isFree = false,
+    this.height = 36,
+    this.fontSize = 12.0,
+  }) : super(key: key);
+
+  @override
+  State<ShakingBuyNowButton> createState() => _ShakingBuyNowButtonState();
+}
+
+class _ShakingBuyNowButtonState extends State<ShakingBuyNowButton> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat();
+
+    _animation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: -4.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -4.0, end: 4.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 4.0, end: -3.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -3.0, end: 3.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 3.0, end: -1.5), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -1.5, end: 1.5), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 1.5, end: 0.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.0), weight: 9),
+    ]).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(_animation.value, 0),
+          child: child,
+        );
+      },
+      child: Container(
+        height: widget.height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          gradient: widget.isFree
+              ? const LinearGradient(colors: [Color(0xFF059669), Color(0xFF10B981)])
+              : const LinearGradient(
+                  colors: [Color(0xFFFF3B30), Color(0xFFEF4444), Color(0xFFDC2626)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+          boxShadow: [
+            BoxShadow(
+              color: widget.isFree
+                  ? const Color(0xFF10B981).withValues(alpha: 0.4)
+                  : const Color(0xFFEF4444).withValues(alpha: 0.45),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: widget.onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    widget.isFree ? Icons.bolt_rounded : Icons.shopping_cart_rounded,
+                    size: widget.fontSize + 2.5,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    widget.label,
+                    style: GoogleFonts.inter(
+                      fontSize: widget.fontSize,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class TestSeriesScreen extends StatefulWidget {
   final VoidCallback? onBackToDashboard;
   final Function(int)? onNavigateTab;
@@ -88,6 +208,7 @@ class TestSeriesCardData {
   final bool isFavorite;
 
   final String bannerImageFit;
+  final String leaderboardType; // 'realtime' or 'marketing'
 
   TestSeriesCardData({
     required this.id,
@@ -114,6 +235,7 @@ class TestSeriesCardData {
     required this.icon,
     this.bannerImageUrl,
     this.bannerImageFit = 'contain',
+    this.leaderboardType = 'realtime',
     this.isFree = false,
     this.price = 299.0,
     this.originalPrice = 999.0,
@@ -1332,40 +1454,45 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   // ===========================================================================
   // MOBILE TEST SERIES CARD (Horizontal Split Layout matching Mobile Screenshot)
   // ===========================================================================
+  // ===========================================================================
+  // MOBILE TEST SERIES CARD (Horizontal Split Layout matching Mobile Screenshot)
+  // ===========================================================================
   Widget _buildMobileTestSeriesCard(TestSeriesCardData item) {
     final bool isFav = _favoritesMap[item.id] ?? false;
-    final int discountPct = (((item.originalPrice - item.price) / item.originalPrice) * 100).round();
+    final int discountPct = item.originalPrice > item.price
+        ? (((item.originalPrice - item.price) / item.originalPrice) * 100).round()
+        : 0;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top Image Banner (Full Width, ~150px Height)
-            InkWell(
-              onTap: () => context.push('/product/${item.id}'),
-              child: Stack(
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: () => context.push('/product/${item.id}'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Image Banner (Full Width, ~155px Height)
+              Stack(
                 children: [
                   Hero(
                     tag: 'test_series_banner_${item.id}',
                     child: Material(
                       type: MaterialType.transparency,
                       child: Container(
-                        height: 150,
+                        height: 155,
                         width: double.infinity,
                         decoration: BoxDecoration(
                           gradient: _getCardBannerGradient(item),
@@ -1386,7 +1513,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                     top: 10,
                     left: 10,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
@@ -1397,7 +1524,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                         borderRadius: BorderRadius.circular(6),
                         boxShadow: [
                           BoxShadow(
-                            color: item.dynamicTagColor.withValues(alpha: 0.3),
+                            color: item.dynamicTagColor.withValues(alpha: 0.35),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
@@ -1407,7 +1534,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                         item.dynamicTag,
                         style: GoogleFonts.inter(
                           color: Colors.white,
-                          fontSize: 9.5,
+                          fontSize: 10,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.2,
                         ),
@@ -1424,202 +1551,187 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.35),
+                          color: Colors.black.withValues(alpha: 0.4),
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
                         ),
                         child: Icon(
                           isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                           color: isFav ? const Color(0xFFEF4444) : Colors.white,
-                          size: 16,
+                          size: 17,
                         ),
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
 
-            // Card Content Area
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title + Icon Row
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: item.iconBgColor,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(item.icon, color: Colors.white, size: 17),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          item.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF0F172A),
-                            height: 1.25,
+              // Card Content Area
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title + Icon Row
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: item.iconBgColor,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: item.iconBgColor.withValues(alpha: 0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
+                          child: Icon(item.icon, color: Colors.white, size: 19),
                         ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  // Description
-                  Text(
-                    item.description,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: const Color(0xFF64748B),
-                      height: 1.3,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // Meta Pills Row
-                  Wrap(
-                    spacing: 5,
-                    runSpacing: 5,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: item.exam.contains('JEE') ? const Color(0xFFEFF6FF) : const Color(0xFFF0FDF4),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: item.exam.contains('JEE') ? const Color(0xFFBFDBFE) : const Color(0xFFBBF7D0),
-                          ),
-                        ),
-                        child: Text(
-                          item.exam.contains('JEE') ? 'JEE' : 'NEET',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: item.exam.contains('JEE') ? const Color(0xFF1E40AF) : const Color(0xFF166534),
-                          ),
-                        ),
-                      ),
-                      _buildMetaMiniPill('📄 ${item.testCount} Tests'),
-                      _buildMetaMiniPill('⏱️ ${item.durationFormatted}'),
-                      _buildMetaMiniPill('📊 ${item.difficulty}'),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Footer Row: Price + Green "Buy Now" CTA Button
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Price Stack
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            '₹${item.price.toInt()}',
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.inter(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
                               color: const Color(0xFF0F172A),
+                              height: 1.25,
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '₹${item.originalPrice.toInt()}',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              decoration: TextDecoration.lineThrough,
-                              color: const Color(0xFF94A3B8),
-                            ),
-                          ),
-                          const SizedBox(width: 5),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // Description
+                    Text(
+                      item.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        color: const Color(0xFF64748B),
+                        height: 1.35,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Meta Info Pills Row (Horizontal Scroll, No text overlapping)
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFEE2E2),
-                              borderRadius: BorderRadius.circular(4),
+                              color: item.exam.contains('JEE') ? const Color(0xFFEFF6FF) : const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: item.exam.contains('JEE') ? const Color(0xFFBFDBFE) : const Color(0xFFA7F3D0),
+                              ),
                             ),
                             child: Text(
-                              '$discountPct% OFF',
-                              style: const TextStyle(
-                                color: Color(0xFFDC2626),
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
+                              item.exam.contains('JEE') ? 'JEE' : 'NEET',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                color: item.exam.contains('JEE') ? const Color(0xFF1E40AF) : const Color(0xFF047857),
                               ),
                             ),
                           ),
-                        ],
-                      ),
-
-                      // Green "Buy Now" CTA Button
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF10B981),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        onPressed: () => _handlePurchaseOrEnroll(item),
-                        icon: const Icon(Icons.shopping_cart_outlined, size: 14, color: Colors.white),
-                        label: Text(
-                          item.isFree ? 'Enroll Free' : 'Buy Now',
-                          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  InkWell(
-                    onTap: () => context.push('/product/${item.id}'),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFBFDBFE)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.touch_app_rounded, size: 14, color: Color(0xFF2563EB)),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              'Click card for full overview, all tests, reviews & top scores',
-                              style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB)),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
+                          const SizedBox(width: 6),
+                          _buildMetaMiniPill('📄 ${item.testCount} Tests'),
+                          const SizedBox(width: 6),
+                          _buildMetaMiniPill('⏱️ ${item.durationFormatted}'),
+                          const SizedBox(width: 6),
+                          _buildMetaMiniPill('📊 ${item.difficulty}'),
                         ],
                       ),
                     ),
-                  ),
-                ],
+
+                    const SizedBox(height: 14),
+                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                    const SizedBox(height: 12),
+
+                    // Footer Row: Pricing Stack + Shaking Red Gradient Buy Now Button
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Price Column
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  '₹${item.price.toInt()}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w900,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                if (item.originalPrice > item.price) ...[
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '₹${item.originalPrice.toInt()}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      decoration: TextDecoration.lineThrough,
+                                      color: const Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            if (discountPct > 0) ...[
+                              const SizedBox(height: 2),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF2F2),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                                ),
+                                child: Text(
+                                  '$discountPct% OFF',
+                                  style: GoogleFonts.inter(
+                                    color: const Color(0xFFDC2626),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+
+                        // Shaking Vibrant Red Buy Now Button
+                        ShakingBuyNowButton(
+                          label: item.isFree ? 'Enroll Free' : 'Buy Now',
+                          isFree: item.isFree,
+                          height: 38,
+                          fontSize: 12.5,
+                          onTap: () => _handlePurchaseOrEnroll(item),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1630,29 +1742,32 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   // ===========================================================================
   Widget _buildDesktopTestSeriesCard(TestSeriesCardData item) {
     final bool isFav = _favoritesMap[item.id] ?? false;
-    final int discountPct = (((item.originalPrice - item.price) / item.originalPrice) * 100).round();
+    final int discountPct = item.originalPrice > item.price
+        ? (((item.originalPrice - item.price) / item.originalPrice) * 100).round()
+        : 0;
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            InkWell(
-              onTap: () => _showProductDetailsModal(item),
-              child: Stack(
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: () => _showProductDetailsModal(item),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Banner Image
+              Stack(
                 children: [
                   Hero(
                     tag: 'test_series_banner_${item.id}',
@@ -1675,7 +1790,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                     ),
                   ),
 
-                  // Top-Left Glass Tag
+                  // Dynamic Tag
                   Positioned(
                     top: 10,
                     left: 10,
@@ -1709,6 +1824,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                     ),
                   ),
 
+                  // Favorite Button
                   Positioned(
                     top: 10,
                     right: 10,
@@ -1731,156 +1847,160 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                   ),
                 ],
               ),
-            ),
 
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: item.iconBgColor,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(item.icon, color: Colors.white, size: 19),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            item.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFF0F172A),
+              // Body
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: item.iconBgColor,
+                              borderRadius: BorderRadius.circular(8),
                             ),
+                            child: Icon(item.icon, color: Colors.white, size: 18),
                           ),
-                        ),
-                        const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF94A3B8), size: 18),
-                      ],
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    Text(
-                      item.description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        fontSize: 11.5,
-                        color: const Color(0xFF64748B),
-                        height: 1.3,
-                      ),
-                    ),
-
-                    const Spacer(),
-
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                          decoration: BoxDecoration(
-                            color: item.exam.contains('JEE') ? const Color(0xFFEFF6FF) : const Color(0xFFF0FDF4),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: item.exam.contains('JEE') ? const Color(0xFFBFDBFE) : const Color(0xFFBBF7D0),
-                            ),
-                          ),
-                          child: Text(
-                            item.exam.contains('JEE') ? 'JEE' : 'NEET',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: item.exam.contains('JEE') ? const Color(0xFF1E40AF) : const Color(0xFF166534),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(width: 6),
-                        _buildMetaMiniPill('📄 ${item.testCount} Tests'),
-                        const SizedBox(width: 4),
-                        _buildMetaMiniPill('⏱️ ${item.durationFormatted}'),
-                        const SizedBox(width: 4),
-                        _buildMetaMiniPill('📊 ${item.difficulty}'),
-                      ],
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(
-                              '₹${item.price.toInt()}',
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.inter(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
                                 color: const Color(0xFF0F172A),
                               ),
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '₹${item.originalPrice.toInt()}',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                decoration: TextDecoration.lineThrough,
-                                color: const Color(0xFF94A3B8),
-                              ),
-                            ),
-                            const SizedBox(width: 5),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      Text(
+                        item.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: const Color(0xFF64748B),
+                          height: 1.3,
+                        ),
+                      ),
+
+                      const Spacer(),
+
+                      // Meta Pills Row (Horizontal Scroll)
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFEE2E2),
+                                color: item.exam.contains('JEE') ? const Color(0xFFEFF6FF) : const Color(0xFFECFDF5),
                                 borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: item.exam.contains('JEE') ? const Color(0xFFBFDBFE) : const Color(0xFFBBF7D0),
+                                ),
                               ),
                               child: Text(
-                                '$discountPct% OFF',
-                                style: const TextStyle(
-                                  color: Color(0xFFDC2626),
-                                  fontSize: 9.5,
+                                item.exam.contains('JEE') ? 'JEE' : 'NEET',
+                                style: TextStyle(
+                                  fontSize: 10,
                                   fontWeight: FontWeight.bold,
+                                  color: item.exam.contains('JEE') ? const Color(0xFF1E40AF) : const Color(0xFF047857),
                                 ),
                               ),
                             ),
+                            const SizedBox(width: 5),
+                            _buildMetaMiniPill('📄 ${item.testCount} Tests'),
+                            const SizedBox(width: 4),
+                            _buildMetaMiniPill('⏱️ ${item.durationFormatted}'),
+                            const SizedBox(width: 4),
+                            _buildMetaMiniPill('📊 ${item.difficulty}'),
                           ],
                         ),
+                      ),
 
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF10B981),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      const SizedBox(height: 10),
+
+                      // Footer Row with Shaking Red Buy Now Button
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    '₹${item.price.toInt()}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w900,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  if (item.originalPrice > item.price) ...[
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '₹${item.originalPrice.toInt()}',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        decoration: TextDecoration.lineThrough,
+                                        color: const Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              if (discountPct > 0) ...[
+                                const SizedBox(height: 2),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF2F2),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0xFFFCA5A5)),
+                                  ),
+                                  child: Text(
+                                    '$discountPct% OFF',
+                                    style: GoogleFonts.inter(
+                                      color: const Color(0xFFDC2626),
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                          onPressed: () => _handlePurchaseOrEnroll(item),
-                          icon: const Icon(Icons.shopping_cart_outlined, size: 14, color: Colors.white),
-                          label: Text(
-                            item.isFree ? 'Enroll Free' : 'Buy Now',
-                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
+
+                          ShakingBuyNowButton(
+                            label: item.isFree ? 'Enroll Free' : 'Buy Now',
+                            isFree: item.isFree,
+                            height: 36,
+                            fontSize: 11.5,
+                            onTap: () => _handlePurchaseOrEnroll(item),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -3561,15 +3681,12 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
               label: const Text('Add to Cart', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(width: 10),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              onPressed: () {
+            ShakingBuyNowButton(
+              label: 'Buy Now - ₹${item.price.toInt()}',
+              isFree: item.isFree,
+              height: 40,
+              fontSize: 12.5,
+              onTap: () {
                 Navigator.pop(context);
                 final cartItem = CartItem(
                   id: item.id,
@@ -3588,11 +3705,6 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
                   onStartTest: (testId, title, duration) => widget.onStartTest(testId, title, duration),
                 );
               },
-              icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 16),
-              label: Text(
-                'Buy Now - ₹${item.price.toInt()}',
-                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
-              ),
             ),
           ],
         ],
