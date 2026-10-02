@@ -242,10 +242,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
       showPurchaseButton: showPurchaseButton,
     );
 
-    final user = SupabaseService.activeUserSession;
+    final user = SupabaseService.activeUserSession ?? (SupabaseService.client.auth.currentUser != null
+        ? UserProfileModel(
+            id: SupabaseService.client.auth.currentUser!.id,
+            email: SupabaseService.client.auth.currentUser!.email ?? '',
+            fullName: '',
+          )
+        : null);
     bool owns = false;
     if (user != null) {
-      owns = await SupabaseService.hasActiveEntitlement(user.id, widget.productId);
+      owns = await SupabaseService.hasActiveEntitlement(user.id, widget.productId, userEmail: user.email);
     }
 
     _product = loadedProduct;

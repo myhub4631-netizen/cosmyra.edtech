@@ -107,12 +107,27 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       fullName: (o['student_name'] ?? o['user_name'] ?? 'Student Aspirant').toString(),
     );
 
-    final items = [
-      {
-        'id': o['product_id'] ?? 'ts_neet_all_india_2026',
-        'title': o['product_name'] ?? 'NEET / JEE Test Series',
+    List<Map<String, dynamic>> items = [];
+    if (o['items'] is List && (o['items'] as List).isNotEmpty) {
+      for (var it in o['items']) {
+        if (it is Map) {
+          items.add({
+            'id': (it['id'] ?? it['product_id'] ?? o['product_id'] ?? 'ts_all_access').toString(),
+            'title': (it['title'] ?? it['name'] ?? it['product_name'] ?? o['product_name'] ?? 'NEET / JEE Test Series').toString(),
+            'product_type': (it['product_type'] ?? o['product_type'] ?? 'test_series').toString(),
+          });
+        }
       }
-    ];
+    }
+    if (items.isEmpty) {
+      items = [
+        {
+          'id': (o['product_id'] ?? 'ts_all_access').toString(),
+          'title': (o['product_name'] ?? 'NEET / JEE Test Series').toString(),
+          'product_type': (o['product_type'] ?? 'test_series').toString(),
+        }
+      ];
+    }
 
     await SupabaseService.verifyPaymentAndGrantAccess(
       orderId: rawId,

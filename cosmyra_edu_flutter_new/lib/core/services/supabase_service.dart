@@ -7951,7 +7951,24 @@ class SupabaseService {
   }
 
   /// Check whether user has active entitlement for a product
-  static Future<bool> hasActiveEntitlement(String userId, String productId) async {
+  static Future<bool> hasActiveEntitlement(String userId, String productId, {String? userEmail}) async {
+    final cleanProductId = productId.trim();
+    if (cleanProductId.isEmpty) return false;
+
+    // Resolve user email if missing
+    String resolvedEmail = (userEmail ?? '').trim().toLowerCase();
+    if (resolvedEmail.isEmpty) {
+      final activeUser = activeUserSession;
+      if (activeUser != null && activeUser.email.isNotEmpty) {
+        resolvedEmail = activeUser.email.trim().toLowerCase();
+      } else {
+        final authUser = client.auth.currentUser;
+        if (authUser != null && authUser.email != null && authUser.email!.isNotEmpty) {
+          resolvedEmail = authUser.email!.trim().toLowerCase();
+        }
+      }
+    }
+
     // 1. Check local cache first for instant response
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -7959,12 +7976,23 @@ class SupabaseService {
       if (str != null && str.isNotEmpty) {
         final List list = jsonDecode(str);
         final found = list.any((it) {
-          final pId = it['product_id']?.toString() ?? '';
-          final uId = it['user_id']?.toString() ?? '';
-          final active = it['is_active'] == true;
+          final pId = (it['product_id'] ?? '').toString().trim();
+          final uId = (it['user_id'] ?? '').toString().trim();
+          final uEmail = (it['user_email'] ?? '').toString().trim().toLowerCase();
+          final active = it['is_active'] == true || it['status'] == 'active' || it['status'] == 'completed';
           final expiry = DateTime.tryParse(it['valid_until']?.toString() ?? '');
           final notExpired = expiry == null || expiry.isAfter(DateTime.now());
-          return pId == productId && (uId == userId || uId.isEmpty) && active && notExpired;
+
+          final matchesUser = (userId.isNotEmpty && uId == userId) ||
+                              (resolvedEmail.isNotEmpty && uEmail == resolvedEmail) ||
+                              uId.isEmpty;
+          final matchesProduct = pId == cleanProductId ||
+                                 pId == 'ts_all_access' ||
+                                 pId == 'all_access' ||
+                                 pId == 'full_access' ||
+                                 it['access_type'] == 'full';
+
+          return matchesUser && matchesProduct && active && notExpired;
         });
         if (found) return true;
       }
@@ -7974,42 +8002,201 @@ class SupabaseService {
 
     // 2. Check Supabase entitlements table
     try {
-      final res = await client
-          .from('entitlements')
-          .select()
-          .eq('product_id', productId)
-          .eq('is_active', true)
-          .maybeSingle();
+      var query = client.from('entitlements').select();
+      if (userId.isNotEmpty && resolvedEmail.isNotEmpty) {
+        query = query.or('user_id.eq.$userId,user_email.eq.$resolvedEmail');
+      } else if (userId.isNotEmpty) {
+        query = query.eq('user_id', userId);
+      } else if (resolvedEmail.isNotEmpty) {
+        query = query.eq('user_email', resolvedEmail);
+      }
 
-      if (res != null) {
-        final expiry = DateTime.tryParse(res['valid_until']?.toString() ?? '');
-        if (expiry == null || expiry.isAfter(DateTime.now())) {
-          return true;
+      final res = await query;
+      if (res is List && res.isNotEmpty) {
+        for (var item in res.whereType<Map>()) {
+          final pId = (item['product_id'] ?? '').toString().trim();
+          final active = item['is_active'] == true || item['status'] == 'active' || item['status'] == 'completed';
+          final expiry = DateTime.tryParse(item['valid_until']?.toString() ?? '');
+          final notExpired = expiry == null || expiry.isAfter(DateTime.now());
+
+          final matchesProduct = pId == cleanProductId ||
+                                 pId == 'ts_all_access' ||
+                                 pId == 'all_access' ||
+                                 pId == 'full_access' ||
+                                 item['access_type'] == 'full';
+
+          if (matchesProduct && active && notExpired) {
+            // Cache entitlement locally
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              final cacheStr = prefs.getString('cosmyra_user_entitlements');
+              final List list = cacheStr != null && cacheStr.isNotEmpty ? jsonDecode(cacheStr) : [];
+              list.removeWhere((x) => x['product_id'] == item['product_id']);
+              list.insert(0, item);
+              await prefs.setString('cosmyra_user_entitlements', jsonEncode(list));
+            } catch (_) {}
+
+            return true;
+          }
         }
       }
     } catch (e) {
       debugPrint('Notice checking Supabase entitlements: $e');
     }
 
+    // 3. Check Supabase orders table (for approved/completed orders)
+    try {
+      var orderQuery = client.from('orders').select();
+      if (userId.isNotEmpty && resolvedEmail.isNotEmpty) {
+        orderQuery = orderQuery.or('user_id.eq.$userId,user_email.eq.$resolvedEmail,student_email.eq.$resolvedEmail');
+      } else if (userId.isNotEmpty) {
+        orderQuery = orderQuery.eq('user_id', userId);
+      } else if (resolvedEmail.isNotEmpty) {
+        orderQuery = orderQuery.or('user_email.eq.$resolvedEmail,student_email.eq.$resolvedEmail');
+      }
+
+      final ordersRes = await orderQuery;
+      if (ordersRes is List && ordersRes.isNotEmpty) {
+        for (var ord in ordersRes.whereType<Map>()) {
+          final st = (ord['status'] ?? ord['payment_status'] ?? '').toString().toLowerCase();
+          final isCompleted = st == 'completed' || st == 'approved' || st == 'verified' || st == 'paid' || st == 'success';
+          if (!isCompleted) continue;
+
+          final ordPId = (ord['product_id'] ?? '').toString().trim();
+          final ordPName = (ord['product_name'] ?? ord['title'] ?? '').toString().trim();
+
+          final matchesProduct = ordPId == cleanProductId ||
+                                 ordPId == 'ts_all_access' ||
+                                 ordPId == 'all_access' ||
+                                 ordPId == 'full_access' ||
+                                 ord['access_type'] == 'full' ||
+                                 (cleanProductId.isNotEmpty && ordPName.toLowerCase().contains(cleanProductId.toLowerCase()));
+
+          if (matchesProduct) {
+            return true;
+          }
+
+          // Check inside multi-item order list
+          if (ord['items'] is List) {
+            for (var subIt in (ord['items'] as List).whereType<Map>()) {
+              final subPId = (subIt['id'] ?? subIt['product_id'] ?? '').toString().trim();
+              if (subPId == cleanProductId || subPId == 'ts_all_access' || subPId == 'all_access') {
+                return true;
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice checking Supabase orders for entitlement: $e');
+    }
+
+    // 4. Check Supabase subscriptions table
+    try {
+      var subQuery = client.from('subscriptions').select();
+      if (userId.isNotEmpty && resolvedEmail.isNotEmpty) {
+        subQuery = subQuery.or('user_id.eq.$userId,user_email.eq.$resolvedEmail');
+      } else if (userId.isNotEmpty) {
+        subQuery = subQuery.eq('user_id', userId);
+      } else if (resolvedEmail.isNotEmpty) {
+        subQuery = subQuery.eq('user_email', resolvedEmail);
+      }
+
+      final subRes = await subQuery;
+      if (subRes is List && subRes.isNotEmpty) {
+        for (var sub in subRes.whereType<Map>()) {
+          final st = (sub['status'] ?? '').toString().toLowerCase();
+          final isActive = st == 'active' || st == 'completed';
+          final expiry = DateTime.tryParse(sub['end_date']?.toString() ?? sub['valid_until']?.toString() ?? '');
+          final notExpired = expiry == null || expiry.isAfter(DateTime.now());
+
+          if (isActive && notExpired) {
+            final planId = (sub['plan_id'] ?? sub['product_id'] ?? '').toString().trim();
+            if (planId == cleanProductId || planId == 'ts_all_access' || planId == 'all_access' || sub['access_type'] == 'full') {
+              return true;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice checking Supabase subscriptions for entitlement: $e');
+    }
+
     return false;
   }
 
   /// Fetch all entitlements / purchases for user
-  static Future<List<Map<String, dynamic>>> fetchUserEntitlements(String userId) async {
+  static Future<List<Map<String, dynamic>>> fetchUserEntitlements(String userId, {String? userEmail}) async {
     final List<Map<String, dynamic>> results = [];
+    String resolvedEmail = (userEmail ?? '').trim().toLowerCase();
+    if (resolvedEmail.isEmpty) {
+      final activeUser = activeUserSession;
+      if (activeUser != null && activeUser.email.isNotEmpty) {
+        resolvedEmail = activeUser.email.trim().toLowerCase();
+      } else {
+        final authUser = client.auth.currentUser;
+        if (authUser != null && authUser.email != null && authUser.email!.isNotEmpty) {
+          resolvedEmail = authUser.email!.trim().toLowerCase();
+        }
+      }
+    }
 
     try {
-      final res = await client
-          .from('entitlements')
-          .select()
-          .eq('user_id', userId)
-          .order('created_at', ascending: false);
+      var query = client.from('entitlements').select();
+      if (userId.isNotEmpty && resolvedEmail.isNotEmpty) {
+        query = query.or('user_id.eq.$userId,user_email.eq.$resolvedEmail');
+      } else if (userId.isNotEmpty) {
+        query = query.eq('user_id', userId);
+      } else if (resolvedEmail.isNotEmpty) {
+        query = query.eq('user_email', resolvedEmail);
+      }
+      final res = await query.order('created_at', ascending: false);
 
       if (res is List) {
         results.addAll(res.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
       }
     } catch (e) {
       debugPrint('Notice fetching entitlements from Supabase: $e');
+    }
+
+    // Also check completed/approved orders from orders table to synthesize entitlements if missing
+    try {
+      var orderQuery = client.from('orders').select();
+      if (userId.isNotEmpty && resolvedEmail.isNotEmpty) {
+        orderQuery = orderQuery.or('user_id.eq.$userId,user_email.eq.$resolvedEmail,student_email.eq.$resolvedEmail');
+      } else if (userId.isNotEmpty) {
+        orderQuery = orderQuery.eq('user_id', userId);
+      } else if (resolvedEmail.isNotEmpty) {
+        orderQuery = orderQuery.or('user_email.eq.$resolvedEmail,student_email.eq.$resolvedEmail');
+      }
+
+      final ordersRes = await orderQuery;
+      if (ordersRes is List) {
+        for (var ord in ordersRes.whereType<Map>()) {
+          final st = (ord['status'] ?? ord['payment_status'] ?? '').toString().toLowerCase();
+          final isCompleted = st == 'completed' || st == 'approved' || st == 'verified' || st == 'paid' || st == 'success';
+          if (isCompleted) {
+            final pId = (ord['product_id'] ?? 'ts_all_access').toString();
+            final pTitle = (ord['product_name'] ?? ord['title'] ?? 'Test Series Access').toString();
+            if (!results.any((r) => r['product_id'] == pId || r['order_id'] == ord['id'])) {
+              results.add({
+                'id': ord['id'] ?? 'ent_${ord['id']}',
+                'user_id': userId,
+                'user_email': resolvedEmail,
+                'product_id': pId,
+                'product_title': pTitle,
+                'product_type': 'test_series',
+                'order_id': ord['id'] ?? ord['order_number'],
+                'access_type': 'full',
+                'is_active': true,
+                'created_at': ord['created_at'] ?? DateTime.now().toIso8601String(),
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice synthesizing user entitlements from orders: $e');
     }
 
     // Also merge local cache
@@ -9448,21 +9635,22 @@ class SupabaseService {
         debugPrint('Notice updating notification_logs status: $e');
       }
 
-      // 3. If completed, ensure entitlement access is granted to student in entitlements table
-      if (newStatus == 'completed') {
+      // 3. If completed or approved, ensure entitlement access is granted to student in entitlements table
+      if (newStatus == 'completed' || newStatus == 'approved' || newStatus == 'paid' || newStatus == 'verified') {
         try {
           final res = await client.from('orders').select().or('id.eq.$orderId,order_number.eq.$orderId').maybeSingle();
           if (res != null) {
             final uId = (res['user_id'] ?? '').toString();
-            final uEmail = (res['user_email'] ?? '').toString();
+            final uEmail = (res['user_email'] ?? res['student_email'] ?? '').toString();
+            final pId = (res['product_id'] ?? 'ts_all_access').toString();
             final pName = (res['product_name'] ?? 'NEET/JEE Test Series').toString();
-            if (uEmail.isNotEmpty) {
+            if (uEmail.isNotEmpty || uId.isNotEmpty) {
               final now = DateTime.now();
-              await client.from('entitlements').upsert({
+              final ent = {
                 'id': toValidUuid('ent_${now.millisecondsSinceEpoch}_$orderId'),
-                'user_id': uId.isNotEmpty ? uId : 'usr_guest',
+                'user_id': uId.isNotEmpty ? uId : null,
                 'user_email': uEmail,
-                'product_id': 'ts_all_access',
+                'product_id': pId,
                 'product_title': pName,
                 'product_type': 'test_series',
                 'order_id': orderId,
@@ -9470,7 +9658,16 @@ class SupabaseService {
                 'is_active': true,
                 'created_at': now.toIso8601String(),
                 'updated_at': now.toIso8601String(),
-              });
+              };
+              await client.from('entitlements').upsert(ent);
+
+              // Cache locally in SharedPreferences for immediate availability
+              final prefs = await SharedPreferences.getInstance();
+              final cacheStr = prefs.getString('cosmyra_user_entitlements');
+              final List list = cacheStr != null && cacheStr.isNotEmpty ? jsonDecode(cacheStr) : [];
+              list.removeWhere((x) => x['product_id'] == pId);
+              list.insert(0, ent);
+              await prefs.setString('cosmyra_user_entitlements', jsonEncode(list));
             }
           }
         } catch (e) {

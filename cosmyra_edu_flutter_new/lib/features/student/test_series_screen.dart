@@ -268,7 +268,13 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
     }
 
     if (matchingSeries != null && !matchingSeries.isFree) {
-      final user = SupabaseService.activeUserSession;
+      final user = SupabaseService.activeUserSession ?? (SupabaseService.client.auth.currentUser != null
+          ? UserProfileModel(
+              id: SupabaseService.client.auth.currentUser!.id,
+              email: SupabaseService.client.auth.currentUser!.email ?? '',
+              fullName: '',
+            )
+          : null);
       if (user == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -282,7 +288,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         return;
       }
 
-      final hasAccess = await SupabaseService.hasActiveEntitlement(user.id, matchingSeries.id);
+      final hasAccess = await SupabaseService.hasActiveEntitlement(user.id, matchingSeries.id, userEmail: user.email);
       if (!hasAccess) {
         if (mounted) {
           _handlePurchaseOrEnroll(matchingSeries);
@@ -2198,9 +2204,15 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
   }
 
   Future<void> _checkEntitlementStatus() async {
-    final user = SupabaseService.activeUserSession;
+    final user = SupabaseService.activeUserSession ?? (SupabaseService.client.auth.currentUser != null
+        ? UserProfileModel(
+            id: SupabaseService.client.auth.currentUser!.id,
+            email: SupabaseService.client.auth.currentUser!.email ?? '',
+            fullName: '',
+          )
+        : null);
     if (user != null) {
-      final owns = await SupabaseService.hasActiveEntitlement(user.id, widget.item.id);
+      final owns = await SupabaseService.hasActiveEntitlement(user.id, widget.item.id, userEmail: user.email);
       if (mounted) {
         setState(() {
           _hasPurchased = owns;
