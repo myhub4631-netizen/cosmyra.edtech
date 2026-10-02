@@ -1,7 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /admin/
-Disallow: /superadmin/
-Disallow: /api/
-
-Sitemap: https://neet-jee.in/sitemap.xml

@@ -98,7 +98,6 @@ android_sizes = {
 
 android_base_dirs = [
     os.path.join(BASE_DIR, "flutter_app/android/app/src/main/res"),
-    os.path.join(BASE_DIR, "cosmyra_edu_flutter_new/android/app/src/main/res"),
 ]
 
 for res_dir in android_base_dirs:
@@ -129,7 +128,6 @@ ios_sizes = {
 
 ios_base_dirs = [
     os.path.join(BASE_DIR, "flutter_app/ios/Runner/Assets.xcassets/AppIcon.appiconset"),
-    os.path.join(BASE_DIR, "cosmyra_edu_flutter_new/ios/Runner/Assets.xcassets/AppIcon.appiconset"),
 ]
 
 for appicon_dir in ios_base_dirs:
@@ -143,7 +141,6 @@ for appicon_dir in ios_base_dirs:
 web_icon_dirs = [
     os.path.join(BASE_DIR, "public/icons"),
     os.path.join(BASE_DIR, "flutter_app/web/icons"),
-    os.path.join(BASE_DIR, "cosmyra_edu_flutter_new/web/icons"),
 ]
 
 for icon_dir in web_icon_dirs:
@@ -161,7 +158,6 @@ favicon_png = master_rgba.resize((48, 48), Image.Resampling.LANCZOS)
 favicon_dirs = [
     os.path.join(BASE_DIR, "public"),
     os.path.join(BASE_DIR, "flutter_app/web"),
-    os.path.join(BASE_DIR, "cosmyra_edu_flutter_new/web"),
 ]
 
 ico_sizes = [(16, 16), (32, 32), (48, 48)]
@@ -177,7 +173,6 @@ for fdir in favicon_dirs:
 # 5. App Assets (cosmyra_icon.png)
 asset_targets = [
     os.path.join(BASE_DIR, "flutter_app/assets/images/cosmyra_icon.png"),
-    os.path.join(BASE_DIR, "cosmyra_edu_flutter_new/assets/images/cosmyra_icon.png"),
     os.path.join(BASE_DIR, "public/cosmyra_icon.png"),
     os.path.join(BASE_DIR, "public/assets/assets/images/cosmyra_icon.png"),
     os.path.join(BASE_DIR, "public/assets/images/cosmyra_icon.png"),
