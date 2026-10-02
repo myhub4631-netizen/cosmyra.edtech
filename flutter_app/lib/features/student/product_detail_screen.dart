@@ -26,8 +26,10 @@ class ProductDetailScreen extends StatefulWidget {
   State<ProductDetailScreen> createState() => _ProductDetailScreenState();
 }
 
-class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTickerProviderStateMixin {
+class _ProductDetailScreenState extends State<ProductDetailScreen> with TickerProviderStateMixin {
   late TabController _tabController;
+  late AnimationController _shakeController;
+  late Animation<double> _shakeAnimation;
   bool _isLoading = true;
   TestSeriesCardData? _product;
   List<Map<String, dynamic>> _dbPapers = [];
@@ -66,12 +68,33 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         setState(() {});
       }
     });
+
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat();
+
+    _shakeAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: -5.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -5.0, end: 5.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 5.0, end: -4.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -4.0, end: 4.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 4.0, end: -2.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -2.0, end: 2.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 2.0, end: 0.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.0), weight: 9),
+    ]).animate(CurvedAnimation(
+      parent: _shakeController,
+      curve: Curves.easeInOut,
+    ));
+
     _loadProductData();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _shakeController.dispose();
     super.dispose();
   }
 
@@ -1029,75 +1052,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
           item.description,
           style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF475569), height: 1.45),
         ),
-        const SizedBox(height: 16),
-
-        // 3. Key Metric Tiles (100% Dynamic)
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 2.5,
-          children: [
-            _buildMobileMetricTile(
-              Icons.description_outlined,
-              '${tests.length} Tests',
-              'Available Tests',
-              const Color(0xFFF0F7FF),
-              const Color(0xFF2563EB),
-            ),
-            _buildMobileMetricTile(
-              Icons.access_time_rounded,
-              durationStr,
-              'Per Test',
-              const Color(0xFFF5F3FF),
-              const Color(0xFF7C3AED),
-            ),
-            _buildMobileMetricTile(
-              Icons.bar_chart_rounded,
-              item.difficulty,
-              'Difficulty',
-              const Color(0xFFEEF2FF),
-              const Color(0xFF4F46E5),
-            ),
-            _buildMobileMetricTile(
-              Icons.calendar_today_outlined,
-              item.validity,
-              'Validity',
-              const Color(0xFFF3F0FF),
-              const Color(0xFF9333EA),
-            ),
-          ],
-        ),
         const SizedBox(height: 14),
 
-        // 4. Feature Highlights Strip
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFECFDF5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFA7F3D0)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildGreenHighlightItem(Icons.check_circle_rounded, 'Latest NTA Pattern'),
-              _buildGreenHighlightItem(Icons.description_outlined, 'Detailed Solutions'),
-              _buildGreenHighlightItem(Icons.analytics_outlined, 'Performance Analytics'),
-              _buildGreenHighlightItem(Icons.emoji_events_outlined, 'All India Ranking'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // 5. Product Tabs Header & Seamless Content (3 TABS ONLY)
+        // 3. Compact Product Tabs Header & Seamless Content (Shows at top, taking lesser space)
         Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
           child: Column(
@@ -1114,19 +1075,66 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   unselectedLabelColor: const Color(0xFF64748B),
                   indicatorColor: const Color(0xFF2563EB),
                   indicatorWeight: 3,
-                  labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
-                  unselectedLabelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 2),
                   tabs: [
-                    const Tab(icon: Icon(Icons.info_outline_rounded, size: 16), text: 'Overview'),
-                    Tab(icon: const Icon(Icons.format_list_bulleted_rounded, size: 16), text: 'All Tests (${tests.length})'),
-                    const Tab(icon: Icon(Icons.emoji_events_outlined, size: 16), text: 'Top Scores'),
+                    Tab(
+                      height: 38,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.info_outline_rounded, size: 15),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Overview',
+                              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Tab(
+                      height: 38,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.format_list_bulleted_rounded, size: 15),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'All Tests',
+                              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Tab(
+                      height: 38,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.emoji_events_outlined, size: 15),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              'Top Score',
+                              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
 
               // Smooth Tab Content
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                padding: const EdgeInsets.all(12),
                 child: _buildSelectedTabContent(item, tests),
               ),
             ],
@@ -1281,49 +1289,109 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             ),
           ),
           const SizedBox(width: 12),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF059669),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              if (_hasPurchased || item.isFree) {
-                _tabController.animateTo(1);
-              } else {
-                final cartItem = CartItem(
-                  id: item.id,
-                  title: item.title,
-                  description: item.description,
-                  price: item.price,
-                  originalPrice: item.originalPrice,
-                  bannerImageUrl: item.bannerImageUrl ?? '',
-                  exam: item.exam,
-                  validity: item.validity,
-                  testCount: item.testCount,
-                );
-                context.push('/checkout', extra: cartItem);
-              }
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(_hasPurchased || item.isFree ? Icons.play_arrow_rounded : Icons.shopping_cart_outlined, size: 18),
-                const SizedBox(width: 6),
-                Text(
-                  _hasPurchased || item.isFree ? 'Start Practice' : 'Buy Now for ₹${item.price.toInt()}',
-                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right_rounded, size: 18),
-              ],
-            ),
-          ),
+          _buildBuyNowButton(item, fullWidth: false),
         ],
       ),
     );
+  }
+
+  // Helper widget for shaking Buy Now button with vibrant Red gradient
+  Widget _buildBuyNowButton(TestSeriesCardData item, {bool fullWidth = false}) {
+    final isPurchasedOrFree = _hasPurchased || item.isFree;
+    final labelText = isPurchasedOrFree ? 'Start Practice' : 'Buy Now';
+
+    Widget buttonWidget = Container(
+      height: 42,
+      width: fullWidth ? double.infinity : null,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        gradient: isPurchasedOrFree
+            ? const LinearGradient(
+                colors: [Color(0xFF059669), Color(0xFF10B981)],
+              )
+            : const LinearGradient(
+                colors: [Color(0xFFFF3B30), Color(0xFFEF4444), Color(0xFFDC2626)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+        boxShadow: [
+          BoxShadow(
+            color: isPurchasedOrFree
+                ? const Color(0xFF059669).withValues(alpha: 0.3)
+                : const Color(0xFFEF4444).withValues(alpha: 0.45),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () {
+            if (isPurchasedOrFree) {
+              _tabController.animateTo(1);
+            } else {
+              final cartItem = CartItem(
+                id: item.id,
+                title: item.title,
+                description: item.description,
+                price: item.price,
+                originalPrice: item.originalPrice,
+                bannerImageUrl: item.bannerImageUrl ?? '',
+                exam: item.exam,
+                validity: item.validity,
+                testCount: item.testCount,
+              );
+              context.push('/checkout', extra: cartItem);
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Row(
+              mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  isPurchasedOrFree ? Icons.play_arrow_rounded : Icons.shopping_cart_outlined,
+                  size: 18,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  labelText,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                if (!isPurchasedOrFree) ...[
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded, size: 18, color: Colors.white),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (!isPurchasedOrFree) {
+      return AnimatedBuilder(
+        animation: _shakeAnimation,
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(_shakeAnimation.value, 0),
+            child: child,
+          );
+        },
+        child: buttonWidget,
+      );
+    }
+
+    return buttonWidget;
   }
 
   // ==========================================
@@ -1465,12 +1533,59 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                   unselectedLabelColor: const Color(0xFF64748B),
                   indicatorColor: const Color(0xFF2563EB),
                   indicatorWeight: 3,
-                  labelStyle: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold),
-                  unselectedLabelStyle: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w500),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                   tabs: [
-                    const Tab(icon: Icon(Icons.info_outline_rounded, size: 18), text: 'Overview'),
-                    Tab(icon: const Icon(Icons.format_list_bulleted_rounded, size: 18), text: 'All Tests (${tests.length})'),
-                    const Tab(icon: Icon(Icons.emoji_events_outlined, size: 18), text: 'Top Scores'),
+                    Tab(
+                      height: 40,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.info_outline_rounded, size: 16),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Overview',
+                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Tab(
+                      height: 40,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.format_list_bulleted_rounded, size: 16),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'All Tests',
+                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Tab(
+                      height: 40,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.emoji_events_outlined, size: 16),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Top Score',
+                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -3241,42 +3356,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
                 style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
               ),
               const SizedBox(height: 16),
-
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () {
-                    if (_hasPurchased || item.isFree) {
-                      _tabController.animateTo(1);
-                    } else {
-                      final cartItem = CartItem(
-                        id: item.id,
-                        title: item.title,
-                        description: item.description,
-                        price: item.price,
-                        originalPrice: item.originalPrice,
-                        bannerImageUrl: item.bannerImageUrl ?? '',
-                        exam: item.exam,
-                        validity: item.validity,
-                        testCount: item.testCount,
-                      );
-                      context.push('/checkout', extra: cartItem);
-                    }
-                  },
-                  icon: const Icon(Icons.shopping_cart_outlined, size: 20),
-                  label: Text(
-                    _hasPurchased || item.isFree ? 'Start Learning' : 'Buy Now for ₹${item.price.toInt()}',
-                    style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
+              _buildBuyNowButton(item, fullWidth: true),
               const SizedBox(height: 16),
 
               Row(
