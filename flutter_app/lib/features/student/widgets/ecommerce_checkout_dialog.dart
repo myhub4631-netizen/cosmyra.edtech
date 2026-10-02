@@ -9,6 +9,7 @@ import '../../../core/services/cart_service.dart';
 import '../../../core/services/cloudflare_r2_service.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../models/models.dart';
+import '../upi_payment_verification_screen.dart';
 
 class EcommerceCheckoutDialog extends StatefulWidget {
   final CartItem? singleItem; // If Buy Now was clicked for a single item
@@ -257,19 +258,24 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
     required String payeeName,
     required String upiUrl,
   }) async {
-    final utrCtrl = TextEditingController();
-    bool isSubmitting = false;
-    String? paymentScreenshotUrl;
-    bool isUploadingScreenshot = false;
-    String? screenshotFileName;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => UpiPaymentVerificationScreen(
+          user: user,
+          items: items,
+          totalAmount: _totalPayable,
+          couponCode: CartService.instance.appliedCoupon?['code']?.toString() ?? '',
+          upiId: upiId,
+          payeeName: payeeName,
+          upiUrl: upiUrl,
+        ),
+      ),
+    );
+  }
 
-    final qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${Uri.encodeComponent(upiUrl)}';
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (dialogCtx, setDialogState) {
+  /*
+  Future<void> _unusedModal() async {
           final submitButtonWidget = Container(
             height: 50,
             width: double.infinity,
@@ -924,6 +930,7 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
       ),
     );
   }
+  */
 
   @override
   Widget build(BuildContext context) {

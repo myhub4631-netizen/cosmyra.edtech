@@ -22,6 +22,7 @@ import '../../features/leaderboard/leaderboard_screen.dart';
 import '../../features/student/test_series_screen.dart';
 import '../../features/student/product_detail_screen.dart';
 import '../../features/student/checkout_screen.dart';
+import '../../features/student/upi_payment_verification_screen.dart';
 import '../../features/student/cart_screen.dart';
 import '../services/cart_service.dart';
 import '../../features/tests/mock_tests_screen.dart';
@@ -572,6 +573,35 @@ final GoRouter appRouter = GoRouter(
         return CheckoutScreen(
           singleItem: item,
           productId: productId,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/upi-payment-verification',
+      builder: (context, state) {
+        final Map<String, dynamic> data = (state.extra is Map<String, dynamic>)
+            ? state.extra as Map<String, dynamic>
+            : {};
+        final UserProfileModel defaultUser = UserProfileModel(
+          id: (data['userId'] ?? data['customerEmail'] ?? 'user_1').toString(),
+          email: (data['customerEmail'] ?? '').toString(),
+          fullName: (data['customerName'] ?? 'Student').toString(),
+          phoneNumber: (data['customerPhone'] ?? '').toString(),
+          role: 'student',
+        );
+        final upiIdStr = (data['upiId'] ?? '1mdollar2027@okicici').toString();
+        final payeeNameStr = (data['payeeName'] ?? 'Cosmyra Edu Platform').toString();
+        final totalAmountNum = (data['totalAmount'] as num?)?.toDouble() ?? 0.0;
+        final upiUrlStr = (data['upiUrl'] ?? 'upi://pay?pa=$upiIdStr&pn=${Uri.encodeComponent(payeeNameStr)}&am=$totalAmountNum&cu=INR').toString();
+
+        return UpiPaymentVerificationScreen(
+          user: data['user'] is UserProfileModel ? data['user'] as UserProfileModel : defaultUser,
+          items: (data['items'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [],
+          totalAmount: totalAmountNum,
+          couponCode: (data['couponCode'] ?? '').toString(),
+          upiId: upiIdStr,
+          payeeName: payeeNameStr,
+          upiUrl: upiUrlStr,
         );
       },
     ),
