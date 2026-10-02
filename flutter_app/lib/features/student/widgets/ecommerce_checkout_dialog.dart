@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/cart_service.dart';
@@ -24,43 +25,14 @@ class EcommerceCheckoutDialog extends StatefulWidget {
   static Future<void> show(
     BuildContext context, {
     CartItem? singleItem,
-    required Function(String testId, String title, int duration) onStartTest,
+    Function(String testId, String title, int duration)? onStartTest,
   }) async {
-    final user = SupabaseService.activeUserSession ??
-        UserProfileModel(
-          id: 'guest_${DateTime.now().millisecondsSinceEpoch}',
-          fullName: 'Student Aspirant',
-          email: 'student@cosmyra.edtech',
-          role: 'student',
-        );
-
-    final List<Map<String, dynamic>> items = singleItem != null
-        ? [singleItem.toJson()]
-        : (CartService.instance.items.isNotEmpty
-            ? CartService.instance.items.map((e) => e.toJson()).toList()
-            : [CartItem(id: 'ts_default', title: 'Test Series', price: 499, originalPrice: 1999).toJson()]);
-
-    final double totalAmount = singleItem != null ? singleItem.price : CartService.instance.subtotal;
-    final paymentSettings = await SupabaseService.fetchPaymentSettings();
-    final upiId = (paymentSettings['upi_id'] ?? '1mdollar2027@okicici').toString().trim();
-    final payeeName = (paymentSettings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString().trim();
-    final amountStr = totalAmount.toStringAsFixed(2);
-    final upiUrl = 'upi://pay?pa=$upiId&pn=${Uri.encodeComponent(payeeName)}&am=$amountStr&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
-
     if (context.mounted) {
-      await showDialog(
-        context: context,
-        barrierDismissible: true,
-        builder: (ctx) => UpiPaymentVerificationScreen(
-          user: user,
-          items: items,
-          totalAmount: totalAmount,
-          couponCode: CartService.instance.appliedCoupon?['code']?.toString() ?? '',
-          upiId: upiId,
-          payeeName: payeeName,
-          upiUrl: upiUrl,
-        ),
-      );
+      if (singleItem != null) {
+        context.push('/checkout', extra: singleItem);
+      } else {
+        context.push('/checkout');
+      }
     }
   }
 
