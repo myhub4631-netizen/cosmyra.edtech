@@ -42,7 +42,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       final email = (o['student_email'] ?? o['user_email'] ?? '').toString().toLowerCase();
       final phone = (o['student_phone'] ?? o['user_phone'] ?? '').toString().toLowerCase();
       final product = (o['product_name'] ?? '').toString().toLowerCase();
-      final ref = (o['payment_reference'] ?? o['payment_id'] ?? '').toString().toLowerCase();
+      final ref = SupabaseService.extractUtrNumber(o).toLowerCase();
 
       final matchesQuery = q.isEmpty ||
           id.contains(q) ||
@@ -344,7 +344,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     final discount = (o['discount_amount'] as num?)?.toDouble() ?? 0.0;
     final coupon = (o['coupon_code'] ?? '').toString();
     final method = (o['payment_method'] ?? 'Online Payment').toString();
-    final ref = (o['payment_reference'] ?? o['payment_id'] ?? 'N/A').toString();
+    final ref = SupabaseService.extractUtrNumber(o);
     final status = (o['payment_status'] ?? o['status'] ?? 'pending_verification').toString().toLowerCase();
     final notes = (o['notes'] ?? '').toString();
     final createdAt = (o['created_at'] ?? '').toString();
@@ -690,7 +690,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                                 final email = (o['student_email'] ?? o['user_email'] ?? '').toString();
                                 final product = (o['product_name'] ?? 'NEET / JEE Package').toString();
                                 final method = (o['payment_method'] ?? 'UPI').toString();
-                                final ref = (o['payment_reference'] ?? o['payment_id'] ?? '').toString();
+                                final ref = SupabaseService.extractUtrNumber(o);
                                 final amount = (o['total_amount'] ?? o['amount'] as num?)?.toDouble() ?? 299.0;
                                 final status = (o['payment_status'] ?? o['status'] ?? 'pending_verification').toString().toLowerCase();
                                 final dateStr = (o['created_at'] ?? '').toString();
@@ -723,11 +723,13 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(method, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                          if (ref.isNotEmpty)
+                                          if (ref != 'N/A (Direct Online)' && ref.isNotEmpty)
                                             InkWell(
                                               onTap: () => _copyToClipboard(ref, 'UTR Ref'),
-                                              child: Text(ref.length > 16 ? '${ref.substring(0, 14)}...' : ref, style: const TextStyle(fontSize: 11, color: Color(0xFF2563EB))),
-                                            ),
+                                              child: Text(ref.length > 16 ? '${ref.substring(0, 14)}...' : ref, style: const TextStyle(fontSize: 11, color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
+                                            )
+                                          else
+                                            Text(ref, style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
                                         ],
                                       ),
                                     ),

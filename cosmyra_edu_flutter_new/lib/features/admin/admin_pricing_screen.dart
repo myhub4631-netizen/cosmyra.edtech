@@ -2767,7 +2767,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                         final email = ord['user_email']?.toString() ?? ord['student_email']?.toString() ?? '';
                         final product = ord['product_name']?.toString() ?? 'NEET Test Series';
                         final method = ord['payment_method']?.toString() ?? 'UPI';
-                        final ref = (ord['payment_reference'] ?? ord['payment_id'] ?? '').toString();
+                        final ref = SupabaseService.extractUtrNumber(ord);
                         final total = (ord['total_amount'] as num?)?.toDouble() ?? (ord['amount'] as num?)?.toDouble() ?? 0.0;
                         final status = (ord['status']?.toString() ?? ord['payment_status']?.toString() ?? 'completed').toLowerCase();
                         final dateStr = ord['created_at']?.toString() ?? '';
@@ -2802,7 +2802,10 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(method, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                                  if (ref.isNotEmpty) SelectableText(ref, style: const TextStyle(fontSize: 9.5, color: Color(0xFF2563EB), fontWeight: FontWeight.bold)),
+                                  if (ref != 'N/A (Direct Online)' && ref.isNotEmpty)
+                                    SelectableText(ref, style: const TextStyle(fontSize: 9.5, color: Color(0xFF2563EB), fontWeight: FontWeight.bold))
+                                  else
+                                    Text(ref, style: const TextStyle(fontSize: 9.5, color: Color(0xFF94A3B8))),
                                 ],
                               ),
                             ),

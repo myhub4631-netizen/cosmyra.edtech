@@ -4775,23 +4775,26 @@ class SupabaseService {
 
     final orderData = {
       'id': validOrderId,
-      'order_id': validOrderId,
+      'order_id': orderId,
       'order_number': orderId,
       'user_id': profileUserId,
       'user_email': user.email.trim().toLowerCase(),
       'user_name': user.fullName,
       'user_phone': user.phoneNumber ?? '',
-      'total_amount': totalAmount,
       'subtotal_amount': totalAmount,
       'discount_amount': 0.0,
+      'total_amount': totalAmount,
       'coupon_code': couponCode.trim().toUpperCase(),
       'status': 'pending_verification',
       'payment_status': 'pending_verification',
       'payment_method': 'UPI',
       'payment_id': 'UTR_$utrNumber',
       'payment_reference': utrNumber,
+      'payment_utr': utrNumber,
+      'utr_number': utrNumber,
       'notes': 'UPI Payment submitted with UTR: $utrNumber. Awaiting admin approval.',
       'product_name': pTitle,
+      'product_id': pId,
       'created_at': DateTime.now().toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
     };
@@ -4801,10 +4804,14 @@ class SupabaseService {
     try {
       await client.from('orders').insert({
         'id': validOrderId,
+        'order_id': orderId,
+        'order_number': orderId,
         'user_id': profileUserId,
         'user_email': user.email.trim().toLowerCase(),
         'user_name': user.fullName,
         'user_phone': user.phoneNumber ?? '',
+        'product_name': pTitle,
+        'product_id': pId,
         'subtotal_amount': totalAmount,
         'discount_amount': 0.0,
         'total_amount': totalAmount,
@@ -4813,6 +4820,8 @@ class SupabaseService {
         'payment_method': 'UPI',
         'payment_id': 'UTR_$utrNumber',
         'payment_reference': utrNumber,
+        'payment_utr': utrNumber,
+        'utr_number': utrNumber,
         'notes': 'UPI Payment UTR: $utrNumber | Product: $pTitle',
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
@@ -4823,10 +4832,14 @@ class SupabaseService {
       try {
         await client.from('orders').insert({
           'id': validOrderId,
+          'order_id': orderId,
+          'order_number': orderId,
           'user_id': null,
           'user_email': user.email.trim().toLowerCase(),
           'user_name': user.fullName,
           'user_phone': user.phoneNumber ?? '',
+          'product_name': pTitle,
+          'product_id': pId,
           'subtotal_amount': totalAmount,
           'discount_amount': 0.0,
           'total_amount': totalAmount,
@@ -4835,6 +4848,8 @@ class SupabaseService {
           'payment_method': 'UPI',
           'payment_id': 'UTR_$utrNumber',
           'payment_reference': utrNumber,
+          'payment_utr': utrNumber,
+          'utr_number': utrNumber,
           'notes': 'UPI Payment UTR: $utrNumber | Product: $pTitle',
           'created_at': DateTime.now().toIso8601String(),
           'updated_at': DateTime.now().toIso8601String(),
@@ -8565,10 +8580,14 @@ class SupabaseService {
     try {
       await client.from('orders').insert({
         'id': validOrderId,
+        'order_id': customOrderId,
+        'order_number': customOrderId,
         'user_id': profileUserId,
         'user_email': user.email.trim().toLowerCase(),
         'user_name': user.fullName,
         'user_phone': user.phoneNumber ?? '',
+        'product_name': pTitle,
+        'product_id': pId,
         'subtotal_amount': subtotal,
         'discount_amount': discount,
         'total_amount': totalAmount,
@@ -8587,10 +8606,14 @@ class SupabaseService {
       try {
         await client.from('orders').insert({
           'id': validOrderId,
+          'order_id': customOrderId,
+          'order_number': customOrderId,
           'user_id': null,
           'user_email': user.email.trim().toLowerCase(),
           'user_name': user.fullName,
           'user_phone': user.phoneNumber ?? '',
+          'product_name': pTitle,
+          'product_id': pId,
           'subtotal_amount': subtotal,
           'discount_amount': discount,
           'total_amount': totalAmount,
@@ -8740,6 +8763,44 @@ class SupabaseService {
     };
   }
 
+  /// Extract clean UTR / Transaction Reference number from order record
+  static String extractUtrNumber(Map<String, dynamic> o) {
+    final ordId = (o['order_number'] ?? o['order_id'] ?? o['id'] ?? '').toString().trim();
+
+    // 1. Check explicit UTR fields
+    final directUtr = (o['utr_number'] ?? o['payment_utr'] ?? o['utr'] ?? '').toString().trim();
+    if (directUtr.isNotEmpty && directUtr != ordId && !directUtr.startsWith('ORD') && !directUtr.startsWith('CSNJ') && !directUtr.startsWith('SUB_')) {
+      return directUtr;
+    }
+
+    // 2. Check payment_id (e.g. UTR_123456789123 -> 123456789123)
+    final pid = (o['payment_id'] ?? '').toString().trim();
+    if (pid.startsWith('UTR_')) {
+      final cleanPid = pid.substring(4).trim();
+      if (cleanPid.isNotEmpty && cleanPid != ordId) return cleanPid;
+    } else if (pid.isNotEmpty && pid != ordId && RegExp(r'^\d{8,18}$').hasMatch(pid)) {
+      return pid;
+    }
+
+    // 3. Check payment_reference (ONLY if it's not an order ID)
+    final pref = (o['payment_reference'] ?? '').toString().trim();
+    if (pref.isNotEmpty && pref != ordId && !pref.startsWith('ORD') && !pref.startsWith('CSNJ') && !pref.startsWith('SUB_')) {
+      return pref;
+    }
+
+    // 4. Try extracting from notes string (e.g., "UPI Payment UTR: 123456789123")
+    final notes = (o['notes'] ?? '').toString();
+    final match = RegExp(r'(?:UTR|ref|Reference|txn)[:\s]+([A-Za-z0-9]{8,20})', caseSensitive: false).firstMatch(notes);
+    if (match != null && match.group(1) != null) {
+      final found = match.group(1)!.trim();
+      if (found != ordId && !found.startsWith('ORD') && !found.startsWith('CSNJ')) {
+        return found;
+      }
+    }
+
+    return 'N/A (Direct Online)';
+  }
+
   /// Verify payment & grant access in entitlements and subscriptions
   static Future<Map<String, dynamic>> verifyPaymentAndGrantAccess({
     required String orderId,
@@ -8750,6 +8811,7 @@ class SupabaseService {
   }) async {
     final now = DateTime.now();
     final expiry = now.add(const Duration(days: 365));
+    final cleanOrderId = orderId.trim();
 
     // 1. Primary update orders table
     try {
@@ -8759,7 +8821,7 @@ class SupabaseService {
         'payment_id': paymentId,
         'payment_method': paymentMethod,
         'updated_at': now.toIso8601String(),
-      }).or('id.eq.$orderId,order_number.eq.$orderId,payment_reference.eq.$orderId');
+      }).or('id.eq.$cleanOrderId,order_number.eq.$cleanOrderId,order_id.eq.$cleanOrderId,payment_reference.eq.$cleanOrderId');
     } catch (e) {
       debugPrint('Notice updating orders table status: $e');
     }
@@ -8767,7 +8829,7 @@ class SupabaseService {
     // 2. Call server-side atomic fulfillment RPC if available
     try {
       await client.rpc('approve_and_fulfill_order', params: {
-        'p_order_id': orderId,
+        'p_order_id': cleanOrderId,
         'p_admin_id': user.isAdmin ? user.id : null,
         'p_payment_id': paymentId,
       });
@@ -8775,21 +8837,24 @@ class SupabaseService {
       debugPrint('Notice server approve_and_fulfill_order RPC: $e');
     }
 
-    // 3. Multi-channel status update in notification_logs (updates JSON message_body status)
+    // 3. Multi-channel status update in notification_logs (updates ONLY matching order in JSON message_body)
     try {
       final logsRes = await client.from('notification_logs').select('*').eq('type', 'order_placed');
       if (logsRes is List) {
         for (var log in logsRes.whereType<Map>()) {
           final bodyStr = (log['message_body'] ?? '').toString();
-          if (bodyStr.contains(orderId) || log['subject']?.toString().contains(orderId) == true) {
+          if (bodyStr.isNotEmpty) {
             try {
               final Map<String, dynamic> m = Map<String, dynamic>.from(jsonDecode(bodyStr));
-              m['status'] = 'completed';
-              m['payment_status'] = 'completed';
-              await client.from('notification_logs').update({
-                'status': 'completed',
-                'message_body': jsonEncode(m),
-              }).eq('id', log['id']);
+              final logOrdNum = (m['order_number'] ?? m['order_id'] ?? m['id'] ?? '').toString().trim();
+              if (logOrdNum.isNotEmpty && (logOrdNum == cleanOrderId || logOrdNum.toLowerCase() == cleanOrderId.toLowerCase())) {
+                m['status'] = 'completed';
+                m['payment_status'] = 'completed';
+                await client.from('notification_logs').update({
+                  'status': 'completed',
+                  'message_body': jsonEncode(m),
+                }).eq('id', log['id']);
+              }
             } catch (_) {}
           }
         }
@@ -8798,19 +8863,19 @@ class SupabaseService {
       debugPrint('Notice updating notification_logs: $e');
     }
 
-    // 4. Update abandoned_carts table status
+    // 4. Update abandoned_carts table status (ONLY for this specific order/cart ID, not all carts of the email!)
     try {
-      if (user.email.isNotEmpty) {
+      if (cleanOrderId.isNotEmpty) {
         await client.from('abandoned_carts').update({
           'recovery_status': 'completed',
           'updated_at': now.toIso8601String(),
-        }).eq('user_email', user.email.trim().toLowerCase());
+        }).or('id.eq.$cleanOrderId,recovery_status.eq.$cleanOrderId');
       }
     } catch (e) {
       debugPrint('Notice updating abandoned_carts: $e');
     }
 
-    // 5. Multi-channel local cache update
+    // 5. Multi-channel local cache update (strict ID match)
     try {
       final prefs = await SharedPreferences.getInstance();
       for (var keyName in ['cosmyra_saved_admin_orders', 'cosmyra_user_orders']) {
@@ -8818,8 +8883,8 @@ class SupabaseService {
         if (str != null && str.isNotEmpty) {
           final List list = jsonDecode(str);
           for (var item in list.whereType<Map>()) {
-            final ordId = (item['order_number'] ?? item['order_id'] ?? item['id'] ?? '').toString();
-            if (ordId == orderId || ordId.contains(orderId) || orderId.contains(ordId)) {
+            final ordId = (item['order_number'] ?? item['order_id'] ?? item['id'] ?? '').toString().trim();
+            if (ordId.isNotEmpty && (ordId == cleanOrderId || ordId.toLowerCase() == cleanOrderId.toLowerCase())) {
               item['status'] = 'completed';
               item['payment_status'] = 'completed';
             }
