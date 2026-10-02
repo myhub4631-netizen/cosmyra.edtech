@@ -299,29 +299,51 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
 
     final qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${Uri.encodeComponent(_upiUrl)}';
 
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isMobile ? Colors.white : const Color(0xFFF8FAFC),
+      appBar: isMobile
+          ? AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    context.go('/test-series');
+                  }
+                },
+              ),
+              title: Text('Complete UPI Payment', style: GoogleFonts.inter(color: const Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.w800)),
+              centerTitle: true,
+            )
+          : null,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: isMobile ? 8 : 24),
             physics: const BouncingScrollPhysics(),
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 460),
+              constraints: const BoxConstraints(maxWidth: 480),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x0D0F172A),
-                    blurRadius: 20,
-                    offset: Offset(0, 8),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(isMobile ? 16 : 24),
+                border: isMobile ? Border.all(color: const Color(0xFFF1F5F9)) : Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: isMobile
+                    ? null
+                    : const [
+                        BoxShadow(
+                          color: Color(0x0D0F172A),
+                          blurRadius: 20,
+                          offset: Offset(0, 8),
+                        ),
+                      ],
               ),
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(isMobile ? 14 : 20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
