@@ -9099,6 +9099,59 @@ class SupabaseService {
     return userOrders;
   }
 
+  /// Admin Leaderboard Configuration & Custom Overrides
+  static String _leaderboardMode = 'real'; // 'real', 'custom', or 'demo'
+  static List<Map<String, dynamic>> _customLeaderboardEntries = [];
+
+  static Future<void> saveAdminLeaderboardSettings({
+    required String mode,
+    required List<Map<String, dynamic>> entries,
+  }) async {
+    _leaderboardMode = mode;
+    _customLeaderboardEntries = List<Map<String, dynamic>>.from(entries);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_admin_leaderboard_mode_v2', mode);
+      await prefs.setString('cosmyra_admin_custom_leaderboard_v2', jsonEncode(entries));
+    } catch (e) {
+      debugPrint('Error saving admin leaderboard settings to SharedPreferences: $e');
+    }
+
+    try {
+      await client.from('platform_settings').upsert({
+        'key': 'leaderboard_config',
+        'value': jsonEncode({
+          'mode': mode,
+          'custom_entries': entries,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+      });
+    } catch (e) {
+      debugPrint('Notice upserting leaderboard_config in Supabase: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getAdminLeaderboardSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final mode = prefs.getString('cosmyra_admin_leaderboard_mode_v2') ?? 'real';
+      final rawEntries = prefs.getString('cosmyra_admin_custom_leaderboard_v2');
+      List<Map<String, dynamic>> entries = [];
+      if (rawEntries != null && rawEntries.isNotEmpty) {
+        final decoded = jsonDecode(rawEntries);
+        if (decoded is List) {
+          entries = decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      }
+      _leaderboardMode = mode;
+      _customLeaderboardEntries = entries;
+      return {'mode': mode, 'entries': entries};
+    } catch (e) {
+      return {'mode': _leaderboardMode, 'entries': _customLeaderboardEntries};
+    }
+  }
+
   /// Realtime Leaderboard: Fetch actual student rankings from test_attempts & profiles
   static Future<Map<String, dynamic>> fetchRealLeaderboardRankings({
     required String exam,
@@ -9109,6 +9162,37 @@ class SupabaseService {
     Map<String, dynamic>? currentUserRank;
 
     try {
+      final adminSettings = await getAdminLeaderboardSettings();
+      final mode = adminSettings['mode'] as String? ?? 'real';
+      final customEntries = adminSettings['entries'] as List<Map<String, dynamic>>? ?? [];
+
+      if (mode == 'custom' && customEntries.isNotEmpty) {
+        final filtered = customEntries.where((e) {
+          final target = (e['target'] ?? e['exam'] ?? '').toString().toUpperCase();
+          return target.isEmpty || target.contains(exam.toUpperCase()) || exam.toUpperCase().contains(target) || target.contains('ALL');
+        }).toList();
+
+        final list = filtered.isNotEmpty ? filtered : customEntries;
+        final sorted = List<Map<String, dynamic>>.from(list);
+        if (isPointsMode) {
+          sorted.sort((a, b) => ((b['points'] as num?) ?? ((b['score'] as num? ?? 0) * 10)).compareTo((a['points'] as num?) ?? ((a['score'] as num? ?? 0) * 10)));
+        } else {
+          sorted.sort((a, b) => ((b['score'] as num?) ?? 0).compareTo((a['score'] as num?) ?? 0));
+        }
+
+        for (int i = 0; i < sorted.length; i++) {
+          sorted[i]['rank'] = i + 1;
+          if (sorted[i]['is_current_user'] == true || sorted[i]['id'] == currentUserId) {
+            currentUserRank = sorted[i];
+          }
+        }
+        currentUserRank ??= sorted.isNotEmpty ? sorted.first : null;
+        return {
+          'rankings': sorted,
+          'currentUserRank': currentUserRank,
+        };
+      }
+
       // 1. Query test_attempts from Supabase
       final res = await client
           .from('test_attempts')
