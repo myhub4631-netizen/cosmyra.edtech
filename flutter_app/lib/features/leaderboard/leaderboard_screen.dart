@@ -130,7 +130,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         isPointsMode: isPoints,
         currentUserId: currentUid,
         timePeriod: timePeriodStr,
-        forceRealtime: true,
       );
 
       final List rawRankings = result['rankings'] as List? ?? [];
@@ -141,7 +140,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         final rank = (r['rank'] as num?)?.toInt() ?? 1;
         final score = (r['score'] as num?)?.toInt() ?? 0;
         final maxS = (r['max_score'] as num?)?.toInt() ?? 720;
-        final correct = (r['correct_count'] as num?)?.toInt() ?? (score ~/ 4);
+        final points = (r['points'] as num?)?.toInt() ?? ((r['correct_count'] as num?) != null ? ((r['correct_count'] as num).toInt() * 10) : (score * 10));
+        final correct = (r['correct_count'] as num?)?.toInt() ?? (points ~/ 10);
         final accuracy = (r['accuracy'] as num?)?.toDouble() ?? 90.0;
         final name = (r['name'] ?? 'Aspirant').toString();
         final avatar = (r['avatar'] ?? '').toString();
@@ -159,10 +159,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           questionsAttempted: (correct + 5).clamp(1, 180),
           correctQuestions: correct,
           wrongQuestions: 5,
+          points: points,
           rankChange: rankChange,
           isCrownWinner: rank <= 3,
           crownType: rank == 1 ? 'gold' : (rank == 2 ? 'silver' : (rank == 3 ? 'bronze' : 'none')),
-          isCurrentUser: r['is_current_user'] == true,
+          isCurrentUser: r['is_current_user'] == true || (currentUid != null && r['id'] == currentUid),
           recentSessionType: 'All India Test',
           categoryScope: _selectedCategory,
           meetsMinCriteria: true,
@@ -171,10 +172,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
       LeaderboardStudent? currentUserStudent;
       if (rawCurrentUser != null) {
-        final rank = (rawCurrentUser['rank'] as num?)?.toInt() ?? 1248;
-        final score = (rawCurrentUser['score'] as num?)?.toInt() ?? 612;
+        final rank = (rawCurrentUser['rank'] as num?)?.toInt() ?? 1;
+        final score = (rawCurrentUser['score'] as num?)?.toInt() ?? 0;
         final maxS = (rawCurrentUser['max_score'] as num?)?.toInt() ?? 720;
-        final correct = (rawCurrentUser['correct_count'] as num?)?.toInt() ?? (score ~/ 4);
+        final points = (rawCurrentUser['points'] as num?)?.toInt() ?? ((rawCurrentUser['correct_count'] as num?) != null ? ((rawCurrentUser['correct_count'] as num).toInt() * 10) : (score * 10));
+        final correct = (rawCurrentUser['correct_count'] as num?)?.toInt() ?? (points ~/ 10);
         final accuracy = (rawCurrentUser['accuracy'] as num?)?.toDouble() ?? 85.0;
 
         currentUserStudent = LeaderboardStudent(
@@ -184,17 +186,20 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           avatarUrl: widget.userProfile?.avatarUrl ?? rawCurrentUser['avatar'] ?? 'https://i.pravatar.cc/150?img=60',
           score: score,
           maxScore: maxS,
-          percentile: 85.0,
+          percentile: (100.0 - (rank * 0.05)).clamp(50.0, 100.0),
           accuracy: accuracy,
-          questionsAttempted: (correct + 8),
+          questionsAttempted: (correct + 5).clamp(1, 180),
           correctQuestions: correct,
-          wrongQuestions: 8,
-          rankChange: 156,
+          wrongQuestions: 5,
+          points: points,
+          rankChange: 0,
           isCurrentUser: true,
           recentSessionType: 'Custom Practice',
           categoryScope: _selectedCategory,
           meetsMinCriteria: true,
         );
+      } else if (loadedStudents.isNotEmpty) {
+        currentUserStudent = loadedStudents.firstWhere((s) => s.isCurrentUser, orElse: () => loadedStudents.first);
       }
 
       if (mounted) {
