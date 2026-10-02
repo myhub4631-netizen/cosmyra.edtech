@@ -2319,6 +2319,7 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _hasPurchased = false;
+  bool _isPendingVerification = false;
   bool _isLoadingAccess = true;
 
   @override
@@ -2343,9 +2344,19 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
         userEmail: user.email,
         productTitle: widget.item.title,
       );
+      bool isPending = false;
+      if (!owns) {
+        isPending = await SupabaseService.hasPendingPaymentVerification(
+          user.id,
+          widget.item.id,
+          userEmail: user.email,
+          productTitle: widget.item.title,
+        );
+      }
       if (mounted) {
         setState(() {
           _hasPurchased = owns;
+          _isPendingVerification = isPending;
           _isLoadingAccess = false;
         });
       }
@@ -2353,6 +2364,7 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
       if (mounted) {
         setState(() {
           _hasPurchased = false;
+          _isPendingVerification = false;
           _isLoadingAccess = false;
         });
       }
@@ -3643,6 +3655,28 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
               },
               icon: const Icon(Icons.play_arrow_rounded, size: 18),
               label: const Text('Open Product / Start Learning', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+            ),
+          ]
+          // 2.5 LOGGED IN + PAYMENT PENDING VERIFICATION -> Show Pending Verification Badge
+          else if (_isPendingVerification) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFF59E0B)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.hourglass_top_rounded, size: 18, color: Color(0xFFD97706)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Payment Verification Pending • Awaiting Admin Approval',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFB45309)),
+                  ),
+                ],
+              ),
             ),
           ]
           // 3. LOGGED IN + NOT PURCHASED -> Add to Cart + Buy Now

@@ -4918,7 +4918,7 @@ class SupabaseService {
       debugPrint('Notice inserting to abandoned_carts: $e');
     }
 
-    // 5. Local cache fallback
+    // 5. Local cache fallback & invalidate active entitlements for this product until Admin approval
     try {
       final prefs = await SharedPreferences.getInstance();
       for (var keyName in ['cosmyra_user_orders', 'cosmyra_saved_admin_orders']) {
@@ -4927,6 +4927,13 @@ class SupabaseService {
         list.removeWhere((o) => (o['order_number'] ?? o['order_id'] ?? o['id']) == orderId);
         list.insert(0, orderData);
         await prefs.setString(keyName, jsonEncode(list));
+      }
+
+      final cacheEntStr = prefs.getString('cosmyra_user_entitlements');
+      if (cacheEntStr != null && cacheEntStr.isNotEmpty) {
+        final List list = jsonDecode(cacheEntStr);
+        list.removeWhere((x) => x['product_id'] == pId || x['product_id'] == validOrderId);
+        await prefs.setString('cosmyra_user_entitlements', jsonEncode(list));
       }
     } catch (_) {}
 
@@ -8008,7 +8015,7 @@ class SupabaseService {
     return false;
   }
 
-  /// Check whether user has active entitlement for a specific product
+  /// Check whether user has active entitlement for a specific product (verified by Admin)
   static Future<bool> hasActiveEntitlement(String userId, String productId, {String? userEmail, String? productTitle}) async {
     final cleanProductId = productId.trim();
     if (cleanProductId.isEmpty) return false;
@@ -8038,7 +8045,19 @@ class SupabaseService {
           final pName = (it['product_name'] ?? it['title'] ?? '').toString().trim();
           final uId = (it['user_id'] ?? '').toString().trim();
           final uEmail = (it['user_email'] ?? '').toString().trim().toLowerCase();
-          final active = it['is_active'] == true || it['status'] == 'active' || it['status'] == 'completed';
+
+          final accessType = (it['access_type'] ?? '').toString().trim().toLowerCase();
+          final status = (it['status'] ?? it['payment_status'] ?? '').toString().trim().toLowerCase();
+          final isActiveBool = it['is_active'] == true;
+
+          // STRICT CHECK: Pending verification or inactive entitlements MUST NOT grant access
+          if (accessType == 'pending_verification' || accessType == 'pending' || accessType == 'unpaid' ||
+              status == 'pending_verification' || status == 'pending' || status == 'unpaid' || status == 'rejected' || status == 'cancelled' ||
+              !isActiveBool) {
+            return false;
+          }
+
+          final active = isActiveBool || status == 'active' || status == 'completed';
           final expiry = DateTime.tryParse(it['valid_until']?.toString() ?? '');
           final notExpired = expiry == null || expiry.isAfter(DateTime.now());
 
@@ -8050,7 +8069,7 @@ class SupabaseService {
             targetTitle: productTitle,
             purchasedProductId: pId,
             purchasedProductName: pName,
-            accessType: (it['access_type'] ?? '').toString(),
+            accessType: accessType,
           );
 
           return matchesUser && matchesProduct && active && notExpired;
@@ -8077,7 +8096,18 @@ class SupabaseService {
         for (var item in res.whereType<Map>()) {
           final pId = (item['product_id'] ?? '').toString().trim();
           final pName = (item['product_name'] ?? item['title'] ?? '').toString().trim();
-          final active = item['is_active'] == true || item['status'] == 'active' || item['status'] == 'completed';
+          final accessType = (item['access_type'] ?? '').toString().trim().toLowerCase();
+          final status = (item['status'] ?? item['payment_status'] ?? '').toString().trim().toLowerCase();
+          final isActiveBool = item['is_active'] == true;
+
+          // STRICT CHECK: Pending verification or inactive entitlements MUST NOT grant access
+          if (accessType == 'pending_verification' || accessType == 'pending' || accessType == 'unpaid' ||
+              status == 'pending_verification' || status == 'pending' || status == 'unpaid' || status == 'rejected' || status == 'cancelled' ||
+              !isActiveBool) {
+            continue;
+          }
+
+          final active = isActiveBool || status == 'active' || status == 'completed';
           final expiry = DateTime.tryParse(item['valid_until']?.toString() ?? '');
           final notExpired = expiry == null || expiry.isAfter(DateTime.now());
 
@@ -8086,7 +8116,7 @@ class SupabaseService {
             targetTitle: productTitle,
             purchasedProductId: pId,
             purchasedProductName: pName,
-            accessType: (item['access_type'] ?? '').toString(),
+            accessType: accessType,
           );
 
           if (matchesProduct && active && notExpired) {
@@ -8108,7 +8138,7 @@ class SupabaseService {
       debugPrint('Notice checking Supabase entitlements: $e');
     }
 
-    // 3. Check Supabase orders table (for approved/completed orders)
+    // 3. Check Supabase orders table (ONLY for approved/completed orders)
     try {
       var orderQuery = client.from('orders').select();
       if (userId.isNotEmpty && resolvedEmail.isNotEmpty) {
@@ -8122,7 +8152,11 @@ class SupabaseService {
       final ordersRes = await orderQuery;
       if (ordersRes is List && ordersRes.isNotEmpty) {
         for (var ord in ordersRes.whereType<Map>()) {
-          final st = (ord['status'] ?? ord['payment_status'] ?? '').toString().toLowerCase();
+          final st = (ord['status'] ?? ord['payment_status'] ?? '').toString().trim().toLowerCase();
+          final accessType = (ord['access_type'] ?? '').toString().trim().toLowerCase();
+          if (st == 'pending_verification' || st == 'pending' || st == 'unpaid' || st == 'rejected' || st == 'cancelled' || accessType == 'pending_verification') {
+            continue;
+          }
           final isCompleted = st == 'completed' || st == 'approved' || st == 'verified' || st == 'paid' || st == 'success';
           if (!isCompleted) continue;
 
@@ -8134,7 +8168,7 @@ class SupabaseService {
             targetTitle: productTitle,
             purchasedProductId: ordPId,
             purchasedProductName: ordPName,
-            accessType: (ord['access_type'] ?? '').toString(),
+            accessType: accessType,
           );
 
           if (matchesProduct) {
@@ -8177,7 +8211,11 @@ class SupabaseService {
       final subRes = await subQuery;
       if (subRes is List && subRes.isNotEmpty) {
         for (var sub in subRes.whereType<Map>()) {
-          final st = (sub['status'] ?? '').toString().toLowerCase();
+          final st = (sub['status'] ?? '').toString().trim().toLowerCase();
+          final accessType = (sub['access_type'] ?? '').toString().trim().toLowerCase();
+          if (st == 'pending_verification' || st == 'pending' || st == 'unpaid' || st == 'rejected' || st == 'cancelled' || accessType == 'pending_verification') {
+            continue;
+          }
           final isActive = st == 'active' || st == 'completed';
           final expiry = DateTime.tryParse(sub['end_date']?.toString() ?? sub['valid_until']?.toString() ?? '');
           final notExpired = expiry == null || expiry.isAfter(DateTime.now());
@@ -8190,7 +8228,7 @@ class SupabaseService {
               targetTitle: productTitle,
               purchasedProductId: planId,
               purchasedProductName: planName,
-              accessType: (sub['access_type'] ?? '').toString(),
+              accessType: accessType,
             )) {
               return true;
             }
@@ -8204,10 +8242,119 @@ class SupabaseService {
     return false;
   }
 
-  /// Fetch all entitlements / purchases for user
-  static Future<List<Map<String, dynamic>>> fetchUserEntitlements(String userId, {String? userEmail}) async {
+  /// Check whether user has a pending payment verification for a specific product
+  static Future<bool> hasPendingPaymentVerification(String userId, String productId, {String? userEmail, String? productTitle}) async {
+    final cleanProductId = productId.trim();
+    if (cleanProductId.isEmpty) return false;
+
+    String resolvedEmail = (userEmail ?? '').trim().toLowerCase();
+    if (resolvedEmail.isEmpty) {
+      final activeUser = activeUserSession;
+      if (activeUser != null && activeUser.email.isNotEmpty) {
+        resolvedEmail = activeUser.email.trim().toLowerCase();
+      } else {
+        final authUser = client.auth.currentUser;
+        if (authUser != null && authUser.email != null && authUser.email!.isNotEmpty) {
+          resolvedEmail = authUser.email!.trim().toLowerCase();
+        }
+      }
+    }
+
+    try {
+      final orders = await fetchAdminOrders();
+      for (var ord in orders) {
+        final st = (ord['status'] ?? ord['payment_status'] ?? '').toString().toLowerCase();
+        final isPending = st == 'pending_verification' || st == 'pending';
+        if (!isPending) continue;
+
+        final uId = (ord['user_id'] ?? ord['student_id'] ?? '').toString();
+        final uEmail = (ord['student_email'] ?? ord['user_email'] ?? '').toString().trim().toLowerCase();
+
+        final matchesUser = (userId.isNotEmpty && uId == userId) ||
+                            (resolvedEmail.isNotEmpty && uEmail == resolvedEmail);
+        if (!matchesUser) continue;
+
+        final ordPId = (ord['product_id'] ?? '').toString().trim();
+        final ordPName = (ord['product_name'] ?? ord['title'] ?? '').toString().trim();
+
+        if (_isProductMatch(
+          targetProductId: cleanProductId,
+          targetTitle: productTitle,
+          purchasedProductId: ordPId,
+          purchasedProductName: ordPName,
+          accessType: (ord['access_type'] ?? '').toString(),
+        )) {
+          return true;
+        }
+
+        if (ord['items'] is List) {
+          for (var subIt in (ord['items'] as List).whereType<Map>()) {
+            final subPId = (subIt['id'] ?? subIt['product_id'] ?? '').toString().trim();
+            final subPName = (subIt['title'] ?? subIt['product_name'] ?? subIt['name'] ?? '').toString().trim();
+            if (_isProductMatch(
+              targetProductId: cleanProductId,
+              targetTitle: productTitle,
+              purchasedProductId: subPId,
+              purchasedProductName: subPName,
+              accessType: (subIt['access_type'] ?? '').toString(),
+            )) {
+              return true;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice checking pending payment verification: $e');
+    }
+
+    return false;
+  }
+
+  /// Fetch all active entitlements / purchases for user (excluding pending verification unless includePending = true)
+  static Future<List<Map<String, dynamic>>> fetchUserEntitlements(String userId, {String? userEmail, bool includePending = false}) async {
     final List<Map<String, dynamic>> results = [];
     String resolvedEmail = (userEmail ?? '').trim().toLowerCase();
+    if (resolvedEmail.isEmpty) {
+      final activeUser = activeUserSession;
+      if (activeUser != null && activeUser.email.isNotEmpty) {
+        resolvedEmail = activeUser.email.trim().toLowerCase();
+      } else {
+        final authUser = client.auth.currentUser;
+        if (authUser != null && authUser.email != null && authUser.email!.isNotEmpty) {
+          resolvedEmail = authUser.email!.trim().toLowerCase();
+        }
+      }
+    }
+
+    try {
+      var query = client.from('entitlements').select();
+      if (userId.isNotEmpty && resolvedEmail.isNotEmpty) {
+        query = query.or('user_id.eq.$userId,user_email.eq.$resolvedEmail');
+      } else if (userId.isNotEmpty) {
+        query = query.eq('user_id', userId);
+      } else if (resolvedEmail.isNotEmpty) {
+        query = query.eq('user_email', resolvedEmail);
+      }
+      final res = await query.order('created_at', ascending: false);
+
+      if (res is List) {
+        for (var e in res.whereType<Map>()) {
+          final m = Map<String, dynamic>.from(e);
+          final isActiveBool = m['is_active'] == true;
+          final accessType = (m['access_type'] ?? '').toString().trim().toLowerCase();
+          final status = (m['status'] ?? m['payment_status'] ?? '').toString().trim().toLowerCase();
+
+          if (!includePending) {
+            if (!isActiveBool || accessType == 'pending_verification' || accessType == 'pending' || status == 'pending_verification' || status == 'pending') {
+              continue;
+            }
+          }
+          results.add(m);
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice fetching entitlements from Supabase: $e');
+    }
     if (resolvedEmail.isEmpty) {
       final activeUser = activeUserSession;
       if (activeUser != null && activeUser.email.isNotEmpty) {
