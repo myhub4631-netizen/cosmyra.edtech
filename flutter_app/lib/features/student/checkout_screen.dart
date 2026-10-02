@@ -47,6 +47,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
   void initState() {
     super.initState();
 
+    if (widget.singleItem != null) {
+      _activeItem = widget.singleItem;
+      _isLoadingProduct = false;
+    } else if (CartService.instance.items.isNotEmpty) {
+      _activeItem = CartService.instance.items.first;
+      _isLoadingProduct = false;
+    } else if (widget.productId == null || widget.productId!.isEmpty) {
+      _isLoadingProduct = false;
+    }
+
     _shakeController = AnimationController(
       duration: const Duration(milliseconds: 2000),
       vsync: this,
