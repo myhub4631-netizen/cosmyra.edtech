@@ -322,8 +322,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
     required String payeeName,
     required String upiUrl,
   }) async {
-    await Navigator.push(
-      context,
+    Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (ctx) => UpiPaymentVerificationScreen(
           user: user,

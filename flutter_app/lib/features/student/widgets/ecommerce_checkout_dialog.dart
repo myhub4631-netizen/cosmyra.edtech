@@ -258,11 +258,7 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
     required String payeeName,
     required String upiUrl,
   }) async {
-    final nav = Navigator.of(context);
-    if (nav.canPop()) {
-      nav.pop();
-    }
-    await nav.push(
+    Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (ctx) => UpiPaymentVerificationScreen(
           user: user,
