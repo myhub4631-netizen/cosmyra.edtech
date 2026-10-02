@@ -841,7 +841,7 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                 TextField(
                   controller: domainCtrl,
                   decoration: InputDecoration(
-                    hintText: 'https://media.neet-jee.in or https://pub-xxx.r2.dev',
+                    hintText: 'https://pub-xxx.r2.dev or custom R2 bucket public domain',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),

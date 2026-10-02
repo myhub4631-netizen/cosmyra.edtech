@@ -10002,7 +10002,7 @@ class SupabaseService {
     }
 
     // 3. Fallback clean public web URL for website usage
-    return 'https://media.neet-jee.in/uploads/$cleanName';
+    return 'https://pub-r2.dev/uploads/$cleanName';
   }
 
   static Future<bool> saveAdminMediaAsset(Map<String, dynamic> asset) async {

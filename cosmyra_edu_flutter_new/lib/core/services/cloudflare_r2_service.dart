@@ -18,7 +18,7 @@ class CloudflareR2Service {
   static String accessKeyId = const String.fromEnvironment('R2_ACCESS_KEY_ID', defaultValue: '');
   static String secretAccessKey = const String.fromEnvironment('R2_SECRET_ACCESS_KEY', defaultValue: '');
   static String bucketName = const String.fromEnvironment('R2_BUCKET_NAME', defaultValue: 'question-bank-assets');
-  static String publicDomain = const String.fromEnvironment('R2_PUBLIC_DOMAIN', defaultValue: 'https://media.neet-jee.in');
+  static String publicDomain = const String.fromEnvironment('R2_PUBLIC_DOMAIN', defaultValue: '');
 
   static bool get isConfigured =>
       accountId.isNotEmpty && accessKeyId.isNotEmpty && secretAccessKey.isNotEmpty;
@@ -64,7 +64,7 @@ class CloudflareR2Service {
   }
 
   /// Uploads binary file bytes directly to Cloudflare R2 bucket via S3 API V4 Signature
-  /// Returns the short public CDN URL (e.g. https://media.neet-jee.in/uploads/123456_file.png)
+  /// Returns the short public CDN URL (e.g. https://pub-r2.dev/uploads/123456_file.png)
   static Future<String?> uploadFile({
     required Uint8List fileBytes,
     required String fileName,
@@ -72,14 +72,15 @@ class CloudflareR2Service {
   }) async {
     await loadConfig();
 
-    if (!isConfigured) {
-      debugPrint('Cloudflare R2 is not fully configured yet. Falling back to default CDN URL.');
-      final cleanName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-      return 'https://media.neet-jee.in/uploads/$cleanName';
-    }
-
     final cleanName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
     final objectKey = 'uploads/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
+
+    if (!isConfigured) {
+      debugPrint('Cloudflare R2 is not fully configured yet. Falling back to default R2 URL.');
+      final fallbackDomain = publicDomain.isNotEmpty ? publicDomain : 'https://pub-r2.dev';
+      return '$fallbackDomain/$objectKey';
+    }
+
     final region = 'auto';
     final service = 's3';
 
@@ -144,7 +145,7 @@ class CloudflareR2Service {
       debugPrint('Error uploading file to Cloudflare R2: $e');
     }
 
-    final publicBase = publicDomain.isNotEmpty ? publicDomain : 'https://media.neet-jee.in';
+    final publicBase = publicDomain.isNotEmpty ? publicDomain : 'https://pub-r2.dev';
     return '$publicBase/$objectKey';
   }
 
