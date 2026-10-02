@@ -677,7 +677,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
                             ),
                             const SizedBox(height: 16),
 
-                            // STEP 2: Instructions & Verification Submission (UTR or Screenshot or Both)
+                            // STEP 2: Instructions & Verification Submission (UTR, Screenshot or Both)
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
@@ -691,224 +691,275 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
                                   Row(
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFFEF3C7),
+                                          color: const Color(0xFFD97706),
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
                                           'STEP 2',
-                                          style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: const Color(0xFFD97706)),
+                                          style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w900, color: Colors.white),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      Text(
-                                        'Verify Payment (UTR, Screenshot or Both)',
-                                        style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800, color: const Color(0xFF92400E)),
+                                      Expanded(
+                                        child: Text(
+                                          'Verify Payment (UTR, Screenshot or Both)',
+                                          style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800, color: const Color(0xFF92400E)),
+                                        ),
                                       ),
                                     ],
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'Copy 12-digit UTR/Ref No. from GPay/PhonePe/Paytm OR upload payment screenshot receipt below (or provide both):',
+                                    'For verification, you can submit your 12-digit UTR/Ref Number, upload a payment screenshot receipt (Cloudflare S3), or provide BOTH:',
                                     style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF78350F), height: 1.35),
                                   ),
                                 ],
                               ),
                             ),
                             const SizedBox(height: 10),
-                            TextField(
-                              controller: utrCtrl,
-                              keyboardType: TextInputType.number,
-                              maxLength: 12,
-                              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A), letterSpacing: 1.0),
-                              decoration: InputDecoration(
-                                hintText: 'e.g. 429182736410 (UTR / Ref No.)',
-                                hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8), letterSpacing: 0.0),
-                                counterText: '',
-                                isDense: true,
-                                filled: true,
-                                fillColor: const Color(0xFFF8FAFC),
-                                prefixIcon: const Icon(Icons.confirmation_number_rounded, size: 18, color: Color(0xFF64748B)),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+
+                            // OPTION 1: 12-DIGIT UTR NUMBER INPUT
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
                               ),
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                const Expanded(child: Divider(color: Color(0xFFCBD5E1))),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                  child: Text('OR / AND ATTACH SCREENSHOT', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w800, color: const Color(0xFF64748B))),
-                                ),
-                                const Expanded(child: Divider(color: Color(0xFFCBD5E1))),
-                              ],
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.pin_rounded, size: 15, color: Color(0xFF2563EB)),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Option 1: Enter 12-Digit UTR / Ref Number',
+                                        style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w800, color: const Color(0xFF1E293B)),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    controller: utrCtrl,
+                                    keyboardType: TextInputType.number,
+                                    maxLength: 12,
+                                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A), letterSpacing: 1.0),
+                                    decoration: InputDecoration(
+                                      hintText: 'e.g. 429182736410 (UTR / Ref No.)',
+                                      hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8), letterSpacing: 0.0),
+                                      counterText: '',
+                                      isDense: true,
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      prefixIcon: const Icon(Icons.confirmation_number_rounded, size: 18, color: Color(0xFF64748B)),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 10),
 
-                            // Screenshot Upload Card
-                            if (isUploadingScreenshot) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEFF6FF),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFF93C5FD)),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(color: Color(0xFF2563EB), strokeWidth: 2.5),
-                                    ),
-                                    SizedBox(width: 10),
-                                    Text(
-                                      'Uploading Receipt Screenshot to Cloudflare S3...',
-                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
-                                    ),
-                                  ],
-                                ),
+                            // OPTION 2: PAYMENT SCREENSHOT UPLOAD (CLOUDFLARE S3)
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
                               ),
-                            ] else if (paymentScreenshotUrl != null && paymentScreenshotUrl!.isNotEmpty) ...[
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFECFDF5),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFFA7F3D0)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        paymentScreenshotUrl!,
-                                        width: 48,
-                                        height: 48,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (c, e, s) => Container(width: 48, height: 48, color: const Color(0xFFD1FAE5), child: const Icon(Icons.image, color: Color(0xFF059669))),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.cloud_upload_rounded, size: 15, color: Color(0xFF4F46E5)),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Option 2: Upload Payment Screenshot (Cloudflare S3)',
+                                        style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w800, color: const Color(0xFF1E293B)),
                                       ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+
+                                  if (isUploadingScreenshot) ...[
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEFF6FF),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: const Color(0xFF93C5FD)),
+                                      ),
+                                      child: const Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
-                                          Row(
-                                            children: [
-                                              const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF059669)),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                'Screenshot Uploaded to S3',
-                                                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w800, color: const Color(0xFF065F46)),
-                                              ),
-                                            ],
+                                          SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(color: Color(0xFF2563EB), strokeWidth: 2.5),
                                           ),
-                                          const SizedBox(height: 2),
+                                          SizedBox(width: 10),
                                           Text(
-                                            screenshotFileName ?? 'payment_receipt.png',
-                                            style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF047857)),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
+                                            'Uploading Receipt to Cloudflare S3...',
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
                                           ),
                                         ],
                                       ),
                                     ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20),
-                                      tooltip: 'Remove Screenshot',
-                                      onPressed: () {
-                                        setDialogState(() {
-                                          paymentScreenshotUrl = null;
-                                          screenshotFileName = null;
-                                        });
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ] else ...[
-                              Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: () async {
-                                    try {
-                                      final result = await FilePicker.platform.pickFiles(
-                                        type: FileType.custom,
-                                        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
-                                        withData: true,
-                                      );
-                                      if (result != null && result.files.isNotEmpty) {
-                                        final file = result.files.first;
-                                        final bytes = file.bytes;
-                                        if (bytes != null) {
-                                          setDialogState(() => isUploadingScreenshot = true);
-                                          final ext = (file.extension ?? 'png').toLowerCase();
-                                          final mimeType = ext == 'jpg' || ext == 'jpeg' ? 'image/jpeg' : (ext == 'webp' ? 'image/webp' : 'image/png');
-                                          final url = await CloudflareR2Service.uploadFile(
-                                            fileBytes: bytes,
-                                            fileName: file.name,
-                                            mimeType: mimeType,
-                                          );
-                                          setDialogState(() {
-                                            paymentScreenshotUrl = url;
-                                            screenshotFileName = file.name;
-                                            isUploadingScreenshot = false;
-                                          });
-                                        }
-                                      }
-                                    } catch (e) {
-                                      setDialogState(() => isUploadingScreenshot = false);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Screenshot upload note: $e'), backgroundColor: const Color(0xFFEF4444)),
-                                      );
-                                    }
-                                  },
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF8FAFC),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: const Color(0xFFCBD5E1)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFEFF6FF),
-                                            borderRadius: BorderRadius.circular(8),
+                                  ] else if (paymentScreenshotUrl != null && paymentScreenshotUrl!.isNotEmpty) ...[
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFECFDF5),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: const Color(0xFFA7F3D0)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius: BorderRadius.circular(6),
+                                            child: Image.network(
+                                              paymentScreenshotUrl!,
+                                              width: 44,
+                                              height: 44,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (c, e, s) => Container(width: 44, height: 44, color: const Color(0xFFD1FAE5), child: const Icon(Icons.image, color: Color(0xFF059669))),
+                                            ),
                                           ),
-                                          child: const Icon(Icons.add_a_photo_rounded, size: 20, color: Color(0xFF2563EB)),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF059669)),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      'Screenshot Uploaded to S3',
+                                                      style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w800, color: const Color(0xFF065F46)),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  screenshotFileName ?? 'payment_receipt.png',
+                                                  style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF047857)),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                                            tooltip: 'Remove Screenshot',
+                                            onPressed: () {
+                                              setDialogState(() {
+                                                paymentScreenshotUrl = null;
+                                                screenshotFileName = null;
+                                              });
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    Material(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: InkWell(
+                                        onTap: () async {
+                                          try {
+                                            final result = await FilePicker.platform.pickFiles(
+                                              type: FileType.custom,
+                                              allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+                                              withData: true,
+                                              withReadStream: true,
+                                            );
+                                            if (result != null && result.files.isNotEmpty) {
+                                              final file = result.files.first;
+                                              Uint8List? bytes = file.bytes;
+                                              if ((bytes == null || bytes.isEmpty) && file.readStream != null) {
+                                                final List<int> allBytes = [];
+                                                await for (final chunk in file.readStream!) {
+                                                  allBytes.addAll(chunk);
+                                                }
+                                                bytes = Uint8List.fromList(allBytes);
+                                              }
+
+                                              if (bytes != null && bytes.isNotEmpty) {
+                                                setDialogState(() => isUploadingScreenshot = true);
+                                                final ext = (file.extension ?? 'png').toLowerCase();
+                                                final mimeType = ext == 'jpg' || ext == 'jpeg' ? 'image/jpeg' : (ext == 'webp' ? 'image/webp' : 'image/png');
+                                                final url = await SupabaseService.uploadMediaFile(
+                                                  fileBytes: bytes,
+                                                  fileName: file.name,
+                                                  mimeType: mimeType,
+                                                );
+                                                setDialogState(() {
+                                                  paymentScreenshotUrl = url;
+                                                  screenshotFileName = file.name;
+                                                  isUploadingScreenshot = false;
+                                                });
+                                              }
+                                            }
+                                          } catch (e) {
+                                            setDialogState(() => isUploadingScreenshot = false);
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(content: Text('Screenshot upload error: $e'), backgroundColor: const Color(0xFFEF4444)),
+                                            );
+                                          }
+                                        },
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                                          ),
+                                          child: Row(
                                             children: [
-                                              Text(
-                                                'Upload Payment Screenshot',
-                                                style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B)),
+                                              Container(
+                                                padding: const EdgeInsets.all(6),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFEEF2FF),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: const Icon(Icons.add_a_photo_rounded, size: 18, color: Color(0xFF4F46E5)),
                                               ),
-                                              Text(
-                                                'Tap to select GPay / PhonePe / Paytm receipt image',
-                                                style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      'Upload Payment Screenshot Receipt',
+                                                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B)),
+                                                    ),
+                                                    Text(
+                                                      'Tap to select GPay / PhonePe / Paytm receipt (S3)',
+                                                      style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
+                                              const Icon(Icons.cloud_upload_outlined, color: Color(0xFF4F46E5), size: 18),
                                             ],
                                           ),
                                         ),
-                                        const Icon(Icons.file_upload_outlined, color: Color(0xFF2563EB), size: 20),
-                                      ],
+                                      ),
                                     ),
-                                  ),
-                                ),
+                                  ],
+                                ],
                               ),
-                            ],
+                            ),
                             const SizedBox(height: 18),
 
                             // Shaking Vibrant Red Gradient Submit Button
