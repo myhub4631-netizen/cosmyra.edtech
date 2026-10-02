@@ -251,7 +251,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         : null);
     bool owns = false;
     if (user != null) {
-      owns = await SupabaseService.hasActiveEntitlement(user.id, widget.productId, userEmail: user.email);
+      owns = await SupabaseService.hasActiveEntitlement(
+        user.id,
+        widget.productId,
+        userEmail: user.email,
+        productTitle: loadedProduct.title,
+      );
     }
 
     _product = loadedProduct;

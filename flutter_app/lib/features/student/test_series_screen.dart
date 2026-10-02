@@ -288,7 +288,12 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         return;
       }
 
-      final hasAccess = await SupabaseService.hasActiveEntitlement(user.id, matchingSeries.id, userEmail: user.email);
+      final hasAccess = await SupabaseService.hasActiveEntitlement(
+        user.id,
+        matchingSeries.id,
+        userEmail: user.email,
+        productTitle: matchingSeries.title,
+      );
       if (!hasAccess) {
         if (mounted) {
           _handlePurchaseOrEnroll(matchingSeries);
@@ -2212,7 +2217,12 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
           )
         : null);
     if (user != null) {
-      final owns = await SupabaseService.hasActiveEntitlement(user.id, widget.item.id, userEmail: user.email);
+      final owns = await SupabaseService.hasActiveEntitlement(
+        user.id,
+        widget.item.id,
+        userEmail: user.email,
+        productTitle: widget.item.title,
+      );
       if (mounted) {
         setState(() {
           _hasPurchased = owns;

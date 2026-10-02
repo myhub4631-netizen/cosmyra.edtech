@@ -7950,8 +7950,66 @@ class SupabaseService {
     };
   }
 
-  /// Check whether user has active entitlement for a product
-  static Future<bool> hasActiveEntitlement(String userId, String productId, {String? userEmail}) async {
+  static String _normalizeProductKey(String val) {
+    if (val.isEmpty) return '';
+    var s = val.trim().toLowerCase();
+    s = s.replaceAll(RegExp(r'^ts[_-]'), ''); // strip leading ts_ / ts-
+    s = s.replaceAll(RegExp(r'[^a-z0-9]'), ''); // keep only alphanumeric
+    return s;
+  }
+
+  static bool _isProductMatch({
+    required String targetProductId,
+    String? targetTitle,
+    required String purchasedProductId,
+    String? purchasedProductName,
+    String? accessType,
+  }) {
+    final cleanTargetId = targetProductId.trim();
+    if (cleanTargetId.isEmpty) return false;
+
+    final cleanPurchasedId = purchasedProductId.trim();
+    final cleanPurchasedName = (purchasedProductName ?? '').trim();
+    final cleanAccessType = (accessType ?? '').trim().toLowerCase();
+
+    // 1. Site-wide / All-access pass check (EXCLUDING individual 'full' access_type)
+    if (cleanPurchasedId == 'ts_all_access' ||
+        cleanPurchasedId == 'all_access' ||
+        cleanPurchasedId == 'all_pass' ||
+        cleanPurchasedId == 'site_wide_pass' ||
+        cleanAccessType == 'all_access' ||
+        cleanAccessType == 'site_wide' ||
+        cleanAccessType == 'all_pass') {
+      return true;
+    }
+
+    // 2. Direct string equality (case-insensitive)
+    if (cleanPurchasedId.isNotEmpty && cleanPurchasedId.toLowerCase() == cleanTargetId.toLowerCase()) {
+      return true;
+    }
+
+    // 3. Normalized key matching
+    final normTargetId = _normalizeProductKey(cleanTargetId);
+    final normTargetTitle = targetTitle != null ? _normalizeProductKey(targetTitle) : '';
+
+    final normPurchasedId = _normalizeProductKey(cleanPurchasedId);
+    final normPurchasedName = _normalizeProductKey(cleanPurchasedName);
+
+    if (normTargetId.isNotEmpty) {
+      if (normPurchasedId.isNotEmpty && normPurchasedId == normTargetId) return true;
+      if (normPurchasedName.isNotEmpty && normPurchasedName == normTargetId) return true;
+    }
+
+    if (normTargetTitle.isNotEmpty) {
+      if (normPurchasedId.isNotEmpty && normPurchasedId == normTargetTitle) return true;
+      if (normPurchasedName.isNotEmpty && normPurchasedName == normTargetTitle) return true;
+    }
+
+    return false;
+  }
+
+  /// Check whether user has active entitlement for a specific product
+  static Future<bool> hasActiveEntitlement(String userId, String productId, {String? userEmail, String? productTitle}) async {
     final cleanProductId = productId.trim();
     if (cleanProductId.isEmpty) return false;
 
@@ -7969,7 +8027,7 @@ class SupabaseService {
       }
     }
 
-    // 1. Check local cache first for instant response
+    // 1. Check local cache first
     try {
       final prefs = await SharedPreferences.getInstance();
       final str = prefs.getString('cosmyra_user_entitlements');
@@ -7977,6 +8035,7 @@ class SupabaseService {
         final List list = jsonDecode(str);
         final found = list.any((it) {
           final pId = (it['product_id'] ?? '').toString().trim();
+          final pName = (it['product_name'] ?? it['title'] ?? '').toString().trim();
           final uId = (it['user_id'] ?? '').toString().trim();
           final uEmail = (it['user_email'] ?? '').toString().trim().toLowerCase();
           final active = it['is_active'] == true || it['status'] == 'active' || it['status'] == 'completed';
@@ -7986,11 +8045,13 @@ class SupabaseService {
           final matchesUser = (userId.isNotEmpty && uId == userId) ||
                               (resolvedEmail.isNotEmpty && uEmail == resolvedEmail) ||
                               uId.isEmpty;
-          final matchesProduct = pId == cleanProductId ||
-                                 pId == 'ts_all_access' ||
-                                 pId == 'all_access' ||
-                                 pId == 'full_access' ||
-                                 it['access_type'] == 'full';
+          final matchesProduct = _isProductMatch(
+            targetProductId: cleanProductId,
+            targetTitle: productTitle,
+            purchasedProductId: pId,
+            purchasedProductName: pName,
+            accessType: (it['access_type'] ?? '').toString(),
+          );
 
           return matchesUser && matchesProduct && active && notExpired;
         });
@@ -8015,15 +8076,18 @@ class SupabaseService {
       if (res is List && res.isNotEmpty) {
         for (var item in res.whereType<Map>()) {
           final pId = (item['product_id'] ?? '').toString().trim();
+          final pName = (item['product_name'] ?? item['title'] ?? '').toString().trim();
           final active = item['is_active'] == true || item['status'] == 'active' || item['status'] == 'completed';
           final expiry = DateTime.tryParse(item['valid_until']?.toString() ?? '');
           final notExpired = expiry == null || expiry.isAfter(DateTime.now());
 
-          final matchesProduct = pId == cleanProductId ||
-                                 pId == 'ts_all_access' ||
-                                 pId == 'all_access' ||
-                                 pId == 'full_access' ||
-                                 item['access_type'] == 'full';
+          final matchesProduct = _isProductMatch(
+            targetProductId: cleanProductId,
+            targetTitle: productTitle,
+            purchasedProductId: pId,
+            purchasedProductName: pName,
+            accessType: (item['access_type'] ?? '').toString(),
+          );
 
           if (matchesProduct && active && notExpired) {
             // Cache entitlement locally
@@ -8065,12 +8129,13 @@ class SupabaseService {
           final ordPId = (ord['product_id'] ?? '').toString().trim();
           final ordPName = (ord['product_name'] ?? ord['title'] ?? '').toString().trim();
 
-          final matchesProduct = ordPId == cleanProductId ||
-                                 ordPId == 'ts_all_access' ||
-                                 ordPId == 'all_access' ||
-                                 ordPId == 'full_access' ||
-                                 ord['access_type'] == 'full' ||
-                                 (cleanProductId.isNotEmpty && ordPName.toLowerCase().contains(cleanProductId.toLowerCase()));
+          final matchesProduct = _isProductMatch(
+            targetProductId: cleanProductId,
+            targetTitle: productTitle,
+            purchasedProductId: ordPId,
+            purchasedProductName: ordPName,
+            accessType: (ord['access_type'] ?? '').toString(),
+          );
 
           if (matchesProduct) {
             return true;
@@ -8080,7 +8145,14 @@ class SupabaseService {
           if (ord['items'] is List) {
             for (var subIt in (ord['items'] as List).whereType<Map>()) {
               final subPId = (subIt['id'] ?? subIt['product_id'] ?? '').toString().trim();
-              if (subPId == cleanProductId || subPId == 'ts_all_access' || subPId == 'all_access') {
+              final subPName = (subIt['title'] ?? subIt['product_name'] ?? subIt['name'] ?? '').toString().trim();
+              if (_isProductMatch(
+                targetProductId: cleanProductId,
+                targetTitle: productTitle,
+                purchasedProductId: subPId,
+                purchasedProductName: subPName,
+                accessType: (subIt['access_type'] ?? '').toString(),
+              )) {
                 return true;
               }
             }
@@ -8112,7 +8184,14 @@ class SupabaseService {
 
           if (isActive && notExpired) {
             final planId = (sub['plan_id'] ?? sub['product_id'] ?? '').toString().trim();
-            if (planId == cleanProductId || planId == 'ts_all_access' || planId == 'all_access' || sub['access_type'] == 'full') {
+            final planName = (sub['plan_name'] ?? sub['title'] ?? '').toString().trim();
+            if (_isProductMatch(
+              targetProductId: cleanProductId,
+              targetTitle: productTitle,
+              purchasedProductId: planId,
+              purchasedProductName: planName,
+              accessType: (sub['access_type'] ?? '').toString(),
+            )) {
               return true;
             }
           }
