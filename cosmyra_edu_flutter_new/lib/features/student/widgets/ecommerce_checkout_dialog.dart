@@ -258,233 +258,425 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
     final utrCtrl = TextEditingController();
     bool isSubmitting = false;
 
-    final qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${Uri.encodeComponent(upiUrl)}';
+    final qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${Uri.encodeComponent(upiUrl)}';
 
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (dialogCtx, setDialogState) {
+          final submitButtonWidget = Container(
+            height: 50,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              gradient: isSubmitting
+                  ? const LinearGradient(colors: [Color(0xFF94A3B8), Color(0xFF64748B)])
+                  : const LinearGradient(
+                      colors: [Color(0xFFFF3B30), Color(0xFFEF4444), Color(0xFFDC2626)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+              boxShadow: [
+                BoxShadow(
+                  color: isSubmitting
+                      ? Colors.black.withValues(alpha: 0.1)
+                      : const Color(0xFFEF4444).withValues(alpha: 0.5),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: isSubmitting
+                    ? null
+                    : () async {
+                        final utr = utrCtrl.text.trim();
+                        if (utr.isEmpty || utr.length < 6) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please enter valid 12-digit UTR or Transaction Ref number.'),
+                              backgroundColor: Color(0xFFEF4444),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          return;
+                        }
+
+                        setDialogState(() => isSubmitting = true);
+
+                        final res = await SupabaseService.submitUpiPaymentVerification(
+                          user: user,
+                          items: items,
+                          utrNumber: utr,
+                          couponCode: CartService.instance.appliedCoupon?['code']?.toString() ?? '',
+                          totalAmount: _totalPayable,
+                        );
+
+                        if (widget.singleItem == null) {
+                          CartService.instance.clearCart();
+                        }
+
+                        if (ctx.mounted) Navigator.pop(ctx);
+
+                        if (mounted) {
+                          setState(() {
+                            _isProcessing = false;
+                            _isSuccess = true;
+                            _isPendingVerification = true;
+                            _orderId = res['order_number'] ?? 'ORD-${DateTime.now().millisecondsSinceEpoch}';
+                            _submittedUtr = utr;
+                            _successMessage = 'UPI Payment request submitted with UTR: $utr. Pending Admin approval.';
+                          });
+                        }
+                      },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (isSubmitting) ...[
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Submitting Verification...',
+                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
+                        ),
+                      ] else ...[
+                        const Icon(Icons.verified_rounded, size: 20, color: Colors.white),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Submit Payment Verification',
+                          style: GoogleFonts.inter(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+
           return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            child: Container(
-              width: 460,
-              padding: const EdgeInsets.all(24),
-              child: SingleChildScrollView(
+            backgroundColor: Colors.white,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 440,
+                maxHeight: MediaQuery.of(dialogCtx).size.height * 0.88,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Modal Header
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(10)),
-                          child: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFF2563EB), size: 22),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 20),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Complete UPI Payment', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
-                              Text('Pay ₹${_totalPayable.toInt()} via GPay, PhonePe, Paytm, BHIM', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                              Text(
+                                'Complete UPI Payment',
+                                style: GoogleFonts.inter(fontSize: 16.5, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A)),
+                              ),
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFECFDF5),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'Pay ₹${_totalPayable.toInt()}',
+                                      style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w900, color: const Color(0xFF059669)),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'GPay • PhonePe • Paytm • BHIM',
+                                      style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w500),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
                         ),
-                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () => Navigator.pop(ctx),
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
+                          ),
+                        ),
                       ],
                     ),
-                    const Divider(height: 20),
+                    const Divider(height: 24, color: Color(0xFFE2E8F0)),
 
-                    // Open App Direct Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        onPressed: () => _launchUpiApp(upiUrl),
-                        icon: const Icon(Icons.touch_app_rounded, size: 20),
-                        label: const Text('Open UPI App (GPay, PhonePe, Paytm)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // QR Code Image
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFCBD5E1)),
-                        boxShadow: [
-                          BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
-                        ],
-                      ),
-                      child: Image.network(
-                        qrImageUrl,
-                        width: 170,
-                        height: 170,
-                        fit: BoxFit.contain,
-                        errorBuilder: (ctx, err, st) => Container(
-                          width: 170,
-                          height: 170,
-                          color: const Color(0xFFF1F5F9),
-                          child: const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.qr_code_2_rounded, size: 48, color: Color(0xFF64748B)),
-                              SizedBox(height: 8),
-                              Text('Scan with any UPI App', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // UPI ID Copy Row
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                    // Scrollable Inner Body to prevent clipping
+                    Flexible(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // STEP 1 Badge & Direct App Launch Button
+                            Row(
                               children: [
-                                const Text('Merchant UPI ID:', style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
-                                SelectableText(upiId, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF2563EB))),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEEF2FF),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'STEP 1',
+                                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: const Color(0xFF4F46E5)),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Tap below to open UPI App:',
+                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF334155)),
+                                ),
                               ],
                             ),
-                          ),
-                          OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
-                            onPressed: () {
-                              Clipboard.setData(ClipboardData(text: upiId));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('✓ UPI ID copied to clipboard!'),
-                                  backgroundColor: Color(0xFF10B981),
-                                  duration: Duration(seconds: 2),
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2563EB),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),
-                              );
-                            },
-                            icon: const Icon(Icons.copy_rounded, size: 14),
-                            label: const Text('Copy ID', style: TextStyle(fontSize: 11)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                                onPressed: () => _launchUpiApp(upiUrl),
+                                icon: const Icon(Icons.touch_app_rounded, size: 18),
+                                label: Text(
+                                  'Open UPI App (GPay / PhonePe / Paytm)',
+                                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
 
-                    // Step 2 Instructions & UTR Entry
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFBEB),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFFCD34D)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.check_circle_outline_rounded, color: Color(0xFFD97706), size: 18),
-                              const SizedBox(width: 6),
-                              Text('Step 2: Enter 12-Digit UTR Number', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF92400E))),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'After completing payment in GPay / PhonePe / Paytm, copy the 12-digit UTR/Ref No. from payment details and paste below.',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF78350F), height: 1.3),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: utrCtrl,
-                      keyboardType: TextInputType.number,
-                      maxLength: 12,
-                      decoration: InputDecoration(
-                        hintText: 'e.g. 429182736410',
-                        counterText: '',
-                        isDense: true,
-                        prefixIcon: const Icon(Icons.confirmation_number_outlined, size: 18, color: Color(0xFF64748B)),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-
-                    // Submit Verification Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 46,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF10B981),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        onPressed: isSubmitting
-                            ? null
-                            : () async {
-                                final utr = utrCtrl.text.trim();
-                                if (utr.isEmpty || utr.length < 6) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Please enter valid 12-digit UTR or Transaction Ref number.'),
-                                      backgroundColor: Color(0xFFEF4444),
+                            // QR Code Card Display
+                            Center(
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
                                     ),
-                                  );
-                                  return;
-                                }
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.network(
+                                        qrImageUrl,
+                                        width: 160,
+                                        height: 160,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (ctx, err, st) => Container(
+                                          width: 160,
+                                          height: 160,
+                                          color: const Color(0xFFF1F5F9),
+                                          child: const Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.qr_code_2_rounded, size: 44, color: Color(0xFF64748B)),
+                                              SizedBox(height: 6),
+                                              Text('Scan with any UPI App', style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Scan QR using GPay, PhonePe, Paytm, BHIM',
+                                      style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
 
-                                setDialogState(() => isSubmitting = true);
+                            // Merchant UPI ID Card
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Official Merchant UPI ID:', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                                        const SizedBox(height: 2),
+                                        SelectableText(
+                                          upiId,
+                                          style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w900, color: const Color(0xFF2563EB)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onPressed: () {
+                                      Clipboard.setData(ClipboardData(text: upiId));
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('✓ Merchant UPI ID copied to clipboard!'),
+                                          backgroundColor: Color(0xFF10B981),
+                                          behavior: SnackBarBehavior.floating,
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.copy_rounded, size: 13, color: Color(0xFF475569)),
+                                    label: Text('Copy ID', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF475569))),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
 
-                                final res = await SupabaseService.submitUpiPaymentVerification(
-                                  user: user,
-                                  items: items,
-                                  utrNumber: utr,
-                                  couponCode: CartService.instance.appliedCoupon?['code']?.toString() ?? '',
-                                  totalAmount: _totalPayable,
+                            // STEP 2: Instructions & UTR Entry
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFFBEB),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFFDE68A)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFEF3C7),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'STEP 2',
+                                          style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w900, color: const Color(0xFFD97706)),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Enter 12-Digit UTR / Ref Number',
+                                        style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800, color: const Color(0xFF92400E)),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'After payment in GPay / PhonePe / Paytm, copy the 12-digit UTR/Ref No. from transaction details and paste below:',
+                                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF78350F), height: 1.35),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: utrCtrl,
+                              keyboardType: TextInputType.number,
+                              maxLength: 12,
+                              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A), letterSpacing: 1.0),
+                              decoration: InputDecoration(
+                                hintText: 'e.g. 429182736410',
+                                hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8), letterSpacing: 0.0),
+                                counterText: '',
+                                isDense: true,
+                                filled: true,
+                                fillColor: const Color(0xFFF8FAFC),
+                                prefixIcon: const Icon(Icons.confirmation_number_rounded, size: 18, color: Color(0xFF64748B)),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+
+                            // Shaking Vibrant Red Gradient Submit Button
+                            AnimatedBuilder(
+                              animation: _shakeAnimation,
+                              builder: (context, child) {
+                                return Transform.translate(
+                                  offset: Offset(_shakeAnimation.value, 0),
+                                  child: child,
                                 );
-
-                                if (widget.singleItem == null) {
-                                  CartService.instance.clearCart();
-                                }
-
-                                if (ctx.mounted) Navigator.pop(ctx);
-
-                                if (mounted) {
-                                  setState(() {
-                                    _isProcessing = false;
-                                    _isSuccess = true;
-                                    _isPendingVerification = true;
-                                    _orderId = res['order_number'] ?? 'ORD-${DateTime.now().millisecondsSinceEpoch}';
-                                    _submittedUtr = utr;
-                                    _successMessage = 'UPI Payment request submitted with UTR: $utr. Pending Admin approval.';
-                                  });
-                                }
                               },
-                        icon: isSubmitting
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : const Icon(Icons.verified_rounded, size: 18),
-                        label: Text(
-                          isSubmitting ? 'Submitting...' : 'Submit Payment Verification',
-                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
+                              child: submitButtonWidget,
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -492,7 +684,7 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
                 ),
               ),
             ),
-          );
+          ).animate().fadeIn(duration: 250.ms).scale(begin: const Offset(0.96, 0.96));
         },
       ),
     );
