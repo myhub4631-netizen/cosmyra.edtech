@@ -1587,83 +1587,256 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
   }
 
   // ==========================================
+  // ==========================================
   // CELEBRATORY ORDER SUCCESS SCREEN
   // ==========================================
   Widget _buildSuccessCelebration() {
+    final primaryButtonWidget = Container(
+      height: 52,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF3B30), Color(0xFFEF4444), Color(0xFFDC2626)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFEF4444).withValues(alpha: 0.5),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
+            final targetId = _activeItem?.id ?? 'ts_neet_all_india_2026';
+            context.go('/product/$targetId');
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _isPendingVerification ? Icons.rocket_launch_rounded : Icons.play_arrow_rounded,
+                  size: 20,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _isPendingVerification ? 'Go to My Courses & Tests' : 'Start Learning Now',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.arrow_forward_rounded, size: 18, color: Colors.white),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 540),
-            padding: const EdgeInsets.all(32),
+            constraints: const BoxConstraints(maxWidth: 480),
+            padding: const EdgeInsets.all(28),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
               border: Border.all(color: const Color(0xFFE2E8F0)),
               boxShadow: [
-                BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4)),
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
               ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Top Icon Badge
                 Container(
-                  width: 72,
-                  height: 72,
+                  width: 76,
+                  height: 76,
                   decoration: BoxDecoration(
-                    color: _isPendingVerification ? const Color(0xFFFEF3C7) : const Color(0xFFDCFCE7),
+                    gradient: _isPendingVerification
+                        ? const LinearGradient(
+                            colors: [Color(0xFFFF3B30), Color(0xFFEF4444), Color(0xFFDC2626)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : const LinearGradient(
+                            colors: [Color(0xFF059669), Color(0xFF10B981)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _isPendingVerification
+                            ? const Color(0xFFEF4444).withValues(alpha: 0.45)
+                            : const Color(0xFF10B981).withValues(alpha: 0.45),
+                        blurRadius: 18,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
                   child: Icon(
                     _isPendingVerification ? Icons.hourglass_top_rounded : Icons.check_circle_rounded,
-                    color: _isPendingVerification ? const Color(0xFFD97706) : const Color(0xFF16A34A),
-                    size: 44,
+                    color: Colors.white,
+                    size: 42,
                   ),
-                ),
+                ).animate().scale(duration: 500.ms, curve: Curves.elasticOut),
                 const SizedBox(height: 20),
+
+                // Main Title
                 Text(
                   _isPendingVerification ? 'Verification Request Sent! ⏳' : 'Enrollment Confirmed! 🎉',
-                  style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A)),
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF0F172A),
+                    letterSpacing: -0.3,
+                  ),
                 ),
                 const SizedBox(height: 8),
+
                 Text(
                   _isPendingVerification
-                      ? 'Order #$_createdOrderId has been submitted with UTR: $_submittedUtr. Our Admin team will verify your payment and grant instant access shortly.'
-                      : 'Order #$_createdOrderId has been successfully processed. All mock tests and study materials are now permanently unlocked in your profile.',
+                      ? 'Your payment proof has been safely received. Our Admin team will verify your UTR and activate instant access shortly.'
+                      : 'Congratulations! Your enrollment is active. All mock tests, detailed solutions, and analytics are unlocked.',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF64748B), height: 1.5),
+                  style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B), height: 1.45),
+                ),
+                const SizedBox(height: 20),
+
+                // Summary Order Card
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Order Number:', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                          Text(
+                            _createdOrderId.length > 20 ? '${_createdOrderId.substring(0, 20)}...' : _createdOrderId,
+                            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                          ),
+                        ],
+                      ),
+                      if (_submittedUtr.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('UTR Ref No:', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEEF2FF),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                _submittedUtr,
+                                style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w900, color: const Color(0xFF4F46E5)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      const Divider(height: 20, color: Color(0xFFE2E8F0)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Verification Status:', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: _isPendingVerification ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _isPendingVerification ? const Color(0xFFFCA5A5) : const Color(0xFFA7F3D0),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _isPendingVerification ? Icons.schedule_rounded : Icons.verified_rounded,
+                                  size: 12,
+                                  color: _isPendingVerification ? const Color(0xFFDC2626) : const Color(0xFF059669),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _isPendingVerification ? 'Pending Admin Approval' : 'Verified & Active',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: _isPendingVerification ? const Color(0xFFDC2626) : const Color(0xFF059669),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isPendingVerification ? const Color(0xFFD97706) : const Color(0xFF2563EB),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 48),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  onPressed: () {
-                    final targetId = _activeItem?.id ?? 'ts_neet_all_india_2026';
-                    context.go('/product/$targetId');
+
+                // Shaking Red Gradient Primary Action Button
+                AnimatedBuilder(
+                  animation: _shakeAnimation,
+                  builder: (context, child) {
+                    return Transform.translate(
+                      offset: Offset(_shakeAnimation.value, 0),
+                      child: child,
+                    );
                   },
-                  icon: Icon(_isPendingVerification ? Icons.receipt_long_rounded : Icons.play_arrow_rounded, size: 20),
-                  label: Text(_isPendingVerification ? 'Go to My Courses & Tests' : 'Start Learning Now', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  child: primaryButtonWidget,
                 ),
                 const SizedBox(height: 12),
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF64748B),
-                    minimumSize: const Size(double.infinity, 44),
-                    side: const BorderSide(color: Color(0xFFCBD5E1)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+
+                // Secondary Action Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF475569),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: () => context.go('/test-series'),
+                    child: Text('Explore More Test Series', style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700)),
                   ),
-                  onPressed: () => context.go('/test-series'),
-                  child: const Text('Explore More Test Series', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
-          ),
+          ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.94, 0.94)),
         ),
       ),
     );

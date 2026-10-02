@@ -1338,41 +1338,136 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
   Widget _buildSuccessDialog() {
     final firstItem = _effectiveItems.isNotEmpty ? _effectiveItems.first : null;
 
+    final primaryButtonWidget = Container(
+      height: 50,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF3B30), Color(0xFFEF4444), Color(0xFFDC2626)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFEF4444).withValues(alpha: 0.5),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () {
+            Navigator.of(context).pop();
+            if (firstItem != null) {
+              widget.onStartTest(firstItem.id, firstItem.title, 180);
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _isPendingVerification ? Icons.rocket_launch_rounded : Icons.play_arrow_rounded,
+                  size: 20,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _isPendingVerification ? 'Go to My Courses & Tests' : 'Start Learning Now',
+                  style: GoogleFonts.inter(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.arrow_forward_rounded, size: 18, color: Colors.white),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
     return Dialog(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Container(
-        width: 480,
-        padding: const EdgeInsets.all(28),
+        width: 440,
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Top Glowing Icon Badge
             Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: Color(0xFFECFDF5),
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                gradient: _isPendingVerification
+                    ? const LinearGradient(
+                        colors: [Color(0xFFFF3B30), Color(0xFFEF4444), Color(0xFFDC2626)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : const LinearGradient(
+                        colors: [Color(0xFF059669), Color(0xFF10B981)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: _isPendingVerification
+                        ? const Color(0xFFEF4444).withValues(alpha: 0.45)
+                        : const Color(0xFF10B981).withValues(alpha: 0.45),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 48),
+              child: Icon(
+                _isPendingVerification ? Icons.hourglass_top_rounded : Icons.check_circle_rounded,
+                color: Colors.white,
+                size: 42,
+              ),
+            ).animate().scale(duration: 500.ms, curve: Curves.elasticOut),
+            const SizedBox(height: 18),
+
+            // Main Title
+            Text(
+              _isPendingVerification ? 'Verification Request Sent! ⏳' : 'Enrollment Confirmed! 🎉',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 21,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF0F172A),
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            Text(
+              _isPendingVerification
+                  ? 'Order #${_orderId.isNotEmpty ? _orderId : "ORD-39346739"} has been submitted${_submittedUtr.isNotEmpty ? " with UTR: $_submittedUtr" : ""}. Our Admin team will verify your payment and grant instant access shortly.'
+                  : 'Congratulations! Your payment has been verified. All test series and solutions are now active.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF64748B), height: 1.45),
             ),
             const SizedBox(height: 18),
-            Text(
-              'Payment Confirmed!',
-              style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              _successMessage,
-              style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
+
+            // Summary Order Card
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: Column(
@@ -1380,65 +1475,106 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Order ID', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                      Text('Order Number:', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B), fontWeight: FontWeight.w500)),
                       Text(
-                        _orderId.length > 18 ? '${_orderId.substring(0, 18)}...' : _orderId,
-                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                        _orderId.length > 20 ? '${_orderId.substring(0, 20)}...' : (_orderId.isNotEmpty ? _orderId : 'ORD-39346739'),
+                        style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  if (_submittedUtr.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('UTR Ref No:', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEEF2FF),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            _submittedUtr,
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w900, color: const Color(0xFF4F46E5)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const Divider(height: 18, color: Color(0xFFE2E8F0)),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Amount Paid', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
-                      Text(
-                        '₹${_totalPayable.toInt()}',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
+                      Text('Verification Status:', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: _isPendingVerification ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: _isPendingVerification ? const Color(0xFFFCA5A5) : const Color(0xFFA7F3D0),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _isPendingVerification ? Icons.schedule_rounded : Icons.verified_rounded,
+                              size: 11,
+                              color: _isPendingVerification ? const Color(0xFFDC2626) : const Color(0xFF059669),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _isPendingVerification ? 'Pending Admin Approval' : 'Verified & Active',
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: _isPendingVerification ? const Color(0xFFDC2626) : const Color(0xFF059669),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 22),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: const Text('Back to Test Series'),
-                  ),
+            const SizedBox(height: 20),
+
+            // Shaking Vibrant Red Gradient Primary Button
+            AnimatedBuilder(
+              animation: _shakeAnimation,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(_shakeAnimation.value, 0),
+                  child: child,
+                );
+              },
+              child: primaryButtonWidget,
+            ),
+            const SizedBox(height: 10),
+
+            // Secondary Option: Explore More Test Series
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      if (firstItem != null) {
-                        widget.onStartTest(firstItem.id, firstItem.title, 180);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4F46E5),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                    label: const Text('Start Test Now', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
+                child: Text(
+                  'Explore More Test Series',
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF475569)),
                 ),
-              ],
+              ),
             ),
           ],
         ),
       ),
-    );
+    ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.94, 0.94));
   }
 }
