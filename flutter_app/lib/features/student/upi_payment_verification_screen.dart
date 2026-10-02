@@ -322,28 +322,29 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
             )
           : null,
       body: SafeArea(
-        child: Center(
+        child: Align(
+          alignment: Alignment.topCenter,
           child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: isMobile ? 8 : 24),
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20, vertical: isMobile ? 12 : 24),
             physics: const BouncingScrollPhysics(),
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 480),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(isMobile ? 16 : 24),
-                border: isMobile ? Border.all(color: const Color(0xFFF1F5F9)) : Border.all(color: const Color(0xFFE2E8F0)),
-                boxShadow: isMobile
-                    ? null
-                    : const [
+              constraints: const BoxConstraints(maxWidth: 520),
+              decoration: isMobile
+                  ? null
+                  : BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: const [
                         BoxShadow(
                           color: Color(0x0D0F172A),
                           blurRadius: 20,
                           offset: Offset(0, 8),
                         ),
                       ],
-              ),
+                    ),
               child: Padding(
-                padding: EdgeInsets.all(isMobile ? 14 : 20),
+                padding: EdgeInsets.all(isMobile ? 0 : 20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -407,24 +408,25 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
                             ],
                           ),
                         ),
-                        InkWell(
-                          borderRadius: BorderRadius.circular(20),
-                          onTap: () {
-                            if (Navigator.of(context).canPop()) {
-                              Navigator.of(context).pop();
-                            } else {
-                              context.go('/dashboard');
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFF1F5F9),
-                              shape: BoxShape.circle,
+                        if (!isMobile)
+                          InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () {
+                              if (Navigator.of(context).canPop()) {
+                                Navigator.of(context).pop();
+                              } else {
+                                context.go('/dashboard');
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF1F5F9),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
                             ),
-                            child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
                           ),
-                        ),
                       ],
                     ),
                     const Divider(height: 24, color: Color(0xFFE2E8F0)),

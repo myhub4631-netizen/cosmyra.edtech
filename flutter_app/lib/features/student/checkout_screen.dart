@@ -332,19 +332,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
     required String payeeName,
     required String upiUrl,
   }) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => UpiPaymentVerificationScreen(
-        user: user,
-        items: items,
-        totalAmount: _finalTotal,
-        couponCode: CartService.instance.appliedCouponCode ?? '',
-        upiId: upiId,
-        payeeName: payeeName,
-        upiUrl: upiUrl,
-      ),
-    );
+    if (context.mounted) {
+      context.push('/upi-payment-verification', extra: {
+        'user': user,
+        'items': items,
+        'totalAmount': _finalTotal,
+        'couponCode': CartService.instance.appliedCouponCode ?? '',
+        'upiId': upiId,
+        'payeeName': payeeName,
+        'upiUrl': upiUrl,
+      });
+    }
   }
 
 
