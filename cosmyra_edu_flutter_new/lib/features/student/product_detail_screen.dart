@@ -340,57 +340,67 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
 
     final Map<String, Map<String, dynamic>> testMap = {};
 
-    // 1. Add embedded tests from item.tests
+    // 1. Add real embedded tests attached to this test series item
     for (var t in item.tests) {
-      final m = Map<String, dynamic>.from(t);
-      final id = (m['id'] ?? m['paper_id'] ?? '').toString().trim();
-      final title = (m['title'] ?? m['paper_name'] ?? m['name'] ?? 'Mock Test ${testMap.length + 1}').toString().trim();
-      final key = id.isNotEmpty ? id.toLowerCase() : title.toLowerCase();
-
-      testMap[key] = {
-        'id': id.isNotEmpty ? id : 'test_${testMap.length + 1}',
-        'number': (m['number'] ?? '${testMap.length + 1 < 10 ? '0${testMap.length + 1}' : '${testMap.length + 1}'}').toString(),
-        'title': title,
-        'type': (m['type'] ?? m['paper_type'] ?? item.testType).toString(),
-        'questions': m['questions'] ?? m['saved_questions_count'] ?? m['question_count'] ?? (item.exam.contains('JEE') ? 90 : 200),
-        'marks': m['marks'] ?? m['total_marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
-        'duration': m['duration'] ?? m['duration_minutes'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
-        'status': (m['status'] ?? 'Not Attempted').toString(),
-      };
+      if (t is Map) {
+        final m = Map<String, dynamic>.from(t);
+        final id = (m['id'] ?? m['paper_id'] ?? '').toString().trim();
+        final title = (m['title'] ?? m['paper_name'] ?? m['name'] ?? '').toString().trim();
+        if (title.isNotEmpty) {
+          final key = id.isNotEmpty ? id.toLowerCase() : title.toLowerCase();
+          testMap[key] = {
+            'id': id.isNotEmpty ? id : 'test_${testMap.length + 1}',
+            'number': (m['number'] ?? '${testMap.length + 1 < 10 ? '0${testMap.length + 1}' : '${testMap.length + 1}'}').toString(),
+            'title': title,
+            'type': (m['type'] ?? m['paper_type'] ?? item.testType).toString(),
+            'questions': (m['questions'] is num && (m['questions'] as num) > 0)
+                ? (m['questions'] as num).toInt()
+                : ((m['saved_questions_count'] is num && (m['saved_questions_count'] as num) > 0)
+                    ? (m['saved_questions_count'] as num).toInt()
+                    : ((m['question_count'] is num && (m['question_count'] as num) > 0)
+                        ? (m['question_count'] as num).toInt()
+                        : 0)),
+            'marks': m['marks'] ?? m['total_marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
+            'duration': m['duration'] ?? m['duration_minutes'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
+            'status': (m['status'] ?? 'Published').toString(),
+            'test_date_time': m['test_date_time'] ?? m['scheduled_at'] ?? m['start_time'],
+          };
+        }
+      }
     }
 
-    // 2. Scan all papers in _dbPapers to find any created papers matching this test series
+    // 2. Scan all created papers in _dbPapers specifically assigned to this test series
     final itemTitleLower = item.title.trim().toLowerCase();
     final itemIdLower = item.id.trim().toLowerCase();
-    final itemExamLower = item.exam.trim().toLowerCase();
 
     for (var p in _dbPapers) {
       final pId = (p['id'] ?? '').toString().trim();
       final pSeriesId = (p['test_series_id'] ?? p['series_id'] ?? p['testSeriesId'] ?? '').toString().trim().toLowerCase();
       final pSeriesTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? p['test_series'] ?? p['testSeriesTitle'] ?? p['test_series_name'] ?? '').toString().trim().toLowerCase();
       final pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? p['name'] ?? '').toString().trim().toLowerCase();
-      final pExam = (p['target_exam'] ?? p['exam'] ?? '').toString().trim().toLowerCase();
-      final isTs = p['is_test_series'] == true || (p['available_in'] is List && (p['available_in'] as List).contains('test_series')) || (p['category'] ?? '').toString().toLowerCase().contains('series');
 
-      bool isMatch = false;
+      bool isDirectMatch = false;
       if (pSeriesId.isNotEmpty && (pSeriesId == itemIdLower || itemIdLower.contains(pSeriesId) || pSeriesId.contains(itemIdLower))) {
-        isMatch = true;
+        isDirectMatch = true;
       }
       if (pSeriesTitle.isNotEmpty && (pSeriesTitle == itemTitleLower || itemTitleLower.contains(pSeriesTitle) || pSeriesTitle.contains(itemTitleLower))) {
-        isMatch = true;
+        isDirectMatch = true;
       }
-      if (pName.isNotEmpty && (pName == itemTitleLower || itemTitleLower.contains(pName) || pName.contains(itemTitleLower))) {
-        isMatch = true;
-      }
-      if (pExam.isNotEmpty && itemExamLower.isNotEmpty && (pExam.contains(itemExamLower) || itemExamLower.contains(pExam))) {
-        if (pSeriesTitle.isEmpty || pSeriesTitle == itemTitleLower || itemTitleLower.contains(pSeriesTitle) || pSeriesTitle.contains(itemTitleLower) || pName.contains('mock') || pName.contains('test') || pName.contains('full') || pName.contains('syllabus')) {
-          isMatch = true;
-        }
+      if (pName.isNotEmpty && pSeriesTitle.isEmpty && (pName == itemTitleLower || itemTitleLower.contains(pName))) {
+        isDirectMatch = true;
       }
 
-      if (isMatch) {
-        final paperTitleStr = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? p['name'] ?? 'Test Paper ${testMap.length + 1}').toString().trim();
+      if (isDirectMatch) {
+        final paperTitleStr = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? p['name'] ?? 'Test Paper').toString().trim();
         final key = pId.isNotEmpty ? pId.toLowerCase() : paperTitleStr.toLowerCase();
+
+        final qCount = (p['saved_questions_count'] is num && (p['saved_questions_count'] as num) > 0)
+            ? (p['saved_questions_count'] as num).toInt()
+            : ((p['question_count'] is num && (p['question_count'] as num) > 0)
+                ? (p['question_count'] as num).toInt()
+                : ((p['total_questions'] is num && (p['total_questions'] as num) > 0)
+                    ? (p['total_questions'] as num).toInt()
+                    : 0));
 
         if (!testMap.containsKey(key)) {
           testMap[key] = {
@@ -398,41 +408,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
             'number': '${testMap.length + 1 < 10 ? '0${testMap.length + 1}' : '${testMap.length + 1}'}',
             'title': paperTitleStr,
             'type': p['paper_type'] ?? p['type'] ?? item.testType,
-            'questions': p['saved_questions_count'] ?? p['question_count'] ?? p['total_questions'] ?? (item.exam.contains('JEE') ? 90 : 200),
+            'questions': qCount,
             'marks': p['total_marks'] ?? p['marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
             'duration': p['duration_minutes'] ?? p['duration'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
-            'status': p['status'] ?? 'Not Attempted',
+            'status': p['status'] ?? 'Published',
+            'test_date_time': p['test_date_time'] ?? p['scheduled_at'] ?? p['start_time'],
           };
+        } else {
+          if (qCount > 0 && (testMap[key]!['questions'] == 0 || testMap[key]!['questions'] == null)) {
+            testMap[key]!['questions'] = qCount;
+          }
         }
       }
     }
 
-    // 3. Fallback: Ensure total test count matches created total or at least 5 tests
-    int targetTotalCount = testMap.length;
-    if (item.testCount > targetTotalCount) {
-      targetTotalCount = item.testCount;
-    }
-    if (targetTotalCount < 5) {
-      targetTotalCount = 5; // Minimum 5 created test papers dynamically resolved
-    }
-
     final result = testMap.values.toList();
-    if (result.length < targetTotalCount) {
-      for (int i = result.length + 1; i <= targetTotalCount; i++) {
-        final numStr = i < 10 ? '0$i' : '$i';
-        result.add({
-          'id': 'generated_test_$i',
-          'number': numStr,
-          'title': '${item.exam} Full Syllabus Mock Test $numStr',
-          'type': item.testType,
-          'questions': item.exam.contains('JEE') ? 90 : 200,
-          'marks': item.exam.contains('JEE') ? 300 : 720,
-          'duration': item.durationMinutes > 0 ? item.durationMinutes : 180,
-          'status': 'Not Attempted',
-        });
-      }
-    }
-
     for (int i = 0; i < result.length; i++) {
       result[i]['number'] = '${i + 1 < 10 ? '0${i + 1}' : '${i + 1}'}';
     }

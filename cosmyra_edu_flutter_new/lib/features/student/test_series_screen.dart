@@ -2237,78 +2237,95 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
 
   List<Map<String, dynamic>> _resolveSeriesTests() {
     final item = widget.item;
+    final Map<String, Map<String, dynamic>> testMap = {};
 
-    // 0. If real tests are explicitly defined by admin, return them
-    if (item.tests.isNotEmpty) {
-      return item.tests.map((t) {
+    // 1. Add real embedded tests attached to this test series item
+    for (var t in item.tests) {
+      if (t is Map) {
         final m = Map<String, dynamic>.from(t);
-        m['id'] = (m['id'] ?? 'test_${item.id}_${m['title']}').toString();
-        m['title'] = (m['title'] ?? 'Mock Test').toString();
-        m['type'] = (m['type'] ?? item.testType).toString();
-        m['questions'] = m['questions'] ?? (item.exam.contains('JEE') ? 90 : 200);
-        m['marks'] = m['marks'] ?? (item.exam.contains('JEE') ? 300 : 720);
-        m['duration'] = m['duration'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180);
-        m['status'] = (m['status'] ?? 'Not Attempted').toString();
-        return m;
-      }).toList();
-    }
-
-    final List<Map<String, dynamic>> tests = [];
-
-    // 1. Check for real tests in dbPapers matching this series
-    for (var p in widget.dbPapers) {
-      final pTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? '').toString().trim();
-      final name = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().trim();
-      if (pTitle.toLowerCase() == item.title.toLowerCase() || (name.isNotEmpty && name.toLowerCase() == item.title.toLowerCase())) {
-        tests.add({
-          'id': p['id']?.toString() ?? 'test_${tests.length + 1}',
-          'title': name.isNotEmpty ? name : 'Mock Test ${tests.length + 1}',
-          'type': item.testType,
-          'questions': p['saved_questions_count'] ?? p['question_count'] ?? (item.exam.contains('JEE') ? 90 : 200),
-          'marks': p['total_marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
-          'duration': p['duration_minutes'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
-          'status': p['status'] ?? 'Not Attempted',
-        });
+        final id = (m['id'] ?? m['paper_id'] ?? '').toString().trim();
+        final title = (m['title'] ?? m['paper_name'] ?? m['name'] ?? '').toString().trim();
+        if (title.isNotEmpty) {
+          final key = id.isNotEmpty ? id.toLowerCase() : title.toLowerCase();
+          testMap[key] = {
+            'id': id.isNotEmpty ? id : 'test_${testMap.length + 1}',
+            'number': (m['number'] ?? '${testMap.length + 1 < 10 ? '0${testMap.length + 1}' : '${testMap.length + 1}'}').toString(),
+            'title': title,
+            'type': (m['type'] ?? m['paper_type'] ?? item.testType).toString(),
+            'questions': (m['questions'] is num && (m['questions'] as num) > 0)
+                ? (m['questions'] as num).toInt()
+                : ((m['saved_questions_count'] is num && (m['saved_questions_count'] as num) > 0)
+                    ? (m['saved_questions_count'] as num).toInt()
+                    : ((m['question_count'] is num && (m['question_count'] as num) > 0)
+                        ? (m['question_count'] as num).toInt()
+                        : 0)),
+            'marks': m['marks'] ?? m['total_marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
+            'duration': m['duration'] ?? m['duration_minutes'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
+            'status': (m['status'] ?? 'Published').toString(),
+            'test_date_time': m['test_date_time'] ?? m['scheduled_at'] ?? m['start_time'],
+          };
+        }
       }
     }
 
-    // 2. Supplement up to item.testCount with structured mock tests
-    final targetTotal = item.testCount > 0 ? item.testCount : 10;
-    final int defaultQCount = item.exam.contains('JEE') ? 90 : 200;
-    final int defaultMarks = item.exam.contains('JEE') ? 300 : 720;
+    // 2. Scan widget.dbPapers for created papers specifically assigned to this test series
+    final itemTitleLower = item.title.trim().toLowerCase();
+    final itemIdLower = item.id.trim().toLowerCase();
 
-    final mockNames = [
-      'All India Open Grand Mock 01',
-      'High Yield NTA Standard Mock 02',
-      'Physics & Chemistry Core Mastery Mock 03',
-      item.exam.contains('JEE') ? 'Mathematics Advance Problem-Solving Mock 04' : 'Biology / Botany & Zoology Complete Mock 04',
-      'National All India Ranker Grand Mock 05',
-      'Speed & Negative Marking Control Mock 06',
-      'Previous 10-Year High-Weightage Mock 07',
-      'Target Score Maximizer Mock 08',
-      'Pre-Exam Final Readiness Mock 09',
-      'All India Rank Prediction Mock 10',
-      'Ultimate Final Sprint Mock 11',
-      'Championship Benchmark Mock 12',
-    ];
+    for (var p in widget.dbPapers) {
+      final pId = (p['id'] ?? '').toString().trim();
+      final pSeriesId = (p['test_series_id'] ?? p['series_id'] ?? p['testSeriesId'] ?? '').toString().trim().toLowerCase();
+      final pSeriesTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? p['test_series'] ?? p['testSeriesTitle'] ?? p['test_series_name'] ?? '').toString().trim().toLowerCase();
+      final pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? p['name'] ?? '').toString().trim().toLowerCase();
 
-    while (tests.length < targetTotal) {
-      final idx = tests.length;
-      final title = idx < mockNames.length
-          ? mockNames[idx]
-          : '${item.testType} Syllabus Mock Test ${idx + 1}';
-      tests.add({
-        'id': '${item.id}_test_${idx + 1}',
-        'title': title,
-        'type': item.testType,
-        'questions': defaultQCount,
-        'marks': defaultMarks,
-        'duration': item.durationMinutes > 0 ? item.durationMinutes : 180,
-        'status': idx == 0 ? item.attemptStatus : 'Not Attempted',
-      });
+      bool isDirectMatch = false;
+      if (pSeriesId.isNotEmpty && (pSeriesId == itemIdLower || itemIdLower.contains(pSeriesId) || pSeriesId.contains(itemIdLower))) {
+        isDirectMatch = true;
+      }
+      if (pSeriesTitle.isNotEmpty && (pSeriesTitle == itemTitleLower || itemTitleLower.contains(pSeriesTitle) || pSeriesTitle.contains(itemTitleLower))) {
+        isDirectMatch = true;
+      }
+      if (pName.isNotEmpty && pSeriesTitle.isEmpty && (pName == itemTitleLower || itemTitleLower.contains(pName))) {
+        isDirectMatch = true;
+      }
+
+      if (isDirectMatch) {
+        final paperTitleStr = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? p['name'] ?? 'Test Paper').toString().trim();
+        final key = pId.isNotEmpty ? pId.toLowerCase() : paperTitleStr.toLowerCase();
+
+        final qCount = (p['saved_questions_count'] is num && (p['saved_questions_count'] as num) > 0)
+            ? (p['saved_questions_count'] as num).toInt()
+            : ((p['question_count'] is num && (p['question_count'] as num) > 0)
+                ? (p['question_count'] as num).toInt()
+                : ((p['total_questions'] is num && (p['total_questions'] as num) > 0)
+                    ? (p['total_questions'] as num).toInt()
+                    : 0));
+
+        if (!testMap.containsKey(key)) {
+          testMap[key] = {
+            'id': pId.isNotEmpty ? pId : 'test_${testMap.length + 1}',
+            'number': '${testMap.length + 1 < 10 ? '0${testMap.length + 1}' : '${testMap.length + 1}'}',
+            'title': paperTitleStr,
+            'type': p['paper_type'] ?? p['type'] ?? item.testType,
+            'questions': qCount,
+            'marks': p['total_marks'] ?? p['marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
+            'duration': p['duration_minutes'] ?? p['duration'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
+            'status': p['status'] ?? 'Published',
+            'test_date_time': p['test_date_time'] ?? p['scheduled_at'] ?? p['start_time'],
+          };
+        } else {
+          if (qCount > 0 && (testMap[key]!['questions'] == 0 || testMap[key]!['questions'] == null)) {
+            testMap[key]!['questions'] = qCount;
+          }
+        }
+      }
     }
 
-    return tests;
+    final result = testMap.values.toList();
+    for (int i = 0; i < result.length; i++) {
+      result[i]['number'] = '${i + 1 < 10 ? '0${i + 1}' : '${i + 1}'}';
+    }
+    return result;
   }
 
   @override
