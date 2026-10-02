@@ -116,14 +116,25 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       final isPoints = _selectedSystemMode == LeaderboardSystemMode.points;
       final currentUid = widget.userProfile?.id ?? SupabaseService.activeUserSession?.id;
 
+      String timePeriodStr = 'all';
+      if (_selectedTimeframe == LeaderboardTimeframe.today) {
+        timePeriodStr = 'daily';
+      } else if (_selectedTimeframe == LeaderboardTimeframe.thisWeek) {
+        timePeriodStr = 'weekly';
+      } else if (_selectedTimeframe == LeaderboardTimeframe.thisMonth) {
+        timePeriodStr = 'monthly';
+      }
+
       final result = await SupabaseService.fetchRealLeaderboardRankings(
         exam: examKey,
         isPointsMode: isPoints,
         currentUserId: currentUid,
+        timePeriod: timePeriodStr,
+        forceRealtime: true,
       );
 
       final List rawRankings = result['rankings'] as List? ?? [];
-      final Map<String, dynamic>? rawCurrentUser = result['currentUser'] as Map<String, dynamic>?;
+      final Map<String, dynamic>? rawCurrentUser = (result['currentUserRank'] ?? result['currentUser']) as Map<String, dynamic>?;
 
       final List<LeaderboardStudent> loadedStudents = [];
       for (var r in rawRankings) {

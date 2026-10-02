@@ -9159,6 +9159,7 @@ class SupabaseService {
     required bool isPointsMode,
     String? currentUserId,
     bool forceRealtime = false,
+    String timePeriod = 'all', // 'daily', 'weekly', 'monthly', 'all'
   }) async {
     final List<Map<String, dynamic>> rankings = [];
     Map<String, dynamic>? currentUserRank;
@@ -9202,32 +9203,49 @@ class SupabaseService {
         }
       }
 
-      // REAL MODE: Query actual test_attempts from Supabase (Strictly NO fake seed profiles!)
+      // REAL MODE: Query actual test_attempts & real user profiles from Supabase
+      DateTime? timeCutoff;
+      if (timePeriod == 'daily' || timePeriod == 'day') {
+        timeCutoff = DateTime.now().subtract(const Duration(hours: 24));
+      } else if (timePeriod == 'weekly' || timePeriod == 'week') {
+        timeCutoff = DateTime.now().subtract(const Duration(days: 7));
+      } else if (timePeriod == 'monthly' || timePeriod == 'month') {
+        timeCutoff = DateTime.now().subtract(const Duration(days: 30));
+      }
+
       List<dynamic> res = [];
       try {
+        var query = client
+            .from('test_attempts')
+            .select('student_id, total_score, max_score, correct_count, accuracy_percentage, submitted_at, test_series_id');
+
         if (testSeriesId != null && testSeriesId.isNotEmpty) {
+          query = query.or('test_series_id.eq.$testSeriesId,product_id.eq.$testSeriesId');
+        }
+        if (timeCutoff != null) {
+          query = query.gte('submitted_at', timeCutoff.toIso8601String());
+        }
+
+        final resList = await query.order('total_score', ascending: false).limit(200);
+        res = resList as List<dynamic>;
+      } catch (e) {
+        debugPrint('Notice filtering test_attempts: $e');
+      }
+
+      if (res.isEmpty && (testSeriesId == null || testSeriesId.isEmpty) && timeCutoff == null) {
+        try {
           final resList = await client
               .from('test_attempts')
-              .select('student_id, total_score, max_score, correct_count, accuracy_percentage, submitted_at, test_series_id')
-              .or('test_series_id.eq.$testSeriesId,product_id.eq.$testSeriesId')
+              .select('student_id, total_score, max_score, correct_count, accuracy_percentage, submitted_at')
               .order('total_score', ascending: false)
-              .limit(100);
+              .limit(200);
           res = resList as List<dynamic>;
+        } catch (e) {
+          debugPrint('Notice querying fallback test_attempts: $e');
         }
-      } catch (e) {
-        debugPrint('Notice filtering test_attempts by test_series_id: $e');
       }
 
-      if (res.isEmpty && (testSeriesId == null || testSeriesId.isEmpty)) {
-        final resList = await client
-            .from('test_attempts')
-            .select('student_id, total_score, max_score, correct_count, accuracy_percentage, submitted_at')
-            .order('total_score', ascending: false)
-            .limit(100);
-        res = resList as List<dynamic>;
-      }
-
-      // Fetch user profiles to resolve real names & avatars
+      // Fetch all registered user profiles to resolve real names & avatars
       final allProfiles = await fetchAllProfiles();
       final profileMap = {for (var p in allProfiles) p.id: p};
       final activeUser = client.auth.currentUser;
@@ -9238,74 +9256,128 @@ class SupabaseService {
               activeUserMeta?['avatar'])
           ?.toString();
 
-      if (res.isNotEmpty) {
-        int rankCounter = 1;
-        for (var row in res) {
-          final sId = row['student_id']?.toString() ?? '';
-          final profile = profileMap[sId];
-          var studentName = (profile?.fullName != null && profile!.fullName.trim().isNotEmpty) ? profile.fullName.trim() : '';
-          var avatar = profile?.avatarUrl ?? '';
+      // Group attempts by student_id
+      final Map<String, Map<String, dynamic>> studentAggMap = {};
 
-          if ((studentName.isEmpty || avatar.isEmpty) &&
-              (sId == currentUserId || sId == activeUserSession?.id || sId == activeUser?.id)) {
-            if (studentName.isEmpty) {
-              studentName = activeUserSession?.fullName ??
-                  (activeUserMeta?['full_name'] ?? activeUserMeta?['name'])?.toString() ??
-                  activeUser?.email?.split('@').first ??
-                  '';
-            }
-            if (avatar.isEmpty) {
-              avatar = activeUserSession?.avatarUrl ?? activeGoogleAvatar ?? '';
-            }
-          }
+      for (var row in res) {
+        final sId = row['student_id']?.toString() ?? '';
+        if (sId.isEmpty) continue;
 
-          if (studentName.isEmpty) {
-            studentName = 'Student ${rankCounter + 10}';
-          }
+        final score = (row['total_score'] as num?)?.toInt() ?? 0;
+        final maxScore = (row['max_score'] as num?)?.toInt() ?? 720;
+        final correct = (row['correct_count'] as num?)?.toInt() ?? 0;
+        final accuracy = (row['accuracy_percentage'] as num?)?.toDouble() ?? 85.0;
 
-          final score = (row['total_score'] as num?)?.toInt() ?? 0;
-          final maxScore = (row['max_score'] as num?)?.toInt() ?? 720;
-          final correct = (row['correct_count'] as num?)?.toInt() ?? 0;
-          final accuracy = (row['accuracy_percentage'] as num?)?.toDouble() ?? 85.0;
-          final points = (score * 10) + (correct * 5);
-
-          final item = {
-            'rank': rankCounter,
-            'id': sId,
-            'name': studentName,
-            'avatar': avatar,
-            'score': score,
+        if (!studentAggMap.containsKey(sId)) {
+          studentAggMap[sId] = {
+            'student_id': sId,
+            'best_score': score,
             'max_score': maxScore,
-            'correct_count': correct,
+            'total_correct': correct,
             'accuracy': accuracy,
-            'points': points,
-            'target': profile?.targetExam ?? exam,
-            'is_current_user': currentUserId != null && sId == currentUserId,
-            'rank_change': 0,
-            'isVerified': true,
+            'attempts_count': 1,
           };
-
-          if (item['is_current_user'] == true) {
-            currentUserRank = item;
+        } else {
+          final existing = studentAggMap[sId]!;
+          if (score > (existing['best_score'] as int)) {
+            existing['best_score'] = score;
+            existing['max_score'] = maxScore;
           }
-
-          rankings.add(item);
-          rankCounter++;
+          existing['total_correct'] = (existing['total_correct'] as int) + correct;
+          existing['accuracy'] = (((existing['accuracy'] as double) + accuracy) / 2);
+          existing['attempts_count'] = (existing['attempts_count'] as int) + 1;
         }
       }
 
-      // In REAL mode, return ONLY real student rankings (no fake seed profiles added)
+      // Always include all registered real student profiles so every real user & avatar is represented
+      for (var p in allProfiles) {
+        if (p.id.isNotEmpty && !studentAggMap.containsKey(p.id)) {
+          studentAggMap[p.id] = {
+            'student_id': p.id,
+            'best_score': 0,
+            'max_score': exam.contains('JEE') ? 300 : 720,
+            'total_correct': 0,
+            'accuracy': 0.0,
+            'attempts_count': 0,
+          };
+        }
+      }
+
+      // Build ranking items
+      final List<Map<String, dynamic>> studentList = [];
+
+      studentAggMap.forEach((sId, data) {
+        final profile = profileMap[sId];
+        var studentName = (profile?.fullName != null && profile!.fullName.trim().isNotEmpty) ? profile.fullName.trim() : '';
+        var avatar = profile?.avatarUrl ?? '';
+
+        if ((studentName.isEmpty || avatar.isEmpty) &&
+            (sId == currentUserId || sId == activeUserSession?.id || sId == activeUser?.id)) {
+          if (studentName.isEmpty) {
+            studentName = activeUserSession?.fullName ??
+                (activeUserMeta?['full_name'] ?? activeUserMeta?['name'])?.toString() ??
+                activeUser?.email?.split('@').first ??
+                '';
+          }
+          if (avatar.isEmpty) {
+            avatar = activeUserSession?.avatarUrl ?? activeGoogleAvatar ?? '';
+          }
+        }
+
+        if (studentName.isEmpty) {
+          studentName = 'Student ${studentList.length + 1}';
+        }
+
+        final bestScore = data['best_score'] as int;
+        final maxS = data['max_score'] as int;
+        final totalCorrect = data['total_correct'] as int;
+        // Points system: 10 points awarded for every correct question
+        final points = totalCorrect * 10;
+        final accuracy = (data['accuracy'] as double).clamp(0.0, 100.0);
+
+        studentList.add({
+          'id': sId,
+          'name': studentName,
+          'avatar': avatar,
+          'score': bestScore,
+          'max_score': maxS,
+          'correct_count': totalCorrect,
+          'accuracy': accuracy,
+          'points': points,
+          'target': profile?.targetExam ?? exam,
+          'is_current_user': currentUserId != null && sId == currentUserId,
+          'rank_change': 0,
+          'isVerified': true,
+        });
+      });
+
+      // Sort by Points or Best Score
+      if (isPointsMode) {
+        studentList.sort((a, b) => (b['points'] as int).compareTo(a['points'] as int));
+      } else {
+        studentList.sort((a, b) {
+          final c = (b['score'] as int).compareTo(a['score'] as int);
+          if (c != 0) return c;
+          return (b['points'] as int).compareTo(a['points'] as int);
+        });
+      }
+
+      // Assign ranks 1..N
+      for (int i = 0; i < studentList.length; i++) {
+        studentList[i]['rank'] = i + 1;
+        if (studentList[i]['is_current_user'] == true) {
+          currentUserRank = studentList[i];
+        }
+      }
+
       return {
-        'rankings': rankings,
+        'rankings': studentList,
         'currentUserRank': currentUserRank,
       };
     } catch (e) {
       debugPrint('Error fetching real leaderboard rankings: $e');
+      return {'rankings': <Map<String, dynamic>>[], 'currentUserRank': null};
     }
-    return {
-      'rankings': rankings,
-      'currentUserRank': currentUserRank,
-    };
   }
 
   /// Admin: Fetch all active & expired subscriptions

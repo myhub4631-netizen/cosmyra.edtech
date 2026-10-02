@@ -19,6 +19,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
   String _selectedTestSeries = 'All Test Series';
   String _searchQuery = '';
   String _statusFilter = 'All'; // 'All', 'Verified', 'Flagged', 'Disqualified'
+  String _selectedTimePeriod = 'all'; // 'all', 'daily', 'weekly', 'monthly'
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -38,6 +39,13 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
     'Physics Booster Chapter Series',
   ];
 
+  final Map<String, String> _timePeriodOptions = {
+    'all': 'All Time',
+    'daily': 'Daily (24h)',
+    'weekly': 'Weekly (7d)',
+    'monthly': 'Monthly (30d)',
+  };
+
   List<Map<String, dynamic>> _leaderboardData = [];
 
   @override
@@ -51,26 +59,25 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
     try {
       final settings = await SupabaseService.getAdminLeaderboardSettings();
       _activeMode = settings['mode'] as String? ?? 'real';
-      final entries = settings['entries'] as List<Map<String, dynamic>>? ?? [];
 
-      if (entries.isNotEmpty) {
-        _leaderboardData = List<Map<String, dynamic>>.from(entries);
-      } else {
-        _leaderboardData = _getDefaultDemoLeaderboard();
-      }
-
-      // Also try fetching live attempts to merge if list is empty
-      if (_leaderboardData.isEmpty) {
+      if (_activeMode == 'real') {
         final realResult = await SupabaseService.fetchRealLeaderboardRankings(
           exam: _selectedExam,
           isPointsMode: false,
+          timePeriod: _selectedTimePeriod,
+          forceRealtime: true,
         );
         final liveRankings = (realResult['rankings'] as List<dynamic>?)
                 ?.map((e) => Map<String, dynamic>.from(e as Map))
                 .toList() ??
             [];
-        if (liveRankings.isNotEmpty) {
-          _leaderboardData = liveRankings;
+        _leaderboardData = liveRankings;
+      } else {
+        final entries = settings['entries'] as List<Map<String, dynamic>>? ?? [];
+        if (entries.isNotEmpty) {
+          _leaderboardData = List<Map<String, dynamic>>.from(entries);
+        } else {
+          _leaderboardData = _getDefaultDemoLeaderboard();
         }
       }
     } catch (e) {
@@ -606,7 +613,35 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                     value: _selectedTestSeries,
                     items: _testSeriesOptions.map((e) => DropdownMenuItem(value: e, child: Text(e, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B))))).toList(),
                     onChanged: (val) {
-                      if (val != null) setState(() => _selectedTestSeries = val);
+                      if (val != null) {
+                        setState(() => _selectedTestSeries = val);
+                        _loadLeaderboardSettings();
+                      }
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+
+              // Time Period Dropdown (Daily, Weekly, Monthly, All Time)
+              Text('Period: ', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFC7D2FE)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedTimePeriod,
+                    icon: const Icon(Icons.calendar_today_rounded, size: 14, color: Color(0xFF4F46E5)),
+                    items: _timePeriodOptions.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF4338CA))))).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() => _selectedTimePeriod = val);
+                        _loadLeaderboardSettings();
+                      }
                     },
                   ),
                 ),
@@ -681,6 +716,7 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                 const Expanded(flex: 3, child: Text('Student Name & ID', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
                 const Expanded(flex: 3, child: Text('Test Series / Target Exam', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
                 const SizedBox(width: 90, child: Text('Score', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
+                const SizedBox(width: 100, child: Text('Points (10/Q)', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
                 const SizedBox(width: 80, child: Text('Accuracy', textAlign: TextAlign.right, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
                 const SizedBox(width: 100, child: Text('Status', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
                 const SizedBox(width: 120, child: Text('Actions', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)))),
@@ -702,6 +738,8 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
               final sId = item['id']?.toString() ?? '';
               final score = item['score'] ?? 0;
               final maxScore = item['max_score'] ?? 720;
+              final correctCount = (item['correct_count'] is num) ? (item['correct_count'] as num).toInt() : (score ~/ 4);
+              final points = (item['points'] is num) ? (item['points'] as num).toInt() : (correctCount * 10);
               final accuracy = item['accuracy'] ?? 85.0;
               final target = (item['target'] ?? 'NEET UG').toString();
               final isVerified = item['isVerified'] == true;
@@ -806,6 +844,27 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
                         '$score / $maxScore',
                         textAlign: TextAlign.right,
                         style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w900, color: const Color(0xFF059669)),
+                      ),
+                    ),
+
+                    // Total Points (10 points per correct question)
+                    SizedBox(
+                      width: 100,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '$points Pts',
+                            textAlign: TextAlign.right,
+                            style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800, color: const Color(0xFF2563EB)),
+                          ),
+                          Text(
+                            '$correctCount Correct',
+                            textAlign: TextAlign.right,
+                            style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                          ),
+                        ],
                       ),
                     ),
 
