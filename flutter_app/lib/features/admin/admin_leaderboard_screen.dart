@@ -58,7 +58,10 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
     setState(() => _isLoading = true);
     try {
       final settings = await SupabaseService.getAdminLeaderboardSettings();
-      _activeMode = settings['mode'] as String? ?? 'real';
+      final savedMode = settings['mode'] as String? ?? 'real';
+      if (_activeMode.isEmpty) {
+        _activeMode = (savedMode == 'real') ? 'real' : 'demo';
+      }
 
       if (_activeMode == 'real') {
         final realResult = await SupabaseService.fetchRealLeaderboardRankings(
@@ -82,7 +85,9 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       }
     } catch (e) {
       debugPrint('Error loading admin leaderboard data: $e');
-      _leaderboardData = _getDefaultDemoLeaderboard();
+      if (_activeMode != 'real') {
+        _leaderboardData = _getDefaultDemoLeaderboard();
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -203,25 +208,19 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
       final res = await SupabaseService.fetchRealLeaderboardRankings(
         exam: _selectedExam,
         isPointsMode: false,
+        timePeriod: _selectedTimePeriod,
+        forceRealtime: true,
       );
       final liveList = (res['rankings'] as List<dynamic>?)
               ?.map((e) => Map<String, dynamic>.from(e as Map))
               .toList() ??
           [];
 
-      if (liveList.isNotEmpty) {
-        setState(() {
-          _leaderboardData = liveList;
-          _activeMode = 'real';
-        });
-        await _saveSettings();
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No live test attempts found yet. Loaded default entries.')),
-          );
-        }
-      }
+      setState(() {
+        _leaderboardData = liveList;
+        _activeMode = 'real';
+      });
+      await _saveSettings();
     } catch (e) {
       debugPrint('Error fetching live attempts: $e');
     } finally {
@@ -437,9 +436,13 @@ class _AdminLeaderboardScreenState extends State<AdminLeaderboardScreen> {
   Widget _buildModeOptionTile(String mode, String title, String desc, IconData icon, Color activeColor) {
     final isSelected = _activeMode == mode;
     return InkWell(
-      onTap: () {
+      onTap: () async {
         setState(() => _activeMode = mode);
-        _saveSettings();
+        await SupabaseService.saveAdminLeaderboardSettings(
+          mode: mode,
+          entries: _leaderboardData,
+        );
+        _loadLeaderboardSettings();
       },
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
