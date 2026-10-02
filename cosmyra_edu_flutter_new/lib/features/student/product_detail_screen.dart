@@ -1501,38 +1501,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
         ? item.longDescription
         : 'Welcome to ${item.title}. This test series provides ${tests.length} tests designed specifically for ${item.exam} ${item.targetYear} aspirants with full syllabus coverage, detailed solutions, and instant analytics to track performance.';
 
-    final List<Map<String, dynamic>> featureTiles = item.features.isNotEmpty
-        ? item.features.map((f) => {'title': f.toString(), 'sub': 'Key Feature', 'icon': Icons.check_circle_outline}).toList()
-        : [
-            {
-              'title': '${tests.length} Practice Tests',
-              'sub': 'Full Syllabus & Chapter Papers',
-              'icon': Icons.description_outlined,
-              'bg': const Color(0xFFEFF6FF),
-              'color': const Color(0xFF2563EB),
-            },
-            {
-              'title': 'Detailed Solutions',
-              'sub': 'Step-by-step explanations with concepts',
-              'icon': Icons.menu_book_outlined,
-              'bg': const Color(0xFFF5F3FF),
-              'color': const Color(0xFF7C3AED),
-            },
-            {
-              'title': '$durationStr Duration',
-              'sub': 'Standard time limit per test paper',
-              'icon': Icons.access_time_rounded,
-              'bg': const Color(0xFFECFDF5),
-              'color': const Color(0xFF059669),
-            },
-            {
-              'title': item.validity,
-              'sub': 'Unlimited practice until exam date',
-              'icon': Icons.calendar_today_outlined,
-              'bg': const Color(0xFFFFF7ED),
-              'color': const Color(0xFFD97706),
-            },
-          ];
+    final List<Map<String, dynamic>> featureTiles = _parseFeatureTiles(
+      item.features,
+      tests,
+      item.exam,
+      durationStr,
+      item.validity,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1622,22 +1597,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               ),
               const SizedBox(height: 14),
 
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 2.2,
-                children: featureTiles.map((ft) {
-                  return _buildIncludedTile(
-                    (ft['icon'] as IconData?) ?? Icons.check_circle_outline,
-                    ft['title'].toString(),
-                    ft['sub'].toString(),
-                    (ft['bg'] as Color?) ?? const Color(0xFFEFF6FF),
-                    (ft['color'] as Color?) ?? const Color(0xFF2563EB),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth > 500;
+                  return GridView.count(
+                    crossAxisCount: isWide ? 2 : 1,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: isWide ? 2.6 : 3.2,
+                    children: featureTiles.map((ft) {
+                      return _buildIncludedTile(
+                        (ft['icon'] as IconData?) ?? Icons.check_circle_outline,
+                        ft['title'].toString(),
+                        ft['sub'].toString(),
+                        (ft['bg'] as Color?) ?? const Color(0xFFEFF6FF),
+                        (ft['color'] as Color?) ?? const Color(0xFF2563EB),
+                      );
+                    }).toList(),
                   );
-                }).toList(),
+                },
               ),
             ],
           ),
@@ -1654,24 +1634,195 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     );
   }
 
+  Map<String, String> _parseFeatureItem(dynamic f) {
+    String title = '';
+    String desc = '';
+
+    if (f is Map) {
+      title = (f['title'] ?? f['name'] ?? f['feature_name'] ?? f['feature'] ?? '').toString().trim();
+      desc = (f['description'] ?? f['desc'] ?? f['sub'] ?? f['subtitle'] ?? '').toString().trim();
+    } else if (f != null) {
+      final str = f.toString().trim();
+      if (str.startsWith('{') && str.endsWith('}')) {
+        try {
+          final decoded = jsonDecode(str);
+          if (decoded is Map) {
+            title = (decoded['title'] ?? decoded['name'] ?? decoded['feature'] ?? '').toString().trim();
+            desc = (decoded['description'] ?? decoded['desc'] ?? decoded['sub'] ?? '').toString().trim();
+          }
+        } catch (_) {
+          final titleMatch = RegExp(r'title:\s*([^,}]+)').firstMatch(str);
+          final descMatch = RegExp(r'description:\s*([^,}]+)').firstMatch(str);
+          if (titleMatch != null) {
+            title = titleMatch.group(1)?.trim() ?? '';
+          }
+          if (descMatch != null) {
+            desc = descMatch.group(1)?.trim() ?? '';
+          }
+          if (title.isEmpty) {
+            title = str.replaceAll(RegExp(r'[{}]'), '').trim();
+          }
+        }
+      } else {
+        title = str;
+      }
+    }
+
+    title = title.replaceAll(RegExp(r'^\{|\}$'), '').trim();
+    desc = desc.replaceAll(RegExp(r'^\{|\}$'), '').trim();
+
+    if (desc.isEmpty || desc.toLowerCase() == 'key feature') {
+      final lower = title.toLowerCase();
+      if (lower.contains('nta') || lower.contains('pattern')) {
+        desc = 'Matches exact NTA exam pattern & weightage';
+      } else if (lower.contains('rank') || lower.contains('prediction') || lower.contains('air')) {
+        desc = 'Real-time All India Rank & percentile benchmarking';
+      } else if (lower.contains('solution') || lower.contains('step')) {
+        desc = 'Detailed step-by-step video & text solutions';
+      } else if (lower.contains('analytic') || lower.contains('performance') || lower.contains('deep')) {
+        desc = 'Topic-wise weakness, accuracy & speed insights';
+      } else {
+        desc = 'Includes practice questions & verified answer keys';
+      }
+    }
+
+    return {
+      'title': title,
+      'description': desc,
+    };
+  }
+
+  List<Map<String, dynamic>> _parseFeatureTiles(
+    List<dynamic> features,
+    List<Map<String, dynamic>> tests,
+    String exam,
+    String durationStr,
+    String validity,
+  ) {
+    final List<Map<String, dynamic>> tiles = [];
+
+    final List<Color> bgColors = [
+      const Color(0xFFEFF6FF),
+      const Color(0xFFF5F3FF),
+      const Color(0xFFECFDF5),
+      const Color(0xFFFFF7ED),
+      const Color(0xFFFEF2F2),
+      const Color(0xFFF0FDF4),
+    ];
+    final List<Color> iconColors = [
+      const Color(0xFF2563EB),
+      const Color(0xFF7C3AED),
+      const Color(0xFF059669),
+      const Color(0xFFD97706),
+      const Color(0xFFDC2626),
+      const Color(0xFF16A34A),
+    ];
+    final List<IconData> defaultIcons = [
+      Icons.verified_outlined,
+      Icons.emoji_events_outlined,
+      Icons.fact_check_outlined,
+      Icons.insights_rounded,
+      Icons.menu_book_outlined,
+      Icons.workspace_premium_outlined,
+    ];
+
+    if (features.isNotEmpty) {
+      for (int i = 0; i < features.length; i++) {
+        final parsed = _parseFeatureItem(features[i]);
+        final title = parsed['title']!;
+        final sub = parsed['description']!;
+
+        if (title.isEmpty) continue;
+
+        IconData icon = defaultIcons[i % defaultIcons.length];
+        final lower = title.toLowerCase();
+        if (lower.contains('pattern') || lower.contains('nta')) {
+          icon = Icons.verified_outlined;
+        } else if (lower.contains('rank') || lower.contains('air') || lower.contains('prediction')) {
+          icon = Icons.emoji_events_outlined;
+        } else if (lower.contains('solution') || lower.contains('explanation') || lower.contains('step')) {
+          icon = Icons.fact_check_outlined;
+        } else if (lower.contains('analytic') || lower.contains('performance') || lower.contains('deep')) {
+          icon = Icons.insights_rounded;
+        } else if (lower.contains('time') || lower.contains('duration')) {
+          icon = Icons.access_time_rounded;
+        } else if (lower.contains('test') || lower.contains('paper')) {
+          icon = Icons.description_outlined;
+        }
+
+        tiles.add({
+          'title': title,
+          'sub': sub,
+          'icon': icon,
+          'bg': bgColors[i % bgColors.length],
+          'color': iconColors[i % iconColors.length],
+        });
+      }
+    }
+
+    if (tiles.isEmpty) {
+      tiles.addAll([
+        {
+          'title': '${tests.length} Practice Tests',
+          'sub': 'Full Syllabus & Chapter Papers',
+          'icon': Icons.description_outlined,
+          'bg': const Color(0xFFEFF6FF),
+          'color': const Color(0xFF2563EB),
+        },
+        {
+          'title': 'Detailed Solutions',
+          'sub': 'Step-by-step explanations with concepts',
+          'icon': Icons.menu_book_outlined,
+          'bg': const Color(0xFFF5F3FF),
+          'color': const Color(0xFF7C3AED),
+        },
+        {
+          'title': '$durationStr Duration',
+          'sub': 'Standard time limit per test paper',
+          'icon': Icons.access_time_rounded,
+          'bg': const Color(0xFFECFDF5),
+          'color': const Color(0xFF059669),
+        },
+        {
+          'title': validity,
+          'sub': 'Unlimited practice until exam date',
+          'icon': Icons.calendar_today_outlined,
+          'bg': const Color(0xFFFFF7ED),
+          'color': const Color(0xFFD97706),
+        },
+      ]);
+    }
+
+    return tiles;
+  }
+
   Widget _buildIncludedTile(IconData icon, String title, String subtitle, Color bgColor, Color iconColor) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: iconColor.withValues(alpha: 0.15)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: iconColor.withValues(alpha: 0.08),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Icon(icon, color: iconColor, size: 20),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1679,14 +1830,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                  maxLines: 1,
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A), height: 1.2),
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
                   subtitle,
-                  style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B)),
+                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w400, color: const Color(0xFF64748B), height: 1.25),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),

@@ -2580,18 +2580,52 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
             runSpacing: 12,
             children: item.features.isNotEmpty
                 ? item.features.map((f) {
+                    String title = '';
+                    String desc = '';
                     if (f is Map) {
-                      return _buildFeatureCard(
-                        Icons.verified_outlined,
-                        (f['title'] ?? 'Feature').toString(),
-                        (f['description'] ?? 'Comprehensive coverage for high exam scores.').toString(),
-                        const Color(0xFF2563EB),
-                      );
+                      title = (f['title'] ?? f['name'] ?? f['feature'] ?? '').toString().trim();
+                      desc = (f['description'] ?? f['desc'] ?? f['sub'] ?? '').toString().trim();
+                    } else if (f != null) {
+                      final str = f.toString().trim();
+                      if (str.startsWith('{') && str.endsWith('}')) {
+                        final titleMatch = RegExp(r'title:\s*([^,}]+)').firstMatch(str);
+                        final descMatch = RegExp(r'description:\s*([^,}]+)').firstMatch(str);
+                        if (titleMatch != null) title = titleMatch.group(1)?.trim() ?? '';
+                        if (descMatch != null) desc = descMatch.group(1)?.trim() ?? '';
+                        if (title.isEmpty) title = str.replaceAll(RegExp(r'[{}]'), '').trim();
+                      } else {
+                        title = str;
+                      }
+                    }
+                    title = title.replaceAll(RegExp(r'^\{|\}$'), '').trim();
+                    desc = desc.replaceAll(RegExp(r'^\{|\}$'), '').trim();
+                    if (desc.isEmpty || desc.toLowerCase() == 'key feature') {
+                      final lower = title.toLowerCase();
+                      if (lower.contains('nta') || lower.contains('pattern')) {
+                        desc = 'Matches exact NTA exam pattern & weightage';
+                      } else if (lower.contains('rank') || lower.contains('prediction') || lower.contains('air')) {
+                        desc = 'Real-time All India Rank & percentile benchmarking';
+                      } else if (lower.contains('solution') || lower.contains('step')) {
+                        desc = 'Detailed step-by-step video & text solutions';
+                      } else if (lower.contains('analytic') || lower.contains('performance')) {
+                        desc = 'Topic-wise weakness, accuracy & speed insights';
+                      } else {
+                        desc = 'Comprehensive coverage for high exam scores';
+                      }
+                    }
+                    IconData icon = Icons.verified_outlined;
+                    final lower = title.toLowerCase();
+                    if (lower.contains('rank') || lower.contains('air') || lower.contains('prediction')) {
+                      icon = Icons.emoji_events_outlined;
+                    } else if (lower.contains('solution') || lower.contains('step')) {
+                      icon = Icons.fact_check_outlined;
+                    } else if (lower.contains('analytic') || lower.contains('performance')) {
+                      icon = Icons.insights_rounded;
                     }
                     return _buildFeatureCard(
-                      Icons.verified_outlined,
-                      f.toString(),
-                      'Key examination preparation inclusion.',
+                      icon,
+                      title,
+                      desc,
                       const Color(0xFF2563EB),
                     );
                   }).toList()
