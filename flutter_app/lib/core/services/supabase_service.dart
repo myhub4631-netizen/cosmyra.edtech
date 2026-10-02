@@ -9155,6 +9155,7 @@ class SupabaseService {
   /// Realtime Leaderboard: Fetch actual student rankings from test_attempts & profiles
   static Future<Map<String, dynamic>> fetchRealLeaderboardRankings({
     required String exam,
+    String? testSeriesId,
     required bool isPointsMode,
     String? currentUserId,
   }) async {
@@ -9166,10 +9167,15 @@ class SupabaseService {
       final mode = adminSettings['mode'] as String? ?? 'real';
       final customEntries = adminSettings['entries'] as List<Map<String, dynamic>>? ?? [];
 
+      // CUSTOM MODE: Return admin-configured custom leaderboard entries
       if (mode == 'custom' && customEntries.isNotEmpty) {
         final filtered = customEntries.where((e) {
           final target = (e['target'] ?? e['exam'] ?? '').toString().toUpperCase();
-          return target.isEmpty || target.contains(exam.toUpperCase()) || exam.toUpperCase().contains(target) || target.contains('ALL');
+          return target.isEmpty ||
+              target.contains(exam.toUpperCase()) ||
+              exam.toUpperCase().contains(target) ||
+              target.contains('ALL') ||
+              (testSeriesId != null && e['test_series_id'] == testSeriesId);
         }).toList();
 
         final list = filtered.isNotEmpty ? filtered : customEntries;
@@ -9193,14 +9199,32 @@ class SupabaseService {
         };
       }
 
-      // 1. Query test_attempts from Supabase
-      final res = await client
-          .from('test_attempts')
-          .select('student_id, total_score, max_score, correct_count, accuracy_percentage, submitted_at')
-          .order('total_score', ascending: false)
-          .limit(100);
+      // REAL MODE: Query actual test_attempts from Supabase (Strictly NO fake seed profiles!)
+      List<dynamic> res = [];
+      try {
+        if (testSeriesId != null && testSeriesId.isNotEmpty) {
+          final resList = await client
+              .from('test_attempts')
+              .select('student_id, total_score, max_score, correct_count, accuracy_percentage, submitted_at, test_series_id')
+              .or('test_series_id.eq.$testSeriesId,product_id.eq.$testSeriesId')
+              .order('total_score', ascending: false)
+              .limit(100);
+          res = resList as List<dynamic>;
+        }
+      } catch (e) {
+        debugPrint('Notice filtering test_attempts by test_series_id: $e');
+      }
 
-      // 2. Fetch profiles to get student names and avatars
+      if (res.isEmpty) {
+        final resList = await client
+            .from('test_attempts')
+            .select('student_id, total_score, max_score, correct_count, accuracy_percentage, submitted_at')
+            .order('total_score', ascending: false)
+            .limit(100);
+        res = resList as List<dynamic>;
+      }
+
+      // Fetch user profiles to resolve real names & avatars
       final allProfiles = await fetchAllProfiles();
       final profileMap = {for (var p in allProfiles) p.id: p};
       final activeUser = client.auth.currentUser;
@@ -9233,14 +9257,13 @@ class SupabaseService {
           }
 
           if (studentName.isEmpty) {
-            studentName = 'Aspirant ${rankCounter + 10}';
+            studentName = 'Student ${rankCounter + 10}';
           }
 
           final score = (row['total_score'] as num?)?.toInt() ?? 0;
           final maxScore = (row['max_score'] as num?)?.toInt() ?? 720;
           final correct = (row['correct_count'] as num?)?.toInt() ?? 0;
           final accuracy = (row['accuracy_percentage'] as num?)?.toDouble() ?? 85.0;
-          // Points formula: 10 pts per score mark + 5 pts per correct question
           final points = (score * 10) + (correct * 5);
 
           final item = {
@@ -9255,7 +9278,8 @@ class SupabaseService {
             'points': points,
             'target': profile?.targetExam ?? exam,
             'is_current_user': currentUserId != null && sId == currentUserId,
-            'rank_change': (rankCounter % 3 == 0) ? -1 : ((rankCounter % 2 == 0) ? 2 : 0),
+            'rank_change': 0,
+            'isVerified': true,
           };
 
           if (item['is_current_user'] == true) {
@@ -9266,108 +9290,18 @@ class SupabaseService {
           rankCounter++;
         }
       }
+
+      // In REAL mode, return ONLY real student rankings (no fake seed profiles added)
+      return {
+        'rankings': rankings,
+        'currentUserRank': currentUserRank,
+      };
     } catch (e) {
-      debugPrint('Notice querying realtime test_attempts: $e');
+      debugPrint('Error fetching real leaderboard rankings: $e');
     }
-
-    // 3. Fallback / supplement with registered profiles if test_attempts is small
-    if (rankings.length < 5) {
-      final profiles = await fetchAllProfiles();
-      final candidates = profiles.isNotEmpty ? profiles : [
-        getMockProfile(role: 'student'),
-      ];
-
-      // Base scores for NEET / JEE
-      final isNeet = exam.toUpperCase().contains('NEET');
-      final baseMax = isNeet ? 720 : 300;
-      final seedScores = isNeet ? [720, 715, 710, 705, 695, 680, 672] : [295, 290, 285, 278, 270, 262, 255];
-
-      for (int i = 0; i < seedScores.length; i++) {
-        final prof = (i < candidates.length) ? candidates[i] : null;
-        final score = seedScores[i];
-        final correct = (score / 4).round();
-        final points = (score * 10) + (correct * 5);
-        var name = (prof != null && prof.fullName.isNotEmpty) ? prof.fullName : (i == 0 ? 'Aarav Sharma' : (i == 1 ? 'Sneha Patel' : (i == 2 ? 'Rohan Verma' : 'Ishita Sen')));
-        var avatar = prof?.avatarUrl ?? '';
-
-        final activeUser = client.auth.currentUser;
-        final activeUserMeta = activeUser?.userMetadata;
-        final activeGoogleAvatar = (activeUserMeta?['avatar_url'] ??
-                activeUserMeta?['picture'] ??
-                activeUserMeta?['photo_url'] ??
-                activeUserMeta?['avatar'])
-            ?.toString();
-
-        if (avatar.isEmpty && (prof?.id == currentUserId || prof?.id == activeUserSession?.id || prof?.id == activeUser?.id)) {
-          avatar = activeUserSession?.avatarUrl ?? activeGoogleAvatar ?? '';
-        }
-
-        final item = {
-          'rank': i + 1,
-          'id': prof?.id ?? 'seed_$i',
-          'name': name,
-          'avatar': avatar,
-          'score': score,
-          'max_score': baseMax,
-          'correct_count': correct,
-          'accuracy': (99.5 - (i * 0.8)).clamp(70.0, 100.0),
-          'points': points,
-          'target': '$exam 2026',
-          'is_current_user': prof != null && currentUserId != null && prof.id == currentUserId,
-          'rank_change': i == 1 ? 2 : (i == 2 ? -1 : 0),
-        };
-
-        if (item['is_current_user'] == true) {
-          currentUserRank = item;
-        }
-
-        if (!rankings.any((r) => r['name'] == name)) {
-          rankings.add(item);
-        }
-      }
-    }
-
-    // Sort rankings by points (if isPointsMode) or score (if marks mode)
-    if (isPointsMode) {
-      rankings.sort((a, b) => ((b['points'] as num?) ?? 0).compareTo((a['points'] as num?) ?? 0));
-    } else {
-      rankings.sort((a, b) => ((b['score'] as num?) ?? 0).compareTo((a['score'] as num?) ?? 0));
-    }
-
-    // Re-assign 1-based ranks
-    for (int i = 0; i < rankings.length; i++) {
-      rankings[i]['rank'] = i + 1;
-      if (rankings[i]['is_current_user'] == true) {
-        currentUserRank = rankings[i];
-      }
-    }
-
-    // Ensure currentUserRank exists
-    final activeUser = client.auth.currentUser;
-    final activeUserMeta = activeUser?.userMetadata;
-    final activeGoogleAvatar = (activeUserMeta?['avatar_url'] ??
-            activeUserMeta?['picture'] ??
-            activeUserMeta?['photo_url'] ??
-            activeUserMeta?['avatar'])
-        ?.toString();
-
-    currentUserRank ??= {
-      'rank': 1248,
-      'name': activeUserSession?.fullName ?? 'You',
-      'avatar': activeUserSession?.avatarUrl ?? activeGoogleAvatar ?? '',
-      'score': 612,
-      'max_score': 720,
-      'points': 6120,
-      'accuracy': 85.0,
-      'target': '$exam 2026',
-      'rank_change': 156,
-      'is_current_user': true,
-    };
-
     return {
       'rankings': rankings,
-      'currentUser': currentUserRank,
-      'updated_at': DateTime.now().toIso8601String(),
+      'currentUserRank': currentUserRank,
     };
   }
 

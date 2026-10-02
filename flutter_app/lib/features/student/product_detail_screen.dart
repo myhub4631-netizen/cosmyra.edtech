@@ -322,6 +322,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with SingleTi
     final user = SupabaseService.activeUserSession;
     final result = await SupabaseService.fetchRealLeaderboardRankings(
       exam: _product?.exam ?? 'NEET',
+      testSeriesId: widget.productId,
       isPointsMode: _isPointsMode,
       currentUserId: user?.id,
     );
