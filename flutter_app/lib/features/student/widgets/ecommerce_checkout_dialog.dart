@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/cart_service.dart';
@@ -36,7 +37,7 @@ class EcommerceCheckoutDialog extends StatefulWidget {
   State<EcommerceCheckoutDialog> createState() => _EcommerceCheckoutDialogState();
 }
 
-class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
+class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> with SingleTickerProviderStateMixin {
   final TextEditingController _couponCtrl = TextEditingController();
   final TextEditingController _nameCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
@@ -50,9 +51,32 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
   String _orderId = '';
   String _successMessage = '';
 
+  late AnimationController _shakeController;
+  late Animation<double> _shakeAnimation;
+
   @override
   void initState() {
     super.initState();
+
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat();
+
+    _shakeAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: -5.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -5.0, end: 5.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 5.0, end: -4.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -4.0, end: 4.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 4.0, end: -2.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -2.0, end: 2.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 2.0, end: 0.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.0), weight: 8),
+    ]).animate(CurvedAnimation(
+      parent: _shakeController,
+      curve: Curves.easeInOut,
+    ));
+
     final profile = SupabaseService.activeUserSession;
     _nameCtrl.text = profile?.fullName ?? 'Aman Kumar';
     _phoneCtrl.text = profile?.phoneNumber ?? '9876543210';
@@ -81,6 +105,7 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
 
   @override
   void dispose() {
+    _shakeController.dispose();
     _couponCtrl.dispose();
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
@@ -1012,6 +1037,67 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
   }
 
   Widget _buildStickyBottomBar() {
+    final buttonWidget = Container(
+      height: 48,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF3B30), Color(0xFFEF4444), Color(0xFFDC2626)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFEF4444).withValues(alpha: 0.5),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: _isProcessing ? null : _handlePayment,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_isProcessing) ...[
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Securing...',
+                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
+                  ),
+                ] else ...[
+                  const Icon(Icons.shield_outlined, size: 18, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Pay ₹${_totalPayable.toInt()}',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.chevron_right_rounded, size: 18, color: Colors.white),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       decoration: const BoxDecoration(
@@ -1024,34 +1110,33 @@ class _EcommerceCheckoutDialogState extends State<EcommerceCheckoutDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Final Amount', style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+              Row(
+                children: [
+                  const Icon(Icons.security_rounded, size: 11, color: Color(0xFF10B981)),
+                  const SizedBox(width: 3),
+                  Text(
+                    'TOTAL PAYABLE',
+                    style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.bold, color: const Color(0xFF64748B), letterSpacing: 0.5),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
               Text(
                 '₹${_totalPayable.toInt()}',
-                style: GoogleFonts.inter(fontSize: 19, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A)),
+                style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A)),
               ),
             ],
           ),
           const Spacer(),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 13),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: _isProcessing ? null : _handlePayment,
-            icon: _isProcessing
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Icon(Icons.lock_rounded, size: 16, color: Colors.white),
-            label: Text(
-              _isProcessing ? 'Processing Securely...' : 'Pay ₹${_totalPayable.toInt()}',
-              style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.bold),
-            ),
+          AnimatedBuilder(
+            animation: _shakeAnimation,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(_shakeAnimation.value, 0),
+                child: child,
+              );
+            },
+            child: buttonWidget,
           ),
         ],
       ),
