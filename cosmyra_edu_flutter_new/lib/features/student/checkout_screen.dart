@@ -10,6 +10,7 @@ import '../../core/services/cart_service.dart';
 import '../../core/services/cloudflare_r2_service.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
+import 'upi_payment_verification_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final CartItem? singleItem;
@@ -321,19 +322,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
     required String payeeName,
     required String upiUrl,
   }) async {
-    final utrCtrl = TextEditingController();
-    bool isSubmitting = false;
-    String? paymentScreenshotUrl;
-    bool isUploadingScreenshot = false;
-    String? screenshotFileName;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (ctx) => UpiPaymentVerificationScreen(
+          user: user,
+          items: items,
+          totalAmount: _finalTotal,
+          couponCode: CartService.instance.appliedCouponCode ?? '',
+          upiId: upiId,
+          payeeName: payeeName,
+          upiUrl: upiUrl,
+        ),
+      ),
+    );
+  }
 
-    final qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${Uri.encodeComponent(upiUrl)}';
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (dialogCtx, setDialogState) {
+  /*
+  Future<void> _unusedModal() async {
           final submitButtonWidget = Container(
             height: 50,
             width: double.infinity,
@@ -720,69 +726,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
                             ),
                             const SizedBox(height: 10),
 
-                            // OPTION 1: 12-DIGIT UTR NUMBER INPUT
+                            // OPTION 1: PAYMENT SCREENSHOT UPLOAD (CLOUDFLARE S3) - PROMINENT FIRST
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
+                                color: const Color(0xFFF5F3FF),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                                border: Border.all(color: const Color(0xFFDDD6FE), width: 1.5),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
                                     children: [
-                                      const Icon(Icons.pin_rounded, size: 15, color: Color(0xFF2563EB)),
+                                      const Icon(Icons.cloud_upload_rounded, size: 16, color: Color(0xFF6D28D9)),
                                       const SizedBox(width: 6),
                                       Text(
-                                        'Option 1: Enter 12-Digit UTR / Ref Number',
-                                        style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w800, color: const Color(0xFF1E293B)),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  TextField(
-                                    controller: utrCtrl,
-                                    keyboardType: TextInputType.number,
-                                    maxLength: 12,
-                                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A), letterSpacing: 1.0),
-                                    decoration: InputDecoration(
-                                      hintText: 'e.g. 429182736410 (UTR / Ref No.)',
-                                      hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8), letterSpacing: 0.0),
-                                      counterText: '',
-                                      isDense: true,
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      prefixIcon: const Icon(Icons.confirmation_number_rounded, size: 18, color: Color(0xFF64748B)),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-
-                            // OPTION 2: PAYMENT SCREENSHOT UPLOAD (CLOUDFLARE S3)
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.cloud_upload_rounded, size: 15, color: Color(0xFF4F46E5)),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Option 2: Upload Payment Screenshot (Cloudflare S3)',
-                                        style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w800, color: const Color(0xFF1E293B)),
+                                        'Option 1: Upload Payment Screenshot (Cloudflare S3)',
+                                        style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w800, color: const Color(0xFF5B21B6)),
                                       ),
                                     ],
                                   ),
@@ -922,17 +883,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
                                           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
                                           decoration: BoxDecoration(
                                             borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                                            border: Border.all(color: const Color(0xFF7C3AED), width: 1.2),
+                                            color: const Color(0xFFF3E8FF),
                                           ),
                                           child: Row(
                                             children: [
                                               Container(
                                                 padding: const EdgeInsets.all(6),
                                                 decoration: BoxDecoration(
-                                                  color: const Color(0xFFEEF2FF),
+                                                  color: const Color(0xFF7C3AED),
                                                   borderRadius: BorderRadius.circular(6),
                                                 ),
-                                                child: const Icon(Icons.add_a_photo_rounded, size: 18, color: Color(0xFF4F46E5)),
+                                                child: const Icon(Icons.add_a_photo_rounded, size: 18, color: Colors.white),
                                               ),
                                               const SizedBox(width: 10),
                                               Expanded(
@@ -941,22 +903,67 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
                                                   children: [
                                                     Text(
                                                       'Upload Payment Screenshot Receipt',
-                                                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B)),
+                                                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF5B21B6)),
                                                     ),
                                                     Text(
                                                       'Tap to select GPay / PhonePe / Paytm receipt (S3)',
-                                                      style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B)),
+                                                      style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF6D28D9)),
                                                     ),
                                                   ],
                                                 ),
                                               ),
-                                              const Icon(Icons.cloud_upload_outlined, color: Color(0xFF4F46E5), size: 18),
+                                              const Icon(Icons.cloud_upload_rounded, color: Color(0xFF7C3AED), size: 20),
                                             ],
                                           ),
                                         ),
                                       ),
                                     ),
                                   ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+
+                            // OPTION 2: 12-DIGIT UTR NUMBER INPUT
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.pin_rounded, size: 15, color: Color(0xFF2563EB)),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Option 2: Enter 12-Digit UTR / Ref Number',
+                                        style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w800, color: const Color(0xFF1E293B)),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextField(
+                                    controller: utrCtrl,
+                                    keyboardType: TextInputType.number,
+                                    maxLength: 12,
+                                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A), letterSpacing: 1.0),
+                                    decoration: InputDecoration(
+                                      hintText: 'e.g. 429182736410 (UTR / Ref No.)',
+                                      hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8), letterSpacing: 0.0),
+                                      counterText: '',
+                                      isDense: true,
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      prefixIcon: const Icon(Icons.confirmation_number_rounded, size: 18, color: Color(0xFF64748B)),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -986,6 +993,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
       ),
     );
   }
+  */
 
   @override
   Widget build(BuildContext context) {
