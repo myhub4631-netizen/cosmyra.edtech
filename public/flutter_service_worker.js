@@ -3,7 +3,7 @@ const MANIFEST = 'flutter-app-manifest';
 const TEMP = 'flutter-temp-cache';
 const CACHE_NAME = 'flutter-app-cache';
 
-const RESOURCES = {"flutter_bootstrap.js": "95294db81e6bd717a2b062a4e6ec5f1c",
+const RESOURCES = {"flutter_bootstrap.js": "c72f78fe72fac73f34f60777753b6f1c",
 "version.json": "c17c3eb7790f92a2ee405aa48804465c",
 "favicon.ico": "afb14b8a5f4ded010a2a021990af4b65",
 "index.html": "416afefdd09f4c2cfe902a73e18f5f74",
@@ -48,7 +48,7 @@ const RESOURCES = {"flutter_bootstrap.js": "95294db81e6bd717a2b062a4e6ec5f1c",
 "assets/packages/cupertino_icons/assets/CupertinoIcons.ttf": "33b7d9392238c04c131b6ce224e13711",
 "assets/shaders/ink_sparkle.frag": "ecc85a2e95f5e9f53123dcaf8cb9b6ce",
 "assets/AssetManifest.bin": "02f5b91c03e47142f07905db1ceb1b40",
-"assets/fonts/MaterialIcons-Regular.otf": "4da0ed1cef97d5523ef46440ab5b24dd",
+"assets/fonts/MaterialIcons-Regular.otf": "fea5ed722e38fc5c13bd0ace8fc4442a",
 "assets/assets/images/cosmyra_icon.png": "6e5ae708b5147c893cc9a48bcb22ed44",
 "assets/assets/images/trusted_avatars.png": "2e135fd7cfa89d7e3d858e856d51e5b5",
 "assets/assets/images/student_study_illustration.png": "ab920e5d05dbe145b3b91b5ad6746316",
