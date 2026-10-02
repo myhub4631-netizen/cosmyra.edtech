@@ -25,15 +25,44 @@ class EcommerceCheckoutDialog extends StatefulWidget {
     BuildContext context, {
     CartItem? singleItem,
     required Function(String testId, String title, int duration) onStartTest,
-  }) {
-    return showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => EcommerceCheckoutDialog(
-        singleItem: singleItem,
-        onStartTest: onStartTest,
-      ),
-    );
+  }) async {
+    final user = SupabaseService.activeUserSession ??
+        UserProfileModel(
+          id: 'guest_${DateTime.now().millisecondsSinceEpoch}',
+          fullName: 'Student Aspirant',
+          email: 'student@cosmyra.edtech',
+          role: 'student',
+        );
+
+    final List<Map<String, dynamic>> items = singleItem != null
+        ? [singleItem.toJson()]
+        : (CartService.instance.items.isNotEmpty
+            ? CartService.instance.items.map((e) => e.toJson()).toList()
+            : [CartItem(id: 'ts_default', title: 'Test Series', price: 499, originalPrice: 1999).toJson()]);
+
+    final double totalAmount = singleItem != null ? singleItem.price : CartService.instance.subtotal;
+    final paymentSettings = await SupabaseService.fetchPaymentSettings();
+    final upiId = (paymentSettings['upi_id'] ?? '1mdollar2027@okicici').toString().trim();
+    final payeeName = (paymentSettings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString().trim();
+    final amountStr = totalAmount.toStringAsFixed(2);
+    final upiUrl = 'upi://pay?pa=$upiId&pn=${Uri.encodeComponent(payeeName)}&am=$amountStr&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
+
+    if (context.mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (ctx) => UpiPaymentVerificationScreen(
+            user: user,
+            items: items,
+            totalAmount: totalAmount,
+            couponCode: CartService.instance.appliedCoupon?['code']?.toString() ?? '',
+            upiId: upiId,
+            payeeName: payeeName,
+            upiUrl: upiUrl,
+          ),
+        ),
+      );
+    }
   }
 
   @override
