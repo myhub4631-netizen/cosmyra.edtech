@@ -1,7 +1,7 @@
 name: cosmyra_neet_jee
 description: "Cosmyra Neet Jee - AI-Powered NEET & JEE Exam Prep Platform"
 publish_to: 'none'
-version: 1.4.0+13
+version: 1.5.1+14
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
