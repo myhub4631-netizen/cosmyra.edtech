@@ -2593,8 +2593,11 @@ class SupabaseService {
   static Future<List<QuestionModel>> fetchQuestions({
     String? examId,
     String? subjectId,
+    List<String>? subjectIds,
     String? chapterId,
+    List<String>? selectedChapters,
     String? topicId,
+    List<String>? selectedTopics,
     String? source,
     String? category,
     String? difficulty,
@@ -2605,7 +2608,7 @@ class SupabaseService {
 
     // 1. Primary DB fetch (using clean select to prevent PostgREST .or syntax errors)
     try {
-      final res = await client.from('questions').select('*').order('created_at', ascending: false).limit(limit > 0 ? limit * 2 : 100);
+      final res = await client.from('questions').select('*').order('created_at', ascending: false).limit(limit > 0 ? limit * 3 : 150);
       if (res != null && (res as List).isNotEmpty) {
         final dbList = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         allMaps.addAll(dbList);
@@ -2773,10 +2776,13 @@ class SupabaseService {
         }
       }
 
+      final String rawSub = (map['subject'] ?? map['subject_id'] ?? map['subject_name'] ?? map['subjectName'] ?? '').toString().trim();
+      final String finalSub = rawSub.isNotEmpty ? rawSub : 'Biology';
+
       models.add(QuestionModel(
         id: map['id']?.toString() ?? '',
         examId: map['exam']?.toString() ?? map['exam_id']?.toString() ?? 'NEET',
-        subjectId: map['subject']?.toString() ?? map['subject_id']?.toString() ?? 'Physics',
+        subjectId: finalSub,
         chapterId: map['chapter']?.toString() ?? map['chapter_id']?.toString() ?? 'General',
         topicId: map['topic']?.toString() ?? map['topic_id']?.toString() ?? 'General',
         questionText: map['questionText']?.toString() ?? map['question_text']?.toString() ?? '',
@@ -2797,12 +2803,87 @@ class SupabaseService {
       ));
     }
 
-    if (models.isNotEmpty) {
-      _liveQuestionsCache = List<QuestionModel>.from(models);
-      if (limit > 0 && limit <= models.length) {
-        return models.sublist(0, limit);
+    List<QuestionModel> filtered = List<QuestionModel>.from(models);
+
+    // 1. Filter by Exam ID
+    if (examId != null && examId.trim().isNotEmpty) {
+      final cleanExam = examId.trim().toLowerCase();
+      final examFiltered = filtered.where((q) {
+        final qExam = q.examId.trim().toLowerCase();
+        return qExam == cleanExam || qExam.contains(cleanExam) || cleanExam.contains(qExam);
+      }).toList();
+      if (examFiltered.isNotEmpty) filtered = examFiltered;
+    }
+
+    // 2. Filter by Target Subjects (subjectId or subjectIds)
+    final Set<String> targetSubjects = {};
+    if (subjectId != null && subjectId.trim().isNotEmpty) {
+      targetSubjects.add(subjectId.trim().toLowerCase());
+    }
+    if (subjectIds != null && subjectIds.isNotEmpty) {
+      for (var s in subjectIds) {
+        if (s.trim().isNotEmpty) targetSubjects.add(s.trim().toLowerCase());
       }
-      return models;
+    }
+
+    if (targetSubjects.isNotEmpty) {
+      final subFiltered = filtered.where((q) {
+        final qSub = q.subjectId.trim().toLowerCase();
+        for (var targetSub in targetSubjects) {
+          if (qSub == targetSub || qSub.contains(targetSub) || targetSub.contains(qSub)) {
+            return true;
+          }
+        }
+        return false;
+      }).toList();
+
+      if (subFiltered.isNotEmpty) {
+        filtered = subFiltered;
+      }
+    }
+
+    // 3. Filter by Selected Chapters
+    final Set<String> targetChapters = {};
+    if (chapterId != null && chapterId.trim().isNotEmpty) {
+      targetChapters.add(chapterId.trim().toLowerCase());
+    }
+    if (selectedChapters != null && selectedChapters.isNotEmpty) {
+      for (var c in selectedChapters) {
+        if (c.trim().isNotEmpty) targetChapters.add(c.trim().toLowerCase());
+      }
+    }
+
+    if (targetChapters.isNotEmpty) {
+      final chapFiltered = filtered.where((q) {
+        final qChap = q.chapterId.trim().toLowerCase();
+        for (var tc in targetChapters) {
+          if (qChap == tc || qChap.contains(tc) || tc.contains(qChap)) {
+            return true;
+          }
+        }
+        return false;
+      }).toList();
+
+      if (chapFiltered.isNotEmpty) {
+        filtered = chapFiltered;
+      }
+    }
+
+    // 4. Filter by Difficulty
+    if (difficulty != null && difficulty.trim().isNotEmpty && difficulty.trim().toLowerCase() != 'all' && difficulty.trim().toLowerCase() != 'mixed') {
+      final cleanDiff = difficulty.trim().toLowerCase();
+      final diffFiltered = filtered.where((q) => q.difficulty.trim().toLowerCase() == cleanDiff).toList();
+      if (diffFiltered.isNotEmpty) {
+        filtered = diffFiltered;
+      }
+    }
+
+    if (filtered.isNotEmpty) {
+      _liveQuestionsCache = List<QuestionModel>.from(filtered);
+      if (limit > 0 && limit <= filtered.length) {
+        return filtered.sublist(0, limit);
+      }
+      return filtered;
     }
 
     if (_liveQuestionsCache.isNotEmpty) {

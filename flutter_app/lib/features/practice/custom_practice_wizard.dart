@@ -413,9 +413,42 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
 
   void _handleStartSession() async {
     setState(() => _isLoading = true);
+
+    final List<String> activeSubjects = _selectedSubjectTabs.isNotEmpty
+        ? _selectedSubjectTabs.toList()
+        : (_selectedSubjectIds.isNotEmpty ? _selectedSubjectIds.toList() : ['Biology']);
+
+    final List<String> selectedChapterNames = [];
+    final List<String> selectedTopicNames = [];
+
+    for (var sub in activeSubjects) {
+      final chList = _subjectChaptersMap[sub];
+      if (chList != null) {
+        for (var ch in chList) {
+          if (ch['isSelected'] == true) {
+            final chName = (ch['name'] ?? '').toString().trim();
+            if (chName.isNotEmpty) selectedChapterNames.add(chName);
+
+            final subtopics = ch['subtopics'];
+            if (subtopics is List) {
+              for (var st in subtopics) {
+                if (st is Map && st['isSelected'] == true) {
+                  final stName = (st['name'] ?? '').toString().trim();
+                  if (stName.isNotEmpty) selectedTopicNames.add(stName);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
     final questions = await SupabaseService.fetchQuestions(
       examId: _selectedExam,
-      subjectId: _selectedSubjectIds.isNotEmpty ? _selectedSubjectIds.first : null,
+      subjectId: activeSubjects.isNotEmpty ? activeSubjects.first : null,
+      subjectIds: activeSubjects,
+      selectedChapters: selectedChapterNames,
+      selectedTopics: selectedTopicNames,
       source: _selectedSource.toLowerCase(),
       difficulty: _selectedDifficulty.toLowerCase(),
       limit: _questionCount,
