@@ -254,12 +254,11 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
 
     if (confirmed == true) {
-      await SupabaseService.deleteAdminOrder(rawId, orderMap: o);
+      setState(() {
+        _orders.removeWhere((item) => _getDisplayOrderId(item) == rawId || (item['id'] != null && item['id'].toString() == o['id']?.toString()));
+        _selectedOrderIds.remove(rawId);
+      });
       if (mounted) {
-        setState(() {
-          _orders.removeWhere((item) => _getDisplayOrderId(item) == rawId || (item['id'] != null && item['id'].toString() == o['id']?.toString()));
-          _selectedOrderIds.remove(rawId);
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('✓ Order #$rawId deleted successfully'),
@@ -267,8 +266,8 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        _loadOrders();
       }
+      await SupabaseService.bulkDeleteAdminOrders([rawId], [o]);
     }
   }
 
@@ -332,20 +331,14 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
 
     if (confirmed != true) return;
 
-    setState(() => _isBatchProcessing = true);
     final targetIds = _selectedOrderIds.toList();
-    for (var id in targetIds) {
-      final match = _orders.firstWhere(
-        (o) => _getDisplayOrderId(o) == id,
-        orElse: () => <String, dynamic>{},
-      );
-      await SupabaseService.deleteAdminOrder(id, orderMap: match.isNotEmpty ? match : null);
-    }
+    final targetMaps = _orders.where((o) => targetIds.contains(_getDisplayOrderId(o))).toList();
 
+    // 1. INSTANT UI UPDATE (0ms freeze!)
     setState(() {
-      _isBatchProcessing = false;
       _orders.removeWhere((o) => targetIds.contains(_getDisplayOrderId(o)));
       _selectedOrderIds.clear();
+      _isBatchProcessing = false;
     });
 
     if (mounted) {
@@ -356,8 +349,10 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
           behavior: SnackBarBehavior.floating,
         ),
       );
-      _loadOrders();
     }
+
+    // 2. Perform fast background purge
+    await SupabaseService.bulkDeleteAdminOrders(targetIds, targetMaps);
   }
 
   void _exportSelectedCsv() {

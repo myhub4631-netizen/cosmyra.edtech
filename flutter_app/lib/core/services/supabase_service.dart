@@ -10356,13 +10356,16 @@ class SupabaseService {
     }
   }
 
-  static Future<bool> deleteAdminOrder(String orderId, {Map<String, dynamic>? orderMap}) async {
-    final Set<String> targetKeys = {orderId.trim()};
-    if (orderId.contains('-') || orderId.contains('_')) {
-      final stripped = orderId.replaceAll(RegExp(r'^(ORD[_-]|ENT[_-]|SUB[_-]|CART[_-])', caseSensitive: false), '');
-      if (stripped.isNotEmpty) targetKeys.add(stripped);
+  static Future<bool> bulkDeleteAdminOrders(List<String> orderIds, List<Map<String, dynamic>> orderMaps) async {
+    final Set<String> targetKeys = {};
+    for (var id in orderIds) {
+      if (id.trim().isNotEmpty) targetKeys.add(id.trim());
+      if (id.contains('-') || id.contains('_')) {
+        final stripped = id.replaceAll(RegExp(r'^(ORD[_-]|ENT[_-]|SUB[_-]|CART[_-])', caseSensitive: false), '');
+        if (stripped.isNotEmpty) targetKeys.add(stripped);
+      }
     }
-    if (orderMap != null) {
+    for (var orderMap in orderMaps) {
       for (var k in ['id', 'order_id', 'order_number', 'payment_reference', 'payment_id', 'utr_number', 'payment_utr']) {
         final val = orderMap[k]?.toString().trim() ?? '';
         if (val.isNotEmpty) {
@@ -10375,7 +10378,7 @@ class SupabaseService {
       }
     }
 
-    // Save to persistent blacklist in SharedPreferences
+    // 1. Immediately record all keys in SharedPreferences blacklist & purge local caches (INSTANT local persistence)
     try {
       final prefs = await SharedPreferences.getInstance();
       final List<String> deletedList = prefs.getStringList('cosmyra_deleted_order_ids') ?? [];
@@ -10384,77 +10387,16 @@ class SupabaseService {
         if (key.isNotEmpty) updatedSet.add(key.toLowerCase());
       }
       await prefs.setStringList('cosmyra_deleted_order_ids', updatedSet.toList());
-    } catch (e) {
-      debugPrint('Notice saving deleted order blacklist: $e');
-    }
 
-    // 1. Delete from `orders`
-    for (var key in targetKeys) {
-      if (key.isEmpty) continue;
-      try { await client.from('orders').delete().eq('id', key); } catch (_) {}
-      try { await client.from('orders').delete().eq('order_number', key); } catch (_) {}
-      try { await client.from('orders').delete().eq('order_id', key); } catch (_) {}
-      try { await client.from('orders').delete().eq('payment_reference', key); } catch (_) {}
-    }
-
-    // 2. Delete from `abandoned_carts`
-    for (var key in targetKeys) {
-      if (key.isEmpty) continue;
-      try { await client.from('abandoned_carts').delete().eq('id', key); } catch (_) {}
-      try { await client.from('abandoned_carts').delete().eq('order_number', key); } catch (_) {}
-      try { await client.from('abandoned_carts').delete().eq('order_id', key); } catch (_) {}
-    }
-
-    // 3. Delete from `entitlements`
-    for (var key in targetKeys) {
-      if (key.isEmpty) continue;
-      try { await client.from('entitlements').delete().eq('id', key); } catch (_) {}
-      try { await client.from('entitlements').delete().eq('order_id', key); } catch (_) {}
-      try { await client.from('entitlements').delete().eq('order_number', key); } catch (_) {}
-    }
-
-    // 4. Delete from `subscriptions`
-    for (var key in targetKeys) {
-      if (key.isEmpty) continue;
-      try { await client.from('subscriptions').delete().eq('id', key); } catch (_) {}
-    }
-
-    // 5. Delete from `notification_logs`
-    try {
-      final logsRes = await client.from('notification_logs').select('*').eq('type', 'order_placed');
-      if (logsRes is List) {
-        for (var log in logsRes.whereType<Map>()) {
-          final bodyStr = (log['message_body'] ?? '').toString();
-          final subjStr = (log['subject'] ?? '').toString();
-          final logId = log['id'];
-          bool matches = false;
-          for (var key in targetKeys) {
-            if (key.length >= 4 && (bodyStr.contains(key) || subjStr.contains(key))) {
-              matches = true;
-              break;
-            }
-          }
-          if (matches && logId != null) {
-            await client.from('notification_logs').delete().eq('id', logId);
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Notice purging order notification logs: $e');
-    }
-
-    // 6. Purge from SharedPreferences local storage
-    try {
-      final prefs = await SharedPreferences.getInstance();
       for (var keyName in ['cosmyra_user_orders', 'cosmyra_saved_admin_orders', 'cosmyra_abandoned_carts', 'cosmyra_entitlements']) {
         final str = prefs.getString(keyName);
         if (str != null && str.isNotEmpty) {
           try {
             List list = jsonDecode(str);
             list.removeWhere((o) {
-              final itemStr = jsonEncode(o);
+              final itemStr = jsonEncode(o).toLowerCase();
               for (var key in targetKeys) {
-                if (key.length >= 4 && itemStr.contains(key)) return true;
+                if (key.length >= 4 && itemStr.contains(key.toLowerCase())) return true;
               }
               return false;
             });
@@ -10463,10 +10405,53 @@ class SupabaseService {
         }
       }
     } catch (e) {
-      debugPrint('Notice purging local cached orders: $e');
+      debugPrint('Notice recording bulk deletion blacklist: $e');
     }
 
+    // 2. Fire-and-forget background DB delete (Non-blocking, ultra fast)
+    unawaited(Future(() async {
+      final cleanKeys = targetKeys.where((k) => k.isNotEmpty).toList();
+      for (var key in cleanKeys) {
+        final intId = int.tryParse(key);
+        // Delete from `orders`
+        if (intId != null) {
+          try { await client.from('orders').delete().eq('id', intId); } catch (_) {}
+        } else {
+          try { await client.from('orders').delete().eq('id', key); } catch (_) {}
+        }
+        try { await client.from('orders').delete().eq('order_number', key); } catch (_) {}
+        try { await client.from('orders').delete().eq('order_id', key); } catch (_) {}
+        try { await client.from('orders').delete().eq('payment_reference', key); } catch (_) {}
+
+        // Delete from `abandoned_carts`
+        if (intId != null) {
+          try { await client.from('abandoned_carts').delete().eq('id', intId); } catch (_) {}
+        } else {
+          try { await client.from('abandoned_carts').delete().eq('id', key); } catch (_) {}
+        }
+        try { await client.from('abandoned_carts').delete().eq('order_number', key); } catch (_) {}
+        try { await client.from('abandoned_carts').delete().eq('order_id', key); } catch (_) {}
+
+        // Delete from `entitlements`
+        if (intId != null) {
+          try { await client.from('entitlements').delete().eq('id', intId); } catch (_) {}
+        } else {
+          try { await client.from('entitlements').delete().eq('id', key); } catch (_) {}
+        }
+        try { await client.from('entitlements').delete().eq('order_id', key); } catch (_) {}
+
+        // Delete from `subscriptions`
+        if (intId != null) {
+          try { await client.from('subscriptions').delete().eq('id', intId); } catch (_) {}
+        }
+      }
+    }));
+
     return true;
+  }
+
+  static Future<bool> deleteAdminOrder(String orderId, {Map<String, dynamic>? orderMap}) async {
+    return bulkDeleteAdminOrders([orderId], orderMap != null ? [orderMap] : []);
   }
 
   static Future<Map<String, dynamic>> createManualAdminOrder({
