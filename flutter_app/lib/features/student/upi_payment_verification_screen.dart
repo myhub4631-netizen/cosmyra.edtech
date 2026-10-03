@@ -75,14 +75,25 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
 
   Future<void> _initData() async {
     _couponCode = widget.couponCode ?? '';
-    _user = widget.user ??
-        SupabaseService.activeUserSession ??
-        UserProfileModel(
-          id: 'guest_${DateTime.now().millisecondsSinceEpoch}',
-          fullName: 'Student Aspirant',
-          email: 'student@cosmyra.edtech',
-          role: 'student',
-        );
+    final authUser = SupabaseService.client.auth.currentUser;
+    UserProfileModel? resolvedUser = widget.user ?? SupabaseService.activeUserSession;
+    if (resolvedUser == null && authUser != null) {
+      final email = authUser.email ?? 'student@neet-jee.in';
+      final name = (authUser.userMetadata?['full_name'] ?? authUser.userMetadata?['name'] ?? (email.contains('@') ? email.split('@').first : 'Student Aspirant')).toString();
+      resolvedUser = UserProfileModel(
+        id: authUser.id,
+        fullName: name,
+        email: email,
+        phoneNumber: authUser.phone,
+        role: 'student',
+      );
+    }
+    _user = resolvedUser ?? UserProfileModel(
+      id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
+      fullName: 'Student Aspirant',
+      email: 'student@neet-jee.in',
+      role: 'student',
+    );
 
     _items = widget.items ?? (CartService.instance.items.isNotEmpty ? CartService.instance.items.map((e) => e.toJson()).toList() : []);
     _totalAmount = widget.totalAmount ?? (CartService.instance.subtotal > 0 ? CartService.instance.subtotal : 499.0);

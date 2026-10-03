@@ -237,13 +237,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
       return;
     }
 
+    final authUser = SupabaseService.client.auth.currentUser;
     final user = SupabaseService.activeUserSession ??
-        UserProfileModel(
-          id: 'guest_${DateTime.now().millisecondsSinceEpoch}',
-          fullName: 'Student Aspirant',
-          email: 'student@cosmyra.edtech',
-          role: 'student',
-        );
+        (authUser != null
+            ? UserProfileModel(
+                id: authUser.id,
+                fullName: (authUser.userMetadata?['full_name'] ?? authUser.userMetadata?['name'] ?? (authUser.email?.contains('@') == true ? authUser.email!.split('@').first : 'Student Aspirant')).toString(),
+                email: authUser.email ?? 'student@neet-jee.in',
+                phoneNumber: authUser.phone,
+                role: 'student',
+              )
+            : UserProfileModel(
+                id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
+                fullName: 'Student Aspirant',
+                email: 'student@neet-jee.in',
+                role: 'student',
+              ));
 
     final List<CartItem> itemsToPurchase = _activeItem != null
         ? [_activeItem!]

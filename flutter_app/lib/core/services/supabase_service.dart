@@ -4988,8 +4988,13 @@ class SupabaseService {
       'items': items,
     };
 
+    debugPrint('ORDER_CREATE_START user_id=$profileUserId product_id=$pId amount=$totalAmount status=pending_verification');
+    debugPrint('ORDER_AUTH_USER_ID auth_uid=${client.auth.currentUser?.id}');
+    debugPrint('ORDER_PAYLOAD_VALIDATED order_id=$finalOrderId valid_uuid=$validOrderId');
+
     // 1. Primary insert to orders table with retry fallback
     bool orderInserted = false;
+    debugPrint('ORDER_CREATE_REQUEST_SENT order_id=$finalOrderId');
     try {
       await client.from('orders').insert({
         'id': validOrderId,
@@ -5018,8 +5023,9 @@ class SupabaseService {
         'updated_at': DateTime.now().toIso8601String(),
       });
       orderInserted = true;
+      debugPrint('ORDER_CREATE_SUCCESS order_id=$finalOrderId');
     } catch (e) {
-      debugPrint('Notice detailed insert to orders table: $e');
+      debugPrint('ORDER_CREATE_FAILURE notice detailed insert to orders table: $e');
       try {
         await client.from('orders').insert({
           'id': validOrderId,
@@ -5031,6 +5037,7 @@ class SupabaseService {
           'created_at': DateTime.now().toIso8601String(),
         });
         orderInserted = true;
+        debugPrint('ORDER_CREATE_SUCCESS (minimal schema) order_id=$finalOrderId');
       } catch (retryErr) {
         debugPrint('Notice minimal insert to orders table: $retryErr');
       }
@@ -5078,7 +5085,26 @@ class SupabaseService {
       }
     }
 
-    // 3. Multi-channel backup insert to notification_logs
+    // 3. Backup insert to order_items table
+    try {
+      for (var it in (items.isNotEmpty ? items : [{'id': pId, 'title': pTitle, 'price': totalAmount}])) {
+        await client.from('order_items').insert({
+          'id': toValidUuid('item_${DateTime.now().microsecondsSinceEpoch}_${it['id']}'),
+          'order_id': validOrderId,
+          'product_id': it['id']?.toString() ?? pId,
+          'product_title': it['title']?.toString() ?? pTitle,
+          'product_type': it['product_type']?.toString() ?? 'test_series',
+          'price': (it['price'] as num?)?.toDouble() ?? totalAmount,
+          'original_price': (it['original_price'] as num?)?.toDouble() ?? totalAmount,
+          'validity': it['validity']?.toString() ?? 'Valid until exam',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+    } catch (itErr) {
+      debugPrint('Notice inserting order items: $itErr');
+    }
+
+    // 3.5 Multi-channel backup insert to notification_logs
     try {
       await client.from('notification_logs').insert({
         'user_id': profileUserId,
