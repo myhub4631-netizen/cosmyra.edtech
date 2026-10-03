@@ -10322,37 +10322,103 @@ class SupabaseService {
     }
   }
 
-  static Future<bool> deleteAdminOrder(String orderId) async {
-    try {
-      await client.from('orders').delete().or('id.eq.$orderId,order_number.eq.$orderId,payment_reference.eq.$orderId');
-    } catch (e) {
-      debugPrint('Notice deleting order from Supabase: $e');
+  static Future<bool> deleteAdminOrder(String orderId, {Map<String, dynamic>? orderMap}) async {
+    final Set<String> targetKeys = {orderId.trim()};
+    if (orderId.contains('-') || orderId.contains('_')) {
+      final stripped = orderId.replaceAll(RegExp(r'^(ORD[_-]|ENT[_-]|SUB[_-]|CART[_-])', caseSensitive: false), '');
+      if (stripped.isNotEmpty) targetKeys.add(stripped);
     }
+    if (orderMap != null) {
+      for (var k in ['id', 'order_id', 'order_number', 'payment_reference', 'payment_id', 'utr_number']) {
+        final val = orderMap[k]?.toString().trim() ?? '';
+        if (val.isNotEmpty) {
+          targetKeys.add(val);
+          if (val.contains('-') || val.contains('_')) {
+            final st = val.replaceAll(RegExp(r'^(ORD[_-]|ENT[_-]|SUB[_-]|CART[_-])', caseSensitive: false), '');
+            if (st.isNotEmpty) targetKeys.add(st);
+          }
+        }
+      }
+    }
+
+    // 1. Delete from `orders`
+    for (var key in targetKeys) {
+      if (key.isEmpty) continue;
+      try { await client.from('orders').delete().eq('id', key); } catch (_) {}
+      try { await client.from('orders').delete().eq('order_number', key); } catch (_) {}
+      try { await client.from('orders').delete().eq('order_id', key); } catch (_) {}
+      try { await client.from('orders').delete().eq('payment_reference', key); } catch (_) {}
+    }
+
+    // 2. Delete from `abandoned_carts`
+    for (var key in targetKeys) {
+      if (key.isEmpty) continue;
+      try { await client.from('abandoned_carts').delete().eq('id', key); } catch (_) {}
+      try { await client.from('abandoned_carts').delete().eq('order_number', key); } catch (_) {}
+      try { await client.from('abandoned_carts').delete().eq('order_id', key); } catch (_) {}
+    }
+
+    // 3. Delete from `entitlements`
+    for (var key in targetKeys) {
+      if (key.isEmpty) continue;
+      try { await client.from('entitlements').delete().eq('id', key); } catch (_) {}
+      try { await client.from('entitlements').delete().eq('order_id', key); } catch (_) {}
+      try { await client.from('entitlements').delete().eq('order_number', key); } catch (_) {}
+    }
+
+    // 4. Delete from `subscriptions`
+    for (var key in targetKeys) {
+      if (key.isEmpty) continue;
+      try { await client.from('subscriptions').delete().eq('id', key); } catch (_) {}
+    }
+
+    // 5. Delete from `notification_logs`
     try {
       final logsRes = await client.from('notification_logs').select('*').eq('type', 'order_placed');
       if (logsRes is List) {
         for (var log in logsRes.whereType<Map>()) {
           final bodyStr = (log['message_body'] ?? '').toString();
-          if (bodyStr.contains(orderId) || log['subject']?.toString().contains(orderId) == true) {
-            await client.from('notification_logs').delete().eq('id', log['id']);
+          final subjStr = (log['subject'] ?? '').toString();
+          final logId = log['id'];
+          bool matches = false;
+          for (var key in targetKeys) {
+            if (key.length >= 4 && (bodyStr.contains(key) || subjStr.contains(key))) {
+              matches = true;
+              break;
+            }
+          }
+          if (matches && logId != null) {
+            await client.from('notification_logs').delete().eq('id', logId);
           }
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Notice purging order notification logs: $e');
+    }
+
+    // 6. Purge from SharedPreferences local storage
     try {
       final prefs = await SharedPreferences.getInstance();
-      for (var keyName in ['cosmyra_user_orders', 'cosmyra_saved_admin_orders']) {
+      for (var keyName in ['cosmyra_user_orders', 'cosmyra_saved_admin_orders', 'cosmyra_abandoned_carts', 'cosmyra_entitlements']) {
         final str = prefs.getString(keyName);
         if (str != null && str.isNotEmpty) {
-          List list = jsonDecode(str);
-          list.removeWhere((o) {
-            final ordId = (o['order_number'] ?? o['order_id'] ?? o['id'] ?? '').toString();
-            return ordId == orderId || ordId.contains(orderId) || orderId.contains(ordId);
-          });
-          await prefs.setString(keyName, jsonEncode(list));
+          try {
+            List list = jsonDecode(str);
+            list.removeWhere((o) {
+              final itemStr = jsonEncode(o);
+              for (var key in targetKeys) {
+                if (key.length >= 4 && itemStr.contains(key)) return true;
+              }
+              return false;
+            });
+            await prefs.setString(keyName, jsonEncode(list));
+          } catch (_) {}
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Notice purging local cached orders: $e');
+    }
+
     return true;
   }
 

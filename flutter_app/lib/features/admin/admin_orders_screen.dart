@@ -254,8 +254,12 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
 
     if (confirmed == true) {
-      await SupabaseService.deleteAdminOrder(rawId);
+      await SupabaseService.deleteAdminOrder(rawId, orderMap: o);
       if (mounted) {
+        setState(() {
+          _orders.removeWhere((item) => _getDisplayOrderId(item) == rawId || (item['id'] != null && item['id'].toString() == o['id']?.toString()));
+          _selectedOrderIds.remove(rawId);
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('✓ Order #$rawId deleted successfully'),
@@ -331,11 +335,16 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     setState(() => _isBatchProcessing = true);
     final targetIds = _selectedOrderIds.toList();
     for (var id in targetIds) {
-      await SupabaseService.deleteAdminOrder(id);
+      final match = _orders.firstWhere(
+        (o) => _getDisplayOrderId(o) == id,
+        orElse: () => <String, dynamic>{},
+      );
+      await SupabaseService.deleteAdminOrder(id, orderMap: match.isNotEmpty ? match : null);
     }
 
     setState(() {
       _isBatchProcessing = false;
+      _orders.removeWhere((o) => targetIds.contains(_getDisplayOrderId(o)));
       _selectedOrderIds.clear();
     });
 
@@ -1187,6 +1196,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                         : SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: DataTable(
+                              showCheckboxColumn: false,
                               dataRowMinHeight: 64,
                               dataRowMaxHeight: 76,
                               headingRowColor: MaterialStateProperty.all(const Color(0xFFF8FAFC)),
