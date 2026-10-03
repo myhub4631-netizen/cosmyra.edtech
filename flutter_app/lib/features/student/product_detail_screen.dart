@@ -414,7 +414,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with TickerPr
             'marks': m['marks'] ?? m['total_marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
             'duration': m['duration'] ?? m['duration_minutes'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
             'status': (m['status'] ?? 'Published').toString(),
-            'test_date_time': m['test_date_time'] ?? m['scheduled_at'] ?? m['start_time'],
+            'test_date_time': m['test_date_time'] ?? m['scheduled_at'] ?? m['test_date'] ?? m['start_time'] ?? m['date_time'] ?? m['scheduledAt'] ?? m['dateTime'],
           };
         }
       }
@@ -463,7 +463,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with TickerPr
             'marks': p['total_marks'] ?? p['marks'] ?? (item.exam.contains('JEE') ? 300 : 720),
             'duration': p['duration_minutes'] ?? p['duration'] ?? (item.durationMinutes > 0 ? item.durationMinutes : 180),
             'status': p['status'] ?? 'Published',
-            'test_date_time': p['test_date_time'] ?? p['scheduled_at'] ?? p['start_time'],
+            'test_date_time': p['test_date_time'] ?? p['scheduled_at'] ?? p['test_date'] ?? p['start_time'] ?? p['date_time'] ?? p['scheduledAt'] ?? p['dateTime'],
           };
         } else {
           if (qCount > 0 && (testMap[key]!['questions'] == 0 || testMap[key]!['questions'] == null)) {
@@ -2628,7 +2628,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with TickerPr
               final isUnlocked = item.isFree || _hasPurchased;
 
               // Parse test date & time
-              final rawDateTime = t['test_date_time'] ?? t['scheduled_at'] ?? t['test_date'] ?? t['start_time'] ?? t['date_time'];
+              final rawDateTime = t['test_date_time'] ?? t['scheduled_at'] ?? t['test_date'] ?? t['start_time'] ?? t['date_time'] ?? t['scheduledAt'] ?? t['dateTime'];
               DateTime? dt;
               if (rawDateTime != null) {
                 if (rawDateTime is DateTime) {

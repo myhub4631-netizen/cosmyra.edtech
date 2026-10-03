@@ -5812,6 +5812,8 @@ class SupabaseService {
                   (t['paper_id']?.toString().toLowerCase().trim() ?? '') == rawPaperId.toLowerCase().trim() ||
                   (t['title']?.toString().toLowerCase().trim() ?? '') == pTitleStr.toLowerCase().trim());
 
+              final testDateTimeStr = p['test_date_time'] ?? p['scheduled_at'] ?? p['test_date'] ?? p['start_time'] ?? p['date_time'];
+
               final itemMap = {
                 'id': rawPaperId.isNotEmpty ? rawPaperId : 'test_${seriesTests.length + 1}',
                 'paper_id': rawPaperId,
@@ -5821,10 +5823,18 @@ class SupabaseService {
                 'duration': duration,
                 'type': s['test_type'] ?? 'Full',
                 'status': status,
+                'test_date_time': testDateTimeStr,
+                'scheduled_at': testDateTimeStr,
+                'test_date': testDateTimeStr,
               };
 
               if (idx != -1) {
                 seriesTests[idx] = {...itemMap, ...seriesTests[idx]};
+                if (testDateTimeStr != null && (seriesTests[idx]['test_date_time'] == null || seriesTests[idx]['test_date_time'].toString().trim().isEmpty)) {
+                  seriesTests[idx]['test_date_time'] = testDateTimeStr;
+                  seriesTests[idx]['scheduled_at'] = testDateTimeStr;
+                  seriesTests[idx]['test_date'] = testDateTimeStr;
+                }
               } else {
                 seriesTests.add(itemMap);
               }
