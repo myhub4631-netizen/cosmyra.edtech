@@ -100,12 +100,12 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
 
     if (widget.upiId != null && widget.upiId!.isNotEmpty) {
       _upiId = widget.upiId!;
-      _payeeName = widget.payeeName ?? 'Cosmyra Edu Platform';
+      _payeeName = widget.payeeName ?? 'Mahboob Hasan';
       _upiUrl = widget.upiUrl ?? 'upi://pay?pa=$_upiId&pn=${Uri.encodeComponent(_payeeName)}&am=${_totalAmount.toStringAsFixed(2)}&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
     } else {
-      final settings = await SupabaseService.fetchPaymentSettings();
-      _upiId = (settings['upi_id'] ?? 'neetjee27@nyes').toString().trim();
-      _payeeName = (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString().trim();
+      final settings = await SupabaseService.fetchPaymentSettings(forceRefresh: true);
+      _upiId = (settings['upi_id'] ?? 'myhub4631@apl').toString().trim();
+      _payeeName = (settings['upi_payee_name'] ?? 'Mahboob Hasan').toString().trim();
       _upiUrl = 'upi://pay?pa=$_upiId&pn=${Uri.encodeComponent(_payeeName)}&am=${_totalAmount.toStringAsFixed(2)}&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
     }
 

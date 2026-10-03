@@ -4791,9 +4791,9 @@ class SupabaseService {
 
   static Map<String, dynamic> defaultPaymentSettings = {
     'upi_active': true,
-    'upi_id': 'neetjee27@nyes',
-    'upi_payee_name': 'Cosmyra Edu Platform',
-    'cashfree_active': true,
+    'upi_id': 'myhub4631@apl',
+    'upi_payee_name': 'Mahboob Hasan',
+    'cashfree_active': false,
     'cashfree_app_id': '',
     'cashfree_secret_key': '',
     'cashfree_environment': 'TEST',
@@ -4801,8 +4801,8 @@ class SupabaseService {
 
   static Map<String, dynamic>? _memoryPaymentSettingsCache;
 
-  static Future<Map<String, dynamic>> fetchPaymentSettings() async {
-    if (_memoryPaymentSettingsCache != null && _memoryPaymentSettingsCache!.isNotEmpty) {
+  static Future<Map<String, dynamic>> fetchPaymentSettings({bool forceRefresh = false}) async {
+    if (!forceRefresh && _memoryPaymentSettingsCache != null && _memoryPaymentSettingsCache!.isNotEmpty) {
       _fetchAndCacheSettingsFromDb();
       return _memoryPaymentSettingsCache!;
     }
@@ -4812,29 +4812,51 @@ class SupabaseService {
   static Future<Map<String, dynamic>> _fetchAndCacheSettingsFromDb() async {
     Map<String, dynamic>? data;
 
-    // 1. Query payment_settings table directly
+    // 1. Query platform_settings table first (key: payment_gateway_settings)
     try {
-      final res = await client.from('payment_settings').select().eq('id', 'default').maybeSingle();
-      if (res != null) {
-        data = Map<String, dynamic>.from(res);
+      final res = await client.from('platform_settings').select('value').eq('key', 'payment_gateway_settings').maybeSingle();
+      if (res != null && res['value'] != null) {
+        final val = res['value'];
+        if (val is String) {
+          data = Map<String, dynamic>.from(jsonDecode(val));
+        } else if (val is Map) {
+          data = Map<String, dynamic>.from(val);
+        }
       }
     } catch (e) {
-      debugPrint('Notice fetching payment_settings table: $e');
+      debugPrint('Notice fetching platform_settings payment_gateway_settings: $e');
     }
 
-    // 2. Try system_config if payment_settings table is empty
+    // 2. Query payment_settings table directly
+    if (data == null || data.isEmpty) {
+      try {
+        final res = await client.from('payment_settings').select().eq('id', 'default').maybeSingle();
+        if (res != null) {
+          data = Map<String, dynamic>.from(res);
+        }
+      } catch (e) {
+        debugPrint('Notice fetching payment_settings table: $e');
+      }
+    }
+
+    // 3. Try system_config if still empty
     if (data == null || data.isEmpty) {
       try {
         final res = await client.from('system_config').select('value').eq('key', 'payment_gateway_settings').maybeSingle();
         if (res != null && res['value'] != null) {
-          data = Map<String, dynamic>.from(res['value']);
+          final val = res['value'];
+          if (val is String) {
+            data = Map<String, dynamic>.from(jsonDecode(val));
+          } else if (val is Map) {
+            data = Map<String, dynamic>.from(val);
+          }
         }
       } catch (e) {
         debugPrint('Notice fetching system_config payment_gateway_settings: $e');
       }
     }
 
-    // 3. Fallback to local SharedPreferences
+    // 4. Fallback to local SharedPreferences
     if (data == null || data.isEmpty) {
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -4858,13 +4880,13 @@ class SupabaseService {
 
   static Future<bool> savePaymentSettings(Map<String, dynamic> settings) async {
     final bool upiActive = parseBool(settings['upi_active'], defaultValue: true);
-    final bool cashfreeActive = parseBool(settings['cashfree_active'], defaultValue: true);
+    final bool cashfreeActive = parseBool(settings['cashfree_active'], defaultValue: false);
 
     final Map<String, dynamic> full = {
       'id': 'default',
       'upi_active': upiActive,
-      'upi_id': (settings['upi_id'] ?? 'neetjee27@nyes').toString().trim(),
-      'upi_payee_name': (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString().trim(),
+      'upi_id': (settings['upi_id'] ?? 'myhub4631@apl').toString().trim(),
+      'upi_payee_name': (settings['upi_payee_name'] ?? 'Mahboob Hasan').toString().trim(),
       'cashfree_active': cashfreeActive,
       'cashfree_app_id': (settings['cashfree_app_id'] ?? '').toString().trim(),
       'cashfree_secret_key': (settings['cashfree_secret_key'] ?? '').toString().trim(),
@@ -4882,27 +4904,28 @@ class SupabaseService {
       debugPrint('Notice saving payment_settings to SharedPreferences: $e');
     }
 
-    // Save to payment_settings table (UPDATE first, then INSERT/UPSERT)
-    bool savedToDb = false;
+    // 1. Primary Save to platform_settings table (key: payment_gateway_settings)
+    try {
+      await client.from('platform_settings').upsert({
+        'key': 'payment_gateway_settings',
+        'value': jsonEncode(full),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Notice upserting platform_settings payment_gateway_settings: $e');
+    }
+
+    // 2. Save to payment_settings table
     try {
       final updated = await client.from('payment_settings').update(full).eq('id', 'default').select();
-      if (updated.isNotEmpty) {
-        savedToDb = true;
+      if (updated.isEmpty) {
+        await client.from('payment_settings').upsert(full);
       }
     } catch (e) {
       debugPrint('Notice updating payment_settings table: $e');
     }
 
-    if (!savedToDb) {
-      try {
-        await client.from('payment_settings').upsert(full);
-        savedToDb = true;
-      } catch (e) {
-        debugPrint('Notice upserting payment_settings table: $e');
-      }
-    }
-
-    // Backup save to system_config table
+    // 3. Backup save to system_config table
     try {
       await client.from('system_config').upsert({
         'key': 'payment_gateway_settings',

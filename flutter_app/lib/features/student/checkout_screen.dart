@@ -81,12 +81,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
   }
 
   Future<void> _loadPaymentSettings() async {
-    final settings = await SupabaseService.fetchPaymentSettings();
+    final settings = await SupabaseService.fetchPaymentSettings(forceRefresh: true);
     if (mounted) {
       setState(() {
         _paymentSettings = settings;
         final upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: true);
-        final cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: true);
+        final cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: false);
         if (cashfreeActive && !upiActive) {
           _selectedPaymentMethod = 'Cashfree';
         } else if (upiActive) {

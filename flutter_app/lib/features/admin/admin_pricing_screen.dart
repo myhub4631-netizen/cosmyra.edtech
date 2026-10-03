@@ -3348,8 +3348,8 @@ class _PaymentGatewaysConfigCardState extends State<_PaymentGatewaysConfigCard> 
   @override
   void initState() {
     super.initState();
-    _upiIdCtrl = TextEditingController(text: 'neetjee27@nyes');
-    _upiPayeeCtrl = TextEditingController(text: 'Cosmyra Edu Platform');
+    _upiIdCtrl = TextEditingController(text: 'myhub4631@apl');
+    _upiPayeeCtrl = TextEditingController(text: 'Mahboob Hasan');
     _cashfreeAppIdCtrl = TextEditingController();
     _cashfreeSecretCtrl = TextEditingController();
     _loadSettings();
@@ -3365,14 +3365,14 @@ class _PaymentGatewaysConfigCardState extends State<_PaymentGatewaysConfigCard> 
   }
 
   Future<void> _loadSettings() async {
-    final settings = await SupabaseService.fetchPaymentSettings();
+    final settings = await SupabaseService.fetchPaymentSettings(forceRefresh: true);
     if (mounted) {
       setState(() {
         _upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: true);
-        _upiIdCtrl.text = (settings['upi_id'] ?? 'neetjee27@nyes').toString();
-        _upiPayeeCtrl.text = (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString();
+        _upiIdCtrl.text = (settings['upi_id'] ?? 'myhub4631@apl').toString();
+        _upiPayeeCtrl.text = (settings['upi_payee_name'] ?? 'Mahboob Hasan').toString();
 
-        _cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: true);
+        _cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: false);
         _cashfreeAppIdCtrl.text = (settings['cashfree_app_id'] ?? '').toString();
         _cashfreeSecretCtrl.text = (settings['cashfree_secret_key'] ?? '').toString();
         _cashfreeEnv = (settings['cashfree_environment'] ?? 'TEST').toString();
@@ -3393,10 +3393,11 @@ class _PaymentGatewaysConfigCardState extends State<_PaymentGatewaysConfigCard> 
       'cashfree_environment': _cashfreeEnv,
     });
     if (mounted) {
+      await _loadSettings();
       setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(success ? '✅ Payment Gateway Settings Saved Successfully!' : '❌ Failed to save payment gateway settings'),
+          content: Text(success ? '✅ Payment Gateway Settings Saved & Synced Across Platform!' : '❌ Failed to save payment gateway settings'),
           backgroundColor: success ? const Color(0xFF10B981) : Colors.red,
         ),
       );
