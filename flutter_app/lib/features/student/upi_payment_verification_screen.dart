@@ -298,53 +298,77 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
     }
 
     final qrImageUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${Uri.encodeComponent(_upiUrl)}';
-
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
-      backgroundColor: isMobile ? Colors.white : const Color(0xFFF8FAFC),
-      appBar: isMobile
-          ? AppBar(
-              backgroundColor: Colors.white,
-              elevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
-                onPressed: () {
-                  if (Navigator.of(context).canPop()) {
-                    Navigator.of(context).pop();
-                  } else {
-                    context.go('/test-series');
-                  }
-                },
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              context.go('/test-series');
+            }
+          },
+        ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(8),
               ),
-              title: Text('Complete UPI Payment', style: GoogleFonts.inter(color: const Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.w800)),
-              centerTitle: true,
-            )
-          : null,
+              child: const Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 16),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Complete UPI Payment',
+              style: GoogleFonts.inter(
+                color: const Color(0xFF0F172A),
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: Align(
           alignment: Alignment.topCenter,
           child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 20, vertical: isMobile ? 12 : 24),
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 12 : 24,
+              vertical: isMobile ? 12 : 24,
+            ),
             physics: const BouncingScrollPhysics(),
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 520),
-              decoration: isMobile
-                  ? null
-                  : BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x0D0F172A),
-                          blurRadius: 20,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
-                    ),
+              constraints: const BoxConstraints(maxWidth: 540),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x060F172A),
+                    blurRadius: 16,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
               child: Padding(
-                padding: EdgeInsets.all(isMobile ? 0 : 20),
+                padding: EdgeInsets.all(isMobile ? 14 : 24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,25 +432,6 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
                             ],
                           ),
                         ),
-                        if (!isMobile)
-                          InkWell(
-                            borderRadius: BorderRadius.circular(20),
-                            onTap: () {
-                              if (Navigator.of(context).canPop()) {
-                                Navigator.of(context).pop();
-                              } else {
-                                context.go('/dashboard');
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFF1F5F9),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
-                            ),
-                          ),
                       ],
                     ),
                     const Divider(height: 24, color: Color(0xFFE2E8F0)),
