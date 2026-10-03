@@ -10,6 +10,8 @@ import 'core/router/safe_route_parser.dart';
 import 'core/router/app_back_button_handler.dart';
 import 'core/services/seo_tracking_service.dart';
 
+import 'core/services/feature_config_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy(); // Removes # hash from Flutter Web URLs
@@ -20,6 +22,7 @@ void main() async {
   );
 
   await SupabaseService.initialize();
+  await FeatureConfigService.init();
   await SeoTrackingService.initialize();
   AppBackButtonHandler.initialize();
   runApp(const CosmyraApp());

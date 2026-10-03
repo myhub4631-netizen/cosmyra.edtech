@@ -63,6 +63,7 @@ import '../../features/admin/admin_coupons_screen.dart';
 import '../../features/admin/admin_media_screen.dart';
 import '../../features/admin/admin_orders_screen.dart';
 import '../../features/admin/admin_marketing_automation_screen.dart';
+import '../../features/admin/admin_feature_manager_screen.dart';
 import '../../features/cms/dynamic_page_screen.dart';
 import '../../features/blog/blog_list_screen.dart';
 import '../../features/blog/blog_post_screen.dart';
@@ -1047,6 +1048,12 @@ final GoRouter appRouter = GoRouter(
       path: '/admin/banners',
       builder: (context, state) => AdminBannerManagerScreen(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/feature-manager',
+      builder: (context, state) => AdminFeatureManagerScreen(
+        onBack: () => context.go('/admin'),
       ),
     ),
     GoRoute(

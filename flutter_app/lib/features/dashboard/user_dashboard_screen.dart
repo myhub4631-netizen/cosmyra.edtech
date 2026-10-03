@@ -9,6 +9,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lottie/lottie.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/feature_config_service.dart';
 import '../../core/theme/app_design_system.dart';
 import '../../shared/widgets/app_sidebar.dart';
 import '../../shared/widgets/app_header.dart';
@@ -1155,19 +1156,61 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
 
   // 5. Mobile Quick Actions Horizontal Row
   Widget _buildMobileQuickActions() {
-    final actions = [
-      {'label': 'Custom Practice', 'icon': Icons.track_changes_rounded, 'lottie': 'https://assets10.lottiefiles.com/packages/lf20_49rdyysj.json', 'color': const Color(0xFF16A34A), 'bg': const Color(0xFFDCFCE7), 'tap': () => context.go('/custom-practice')},
-      {'label': 'Custom Test', 'icon': Icons.assignment_outlined, 'lottie': 'https://assets5.lottiefiles.com/packages/lf20_touohx80.json', 'color': const Color(0xFF2563EB), 'bg': const Color(0xFFDBEAFE), 'tap': () => context.go('/custom-test')},
-      {'label': 'PYQ Practice', 'icon': Icons.menu_book_rounded, 'lottie': 'https://assets2.lottiefiles.com/packages/lf20_w51pcehl.json', 'color': const Color(0xFF7C3AED), 'bg': const Color(0xFFDDD6FE), 'tap': () => context.go('/pyq')},
-      {'label': 'NTA Questions', 'icon': Icons.shield_outlined, 'lottie': 'https://assets3.lottiefiles.com/packages/lf20_6aYx4t.json', 'color': const Color(0xFFEA580C), 'bg': const Color(0xFFFFEDD5), 'tap': () => context.go('/nta-practice')},
-      {'label': 'Test Series', 'icon': Icons.calendar_today_outlined, 'lottie': 'https://assets5.lottiefiles.com/packages/lf20_touohx80.json', 'color': const Color(0xFFDB2777), 'bg': const Color(0xFFFCE7F3), 'tap': () {
-        if (widget.onOpenTestSeries != null) {
-          widget.onOpenTestSeries!();
-        } else {
-          context.go('/test-series');
-        }
-      }},
+    final rawActions = [
+      {
+        'label': 'Custom Practice',
+        'key': 'custom_practice',
+        'icon': Icons.track_changes_rounded,
+        'lottie': 'https://assets10.lottiefiles.com/packages/lf20_49rdyysj.json',
+        'color': const Color(0xFF16A34A),
+        'bg': const Color(0xFFDCFCE7),
+        'tap': () => FeatureConfigService.handleFeatureTap(context, 'custom_practice', onActive: () => context.go('/custom-practice')),
+      },
+      {
+        'label': 'Custom Test',
+        'key': 'custom_test',
+        'icon': Icons.assignment_outlined,
+        'lottie': 'https://assets5.lottiefiles.com/packages/lf20_touohx80.json',
+        'color': const Color(0xFF2563EB),
+        'bg': const Color(0xFFDBEAFE),
+        'tap': () => FeatureConfigService.handleFeatureTap(context, 'custom_test', onActive: () => context.go('/custom-test')),
+      },
+      {
+        'label': 'PYQ Practice',
+        'key': 'pyq_practice',
+        'icon': Icons.menu_book_rounded,
+        'lottie': 'https://assets2.lottiefiles.com/packages/lf20_w51pcehl.json',
+        'color': const Color(0xFF7C3AED),
+        'bg': const Color(0xFFDDD6FE),
+        'tap': () => FeatureConfigService.handleFeatureTap(context, 'pyq_practice', onActive: () => context.go('/pyq')),
+      },
+      {
+        'label': 'NTA Questions',
+        'key': 'nta_questions',
+        'icon': Icons.shield_outlined,
+        'lottie': 'https://assets3.lottiefiles.com/packages/lf20_6aYx4t.json',
+        'color': const Color(0xFFEA580C),
+        'bg': const Color(0xFFFFEDD5),
+        'tap': () => FeatureConfigService.handleFeatureTap(context, 'nta_questions', onActive: () => context.go('/nta-practice')),
+      },
+      {
+        'label': 'Test Series',
+        'key': 'test_series',
+        'icon': Icons.calendar_today_outlined,
+        'lottie': 'https://assets5.lottiefiles.com/packages/lf20_touohx80.json',
+        'color': const Color(0xFFDB2777),
+        'bg': const Color(0xFFFCE7F3),
+        'tap': () => FeatureConfigService.handleFeatureTap(context, 'test_series', onActive: () {
+          if (widget.onOpenTestSeries != null) {
+            widget.onOpenTestSeries!();
+          } else {
+            context.go('/test-series');
+          }
+        }),
+      },
     ];
+
+    final actions = rawActions.where((a) => FeatureConfigService.isVisible(a['key'] as String)).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1755,24 +1798,30 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   }
 
   Widget _buildSidebar() {
-    final navItems = [
-      {'icon': Icons.dashboard_rounded, 'label': 'Dashboard', 'hasArrow': false},
-      {'icon': Icons.track_changes_rounded, 'label': 'Practice', 'hasArrow': true},
-      {'icon': Icons.edit_note_rounded, 'label': 'Custom Practice', 'hasArrow': false},
-      {'icon': Icons.assignment_outlined, 'label': 'Custom Test', 'hasArrow': false},
-      {'icon': Icons.menu_book_rounded, 'label': 'PYQ', 'hasArrow': true},
-      {'icon': Icons.verified_user_outlined, 'label': 'NTA Questions', 'hasArrow': false},
-      {'icon': Icons.bookmark_border_rounded, 'label': 'Bookmarks', 'hasArrow': false},
-      {'icon': Icons.cancel_outlined, 'label': 'My Mistakes', 'hasArrow': false},
-      {'icon': Icons.calendar_today_rounded, 'label': 'Test Series', 'hasArrow': false},
-      {'icon': Icons.bar_chart_rounded, 'label': 'Analytics', 'hasArrow': true},
-      {'icon': Icons.emoji_events_outlined, 'label': 'Leaderboard', 'hasArrow': false},
-      {'icon': Icons.event_note_rounded, 'label': 'Study Plan', 'hasArrow': false},
-      {'icon': Icons.person_outline_rounded, 'label': 'Profile', 'hasArrow': false},
-      {'icon': Icons.settings_outlined, 'label': 'Settings', 'hasArrow': false},
-      {'icon': Icons.help_outline_rounded, 'label': 'Help & Support', 'hasArrow': false},
-      {'icon': Icons.logout_rounded, 'label': 'Logout', 'hasArrow': false},
+    final rawNavItems = [
+      {'icon': Icons.dashboard_rounded, 'label': 'Dashboard', 'hasArrow': false, 'key': ''},
+      {'icon': Icons.track_changes_rounded, 'label': 'Practice', 'hasArrow': true, 'key': 'custom_practice'},
+      {'icon': Icons.edit_note_rounded, 'label': 'Custom Practice', 'hasArrow': false, 'key': 'custom_practice'},
+      {'icon': Icons.assignment_outlined, 'label': 'Custom Test', 'hasArrow': false, 'key': 'custom_test'},
+      {'icon': Icons.menu_book_rounded, 'label': 'PYQ', 'hasArrow': true, 'key': 'pyq_practice'},
+      {'icon': Icons.verified_user_outlined, 'label': 'NTA Questions', 'hasArrow': false, 'key': 'nta_questions'},
+      {'icon': Icons.bookmark_border_rounded, 'label': 'Bookmarks', 'hasArrow': false, 'key': ''},
+      {'icon': Icons.cancel_outlined, 'label': 'My Mistakes', 'hasArrow': false, 'key': ''},
+      {'icon': Icons.calendar_today_rounded, 'label': 'Test Series', 'hasArrow': false, 'key': 'test_series'},
+      {'icon': Icons.bar_chart_rounded, 'label': 'Analytics', 'hasArrow': true, 'key': 'performance_analytics'},
+      {'icon': Icons.emoji_events_outlined, 'label': 'Leaderboard', 'hasArrow': false, 'key': ''},
+      {'icon': Icons.event_note_rounded, 'label': 'Study Plan', 'hasArrow': false, 'key': ''},
+      {'icon': Icons.person_outline_rounded, 'label': 'Profile', 'hasArrow': false, 'key': ''},
+      {'icon': Icons.settings_outlined, 'label': 'Settings', 'hasArrow': false, 'key': ''},
+      {'icon': Icons.help_outline_rounded, 'label': 'Help & Support', 'hasArrow': false, 'key': ''},
+      {'icon': Icons.logout_rounded, 'label': 'Logout', 'hasArrow': false, 'key': ''},
     ];
+
+    final navItems = rawNavItems.where((item) {
+      final key = item['key'] as String;
+      if (key.isEmpty) return true;
+      return FeatureConfigService.isVisible(key);
+    }).toList();
 
     return Container(
       width: 250,
@@ -1846,20 +1895,27 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                         }
                         return;
                       }
-                      if (item['label'] == 'Practice' || item['label'] == 'Custom Practice') context.go('/custom-practice');
-                      if (item['label'] == 'Custom Test') {
-                        context.go('/custom-test');
+                      if (item['label'] == 'Practice' || item['label'] == 'Custom Practice') {
+                        FeatureConfigService.handleFeatureTap(context, 'custom_practice', onActive: () => context.go('/custom-practice'));
+                      } else if (item['label'] == 'Custom Test') {
+                        FeatureConfigService.handleFeatureTap(context, 'custom_test', onActive: () => context.go('/custom-test'));
                       } else if (item['label'] == 'Test Series') {
-                        if (widget.onOpenTestSeries != null) {
-                          widget.onOpenTestSeries!();
-                        } else {
-                          context.go('/test-series');
-                        }
-                      }
-                      if (item['label'] == 'PYQ' || item['label'] == 'PYQ Practice') context.go('/pyq');
-                      if (item['label'] == 'NTA Questions' || item['label'] == 'NTA Practice') context.go('/nta-practice');
-                      if (item['label'] == 'Bookmarks' || item['label'] == 'My Mistakes') widget.onOpenMistakes();
-                      if (item['label'] == 'Leaderboard') {
+                        FeatureConfigService.handleFeatureTap(context, 'test_series', onActive: () {
+                          if (widget.onOpenTestSeries != null) {
+                            widget.onOpenTestSeries!();
+                          } else {
+                            context.go('/test-series');
+                          }
+                        });
+                      } else if (item['label'] == 'PYQ' || item['label'] == 'PYQ Practice') {
+                        FeatureConfigService.handleFeatureTap(context, 'pyq_practice', onActive: () => context.go('/pyq'));
+                      } else if (item['label'] == 'NTA Questions' || item['label'] == 'NTA Practice') {
+                        FeatureConfigService.handleFeatureTap(context, 'nta_questions', onActive: () => context.go('/nta-practice'));
+                      } else if (item['label'] == 'Analytics') {
+                        FeatureConfigService.handleFeatureTap(context, 'performance_analytics', onActive: () => context.go('/analytics'));
+                      } else if (item['label'] == 'Bookmarks' || item['label'] == 'My Mistakes') {
+                        widget.onOpenMistakes();
+                      } else if (item['label'] == 'Leaderboard') {
                         if (widget.onOpenLeaderboard != null) {
                           widget.onOpenLeaderboard!();
                         } else {

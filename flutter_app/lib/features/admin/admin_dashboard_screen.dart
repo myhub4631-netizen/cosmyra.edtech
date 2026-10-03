@@ -474,6 +474,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 _buildSidebarSectionLabel('SALES & AUTOMATION'),
                 _buildSidebarTile('🛒 Orders & Purchases (Verify UPI)', Icons.shopping_bag_outlined, false, onTap: () => context.go('/admin/order')),
                 _buildSidebarTile('💳 Payment Gateways (UPI & Cashfree)', Icons.payment_rounded, false, onTap: () => context.go('/admin/payment-gateways')),
+                _buildSidebarTile('🚀 Feature Manager (App Features)', Icons.toggle_on_rounded, false, onTap: () => context.go('/admin/feature-manager')),
                 _buildSidebarTile('Email & WhatsApp Automation', Icons.mark_email_read_outlined, false, onTap: () => context.go('/admin/marketing-automation')),
 
                 const SizedBox(height: 16),
@@ -1385,6 +1386,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           children: [
             _buildQuickActionCard('💳 Payment Gateways', 'Configure UPI ID & Cashfree API keys', Icons.payment_rounded, const Color(0xFF10B981), () {
               context.go('/admin/payment-gateways');
+            }),
+            _buildQuickActionCard('🚀 Feature Manager', 'Control app features availability', Icons.toggle_on_rounded, const Color(0xFF8B5CF6), () {
+              context.go('/admin/feature-manager');
             }),
             _buildQuickActionCard('🛒 Orders & Verification', 'Verify UPI payments & grant access', Icons.shopping_bag_outlined, const Color(0xFF2563EB), () {
               context.go('/admin/orders');
