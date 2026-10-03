@@ -8883,7 +8883,7 @@ class SupabaseService {
   static String? extractPaymentScreenshotUrl(Map<String, dynamic> o) {
     bool isValidUrl(String url) {
       final u = url.trim();
-      if (u.isEmpty || u.contains('pub-r2.dev')) return false;
+      if (u.isEmpty) return false;
       return u.startsWith('http://') || u.startsWith('https://') || u.startsWith('data:image/');
     }
 
@@ -10168,7 +10168,7 @@ class SupabaseService {
         fileName: cleanName,
         mimeType: mimeType,
       );
-      if (r2Url != null && r2Url.isNotEmpty && !r2Url.contains('pub-r2.dev')) {
+      if (r2Url != null && r2Url.isNotEmpty) {
         return r2Url;
       }
     } catch (e) {
@@ -10184,7 +10184,7 @@ class SupabaseService {
         fileOptions: FileOptions(contentType: mimeType, upsert: true),
       );
       final publicUrl = client.storage.from('media_assets').getPublicUrl(path);
-      if (publicUrl.isNotEmpty && !publicUrl.contains('pub-r2.dev')) {
+      if (publicUrl.isNotEmpty) {
         return publicUrl;
       }
     } catch (e) {
