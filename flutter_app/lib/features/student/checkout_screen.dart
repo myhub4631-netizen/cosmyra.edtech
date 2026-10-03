@@ -37,6 +37,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
   String _createdOrderId = '';
   CartItem? _activeItem;
   bool _isLoadingProduct = true;
+  UserProfileModel? _currentUser;
 
   bool _isAlreadyOwned = false;
 
@@ -76,8 +77,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
       curve: Curves.easeInOut,
     ));
 
+    _loadCurrentUser();
     _loadPaymentSettings();
     _initCheckoutItem();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final user = await SupabaseService.getCurrentUser();
+    if (mounted && user != null) {
+      setState(() {
+        _currentUser = user;
+      });
+    }
   }
 
   Future<void> _loadPaymentSettings() async {
@@ -379,7 +390,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
     }
 
     final authUser = SupabaseService.client.auth.currentUser;
-    if (authUser == null) {
+    final activeSession = SupabaseService.activeUserSession;
+    final effectiveUser = _currentUser ?? activeSession ?? (authUser != null
+        ? UserProfileModel(
+            id: authUser.id,
+            email: authUser.email ?? '',
+            fullName: (authUser.userMetadata?['full_name'] ?? authUser.userMetadata?['name'] ?? 'Student Aspirant').toString(),
+            role: 'student',
+          )
+        : null);
+
+    if (effectiveUser == null) {
       return Scaffold(
         appBar: AppBar(
           leading: IconButton(
@@ -423,13 +444,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
       );
     }
 
-    final meta = authUser.userMetadata ?? {};
-    final user = UserProfileModel(
-      id: authUser.id,
-      email: authUser.email ?? '',
-      fullName: (meta['full_name'] ?? meta['name'] ?? SupabaseService.activeUserSession?.fullName ?? 'Student Aspirant').toString(),
-      role: 'student',
-    );
+    final user = effectiveUser;
 
     final List<CartItem> itemsToPurchase = _activeItem != null
         ? [_activeItem!]
@@ -438,8 +453,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
             : [CartItem(id: 'ts_default', title: 'Test Series', price: 499, originalPrice: 1999)]);
 
     final List<Map<String, dynamic>> itemsJson = itemsToPurchase.map((it) => it.toJson()).toList();
-    final upiId = (_paymentSettings['upi_id'] ?? 'neetjee27@nyes').toString().trim();
-    final payeeName = (_paymentSettings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString().trim();
+    final upiId = (_paymentSettings['upi_id'] ?? 'myhub4631@apl').toString().trim();
+    final payeeName = (_paymentSettings['upi_payee_name'] ?? 'Mahboob Hasan').toString().trim();
     final amountStr = _finalTotal.toStringAsFixed(2);
     final upiUrl = 'upi://pay?pa=$upiId&pn=${Uri.encodeComponent(payeeName)}&am=$amountStr&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
 
