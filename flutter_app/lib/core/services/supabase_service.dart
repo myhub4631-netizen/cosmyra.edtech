@@ -10161,6 +10161,9 @@ class SupabaseService {
     if (fileBytes == null || fileBytes.isEmpty) return null;
     final cleanName = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
 
+    // Ensure Cloudflare R2 credentials are freshly loaded from Supabase / Local storage
+    await CloudflareR2Service.loadConfig();
+
     // 1. Attempt Cloudflare R2 Upload
     try {
       final r2Url = await CloudflareR2Service.uploadFile(
@@ -10175,23 +10178,25 @@ class SupabaseService {
       debugPrint('Notice uploading to Cloudflare R2: $e');
     }
 
-    // 2. Fallback to Supabase Storage
+    // 2. Fallback to Supabase Storage (attempting across standard buckets)
     final path = 'uploads/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
-    try {
-      await client.storage.from('media_assets').uploadBinary(
-        path,
-        fileBytes,
-        fileOptions: FileOptions(contentType: mimeType, upsert: true),
-      );
-      final publicUrl = client.storage.from('media_assets').getPublicUrl(path);
-      if (publicUrl.isNotEmpty) {
-        return publicUrl;
+    for (final bucket in ['media_assets', 'cms-media', 'question-images', 'banners']) {
+      try {
+        await client.storage.from(bucket).uploadBinary(
+          path,
+          fileBytes,
+          fileOptions: FileOptions(contentType: mimeType, upsert: true),
+        );
+        final publicUrl = client.storage.from(bucket).getPublicUrl(path);
+        if (publicUrl.isNotEmpty) {
+          return publicUrl;
+        }
+      } catch (e) {
+        debugPrint('Notice uploading to Supabase Storage $bucket bucket: $e');
       }
-    } catch (e) {
-      debugPrint('Notice uploading to Supabase Storage media_assets bucket: $e');
     }
 
-    // 3. Fallback: Base64 Data URI (Guarantees image preview across all devices & browsers!)
+    // 3. Last Resort Fallback: Base64 Data URI (Guarantees image preview across all devices & browsers!)
     final base64Str = base64Encode(fileBytes);
     final effectiveMime = mimeType.isNotEmpty ? mimeType : 'image/png';
     return 'data:$effectiveMime;base64,$base64Str';

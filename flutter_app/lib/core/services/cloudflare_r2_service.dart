@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CloudflareR2Service {
   // Environment or SharedPreferences Keys
@@ -23,6 +24,14 @@ class CloudflareR2Service {
   static bool get isConfigured =>
       accountId.isNotEmpty && accessKeyId.isNotEmpty && secretAccessKey.isNotEmpty;
 
+  static String _cleanDomain(String d) {
+    var domain = d.trim().replaceAll(RegExp(r'/$'), '');
+    if (domain.isNotEmpty && !domain.startsWith('http://') && !domain.startsWith('https://')) {
+      domain = 'https://$domain';
+    }
+    return domain;
+  }
+
   static Future<void> loadConfig() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -36,7 +45,51 @@ class CloudflareR2Service {
       if (keyId != null && keyId.isNotEmpty) accessKeyId = keyId;
       if (secret != null && secret.isNotEmpty) secretAccessKey = secret;
       if (bucket != null && bucket.isNotEmpty) bucketName = bucket;
-      if (domain != null && domain.isNotEmpty) publicDomain = domain;
+      if (domain != null && domain.isNotEmpty) publicDomain = _cleanDomain(domain);
+
+      // Also fetch R2 configuration from Supabase system_config table so any student/user device gets the global R2 setup
+      try {
+        final supa = Supabase.instance.client;
+        final res = await supa
+            .from('system_config')
+            .select('value')
+            .or('key.eq.cloudflare_r2_config,key.eq.r2_config')
+            .maybeSingle();
+
+        if (res != null && res['value'] != null) {
+          final rawVal = res['value'];
+          Map<String, dynamic>? data;
+          if (rawVal is Map<String, dynamic>) {
+            data = rawVal;
+          } else if (rawVal is String && rawVal.isNotEmpty) {
+            try {
+              data = jsonDecode(rawVal) as Map<String, dynamic>;
+            } catch (_) {}
+          }
+
+          if (data != null) {
+            final cloudAcc = (data['account_id'] ?? data['r2_account_id'] ?? '').toString().trim();
+            final cloudKeyId = (data['access_key_id'] ?? data['r2_access_key_id'] ?? '').toString().trim();
+            final cloudSecret = (data['secret_access_key'] ?? data['r2_secret_access_key'] ?? '').toString().trim();
+            final cloudBucket = (data['bucket_name'] ?? data['r2_bucket_name'] ?? '').toString().trim();
+            final cloudDomain = (data['public_domain'] ?? data['r2_public_domain'] ?? '').toString().trim();
+
+            if (cloudAcc.isNotEmpty) accountId = cloudAcc;
+            if (cloudKeyId.isNotEmpty) accessKeyId = cloudKeyId;
+            if (cloudSecret.isNotEmpty) secretAccessKey = cloudSecret;
+            if (cloudBucket.isNotEmpty) bucketName = cloudBucket;
+            if (cloudDomain.isNotEmpty) publicDomain = _cleanDomain(cloudDomain);
+
+            if (accountId.isNotEmpty) await prefs.setString(_r2AccountIdKey, accountId);
+            if (accessKeyId.isNotEmpty) await prefs.setString(_r2AccessKeyIdKey, accessKeyId);
+            if (secretAccessKey.isNotEmpty) await prefs.setString(_r2SecretAccessKeyKey, secretAccessKey);
+            if (bucketName.isNotEmpty) await prefs.setString(_r2BucketNameKey, bucketName);
+            if (publicDomain.isNotEmpty) await prefs.setString(_r2PublicDomainKey, publicDomain);
+          }
+        }
+      } catch (e) {
+        debugPrint('Notice loading Cloudflare R2 config from Supabase: $e');
+      }
     } catch (e) {
       debugPrint('Notice loading R2 config: $e');
     }
@@ -53,7 +106,7 @@ class CloudflareR2Service {
     accessKeyId = accessKeyIdVal.trim();
     secretAccessKey = secretAccessKeyVal.trim();
     bucketName = bucketNameVal.trim();
-    publicDomain = publicDomainVal.trim().replaceAll(RegExp(r'/$'), '');
+    publicDomain = _cleanDomain(publicDomainVal);
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_r2AccountIdKey, accountId);
@@ -61,6 +114,25 @@ class CloudflareR2Service {
     await prefs.setString(_r2SecretAccessKeyKey, secretAccessKey);
     await prefs.setString(_r2BucketNameKey, bucketName);
     await prefs.setString(_r2PublicDomainKey, publicDomain);
+
+    // Persist to Supabase system_config table so ALL users & devices get the R2 credentials automatically
+    try {
+      final supa = Supabase.instance.client;
+      final payload = {
+        'account_id': accountId,
+        'access_key_id': accessKeyId,
+        'secret_access_key': secretAccessKey,
+        'bucket_name': bucketName,
+        'public_domain': publicDomain,
+      };
+      await supa.from('system_config').upsert({
+        'key': 'cloudflare_r2_config',
+        'value': jsonEncode(payload),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Notice persisting Cloudflare R2 config to Supabase system_config: $e');
+    }
   }
 
   /// Uploads binary file bytes directly to Cloudflare R2 bucket via S3 API V4 Signature
