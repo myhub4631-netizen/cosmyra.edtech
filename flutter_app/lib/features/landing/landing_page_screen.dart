@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/services/supabase_service.dart';
+import '../../models/models.dart';
+import '../dashboard/widgets/recommended_test_series_section.dart';
 
 class LandingPageScreen extends StatefulWidget {
   final VoidCallback onStartPracticing;
@@ -25,7 +27,6 @@ class LandingPageScreen extends StatefulWidget {
 }
 
 class _LandingPageScreenState extends State<LandingPageScreen> {
-  bool _isMobileMenuOpen = false;
   bool _showEmailLoginForm = false;
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -33,10 +34,15 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
   bool _loginLoading = false;
   String? _loginError;
 
+  Map<String, dynamic> _homeContent = {};
+  List<DashboardBannerModel> _banners = [];
+  bool _isLoadingContent = true;
+
   @override
   void initState() {
     super.initState();
     SupabaseService.authNotifier.addListener(_onLandingAuthChanged);
+    _loadDynamicHomeContent();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         final user = await SupabaseService.getCurrentUser();
@@ -48,6 +54,23 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
       }
     });
   }
+
+  Future<void> _loadDynamicHomeContent() async {
+    try {
+      final content = await SupabaseService.fetchHomePageContent();
+      final bannerList = await SupabaseService.fetchBanners(onlyActive: true);
+      if (mounted) {
+        setState(() {
+          _homeContent = content;
+          _banners = bannerList;
+          _isLoadingContent = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingContent = false);
+    }
+  }
+
   @override
   void dispose() {
     SupabaseService.authNotifier.removeListener(_onLandingAuthChanged);
@@ -79,29 +102,29 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 480),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF7FAF8),
+                  color: const Color(0xFFFFFFFF),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                   boxShadow: const [
-                    BoxShadow(color: Color(0x0C000000), blurRadius: 24, offset: Offset(0, 8)),
+                    BoxShadow(color: Color(0x14000000), blurRadius: 32, offset: Offset(0, 12)),
                   ],
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           TextButton.icon(
                             onPressed: () => context.go('/'),
                             icon: const Icon(Icons.arrow_back_rounded, size: 16, color: Color(0xFF64748B)),
-                            label: const Text('Back to Home', style: TextStyle(color: Color(0xFF64748B), fontSize: 12.5)),
+                            label: Text('Back to Home', style: GoogleFonts.inter(color: const Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w600)),
                           ),
                           TextButton(
                             onPressed: widget.onSignUp,
-                            child: const Text('Create Account', style: TextStyle(color: Color(0xFF0D7A53), fontWeight: FontWeight.bold, fontSize: 12.5)),
+                            child: Text('Create Account', style: GoogleFonts.inter(color: const Color(0xFF4F46E5), fontWeight: FontWeight.bold, fontSize: 13)),
                           ),
                         ],
                       ),
@@ -126,19 +149,16 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // 1. TOP HEADER NAVIGATION BAR (Responsive)
+            // 1. TOP HEADER NAVIGATION BAR
             _buildHeaderNav(context, isDesktop),
 
-            // 2. HERO SECTION CANVAS (Responsive Stack/Column on Mobile)
+            // 2. HERO SECTION CANVAS
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 40,
-                vertical: 36,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 48),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFFF8FAFC), Color(0xFFEEF2FF), Color(0xFFF8FAFC)],
+                  colors: [Color(0xFFF8FAFC), Color(0xFFEEF2FF), Color(0xFFFAF5FF)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -146,37 +166,79 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
               child: MaxWidthContainer(
                 child: Column(
                   children: [
+                    // Clean 2-column layout on Desktop to prevent overlapping
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Left Headline & Call-To-Action Column
-                        Expanded(flex: 5, child: _buildHeroLeftContent(isDesktop, isTablet)),
-                        const SizedBox(width: 24),
+                        // Left Headline & Call-To-Action Column (Flex 7)
+                        Expanded(
+                          flex: 7,
+                          child: _buildHeroLeftContent(isDesktop, isTablet)
+                              .animate()
+                              .fadeIn(duration: 500.ms)
+                              .slideX(begin: -0.05, end: 0, curve: Curves.easeOutCubic),
+                        ),
+                        const SizedBox(width: 48),
 
-                        // Center Hero Column: Student Portrait & Floating Badges
-                        Expanded(flex: 4, child: _buildHeroStudentImage(isDesktop)),
-                        const SizedBox(width: 24),
-
-                        // Right Column: Floating Progress & Streak Dashboard Cards
-                        Expanded(flex: 3, child: _buildHeroRightCards()),
+                        // Right Showcase Column: Student Portrait & Floating Interactive Cards (Flex 5)
+                        Expanded(
+                          flex: 5,
+                          child: _buildHeroRightShowcase(isDesktop)
+                              .animate()
+                              .fadeIn(duration: 600.ms, delay: 150.ms)
+                              .slideX(begin: 0.05, end: 0, curve: Curves.easeOutCubic),
+                        ),
                       ],
                     ),
 
-                    const SizedBox(height: 36),
+                    const SizedBox(height: 52),
 
-                    // 3. KEY STATS METRICS BAR (Responsive Grid/Wrap)
-                    _buildStatsMetricsBar(isDesktop, isTablet),
+                    // 3. KEY STATS METRICS BAR
+                    _buildStatsMetricsBar(isDesktop, isTablet)
+                        .animate()
+                        .fadeIn(duration: 500.ms, delay: 250.ms)
+                        .slideY(begin: 0.1, end: 0),
                     const SizedBox(height: 48),
 
-                    // 4. POWERFUL FEATURES FOR EVERY ASPIRANT
-                    _buildFeaturesSection(context, isDesktop, isTablet),
-                    const SizedBox(height: 40),
+                    // 4. PROMOTIONAL BANNERS CAROUSEL (If available from Admin)
+                    if (_banners.isNotEmpty) ...[
+                      _buildBannersSection(_banners)
+                          .animate()
+                          .fadeIn(duration: 500.ms, delay: 300.ms),
+                      const SizedBox(height: 48),
+                    ],
 
-                    // 5. BOTTOM NEW HERE CTA BANNER
-                    _buildNewHereBanner(isDesktop),
+                    // 5. RECOMMENDED TEST SERIES SHOWCASE
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x06000000), blurRadius: 20, offset: Offset(0, 4)),
+                        ],
+                      ),
+                      child: RecommendedTestSeriesSection(
+                        onViewAll: widget.onExploreTests,
+                      ),
+                    ).animate().fadeIn(duration: 500.ms, delay: 350.ms),
                     const SizedBox(height: 48),
 
-                    // 6. OFFICIAL FOOTER WITH BRAND LOGO
+                    // 6. POWERFUL FEATURES FOR EVERY ASPIRANT
+                    _buildFeaturesSection(context, isDesktop, isTablet)
+                        .animate()
+                        .fadeIn(duration: 500.ms, delay: 400.ms),
+                    const SizedBox(height: 48),
+
+                    // 7. BOTTOM NEW HERE CTA BANNER
+                    _buildNewHereBanner(isDesktop)
+                        .animate()
+                        .fadeIn(duration: 500.ms, delay: 450.ms),
+                    const SizedBox(height: 56),
+
+                    // 8. OFFICIAL FOOTER WITH BRAND LOGO
                     _buildLandingFooter(context, isDesktop),
                   ],
                 ),
@@ -196,14 +258,10 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Mobile Top Header Navbar
             _buildHeaderNav(context, false),
-
-            // Scrollable Onboarding Content matching exact layout & proportions
             Expanded(
               child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                 child: _buildMobileOnboardingContent(context),
               ),
             ),
@@ -215,299 +273,96 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
 
   Widget _buildMobileOnboardingContent(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Image.asset(
-          'assets/images/cosmyra_logo.png',
-          height: 38,
-          fit: BoxFit.contain,
-        ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.2, end: 0),
-        const SizedBox(height: 14),
-
-        // Hero Titles
-        RichText(
-          textAlign: TextAlign.center,
-          text: const TextSpan(
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEEF2FF),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFC7D2FE)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              TextSpan(
-                text: 'Practice Today\n',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                  height: 1.15,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              TextSpan(
-                text: 'Achieve Tomorrow',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0D7A53),
-                  height: 1.15,
-                  letterSpacing: -0.5,
-                ),
+              const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 16),
+              const SizedBox(width: 6),
+              Text(
+                "India's #1 NEET & JEE Prep Platform",
+                style: GoogleFonts.inter(color: const Color(0xFF4F46E5), fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ],
           ),
-        ).animate().fadeIn(duration: 500.ms, delay: 100.ms).slideY(begin: 0.15, end: 0),
-
-        const SizedBox(height: 10),
-
-        // Subtitle
-        const Text(
-          'Everything you need to crack NEET & JEE is here.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            color: Color(0xFF475569),
-            fontWeight: FontWeight.w400,
-            height: 1.4,
-          ),
         ),
-
         const SizedBox(height: 20),
 
-        // Student Illustration
-        Image.asset(
-          'assets/images/student_study_illustration.png',
-          height: 200,
-          fit: BoxFit.contain,
-          errorBuilder: (ctx, err, stack) => Container(
-            height: 160,
-            width: 160,
-            decoration: const BoxDecoration(
-              color: Color(0xFFE8F5E9),
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: Icon(Icons.school_rounded, size: 64, color: Color(0xFF0D7A53)),
-            ),
-          ),
-        ).animate().fadeIn(duration: 500.ms, delay: 200.ms).scale(begin: const Offset(0.92, 0.92)),
-
-        const SizedBox(height: 24),
-
-        // 1. Sign in with Google Button
-        Container(
-          width: double.infinity,
-          height: 52,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.02),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
+        RichText(
+          textAlign: TextAlign.center,
+          text: TextSpan(
+            style: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A), height: 1.2),
+            children: const [
+              TextSpan(text: 'Practice '),
+              TextSpan(text: 'Smarter.\n', style: TextStyle(color: Color(0xFF4F46E5))),
+              TextSpan(text: 'Perform '),
+              TextSpan(text: 'Better.', style: TextStyle(color: Color(0xFF7C3AED))),
             ],
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: _handleGoogleSignIn,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SvgPicture.string(
-                    '''<svg viewBox="0 0 24 24" width="22" height="22">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                    </svg>''',
-                  ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    'Sign in with Google',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        ),
+        const SizedBox(height: 14),
+
+        Text(
+          'Master NEET, JEE & competitive exams with 500+ mock tests, 15-year PYQs and real-time AI error analytics.',
+          style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF64748B), height: 1.5),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 28),
+
+        ElevatedButton(
+          onPressed: widget.onSignUp,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF4F46E5),
+            foregroundColor: Colors.white,
+            minimumSize: const Size(double.infinity, 52),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            elevation: 2,
+            shadowColor: const Color(0x3D4F46E5),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('Get Started - Free Signup', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15)),
+              const SizedBox(width: 8),
+              const Icon(Icons.arrow_forward_rounded, size: 18),
+            ],
           ),
         ),
-
         const SizedBox(height: 12),
 
-        // 2. Email Login Form (when expanded)
-        if (_showEmailLoginForm) ...[
+        OutlinedButton(
+          onPressed: widget.onExploreTests,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 50),
+            side: const BorderSide(color: Color(0xFFC7D2FE), width: 1.5),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+          child: Text('Explore Test Series', style: GoogleFonts.inter(color: const Color(0xFF4F46E5), fontWeight: FontWeight.bold, fontSize: 14)),
+        ),
+        const SizedBox(height: 24),
+
+        if (widget.isLoginRoute || _showEmailLoginForm) ...[
           _buildEmailLoginForm(),
-          const SizedBox(height: 12),
         ] else ...[
-          // Sign in with Email Button
-          Container(
-            width: double.infinity,
-            height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () => setState(() => _showEmailLoginForm = true),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.mail_outline_rounded, color: Color(0xFF0D7A53), size: 22),
-                    SizedBox(width: 12),
-                    Text(
-                      'Sign in with Email',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          OutlinedButton.icon(
+            onPressed: () => setState(() => _showEmailLoginForm = true),
+            icon: const Icon(Icons.email_outlined, color: Color(0xFF4F46E5), size: 18),
+            label: Text('Log in with Email & Password', style: GoogleFonts.inter(color: const Color(0xFF4F46E5), fontWeight: FontWeight.bold, fontSize: 13.5)),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
+              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
-          const SizedBox(height: 12),
         ],
-
-        // 3. Create Account Button
-        Container(
-          width: double.infinity,
-          height: 52,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF0D7A53), width: 1.4),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF0D7A53).withOpacity(0.04),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: widget.onSignUp,
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.person_add_outlined, color: Color(0xFF0D7A53), size: 22),
-                  SizedBox(width: 12),
-                  Text(
-                    'Create Account',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0D7A53),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 24),
-
-        // Social Proof Footer: Trusted by 2M+ students
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset(
-              'assets/images/trusted_avatars.png',
-              height: 28,
-              fit: BoxFit.contain,
-              errorBuilder: (ctx, err, stack) => Row(
-                children: List.generate(
-                  3,
-                  (index) => Container(
-                    margin: const EdgeInsets.only(right: 4),
-                    width: 22,
-                    height: 22,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFFA7F3D0),
-                    ),
-                    child: const Icon(Icons.person, size: 14, color: Color(0xFF0D7A53)),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            RichText(
-              text: const TextSpan(
-                style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                children: [
-                  TextSpan(text: 'Trusted by '),
-                  TextSpan(
-                    text: '2M+',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0D7A53),
-                    ),
-                  ),
-                  TextSpan(text: ' students'),
-                ],
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 12),
-
-        // Terms and Privacy Policy links
-        Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            const Text('By continuing, you agree to our ', style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8))),
-            InkWell(
-              onTap: () => context.go('/terms'),
-              child: const Text(
-                'Terms of Service',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF0D7A53),
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-            ),
-            const Text(' & ', style: TextStyle(fontSize: 11.5, color: Color(0xFF94A3B8))),
-            InkWell(
-              onTap: () => context.go('/privacy-policy'),
-              child: const Text(
-                'Privacy Policy',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF0D7A53),
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 16),
       ],
     );
   }
@@ -517,53 +372,29 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 4))],
+        boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 16, offset: Offset(0, 4))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Sign In with Email',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF64748B)),
-                onPressed: () => setState(() {
-                  _showEmailLoginForm = false;
-                  _loginError = null;
-                }),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+          Text('Log In to Cosmyra', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+          const SizedBox(height: 16),
           if (_loginError != null) ...[
             Container(
               padding: const EdgeInsets.all(10),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFCA5A5)),
-              ),
-              child: Text(
-                _loginError!,
-                style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12),
-              ),
+              decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFFECACA))),
+              child: Text(_loginError!, style: GoogleFonts.inter(color: const Color(0xFFDC2626), fontSize: 12)),
             ),
+            const SizedBox(height: 14),
           ],
           TextField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
             decoration: InputDecoration(
-              hintText: 'Email Address',
-              prefixIcon: const Icon(Icons.mail_outline_rounded, size: 20, color: Color(0xFF64748B)),
+              labelText: 'Email Address',
+              prefixIcon: const Icon(Icons.email_outlined, size: 20),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             ),
@@ -573,43 +404,41 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
             controller: _passwordController,
             obscureText: _obscurePassword,
             decoration: InputDecoration(
-              hintText: 'Password',
-              prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20, color: Color(0xFF64748B)),
+              labelText: 'Password',
+              prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
               suffixIcon: IconButton(
-                icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18, color: const Color(0xFF64748B)),
+                icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
                 onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
               ),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           ElevatedButton(
+            onPressed: _loginLoading ? null : _handleLogin,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D7A53),
+              backgroundColor: const Color(0xFF4F46E5),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            onPressed: _loginLoading ? null : _handleEmailLogin,
             child: _loginLoading
-                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Sign In to Account', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold)),
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : Text('Log In', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _handleEmailLogin() async {
+  Future<void> _handleLogin() async {
     final email = _emailController.text.trim();
-    final password = _passwordController.text;
-
+    final password = _passwordController.text.trim();
     if (email.isEmpty || password.isEmpty) {
       setState(() => _loginError = 'Please enter both email and password.');
       return;
     }
-
     setState(() {
       _loginLoading = true;
       _loginError = null;
@@ -617,137 +446,54 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
 
     try {
       final profile = await SupabaseService.signIn(email: email, password: password);
-      if (mounted) {
-        final redirect = GoRouterState.of(context).uri.queryParameters['redirect'];
-        if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
-          context.go(redirect);
-        } else if (profile.isAdmin || profile.isSuperAdmin) {
-          context.go('/admin');
-        } else {
-          context.go('/dashboard');
-        }
+      if (profile != null && mounted) {
+        context.go('/dashboard');
+      } else {
+        setState(() => _loginError = 'Invalid credentials. Please check your email and password.');
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loginError = e.toString().contains('Invalid')
-              ? 'Invalid email or password. Please try again.'
-              : e.toString().replaceAll('Exception:', '').trim();
-        });
-      }
+      setState(() => _loginError = 'Sign in failed: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _loginLoading = false);
     }
   }
 
-  Future<void> _handleGoogleSignIn() async {
-    try {
-      final success = await SupabaseService.signInWithGoogle();
-      if (success && mounted) {
-        final profile = SupabaseService.activeUserSession;
-        if (profile != null && (profile.isAdmin || profile.isSuperAdmin)) {
-          context.go('/admin');
-        } else {
-          context.go('/dashboard');
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Google Sign In: $e'),
-            backgroundColor: const Color(0xFFDC2626),
-          ),
-        );
-      }
-    }
-  }
-
-  // ================= MOBILE DRAWER MENU =================
   Widget _buildMobileDrawer(BuildContext context) {
     return Drawer(
-      backgroundColor: Colors.white,
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(color: Color(0xFF0D7A53)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Image.asset(
-                    'assets/images/cosmyra_logo.png',
-                    height: 36,
-                    fit: BoxFit.contain,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text('Cosmyra NEET | JEE • Practice | Analyze | Succeed', style: TextStyle(color: Color(0xFFA7F3D0), fontSize: 11)),
-              ],
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Row(
+                children: [
+                  Image.asset('assets/images/cosmyra_logo.png', height: 32, errorBuilder: (_, __, ___) => Text('Cosmyra', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold))),
+                ],
+              ),
             ),
-          ),
-          ListTile(leading: const Icon(Icons.home_outlined), title: const Text('Home'), onTap: () { Navigator.pop(context); context.go('/'); }),
-          ListTile(leading: const Icon(Icons.play_circle_outline), title: const Text('Practice'), onTap: () { Navigator.pop(context); context.go('/practice'); }),
-          ListTile(leading: const Icon(Icons.assignment_outlined), title: const Text('Mock Tests'), onTap: () { Navigator.pop(context); context.go('/mock-tests'); }),
-          ListTile(leading: const Icon(Icons.auto_stories_outlined), title: const Text('PYQ & NTA'), onTap: () { Navigator.pop(context); context.go('/pyq'); }),
-          ListTile(leading: const Icon(Icons.edit_note_rounded, color: Color(0xFF4F46E5)), title: const Text('Blog & Insights', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))), onTap: () { Navigator.pop(context); context.go('/blog'); }),
-          ListTile(leading: const Icon(Icons.info_outline), title: const Text('About Us'), onTap: () { Navigator.pop(context); context.go('/about-us'); }),
-          ListTile(leading: const Icon(Icons.help_outline_rounded), title: const Text('FAQ'), onTap: () { Navigator.pop(context); context.go('/faq'); }),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined, color: Color(0xFF0D7A53)),
-            title: const Text('Privacy Policy', style: TextStyle(color: Color(0xFF0D7A53), fontWeight: FontWeight.w600)),
-            onTap: () {
-              Navigator.pop(context);
-              context.go('/privacy-policy');
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.gavel_rounded, color: Color(0xFF0D7A53)),
-            title: const Text('Terms of Service', style: TextStyle(color: Color(0xFF0D7A53), fontWeight: FontWeight.w600)),
-            onTap: () {
-              Navigator.pop(context);
-              context.go('/terms-of-service');
-            },
-          ),
-          const Divider(),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      widget.onLogIn();
-                    },
-                    style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
-                    child: const Text('Log In', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
+            const Divider(),
+            ListTile(leading: const Icon(Icons.home_outlined), title: const Text('Home'), onTap: () => context.go('/')),
+            ListTile(leading: const Icon(Icons.edit_note_rounded), title: const Text('Practice'), onTap: () => context.go('/practice')),
+            ListTile(leading: const Icon(Icons.assignment_outlined), title: const Text('Mock Tests'), onTap: () => context.go('/mock-tests')),
+            ListTile(leading: const Icon(Icons.school_outlined), title: const Text('Test Series'), onTap: () => context.go('/test-series')),
+            ListTile(leading: const Icon(Icons.article_outlined), title: const Text('Blog'), onTap: () => context.go('/blog')),
+            ListTile(leading: const Icon(Icons.info_outline_rounded), title: const Text('About Us'), onTap: () => context.go('/about-us')),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton(
+                onPressed: widget.onSignUp,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4F46E5),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      widget.onSignUp();
-                    },
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), padding: const EdgeInsets.symmetric(vertical: 12)),
-                    child: const Text('Sign Up', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                  ),
-                ),
-              ],
+                child: const Text('Create Account'),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -755,11 +501,14 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
   // ================= 1. HEADER NAV =================
   Widget _buildHeaderNav(BuildContext context, bool isDesktop) {
     return Container(
-      height: 68,
-      padding: EdgeInsets.symmetric(horizontal: isDesktop ? 40 : 16),
+      height: 72,
+      padding: EdgeInsets.symmetric(horizontal: isDesktop ? 48 : 16),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+        boxShadow: [
+          BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 2)),
+        ],
       ),
       child: MaxWidthContainer(
         child: Row(
@@ -772,52 +521,52 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
                 ),
               ),
             // Logo
-            Image.asset(
-              'assets/images/cosmyra_logo.png',
-              height: 38,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                return Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5E9),
-                        borderRadius: BorderRadius.circular(9),
+            InkWell(
+              onTap: () => context.go('/'),
+              child: Image.asset(
+                'assets/images/cosmyra_logo.png',
+                height: 40,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)]),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.school_rounded, color: Colors.white, size: 20),
                       ),
-                      child: const Icon(Icons.school_rounded, color: Color(0xFF0D7A53), size: 18),
-                    ),
-                    const SizedBox(width: 8),
-                    const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Cosmyra NEET | JEE', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                        Text('AI Mock Tests • Practice | Analyze | Succeed', style: TextStyle(fontSize: 8.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-                      ],
-                    ),
-                  ],
-                );
-              },
+                      const SizedBox(width: 10),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Cosmyra NEET | JEE', style: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                          Text('AI Mock Tests • Practice | Analyze | Succeed', style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-            const SizedBox(width: 24),
+            const SizedBox(width: 36),
 
             // Navigation Links (Desktop only)
             if (isDesktop)
               Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildNavLink('Home', isActive: true, onTap: () => context.go('/')),
-                      _buildNavLink('Practice ∨', onTap: () => context.go('/practice')),
-                      _buildNavLink('Tests ∨', onTap: () => context.go('/mock-tests')),
-                      _buildNavLink('PYQ ∨', onTap: () => context.go('/pyq')),
-                      _buildNavLink('Test Series', onTap: () => context.go('/test-series')),
-                      _buildNavLink('Blog', onTap: () => context.go('/blog')),
-                      _buildNavLink('About Us', onTap: () => context.go('/about-us')),
-                    ],
-                  ),
+                child: Row(
+                  children: [
+                    _buildNavLink('Home', isActive: true, onTap: () => context.go('/')),
+                    _buildNavLink('Practice', onTap: () => context.go('/practice')),
+                    _buildNavLink('Tests', onTap: () => context.go('/mock-tests')),
+                    _buildNavLink('PYQ', onTap: () => context.go('/pyq')),
+                    _buildNavLink('Test Series', onTap: () => context.go('/test-series')),
+                    _buildNavLink('Blog', onTap: () => context.go('/blog')),
+                    _buildNavLink('About Us', onTap: () => context.go('/about-us')),
+                  ],
                 ),
               )
             else
@@ -826,45 +575,41 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
             // Right Action Buttons
             Row(
               children: [
-                IconButton(icon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20), onPressed: () {}),
                 if (isDesktop) ...[
-                  const SizedBox(width: 6),
                   OutlinedButton(
                     onPressed: () {
                       if (widget.onLogIn != null) {
-                        widget.onLogIn!();
+                        widget.onLogIn();
                       } else {
-                        Navigator.pushNamed(context, '/login');
+                        context.go('/login');
                       }
                     },
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFCBD5E1)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    child: const Text('Log In', style: TextStyle(color: Color(0xFF334155), fontWeight: FontWeight.bold, fontSize: 12)),
+                    child: Text('Log In', style: GoogleFonts.inter(color: const Color(0xFF334155), fontWeight: FontWeight.bold, fontSize: 13)),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   ElevatedButton(
                     onPressed: () {
                       if (widget.onSignUp != null) {
-                        widget.onSignUp!();
+                        widget.onSignUp();
                       } else {
-                        Navigator.pushNamed(context, '/signup');
+                        context.go('/signup');
                       }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4F46E5),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 2,
+                      shadowColor: const Color(0x3D4F46E5),
                     ),
-                    child: const Text('Sign Up', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    child: Text('Get Started Free', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
                   ),
-                ] else ...[
-                  // Non-logged in mobile view: No Log In button in header
-                  const SizedBox.shrink(),
                 ],
               ],
             ),
@@ -877,23 +622,23 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
   Widget _buildNavLink(String title, {bool isActive = false, VoidCallback? onTap}) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               title,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+              style: GoogleFonts.inter(
+                fontSize: 13.5,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
                 color: isActive ? const Color(0xFF4F46E5) : const Color(0xFF475569),
               ),
             ),
             if (isActive) ...[
-              const SizedBox(height: 3),
-              Container(height: 2, width: 14, color: const Color(0xFF4F46E5)),
+              const SizedBox(height: 4),
+              Container(height: 2.5, width: 20, decoration: BoxDecoration(color: const Color(0xFF4F46E5), borderRadius: BorderRadius.circular(2))),
             ],
           ],
         ),
@@ -903,159 +648,119 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
 
   // ================= 2. HERO LEFT CONTENT =================
   Widget _buildHeroLeftContent(bool isDesktop, bool isTablet) {
-    final double headlineSize = isDesktop ? 44 : (isTablet ? 36 : 28);
-    final double subtitleSize = isDesktop ? 15 : 13;
+    final heroTitle = _homeContent['hero_title']?.toString() ?? 'Master NEET & JEE with All-India Test Series';
+    final heroSub = _homeContent['hero_subtitle']?.toString() ?? 'Target NEET 2026 & JEE 2026 with 500+ Chapter Tests, NTA Level Mock Papers & Real-time AI Percentile Radar.';
+    final ctaText = _homeContent['cta_text']?.toString() ?? 'Explore Test Series';
 
     return Column(
       crossAxisAlignment: isDesktop ? CrossAxisAlignment.start : CrossAxisAlignment.center,
       children: [
         // Top Star Trust Badge Pill
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: BoxDecoration(
             color: const Color(0xFFFFFBEB),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             border: Border.all(color: const Color(0xFFFDE68A)),
+            boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2))],
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 14),
-              SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  "India's Most Trusted Exam Preparation Platform",
-                  style: TextStyle(color: Color(0xFF4F46E5), fontSize: 11, fontWeight: FontWeight.bold),
-                  overflow: TextOverflow.ellipsis,
-                ),
+              const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 16),
+              const SizedBox(width: 8),
+              Text(
+                "🔥 India's Most Trusted Exam Preparation Platform",
+                style: GoogleFonts.inter(color: const Color(0xFF4F46E5), fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 22),
+
+        // Main Dynamic Headline
+        Text(
+          heroTitle,
+          style: GoogleFonts.outfit(
+            fontSize: isDesktop ? 48 : (isTablet ? 38 : 30),
+            fontWeight: FontWeight.w900,
+            color: const Color(0xFF0F172A),
+            height: 1.15,
+            letterSpacing: -0.5,
+          ),
+          textAlign: isDesktop ? TextAlign.left : TextAlign.center,
         ),
         const SizedBox(height: 18),
 
-        // Main Headline
-        RichText(
-          textAlign: isDesktop ? TextAlign.left : TextAlign.center,
-          text: TextSpan(
-            style: TextStyle(fontSize: headlineSize, fontWeight: FontWeight.w900, color: const Color(0xFF0F172A), height: 1.18),
-            children: const [
-              TextSpan(text: 'Practice '),
-              TextSpan(text: 'Smarter.\n', style: TextStyle(color: Color(0xFF4F46E5))),
-              TextSpan(text: 'Perform '),
-              TextSpan(text: 'Better.\n', style: TextStyle(color: Color(0xFF4F46E5))),
-              TextSpan(text: 'Crack Your Dream Exam.'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Paragraph Subtitle
+        // Subtitle Description
         Text(
-          'Ace NEET, JEE and other competitive exams with thousands of practice questions, full-length tests, PYQs, detailed solutions and advanced performance analytics.',
-          style: TextStyle(fontSize: subtitleSize, color: const Color(0xFF64748B), height: 1.5),
+          heroSub,
+          style: GoogleFonts.inter(fontSize: isDesktop ? 16 : 14, color: const Color(0xFF64748B), height: 1.6),
           textAlign: isDesktop ? TextAlign.left : TextAlign.center,
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 28),
 
-        // CTA Buttons Row / Column
-        if (isDesktop)
-          Row(
-            children: [
-              ElevatedButton(
-                onPressed: widget.onStartPracticing,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4F46E5),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Start Practicing Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    SizedBox(width: 8),
-                    Icon(Icons.arrow_forward_rounded, size: 16),
-                  ],
-                ),
+        // CTA Buttons Row
+        Row(
+          mainAxisAlignment: isDesktop ? MainAxisAlignment.start : MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: widget.onStartPracticing,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 3,
+                shadowColor: const Color(0x404F46E5),
               ),
-              const SizedBox(width: 14),
-              OutlinedButton(
-                onPressed: widget.onExploreTests,
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFC7D2FE), width: 1.5),
-                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('Explore Tests', style: TextStyle(color: Color(0xFF4F46E5), fontWeight: FontWeight.bold, fontSize: 13)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Start Practicing Now', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.arrow_forward_rounded, size: 18),
+                ],
               ),
-            ],
-          )
-        else
-          Column(
-            children: [
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: widget.onStartPracticing,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4F46E5),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    elevation: 0,
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Start Practicing Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                      SizedBox(width: 8),
-                      Icon(Icons.arrow_forward_rounded, size: 16),
-                    ],
-                  ),
-                ),
+            ),
+            const SizedBox(width: 16),
+            OutlinedButton(
+              onPressed: widget.onExploreTests,
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFC7D2FE), width: 1.5),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: widget.onExploreTests,
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFC7D2FE), width: 1.5),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('Explore Tests', style: TextStyle(color: Color(0xFF4F46E5), fontWeight: FontWeight.bold, fontSize: 14)),
-                ),
-              ),
-            ],
-          ),
-        const SizedBox(height: 20),
+              child: Text(ctaText, style: GoogleFonts.inter(color: const Color(0xFF4F46E5), fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 28),
 
         // Social Proof Footnote
         Row(
           mainAxisAlignment: isDesktop ? MainAxisAlignment.start : MainAxisAlignment.center,
           children: [
             SizedBox(
-              width: 70,
+              width: 72,
               height: 28,
               child: Stack(
                 children: const [
-                  Positioned(left: 0, child: CircleAvatar(radius: 12, backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=11'))),
-                  Positioned(left: 16, child: CircleAvatar(radius: 12, backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=12'))),
-                  Positioned(left: 32, child: CircleAvatar(radius: 12, backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=13'))),
+                  Positioned(left: 0, child: CircleAvatar(radius: 13, backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=11'))),
+                  Positioned(left: 18, child: CircleAvatar(radius: 13, backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=12'))),
+                  Positioned(left: 36, child: CircleAvatar(radius: 13, backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=13'))),
                 ],
               ),
             ),
+            const SizedBox(width: 6),
             Flexible(
               child: RichText(
-                text: const TextSpan(
-                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                  children: [
+                text: TextSpan(
+                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                  children: const [
                     TextSpan(text: 'Join '),
-                    TextSpan(text: '2M+ ', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    TextSpan(text: 'students who are preparing smarter!'),
+                    TextSpan(text: '50,000+ ', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    TextSpan(text: 'aspirants preparing smarter every day!'),
                   ],
                 ),
               ),
@@ -1066,93 +771,89 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
     );
   }
 
-  // ================= 3. HERO STUDENT IMAGE & FLOATING BADGES =================
-  Widget _buildHeroStudentImage(bool isDesktop) {
-    final double containerHeight = isDesktop ? 460 : 340;
-
-    return Center(
-      child: Container(
-        constraints: BoxConstraints(maxWidth: isDesktop ? 400 : 320),
-        child: Stack(
-          alignment: Alignment.center,
-          clipBehavior: Clip.none,
+  // ================= 3. HERO RIGHT SHOWCASE (PROTRAIT + PROGRESS + STREAK CARDS) =================
+  Widget _buildHeroRightShowcase(bool isDesktop) {
+    return Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Student Portrait Image
-            ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: Image.asset(
-                'assets/images/hero_student_portrait.jpg',
-                height: containerHeight,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (ctx, err, stack) => Container(
-                  height: containerHeight,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFC7D2FE),
+            Expanded(
+              flex: 6,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ClipRRect(
                     borderRadius: BorderRadius.circular(24),
+                    child: Image.network(
+                      _homeContent['hero_image_url']?.toString() ?? 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&auto=format&fit=crop&q=80',
+                      height: 380,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 380,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFFC7D2FE), Color(0xFF818CF8)]),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: const Center(child: Icon(Icons.school_rounded, size: 90, color: Colors.white)),
+                      ),
+                    ),
                   ),
-                  child: const Center(child: Icon(Icons.person_rounded, size: 90, color: Color(0xFF4F46E5))),
-                ),
+                  Positioned(
+                    left: -12,
+                    top: 24,
+                    child: _buildFloatingBadge(Icons.assignment_outlined, '500+ Mock Tests', 'NTA Standard Pattern', const Color(0xFF10B981)),
+                  ),
+                  Positioned(
+                    right: -12,
+                    bottom: 24,
+                    child: _buildFloatingBadge(Icons.auto_awesome_rounded, 'AI Percentile Radar', 'Instant Error Detection', const Color(0xFF8B5CF6)),
+                  ),
+                ],
               ),
             ),
-
-            // Floating Badges Overlay (Scales gracefully)
-            Positioned(
-              left: isDesktop ? -16 : 8,
-              top: 30,
-              child: _buildHeroBadge(Icons.book_outlined, '10,000+', 'Practice Questions', const Color(0xFF8B5CF6)),
-            ),
-            Positioned(
-              left: isDesktop ? -24 : 4,
-              top: 150,
-              child: _buildHeroBadge(Icons.assignment_outlined, '500+', 'Full Length Tests', const Color(0xFF10B981)),
-            ),
-            Positioned(
-              left: isDesktop ? -10 : 12,
-              bottom: 30,
-              child: _buildHeroBadge(Icons.emoji_events_outlined, 'NEET · JEE', '& Many More Exams', const Color(0xFFF59E0B)),
+            const SizedBox(width: 16),
+            Expanded(
+              flex: 5,
+              child: Column(
+                children: [
+                  _buildYourProgressCard(),
+                  const SizedBox(height: 16),
+                  _buildStreakCard(),
+                ],
+              ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // ================= 4. HERO RIGHT DASHBOARD CARDS =================
-  Widget _buildHeroRightCards() {
-    return Column(
-      children: [
-        _buildYourProgressCard(),
-        const SizedBox(height: 16),
-        _buildStreakCard(),
       ],
     );
   }
 
-  Widget _buildHeroBadge(IconData icon, String title, String sub, Color color) {
+  Widget _buildFloatingBadge(IconData icon, String title, String sub, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))],
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [BoxShadow(color: Color(0x1A000000), blurRadius: 16, offset: Offset(0, 6))],
         border: Border.all(color: const Color(0xFFF1F5F9)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
-            child: Icon(icon, color: color, size: 14),
+            child: Icon(icon, color: color, size: 16),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-              Text(sub, style: const TextStyle(fontSize: 9, color: Color(0xFF64748B))),
+              Text(title, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+              Text(sub, style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF64748B))),
             ],
           ),
         ],
@@ -1160,52 +861,52 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
     );
   }
 
-  // ================= 5. YOUR PROGRESS CARD =================
   Widget _buildYourProgressCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 14, offset: const Offset(0, 4))],
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 16, offset: Offset(0, 4))],
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Your Progress', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-              Text('This Week ∨', style: TextStyle(fontSize: 9.5, color: Colors.grey)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Text('Score', style: TextStyle(fontSize: 9.5, color: Colors.grey)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text('612 / 720', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-              Text('85%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+            children: [
+              Text('Your Progress', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+              Text('This Week', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B), fontWeight: FontWeight.bold)),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
+          Text('Target NEET Mock #14', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B))),
+          const SizedBox(height: 2),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('640 / 720', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+              Text('88.8%', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5))),
+            ],
+          ),
+          const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: const LinearProgressIndicator(
-              value: 0.85,
-              minHeight: 5,
+              value: 0.888,
+              minHeight: 6,
               backgroundColor: Color(0xFFEEF2FF),
               valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4F46E5)),
             ),
           ),
           const SizedBox(height: 14),
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _ProgressStat('Accuracy', '78.4%'),
-              _ProgressStat('Questions Solved', '245'),
-              _ProgressStat('Tests Completed', '16'),
+            children: const [
+              _ProgressStat('Accuracy', '84.2%'),
+              _ProgressStat('Questions', '320'),
+              _ProgressStat('Tests', '18'),
             ],
           ),
         ],
@@ -1213,23 +914,22 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
     );
   }
 
-  // ================= 6. STREAK CARD =================
   Widget _buildStreakCard() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 14, offset: const Offset(0, 4))],
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 16, offset: Offset(0, 4))],
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('🔥 12 Day Streak', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+          Text('🔥 14 Day Active Streak', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
           const SizedBox(height: 2),
-          const Text('Keep it up!', style: TextStyle(fontSize: 9.5, color: Colors.grey)),
-          const SizedBox(height: 10),
+          Text('Keep up your daily target!', style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B))),
+          const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: const [
@@ -1239,7 +939,7 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
               _StreakDay('T', true),
               _StreakDay('F', true),
               _StreakDay('S', true),
-              _StreakDay('S', false),
+              _StreakDay('S', true),
             ],
           ),
         ],
@@ -1247,114 +947,178 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
     );
   }
 
-  // ================= 7. STATS METRICS BAR =================
-  Widget _buildStatsMetricsBar(bool isDesktop, bool isTablet) {
-    if (isDesktop) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 2))],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildMetricItem(Icons.people_outline, '2M+', 'Students', const Color(0xFF8B5CF6)),
-            _buildMetricItem(Icons.school_outlined, '50+', 'Exams', const Color(0xFF3B82F6)),
-            _buildMetricItem(Icons.description_outlined, '1.5M+', 'Questions', const Color(0xFF10B981)),
-            _buildMetricItem(Icons.assignment_outlined, '25K+', 'Tests', const Color(0xFFF59E0B)),
-            _buildMetricItem(Icons.trending_up_rounded, '95%', 'Student Satisfaction', const Color(0xFFEC4899)),
-          ],
-        ),
-      );
-    }
-
-    // MOBILE / TABLET GRID LAYOUT
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Wrap(
-        spacing: 16,
-        runSpacing: 16,
-        alignment: WrapAlignment.center,
-        children: [
-          _buildMetricItem(Icons.people_outline, '2M+', 'Students', const Color(0xFF8B5CF6)),
-          _buildMetricItem(Icons.school_outlined, '50+', 'Exams', const Color(0xFF3B82F6)),
-          _buildMetricItem(Icons.description_outlined, '1.5M+', 'Questions', const Color(0xFF10B981)),
-          _buildMetricItem(Icons.assignment_outlined, '25K+', 'Tests', const Color(0xFFF59E0B)),
-          _buildMetricItem(Icons.trending_up_rounded, '95%', 'Satisfaction', const Color(0xFFEC4899)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricItem(IconData icon, String val, String label, Color color) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+  // ================= 4. BANNERS SECTION =================
+  Widget _buildBannersSection(List<DashboardBannerModel> banners) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
-          child: Icon(icon, color: color, size: 18),
+        Text(
+          'Promotional Banners & Announcements',
+          style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
         ),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(val, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-            Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-          ],
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 180,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: banners.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 16),
+            itemBuilder: (ctx, idx) {
+              final b = banners[idx];
+              return Container(
+                width: 480,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, 4))],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.network(
+                      b.imageUrl.toString(),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)]),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xCC0F172A), Color(0x330F172A)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(b.title, style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                          if (b.subtitle.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(b.subtitle, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFFCBD5E1)), maxLines: 2),
+                          ],
+                          if (b.ctaText.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            ElevatedButton(
+                              onPressed: () {
+                                if (b.ctaDestination.isNotEmpty) {
+                                  context.go(b.ctaDestination);
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFACC15),
+                                foregroundColor: const Color(0xFF0F172A),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: Text(b.ctaText, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12)),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ],
     );
   }
 
-  // ================= 8. FEATURES SECTION GRID =================
+  // ================= 5. STATS METRICS BAR =================
+  Widget _buildStatsMetricsBar(bool isDesktop, bool isTablet) {
+    final statsList = (_homeContent['stats'] is List)
+        ? (_homeContent['stats'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        : [
+            {'value': '50,000+', 'label': 'Active Students'},
+            {'value': '500+', 'label': 'Full Length Tests'},
+            {'value': '15+ Yrs', 'label': 'NTA PYQ Banks'},
+            {'value': '98%', 'label': 'Satisfaction Rate'}
+          ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 16, offset: Offset(0, 4))],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: statsList.map((st) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.stars_rounded, color: Color(0xFF4F46E5), size: 22),
+              ),
+              const SizedBox(width: 14),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(st['value']?.toString() ?? '', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                  Text(st['label']?.toString() ?? '', style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ================= 6. FEATURES SECTION GRID =================
   Widget _buildFeaturesSection(BuildContext context, bool isDesktop, bool isTablet) {
-    final int crossCount = isDesktop ? 6 : (isTablet ? 3 : 1);
+    final int crossCount = isDesktop ? 3 : (isTablet ? 2 : 1);
 
     return Column(
       children: [
-        const Text(
+        Text(
           'EVERYTHING YOU NEED TO SUCCEED',
-          style: TextStyle(color: Color(0xFF4F46E5), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1),
+          style: GoogleFonts.inter(color: const Color(0xFF4F46E5), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2),
         ),
-        const SizedBox(height: 6),
-        const Text(
+        const SizedBox(height: 8),
+        Text(
           'Powerful Features for Every Aspirant',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+          style: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 6),
-        const Text(
+        const SizedBox(height: 8),
+        Text(
           'All the tools you need to plan, practice, analyze and improve your performance.',
-          style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+          style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 32),
 
-        // Features Grid
         GridView.count(
           crossAxisCount: crossCount,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: isDesktop ? 0.95 : (isTablet ? 1.1 : 2.2),
+          crossAxisSpacing: 20,
+          mainAxisSpacing: 20,
+          childAspectRatio: isDesktop ? 1.8 : 2.2,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [
-            _buildFeatureCard('Custom Practice', 'Practice questions from specific subjects, chapters & topics of your choice.', Icons.track_changes_outlined, const Color(0xFF8B5CF6)),
-            _buildFeatureCard('Custom Tests', 'Create your own test with time limit, marks & negative marking and evaluate yourself.', Icons.assignment_outlined, const Color(0xFF10B981)),
-            _buildFeatureCard('PYQ & NTA Questions', 'Practice previous year questions and official NTA questions chapter-wise or full syllabus.', Icons.auto_stories_outlined, const Color(0xFFF59E0B)),
-            _buildFeatureCard('Performance Analytics', 'Detailed analysis of your strengths, weaknesses and progress over time.', Icons.bar_chart_rounded, const Color(0xFF3B82F6)),
-            _buildFeatureCard('Smart Bookmarks', 'Bookmark important questions and revise them anytime, anywhere.', Icons.bookmark_outline_rounded, const Color(0xFFEC4899)),
-            _buildFeatureCard('Leaderboards', 'Compete with other aspirants and climb the daily, weekly & monthly leaderboards.', Icons.emoji_events_outlined, const Color(0xFF8B5CF6)),
+            _buildFeatureCard('Custom Chapter Practice', 'Practice questions from specific subjects, chapters & topics of your choice.', Icons.track_changes_outlined, const Color(0xFF8B5CF6)),
+            _buildFeatureCard('NTA Level Test Engine', 'Create tests with custom time limit, negative marking & full video solutions.', Icons.assignment_outlined, const Color(0xFF10B981)),
+            _buildFeatureCard('15-Year PYQ Archives', 'Practice previous year questions and official NTA questions chapter-wise.', Icons.auto_stories_outlined, const Color(0xFFF59E0B)),
+            _buildFeatureCard('AI Performance Radar', 'Detailed weakness analysis, accuracy trends and topic mastery score.', Icons.bar_chart_rounded, const Color(0xFF3B82F6)),
+            _buildFeatureCard('Smart Revision Bookmarks', 'Bookmark tricky questions and revise them anytime with instant solutions.', Icons.bookmark_outline_rounded, const Color(0xFFEC4899)),
+            _buildFeatureCard('All-India Leaderboards', 'Compete with 50,000+ aspirants and track your real AIR percentile rank.', Icons.emoji_events_outlined, const Color(0xFF6366F1)),
           ],
         ),
       ],
@@ -1363,80 +1127,76 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
 
   Widget _buildFeatureCard(String title, String description, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [BoxShadow(color: Color(0x06000000), blurRadius: 12, offset: Offset(0, 4))],
       ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
-            child: Icon(icon, color: color, size: 20),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(14)),
+            child: Icon(icon, color: color, size: 24),
           ),
-          const SizedBox(height: 10),
-          Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)), textAlign: TextAlign.center),
+          const SizedBox(height: 14),
+          Text(title, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
           const SizedBox(height: 6),
-          Text(description, style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B), height: 1.35), textAlign: TextAlign.center, maxLines: 3),
+          Expanded(
+            child: Text(description, style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B), height: 1.4)),
+          ),
         ],
       ),
     );
   }
 
-  // ================= 9. NEW HERE BOTTOM BANNER =================
+  // ================= 7. NEW HERE BOTTOM BANNER =================
   Widget _buildNewHereBanner(bool isDesktop) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
       decoration: BoxDecoration(
-        color: const Color(0xFFEEF2FF),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFC7D2FE)),
+        gradient: const LinearGradient(colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF4F46E5)]),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [BoxShadow(color: Color(0x3D312E81), blurRadius: 24, offset: Offset(0, 8))],
       ),
-      child: Flex(
-        direction: isDesktop ? Axis.horizontal : Axis.vertical,
+      child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: isDesktop ? CrossAxisAlignment.center : CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                child: const Icon(Icons.card_giftcard_rounded, color: Color(0xFF4F46E5), size: 20),
+                padding: const EdgeInsets.all(12),
+                decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
+                child: const Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 28),
               ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('New Here?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                    SizedBox(height: 2),
-                    Text('Create your free account and get access to free tests, quizzes and more.', style: TextStyle(fontSize: 11, color: Color(0xFF475569))),
-                  ],
-                ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('New to Cosmyra NEET | JEE?', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                  const SizedBox(height: 4),
+                  Text('Create your free account today and get access to free mock tests, PYQ banks & AI analytics.', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFFC7D2FE))),
+                ],
               ),
             ],
           ),
-          if (!isDesktop) const SizedBox(height: 14),
           ElevatedButton(
             onPressed: widget.onSignUp,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4F46E5),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF1E1B4B),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Row(
               children: [
-                Text('Create Free Account', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                SizedBox(width: 6),
-                Icon(Icons.arrow_forward_rounded, size: 15),
+                Text('Create Free Account', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                const SizedBox(width: 8),
+                const Icon(Icons.arrow_forward_rounded, size: 16),
               ],
             ),
           ),
@@ -1445,67 +1205,35 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
     );
   }
 
-  // ================= 10. FOOTER WITH LOGO =================
+  // ================= 8. FOOTER WITH LOGO =================
   Widget _buildLandingFooter(BuildContext context, bool isDesktop) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Image.asset(
-            'assets/images/cosmyra_logo.png',
-            height: 32,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
-          ),
-          const SizedBox(height: 14),
+          Image.asset('assets/images/cosmyra_logo.png', height: 36, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+          const SizedBox(height: 18),
           Wrap(
             alignment: WrapAlignment.center,
-            spacing: 20,
-            runSpacing: 10,
+            spacing: 24,
+            runSpacing: 12,
             children: [
-              InkWell(
-                onTap: () => context.go('/'),
-                child: const Text('Home', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-              ),
-              InkWell(
-                onTap: () => context.go('/about-us'),
-                child: const Text('About Us', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-              ),
-              InkWell(
-                onTap: () => context.go('/blog'),
-                child: const Text('Blog & Insights', style: TextStyle(fontSize: 12.5, color: Color(0xFF4F46E5), fontWeight: FontWeight.bold)),
-              ),
-              InkWell(
-                onTap: () => context.go('/privacy-policy'),
-                child: const Text('Privacy Policy', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-              ),
-              InkWell(
-                onTap: () => context.go('/terms-of-service'),
-                child: const Text('Terms of Service', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-              ),
-              InkWell(
-                onTap: () => context.go('/refund-policy'),
-                child: const Text('Refund Policy', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-              ),
-              InkWell(
-                onTap: () => context.go('/faq'),
-                child: const Text('FAQ', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-              ),
-              InkWell(
-                onTap: () => context.go('/contact-us'),
-                child: const Text('Contact Us', style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-              ),
+              InkWell(onTap: () => context.go('/'), child: Text('Home', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B), fontWeight: FontWeight.w600))),
+              InkWell(onTap: () => context.go('/about-us'), child: Text('About Us', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B), fontWeight: FontWeight.w600))),
+              InkWell(onTap: () => context.go('/blog'), child: Text('Blog & Insights', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF4F46E5), fontWeight: FontWeight.bold))),
+              InkWell(onTap: () => context.go('/privacy-policy'), child: Text('Privacy Policy', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B), fontWeight: FontWeight.w600))),
+              InkWell(onTap: () => context.go('/terms-of-service'), child: Text('Terms of Service', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B), fontWeight: FontWeight.w600))),
+              InkWell(onTap: () => context.go('/refund-policy'), child: Text('Refund Policy', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B), fontWeight: FontWeight.w600))),
+              InkWell(onTap: () => context.go('/faq'), child: Text('FAQ', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B), fontWeight: FontWeight.w600))),
+              InkWell(onTap: () => context.go('/contact-us'), child: Text('Contact Us', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B), fontWeight: FontWeight.w600))),
             ],
           ),
-          const SizedBox(height: 14),
-          const Text(
-            '© 2026 Cosmyra Technologies Pvt. Ltd. All rights reserved.',
-            style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-          ),
+          const SizedBox(height: 18),
+          Text('© 2026 Cosmyra Technologies Pvt. Ltd. All rights reserved.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8))),
         ],
       ),
     );
@@ -1539,9 +1267,9 @@ class _ProgressStat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 9.5, color: Colors.grey)),
+        Text(label, style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B))),
         const SizedBox(height: 2),
-        Text(val, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        Text(val, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
       ],
     );
   }
@@ -1557,11 +1285,11 @@ class _StreakDay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(day, style: const TextStyle(fontSize: 9.5, color: Colors.grey)),
-        const SizedBox(height: 3),
+        Text(day, style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF64748B))),
+        const SizedBox(height: 4),
         Icon(
           isDone ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-          size: 15,
+          size: 16,
           color: isDone ? const Color(0xFF10B981) : const Color(0xFFCBD5E1),
         ),
       ],
