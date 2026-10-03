@@ -215,7 +215,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with TickerPr
     final testType = (match['test_type'] ?? match['testType'] ?? 'Full').toString();
     final validity = (match['validity'] ?? 'Valid until exam').toString();
     final attemptStatus = (match['attempt_status'] ?? match['attemptStatus'] ?? 'Not Attempted').toString();
-    final syllabusUrl = (match['syllabus_url'] ?? match['syllabusUrl'] ?? '').toString();
+    final syllabusUrl = (match['syllabus_url'] ?? match['syllabusUrl'] ?? match['syllabus'] ?? match['syllabus_pdf'] ?? match['pdf_url'] ?? '').toString();
     final isFree = match['is_free'] == true || match['isFree'] == true;
     final price = (match['price'] is num) ? (match['price'] as num).toDouble() : 499.0;
     final origPrice = (match['original_price'] is num) ? (match['original_price'] as num).toDouble() : 1999.0;
@@ -483,17 +483,31 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with TickerPr
   void _downloadSyllabus() async {
     final item = _product;
     if (item == null) return;
-    if (item.syllabusUrl.trim().isNotEmpty) {
-      final uri = Uri.parse(item.syllabusUrl.trim());
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        return;
+    final urlStr = item.syllabusUrl.trim();
+    if (urlStr.isNotEmpty && (urlStr.startsWith('http://') || urlStr.startsWith('https://'))) {
+      final uri = Uri.tryParse(urlStr);
+      if (uri != null) {
+        try {
+          bool launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+          if (!launched) {
+            launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+          }
+          if (launched) return;
+        } catch (e) {
+          debugPrint('Notice opening syllabus URL: $e');
+          try {
+            await launchUrl(uri, mode: LaunchMode.platformDefault);
+            return;
+          } catch (_) {}
+        }
       }
     }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Downloading syllabus PDF for ${item.title}...'),
+          content: Text(urlStr.isEmpty
+              ? 'Syllabus PDF is currently not available for ${item.title}.'
+              : 'Opening syllabus PDF for ${item.title}...'),
           backgroundColor: const Color(0xFF2563EB),
           behavior: SnackBarBehavior.floating,
         ),

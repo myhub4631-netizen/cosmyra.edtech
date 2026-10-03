@@ -672,11 +672,23 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   }
 
   void _handleDownloadSyllabus(TestSeriesCardData item) async {
-    if (item.syllabusUrl.isNotEmpty && (item.syllabusUrl.startsWith('http://') || item.syllabusUrl.startsWith('https://'))) {
-      final uri = Uri.tryParse(item.syllabusUrl);
+    final urlStr = item.syllabusUrl.trim();
+    if (urlStr.isNotEmpty && (urlStr.startsWith('http://') || urlStr.startsWith('https://'))) {
+      final uri = Uri.tryParse(urlStr);
       if (uri != null) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        return;
+        try {
+          bool launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+          if (!launched) {
+            launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+          }
+          if (launched) return;
+        } catch (e) {
+          debugPrint('Notice opening syllabus URL: $e');
+          try {
+            await launchUrl(uri, mode: LaunchMode.platformDefault);
+            return;
+          } catch (_) {}
+        }
       }
     }
     _showSyllabusModal(item);
