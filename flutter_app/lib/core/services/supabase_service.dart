@@ -4778,9 +4778,11 @@ class SupabaseService {
     final effectiveUtr = cleanUtr.isNotEmpty ? cleanUtr : 'N/A';
     final screenshotUrl = paymentScreenshotUrl?.trim() ?? '';
 
+    final String screenshotNoteText = (screenshotUrl.toLowerCase().startsWith('data:image/') || screenshotUrl.length > 100) ? '[Attached Receipt Image]' : screenshotUrl;
+
     final notesText = [
       if (cleanUtr.isNotEmpty) 'UTR: $cleanUtr',
-      if (screenshotUrl.isNotEmpty) 'Screenshot: $screenshotUrl',
+      if (screenshotUrl.isNotEmpty) 'Screenshot: $screenshotNoteText',
       'Product: $pTitle',
     ].join(' | ');
 
@@ -9373,7 +9375,7 @@ class SupabaseService {
               'utr_number': utrStr,
               'payment_screenshot_url': screenshotUrl,
               'screenshot_url': screenshotUrl,
-              'notes': cart['notes'] ?? 'UPI Payment. UTR: $utrStr | Screenshot: $screenshotUrl',
+              'notes': cart['notes'] ?? 'UPI Payment. UTR: $utrStr | Screenshot: ${screenshotUrl.startsWith('data:image/') ? '[Attached Receipt Image]' : screenshotUrl}',
               'created_at': createdAt,
             });
           }

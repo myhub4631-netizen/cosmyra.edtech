@@ -443,7 +443,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.bookmark_rounded, color: Color(0xFF4F46E5)),
+            Icon(Icons.bookmark_rounded, color: Color(0xFFDC2626)),
             SizedBox(width: 8),
             Text('Saved Presets', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
           ],
@@ -471,7 +471,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                         subtitle: Text('${p['exam']} • ${p['questions']} Qs • ${p['difficulty']}'),
                         trailing: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF4F46E5),
+                            backgroundColor: const Color(0xFFDC2626),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                           onPressed: () {
@@ -527,7 +527,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                         ? const SizedBox(
                             height: 300,
                             child: Center(
-                              child: CircularProgressIndicator(color: Color(0xFF4F46E5)),
+                              child: CircularProgressIndicator(color: Color(0xFFDC2626)),
                             ),
                           )
                         : _buildCurrentStepBody(),
@@ -614,20 +614,20 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
               const SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: _showPresetsDialog,
-                icon: const Icon(Icons.bookmark_border_rounded, size: 15, color: Color(0xFF4F46E5)),
+                icon: const Icon(Icons.bookmark_rounded, size: 15, color: Color(0xFFDC2626)),
                 label: const Text(
                   'My Presets',
                   style: TextStyle(
-                    color: Color(0xFF4F46E5),
+                    color: Color(0xFFDC2626),
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  side: const BorderSide(color: Color(0xFFC7D2FE), width: 1.2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  backgroundColor: const Color(0xFFF5F3FF),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  side: const BorderSide(color: Color(0xFFFECACA), width: 1.2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  backgroundColor: const Color(0xFFFFF1F2),
                 ),
               ),
             ],
@@ -669,34 +669,48 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                           if (index > 0)
                             Expanded(
                               child: Container(
-                                height: 2,
-                                color: isCompleted || isCurrent
-                                    ? (index == 1 ? const Color(0xFF22C55E) : const Color(0xFF4F46E5))
-                                    : const Color(0xFFE2E8F0),
+                                height: 3,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(2),
+                                  color: isCompleted || isCurrent
+                                      ? const Color(0xFFEF4444)
+                                      : const Color(0xFFE2E8F0),
+                                ),
                               ),
                             )
                           else
                             const Spacer(),
 
                           // Circle node
-                          Container(
-                            width: 32,
-                            height: 32,
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            width: 34,
+                            height: 34,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: isCompleted
-                                  ? const Color(0xFF22C55E)
-                                  : (isCurrent
-                                      ? const Color(0xFF4F46E5)
-                                      : const Color(0xFFF1F5F9)),
+                              gradient: isCurrent || isCompleted
+                                  ? const LinearGradient(
+                                      colors: [Color(0xFFEF4444), Color(0xFFB91C1C)],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    )
+                                  : null,
+                              color: isCurrent || isCompleted ? null : const Color(0xFFF1F5F9),
                               border: Border.all(
-                                color: isCompleted
-                                    ? const Color(0xFF22C55E)
-                                    : (isCurrent
-                                        ? const Color(0xFF4F46E5)
-                                        : const Color(0xFFE2E8F0)),
+                                color: isCurrent || isCompleted
+                                    ? const Color(0xFFDC2626)
+                                    : const Color(0xFFCBD5E1),
                                 width: 1.5,
                               ),
+                              boxShadow: isCurrent
+                                  ? [
+                                      BoxShadow(
+                                        color: const Color(0xFFEF4444).withOpacity(0.4),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ]
+                                  : null,
                             ),
                             child: Center(
                               child: isCompleted
@@ -704,7 +718,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                                   : Text(
                                       '${steps[index]['number']}',
                                       style: TextStyle(
-                                        fontSize: 14,
+                                        fontSize: 13.5,
                                         fontWeight: FontWeight.bold,
                                         color: isCurrent ? Colors.white : const Color(0xFF64748B),
                                       ),
@@ -716,10 +730,13 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                           if (index < steps.length - 1)
                             Expanded(
                               child: Container(
-                                height: 2,
-                                color: isCompleted
-                                    ? const Color(0xFF4F46E5)
-                                    : (isCurrent && index == 0 ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0)),
+                                height: 3,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(2),
+                                  color: isCompleted
+                                      ? const Color(0xFFEF4444)
+                                      : (isCurrent && index == 0 ? const Color(0xFFEF4444) : const Color(0xFFE2E8F0)),
+                                ),
                               ),
                             )
                           else
@@ -733,8 +750,8 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                         style: TextStyle(
                           fontSize: 11,
                           height: 1.2,
-                          fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                          color: isCurrent ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                          fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w500,
+                          color: isCurrent ? const Color(0xFFDC2626) : const Color(0xFF64748B),
                         ),
                       ),
                     ],
@@ -828,7 +845,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                 iconBgColor: const Color(0xFFEEF2FF),
                 iconWidget: CustomPaint(
                   size: const Size(24, 24),
-                  painter: StethoscopeIconPainter(color: const Color(0xFF4F46E5)),
+                  painter: StethoscopeIconPainter(color: const Color(0xFFDC2626)),
                 ),
                 onTap: () => _selectExam('NEET'),
               ),
@@ -871,7 +888,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                 style: const TextStyle(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF4F46E5),
+                  color: Color(0xFFDC2626),
                 ),
               ),
             ),
@@ -1009,26 +1026,34 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         height: 110,
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFF5F3FF) : Colors.white,
+          color: isSelected ? const Color(0xFFFFF1F2) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
-            width: isSelected ? 1.8 : 1.0,
+            color: isSelected ? const Color(0xFFEF4444) : const Color(0xFFE2E8F0),
+            width: isSelected ? 2.0 : 1.0,
           ),
-          boxShadow: const [
-            BoxShadow(
-              color: Color.fromRGBO(0, 0, 0, 0.02),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            )
-          ],
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFEF4444).withOpacity(0.18),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  )
+                ]
+              : [
+                  const BoxShadow(
+                    color: Color.fromRGBO(0, 0, 0, 0.02),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  )
+                ],
         ),
         child: Stack(
           children: [
-            // Top Right Check Badge if selected
             if (isSelected)
               Positioned(
                 top: 8,
@@ -1037,10 +1062,12 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                   width: 22,
                   height: 22,
                   decoration: const BoxDecoration(
-                    color: Color(0xFF4F46E5),
+                    gradient: LinearGradient(
+                      colors: [Color(0xFFEF4444), Color(0xFFB91C1C)],
+                    ),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.check, size: 14, color: Colors.white),
+                  child: const Icon(Icons.check_rounded, size: 14, color: Colors.white),
                 ),
               ),
 
@@ -1150,15 +1177,20 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
               width: 24,
               height: 24,
               decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF4F46E5) : Colors.white,
+                gradient: isSelected
+                    ? const LinearGradient(
+                        colors: [Color(0xFFEF4444), Color(0xFFB91C1C)],
+                      )
+                    : null,
+                color: isSelected ? null : Colors.white,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
+                  color: isSelected ? const Color(0xFFDC2626) : const Color(0xFFCBD5E1),
                   width: 1.5,
                 ),
               ),
               child: isSelected
-                  ? const Icon(Icons.check, size: 16, color: Colors.white)
+                  ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
                   : null,
             ),
           ],
@@ -1488,7 +1520,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                         margin: const EdgeInsets.only(right: 8, bottom: 12),
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: isCurrentActive ? const Color(0xFF4F46E5) : const Color(0xFFF1F5F9),
+                          color: isCurrentActive ? const Color(0xFFDC2626) : const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -1512,7 +1544,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                     width: 3.5,
                     height: 20,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF4F46E5),
+                      color: const Color(0xFFDC2626),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1774,7 +1806,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4F46E5),
+                    color: const Color(0xFFDC2626),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
@@ -1820,10 +1852,10 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
         width: 22,
         height: 22,
         decoration: BoxDecoration(
-          color: isChecked ? const Color(0xFF4F46E5) : Colors.white,
+          color: isChecked ? const Color(0xFFDC2626) : Colors.white,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: isChecked ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
+            color: isChecked ? const Color(0xFFDC2626) : const Color(0xFFCBD5E1),
             width: 1.5,
           ),
         ),
@@ -1899,7 +1931,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF4F46E5),
+                  color: Color(0xFFDC2626),
                 ),
               ),
             ),
@@ -2109,7 +2141,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
               Icon(
                 icon,
                 size: 20,
-                color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                color: isSelected ? const Color(0xFFDC2626) : const Color(0xFF64748B),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -2126,15 +2158,20 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                 width: 22,
                 height: 22,
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF4F46E5) : Colors.white,
+                  gradient: isSelected
+                      ? const LinearGradient(
+                          colors: [Color(0xFFEF4444), Color(0xFFB91C1C)],
+                        )
+                      : null,
+                  color: isSelected ? null : Colors.white,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFCBD5E1),
+                    color: isSelected ? const Color(0xFFDC2626) : const Color(0xFFCBD5E1),
                     width: 1.5,
                   ),
                 ),
                 child: isSelected
-                    ? const Icon(Icons.check, size: 14, color: Colors.white)
+                    ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
                     : null,
               ),
             ],
@@ -2177,7 +2214,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 13),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
+                    color: isSelected ? const Color(0xFFDC2626) : Colors.transparent,
                     border: index > 0 && !isSelected && options[index - 1] != selectedValue
                         ? const Border(left: BorderSide(color: Color(0xFFE2E8F0), width: 1.0))
                         : null,
@@ -2349,7 +2386,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF4F46E5),
+                      color: Color(0xFFDC2626),
                     ),
                   ),
                 ),
@@ -2584,7 +2621,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
-            color: const Color(0xFFF5F3FF),
+            color: const Color(0xFFFFF1F2),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
@@ -2592,7 +2629,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF4F46E5),
+              color: Color(0xFFDC2626),
             ),
           ),
         );
@@ -2646,51 +2683,69 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
 
           Expanded(
             flex: _currentStep > 0 ? 7 : 10,
-            child: ElevatedButton(
-              onPressed: () {
-                if (_currentStep < 3) {
-                  setState(() => _currentStep++);
-                } else {
-                  _handleStartSession();
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4F46E5),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (_currentStep == 3) ...[
-                    Icon(
-                      widget.mode == PracticeTestMode.test ? Icons.assignment_turned_in_outlined : Icons.play_arrow_outlined,
-                      color: Colors.white,
-                      size: 22,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      widget.mode == PracticeTestMode.test ? 'Start Test' : 'Start Practice',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ] else ...[
-                    const Text(
-                      'Continue',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
-                  ],
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFEF4444), Color(0xFFB91C1C)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFEF4444).withOpacity(0.38),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
                 ],
+              ),
+              child: ElevatedButton(
+                onPressed: () {
+                  if (_currentStep < 3) {
+                    setState(() => _currentStep++);
+                  } else {
+                    _handleStartSession();
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (_currentStep == 3) ...[
+                      Icon(
+                        widget.mode == PracticeTestMode.test ? Icons.assignment_turned_in_rounded : Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        widget.mode == PracticeTestMode.test ? 'Start Test Session' : 'Start Practice Session',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ] else ...[
+                      const Text(
+                        'Continue to Next Step',
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
+                    ],
+                  ],
+                ),
               ),
             ),
           ),

@@ -2522,7 +2522,8 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
     final screenshotUrl = SupabaseService.extractPaymentScreenshotUrl(ord);
     final status = (ord['status'] ?? ord['payment_status'] ?? 'completed').toString();
     final date = (ord['created_at'] ?? '').toString();
-    final notes = (ord['notes'] ?? 'Order placed via portal').toString();
+    final notes = (ord['notes'] ?? '').toString();
+    final sanitizedNotes = _sanitizeNotes(notes);
 
     showDialog(
       context: context,
@@ -2600,7 +2601,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                 ),
               ],
               _buildDetailItem('Order Date', date),
-              _buildDetailItem('Audit / System Notes', notes),
+              if (sanitizedNotes.isNotEmpty) _buildDetailItem('Audit / System Notes', sanitizedNotes),
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -4041,4 +4042,58 @@ class _PlanAccessAndLimitsCardState extends State<_PlanAccessAndLimitsCard> {
       ],
     );
   }
+}
+
+String _sanitizeNotes(String text) {
+  if (text.trim().isEmpty) return '';
+
+  String cleaned = text;
+
+  // 1. Strip base64 image data URIs (including long multiline or non-whitespace sequences)
+  cleaned = cleaned.replaceAll(
+    RegExp(r'data:image/[^\s\|]*', caseSensitive: false),
+    '',
+  );
+  cleaned = cleaned.replaceAll(
+    RegExp(r'data:image/[a-zA-Z0-9\+\/=;,\s\r\n]+', multiLine: true, caseSensitive: false),
+    '',
+  );
+
+  // 2. Remove http/https image URLs if labeled as Screenshot
+  cleaned = cleaned.replaceAll(
+    RegExp(r'Screenshot:\s*https?://[^\s\|]+', caseSensitive: false),
+    '',
+  );
+
+  // 3. Remove common auto-generated system patterns
+  cleaned = cleaned
+      .replaceAll(RegExp(r'Order ID:\s*(?:ORD|SUB|CART|CSNJ)?[-_]?[A-Za-z0-9]+', caseSensitive: false), '')
+      .replaceAll(RegExp(r'Order #\s*[A-Za-z0-9]+', caseSensitive: false), '')
+      .replaceAll(RegExp(r'UPI Payment\.?', caseSensitive: false), '')
+      .replaceAll(RegExp(r'Cashfree PG\.?', caseSensitive: false), '')
+      .replaceAll(RegExp(r'Online Payment\.?', caseSensitive: false), '')
+      .replaceAll(RegExp(r'UTR:\s*N/A', caseSensitive: false), '')
+      .replaceAll(RegExp(r'UTR:\s*[^\|]+', caseSensitive: false), '')
+      .replaceAll(RegExp(r'Screenshot:\s*\[Attached Receipt Image\]', caseSensitive: false), '')
+      .replaceAll(RegExp(r'Screenshot:\s*', caseSensitive: false), '')
+      .replaceAll(RegExp(r'Awaiting admin approval\.?', caseSensitive: false), '')
+      .replaceAll(RegExp(r'Product:\s*[^\|]+', caseSensitive: false), '')
+      .replaceAll(RegExp(r'Manual Order created by Admin', caseSensitive: false), '')
+      .replaceAll(RegExp(r'Updated by Admin', caseSensitive: false), '')
+      .replaceAll(RegExp(r'Active subscription with full access', caseSensitive: false), '');
+
+  // 4. Clean up remaining separators, pipes, extra spaces, dots, dashes
+  cleaned = cleaned
+      .replaceAll(RegExp(r'\|\s*\|'), '|')
+      .replaceAll(RegExp(r'^\s*[\|\.\,\:\;-]+\s*', multiLine: true), '')
+      .replaceAll(RegExp(r'\s*[\|\.\,\:\;-]+\s*$', multiLine: true), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+
+  // 5. If no alphanumeric content remains (only punctuation or whitespace), return empty
+  if (cleaned.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').isEmpty) {
+    return '';
+  }
+
+  return cleaned;
 }
