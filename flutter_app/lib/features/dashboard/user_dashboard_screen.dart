@@ -2495,54 +2495,62 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   }
 
   Widget _buildQuickStartSection() {
-    final quickCards = [
+    final rawQuickCards = [
       {
+        'key': 'custom_practice',
         'title': 'Custom Practice',
         'subtitle': 'Practice questions by selecting subjects, chapters & topics',
         'icon': Icons.track_changes_rounded,
         'gradient': const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)]),
         'bg': const Color(0xFFECFDF5),
-        'onTap': () => context.go('/custom-practice'),
+        'onTap': () => FeatureConfigService.handleFeatureTap(context, 'custom_practice', onActive: () => context.go('/custom-practice')),
       },
       {
+        'key': 'custom_test',
         'title': 'Custom Test',
         'subtitle': 'Create a full-length test and evaluate your performance',
         'icon': Icons.assignment_outlined,
         'gradient': const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF2563EB)]),
         'bg': const Color(0xFFEFF6FF),
-        'onTap': () => context.go('/custom-test'),
+        'onTap': () => FeatureConfigService.handleFeatureTap(context, 'custom_test', onActive: () => context.go('/custom-test')),
       },
       {
+        'key': 'pyq_practice',
         'title': 'PYQ Practice',
         'subtitle': 'Practice previous year questions chapter-wise and year-wise',
         'icon': Icons.menu_book_rounded,
         'gradient': const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)]),
         'bg': const Color(0xFFF5F3FF),
-        'onTap': () => context.go('/pyq'),
+        'onTap': () => FeatureConfigService.handleFeatureTap(context, 'pyq_practice', onActive: () => context.go('/pyq')),
       },
       {
+        'key': 'nta_questions',
         'title': 'NTA Questions',
         'subtitle': 'Practice NTA pattern questions for better rank',
         'icon': Icons.shield_outlined,
         'gradient': const LinearGradient(colors: [Color(0xFFF97316), Color(0xFFEA580C)]),
         'bg': const Color(0xFFFFF7ED),
-        'onTap': () => context.go('/nta-practice'),
+        'onTap': () => FeatureConfigService.handleFeatureTap(context, 'nta_questions', onActive: () => context.go('/nta-practice')),
       },
       {
+        'key': 'test_series',
         'title': 'Test Series Catalog',
         'subtitle': 'Attempt mock tests and improve your exam readiness',
         'icon': Icons.calendar_today_outlined,
         'gradient': const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFFD946EF)]),
         'bg': const Color(0xFFFDF2F8),
-        'onTap': () {
+        'onTap': () => FeatureConfigService.handleFeatureTap(context, 'test_series', onActive: () {
           if (widget.onOpenTestSeries != null) {
             widget.onOpenTestSeries!();
           } else {
             context.go('/test-series');
           }
-        },
+        }),
       },
     ];
+
+    final quickCards = rawQuickCards.where((c) => FeatureConfigService.isVisible(c['key'] as String)).toList();
+    if (quickCards.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

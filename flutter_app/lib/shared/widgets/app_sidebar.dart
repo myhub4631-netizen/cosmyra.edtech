@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/feature_config_service.dart';
 import '../../features/auth/login_screen.dart';
 
 class AppSidebar extends StatefulWidget {
@@ -55,47 +56,87 @@ class _AppSidebarState extends State<AppSidebar> {
     }
   }
 
+  void _executeNavigation(String label, String route) {
+    if (label == 'Practice' && widget.onOpenPractice != null) {
+      widget.onOpenPractice!();
+    } else if (label.contains('Custom Practice') && widget.onOpenCustomPractice != null) {
+      widget.onOpenCustomPractice!();
+    } else if (label.contains('Custom Test') && widget.onOpenCustomTest != null) {
+      widget.onOpenCustomTest!();
+    } else if (label.contains('PYQ') && widget.onOpenPyqs != null) {
+      widget.onOpenPyqs!();
+    } else if (label.contains('Mistakes') && widget.onOpenMistakes != null) {
+      widget.onOpenMistakes!();
+    } else if (label.contains('My All Tests') && widget.onOpenMyTests != null) {
+      widget.onOpenMyTests!();
+    } else if (label.contains('Test Series') && widget.onOpenTestSeries != null) {
+      widget.onOpenTestSeries!();
+    } else if (label.contains('Leaderboard') && widget.onOpenLeaderboard != null) {
+      widget.onOpenLeaderboard!();
+    } else {
+      context.go(route);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final sections = [
+    final rawSections = [
       {
         'header': 'STORE & PACKAGES',
         'items': [
-          {'index': 0, 'icon': Icons.storefront_rounded, 'label': 'Store & Packages', 'route': '/test-series', 'isStore': true},
+          {'index': 0, 'icon': Icons.storefront_rounded, 'label': 'Store & Packages', 'route': '/test-series', 'isStore': true, 'featureKey': 'premium_plans'},
         ]
       },
       {
         'header': 'PRACTICE ENGINE',
         'items': [
-          {'index': 1, 'icon': Icons.track_changes_rounded, 'label': 'Practice', 'route': '/practice'},
-          {'index': 2, 'icon': Icons.tune_rounded, 'label': 'Custom Practice', 'route': '/custom-practice'},
-          {'index': 3, 'icon': Icons.assignment_outlined, 'label': 'Custom Test Wizard', 'route': '/custom-test'},
-          {'index': 4, 'icon': Icons.menu_book_rounded, 'label': '15-Yr PYQ Bank', 'route': '/pyq'},
-          {'index': 5, 'icon': Icons.verified_rounded, 'label': 'NTA Question Bank', 'route': '/nta-practice'},
+          {'index': 1, 'icon': Icons.track_changes_rounded, 'label': 'Practice', 'route': '/practice', 'featureKey': 'custom_practice'},
+          {'index': 2, 'icon': Icons.tune_rounded, 'label': 'Custom Practice', 'route': '/custom-practice', 'featureKey': 'custom_practice'},
+          {'index': 3, 'icon': Icons.assignment_outlined, 'label': 'Custom Test Wizard', 'route': '/custom-test', 'featureKey': 'custom_test'},
+          {'index': 4, 'icon': Icons.menu_book_rounded, 'label': '15-Yr PYQ Bank', 'route': '/pyq', 'featureKey': 'pyq_practice'},
+          {'index': 5, 'icon': Icons.verified_rounded, 'label': 'NTA Question Bank', 'route': '/nta-practice', 'featureKey': 'nta_questions'},
         ]
       },
       {
         'header': 'TESTS & ANALYTICS',
         'items': [
-          {'index': 6, 'icon': Icons.bookmark_border_rounded, 'label': 'Bookmarks', 'route': '/mistakes'},
-          {'index': 7, 'icon': Icons.error_outline_rounded, 'label': 'My Mistakes Radar', 'route': '/mistakes'},
-          {'index': 8, 'icon': Icons.assignment_turned_in_rounded, 'label': 'My All Tests', 'route': '/my-tests'},
-          {'index': 9, 'icon': Icons.dashboard_customize_rounded, 'label': 'Test Series Catalog', 'route': '/test-series'},
-          {'index': 10, 'icon': Icons.insights_rounded, 'label': 'Performance Analytics', 'route': '/analytics'},
-          {'index': 11, 'icon': Icons.emoji_events_rounded, 'label': 'AIR Leaderboards', 'route': '/leaderboard'},
+          {'index': 6, 'icon': Icons.bookmark_border_rounded, 'label': 'Bookmarks', 'route': '/mistakes', 'featureKey': ''},
+          {'index': 7, 'icon': Icons.error_outline_rounded, 'label': 'My Mistakes Radar', 'route': '/mistakes', 'featureKey': ''},
+          {'index': 8, 'icon': Icons.assignment_turned_in_rounded, 'label': 'My All Tests', 'route': '/my-tests', 'featureKey': ''},
+          {'index': 9, 'icon': Icons.dashboard_customize_rounded, 'label': 'Test Series Catalog', 'route': '/test-series', 'featureKey': 'test_series'},
+          {'index': 10, 'icon': Icons.insights_rounded, 'label': 'Performance Analytics', 'route': '/analytics', 'featureKey': 'performance_analytics'},
+          {'index': 11, 'icon': Icons.emoji_events_rounded, 'label': 'AIR Leaderboards', 'route': '/leaderboard', 'featureKey': ''},
         ]
       },
       {
         'header': 'ACCOUNT & SUPPORT',
         'items': [
-          {'index': 12, 'icon': Icons.event_note_rounded, 'label': 'Study Schedule', 'route': '/my-tests'},
-          {'index': 13, 'icon': Icons.person_rounded, 'label': 'My Profile', 'route': '/profile'},
-          {'index': 14, 'icon': Icons.settings_rounded, 'label': 'Settings', 'route': '/profile'},
-          {'index': 15, 'icon': Icons.help_outline_rounded, 'label': 'Help & Support', 'route': '/help'},
-          {'index': 16, 'icon': Icons.logout_rounded, 'label': 'Logout', 'route': '/login', 'isLogout': true},
+          {'index': 12, 'icon': Icons.event_note_rounded, 'label': 'Study Schedule', 'route': '/my-tests', 'featureKey': ''},
+          {'index': 13, 'icon': Icons.person_rounded, 'label': 'My Profile', 'route': '/profile', 'featureKey': ''},
+          {'index': 14, 'icon': Icons.settings_rounded, 'label': 'Settings', 'route': '/profile', 'featureKey': ''},
+          {'index': 15, 'icon': Icons.help_outline_rounded, 'label': 'Help & Support', 'route': '/help', 'featureKey': ''},
+          {'index': 16, 'icon': Icons.logout_rounded, 'label': 'Logout', 'route': '/login', 'isLogout': true, 'featureKey': ''},
         ]
       },
     ];
+
+    // Filter items and sections dynamically according to FeatureConfigService visibility settings
+    final visibleSections = [];
+    for (var sec in rawSections) {
+      final rawItems = sec['items'] as List<Map<String, dynamic>>;
+      final filteredItems = rawItems.where((item) {
+        final key = (item['featureKey'] ?? '').toString();
+        if (key.isEmpty) return true;
+        return FeatureConfigService.isVisible(key);
+      }).toList();
+
+      if (filteredItems.isNotEmpty) {
+        visibleSections.add({
+          'header': sec['header'],
+          'items': filteredItems,
+        });
+      }
+    }
 
     return Container(
       width: 270,
@@ -152,9 +193,9 @@ class _AppSidebarState extends State<AppSidebar> {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                itemCount: sections.length,
+                itemCount: visibleSections.length,
                 itemBuilder: (context, sIdx) {
-                  final section = sections[sIdx];
+                  final section = visibleSections[sIdx];
                   final header = section['header'] as String;
                   final items = section['items'] as List<Map<String, dynamic>>;
 
@@ -181,6 +222,7 @@ class _AppSidebarState extends State<AppSidebar> {
                         final String label = item['label'] as String;
                         final IconData icon = item['icon'] as IconData;
                         final String route = item['route'] as String;
+                        final String featureKey = (item['featureKey'] ?? '').toString();
                         final bool isSelected = _activeIdx == index;
 
                         if (isStore) {
@@ -191,7 +233,13 @@ class _AppSidebarState extends State<AppSidebar> {
                                 if (Scaffold.of(context).isDrawerOpen) {
                                   Navigator.of(context).pop();
                                 }
-                                context.go('/test-series');
+                                if (featureKey.isNotEmpty) {
+                                  FeatureConfigService.handleFeatureTap(context, featureKey, onActive: () {
+                                    context.go('/test-series');
+                                  });
+                                } else {
+                                  context.go('/test-series');
+                                }
                               },
                               borderRadius: BorderRadius.circular(14),
                               child: Container(
@@ -276,24 +324,12 @@ class _AppSidebarState extends State<AppSidebar> {
                                   return;
                                 }
 
-                                if (label == 'Practice' && widget.onOpenPractice != null) {
-                                  widget.onOpenPractice!();
-                                } else if (label.contains('Custom Practice') && widget.onOpenCustomPractice != null) {
-                                  widget.onOpenCustomPractice!();
-                                } else if (label.contains('Custom Test') && widget.onOpenCustomTest != null) {
-                                  widget.onOpenCustomTest!();
-                                } else if (label.contains('PYQ') && widget.onOpenPyqs != null) {
-                                  widget.onOpenPyqs!();
-                                } else if (label.contains('Mistakes') && widget.onOpenMistakes != null) {
-                                  widget.onOpenMistakes!();
-                                } else if (label.contains('My All Tests') && widget.onOpenMyTests != null) {
-                                  widget.onOpenMyTests!();
-                                } else if (label.contains('Test Series') && widget.onOpenTestSeries != null) {
-                                  widget.onOpenTestSeries!();
-                                } else if (label.contains('Leaderboard') && widget.onOpenLeaderboard != null) {
-                                  widget.onOpenLeaderboard!();
+                                if (featureKey.isNotEmpty) {
+                                  FeatureConfigService.handleFeatureTap(context, featureKey, onActive: () {
+                                    _executeNavigation(label, route);
+                                  });
                                 } else {
-                                  context.go(route);
+                                  _executeNavigation(label, route);
                                 }
                               },
                               borderRadius: BorderRadius.circular(12),
@@ -324,7 +360,7 @@ class _AppSidebarState extends State<AppSidebar> {
                                         label,
                                         style: GoogleFonts.inter(
                                           fontSize: 13,
-                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                                           color: isSelected
                                               ? Colors.white
                                               : (isLogout ? const Color(0xFFEF4444) : const Color(0xFF334155)),
@@ -333,8 +369,8 @@ class _AppSidebarState extends State<AppSidebar> {
                                     ),
                                     if (isSelected)
                                       Container(
-                                        width: 6,
-                                        height: 6,
+                                        width: 5,
+                                        height: 5,
                                         decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                                       ),
                                   ],
@@ -343,54 +379,10 @@ class _AppSidebarState extends State<AppSidebar> {
                             ),
                           ),
                         );
-                      }),
+                      }).toList(),
                     ],
                   );
                 },
-              ),
-            ),
-
-            // 3. Bottom Go Premium Card Banner
-            Container(
-              margin: const EdgeInsets.all(12),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1E1B4B), Color(0xFF312E81)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: const [BoxShadow(color: Color(0x20312E81), blurRadius: 12, offset: Offset(0, 4))],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Text('👑', style: TextStyle(fontSize: 18)),
-                      const SizedBox(width: 8),
-                      Text('Go Premium', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text('Unlock 500+ mock tests, video solutions & AI error radar.', style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFFC7D2FE))),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => context.go('/pricing'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4F46E5),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        elevation: 0,
-                      ),
-                      child: Text('Upgrade Now →', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
               ),
             ),
           ],
