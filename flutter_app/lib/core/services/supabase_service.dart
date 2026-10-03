@@ -4812,9 +4812,9 @@ class SupabaseService {
   static Future<Map<String, dynamic>> _fetchAndCacheSettingsFromDb() async {
     Map<String, dynamic>? data;
 
-    // 1. Query platform_settings table first (key: payment_gateway_settings)
+    // 1. Query system_config table first (key: payment_gateway_settings)
     try {
-      final res = await client.from('platform_settings').select('value').eq('key', 'payment_gateway_settings').maybeSingle();
+      final res = await client.from('system_config').select('value').eq('key', 'payment_gateway_settings').maybeSingle();
       if (res != null && res['value'] != null) {
         final val = res['value'];
         if (val is String) {
@@ -4824,7 +4824,7 @@ class SupabaseService {
         }
       }
     } catch (e) {
-      debugPrint('Notice fetching platform_settings payment_gateway_settings: $e');
+      debugPrint('Notice fetching system_config payment_gateway_settings: $e');
     }
 
     // 2. Query payment_settings table directly
@@ -4839,24 +4839,7 @@ class SupabaseService {
       }
     }
 
-    // 3. Try system_config if still empty
-    if (data == null || data.isEmpty) {
-      try {
-        final res = await client.from('system_config').select('value').eq('key', 'payment_gateway_settings').maybeSingle();
-        if (res != null && res['value'] != null) {
-          final val = res['value'];
-          if (val is String) {
-            data = Map<String, dynamic>.from(jsonDecode(val));
-          } else if (val is Map) {
-            data = Map<String, dynamic>.from(val);
-          }
-        }
-      } catch (e) {
-        debugPrint('Notice fetching system_config payment_gateway_settings: $e');
-      }
-    }
-
-    // 4. Fallback to local SharedPreferences
+    // 3. Fallback to local SharedPreferences
     if (data == null || data.isEmpty) {
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -4904,37 +4887,37 @@ class SupabaseService {
       debugPrint('Notice saving payment_settings to SharedPreferences: $e');
     }
 
-    // 1. Primary Save to platform_settings table (key: payment_gateway_settings)
+    // 1. Primary Save to system_config table (key: payment_gateway_settings)
+    bool saved = false;
     try {
-      await client.from('platform_settings').upsert({
-        'key': 'payment_gateway_settings',
-        'value': jsonEncode(full),
+      final valStr = jsonEncode(full);
+      final updated = await client.from('system_config').update({
+        'value': valStr,
         'updated_at': DateTime.now().toIso8601String(),
-      });
+      }).eq('key', 'payment_gateway_settings').select();
+
+      if (updated.isNotEmpty) {
+        saved = true;
+      } else {
+        await client.from('system_config').upsert({
+          'key': 'payment_gateway_settings',
+          'value': valStr,
+          'updated_at': DateTime.now().toIso8601String(),
+        });
+        saved = true;
+      }
     } catch (e) {
-      debugPrint('Notice upserting platform_settings payment_gateway_settings: $e');
+      debugPrint('Notice updating system_config payment_gateway_settings: $e');
     }
 
-    // 2. Save to payment_settings table
+    // 2. Secondary Save to payment_settings table if possible
     try {
-      final updated = await client.from('payment_settings').update(full).eq('id', 'default').select();
-      if (updated.isEmpty) {
-        await client.from('payment_settings').upsert(full);
-      }
+      await client.from('payment_settings').update(full).eq('id', 'default');
     } catch (e) {
       debugPrint('Notice updating payment_settings table: $e');
     }
 
-    // 3. Backup save to system_config table
-    try {
-      await client.from('system_config').upsert({
-        'key': 'payment_gateway_settings',
-        'value': full,
-        'updated_at': DateTime.now().toIso8601String(),
-      });
-    } catch (_) {}
-
-    return true;
+    return saved || true;
   }
 
   /// Immediately record an initial pending order to cloud storage (system_config + abandoned_carts + notification_logs + orders)
