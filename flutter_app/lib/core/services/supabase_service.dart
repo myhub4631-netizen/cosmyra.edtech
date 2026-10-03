@@ -4801,7 +4801,7 @@ class SupabaseService {
 
   static Map<String, dynamic>? _memoryPaymentSettingsCache;
 
-  static Future<Map<String, dynamic>> fetchPaymentSettings({bool forceRefresh = false}) async {
+  static Future<Map<String, dynamic>> fetchPaymentSettings({bool forceRefresh = true}) async {
     if (!forceRefresh && _memoryPaymentSettingsCache != null && _memoryPaymentSettingsCache!.isNotEmpty) {
       return _memoryPaymentSettingsCache!;
     }

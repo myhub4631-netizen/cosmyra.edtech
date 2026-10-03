@@ -589,10 +589,10 @@ final GoRouter appRouter = GoRouter(
           phoneNumber: (data['customerPhone'] ?? '').toString(),
           role: 'student',
         );
-        final upiIdStr = (data['upiId'] ?? 'neetjee2027@nyes').toString();
-        final payeeNameStr = (data['payeeName'] ?? 'Mahboob Hasan').toString();
+        final upiIdStr = data['upiId']?.toString();
+        final payeeNameStr = data['payeeName']?.toString();
         final totalAmountNum = (data['totalAmount'] as num?)?.toDouble() ?? 0.0;
-        final upiUrlStr = (data['upiUrl'] ?? 'upi://pay?pa=$upiIdStr&pn=${Uri.encodeComponent(payeeNameStr)}&am=$totalAmountNum&cu=INR').toString();
+        final upiUrlStr = data['upiUrl']?.toString();
 
         return UpiPaymentVerificationScreen(
           user: data['user'] is UserProfileModel ? data['user'] as UserProfileModel : defaultUser,
@@ -618,10 +618,10 @@ final GoRouter appRouter = GoRouter(
           phoneNumber: (data['customerPhone'] ?? '').toString(),
           role: 'student',
         );
-        final upiIdStr = (data['upiId'] ?? 'neetjee2027@nyes').toString();
-        final payeeNameStr = (data['payeeName'] ?? 'Mahboob Hasan').toString();
+        final upiIdStr = data['upiId']?.toString();
+        final payeeNameStr = data['payeeName']?.toString();
         final totalAmountNum = (data['totalAmount'] as num?)?.toDouble() ?? 0.0;
-        final upiUrlStr = (data['upiUrl'] ?? 'upi://pay?pa=$upiIdStr&pn=${Uri.encodeComponent(payeeNameStr)}&am=$totalAmountNum&cu=INR').toString();
+        final upiUrlStr = data['upiUrl']?.toString();
 
         return UpiPaymentVerificationScreen(
           user: data['user'] is UserProfileModel ? data['user'] as UserProfileModel : defaultUser,
