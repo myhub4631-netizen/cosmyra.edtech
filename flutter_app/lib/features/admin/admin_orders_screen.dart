@@ -37,7 +37,8 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   List<Map<String, dynamic>> get _filteredOrders {
     return _orders.where((o) {
       final q = _searchQuery.trim().toLowerCase();
-      final id = (o['id'] ?? o['order_number'] ?? o['order_id'] ?? '').toString().toLowerCase();
+      final displayId = SupabaseService.extractDisplayOrderId(o).toLowerCase();
+      final rawId = (o['id'] ?? '').toString().toLowerCase();
       final name = (o['student_name'] ?? o['user_name'] ?? '').toString().toLowerCase();
       final email = (o['student_email'] ?? o['user_email'] ?? '').toString().toLowerCase();
       final phone = (o['student_phone'] ?? o['user_phone'] ?? '').toString().toLowerCase();
@@ -45,7 +46,8 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       final ref = SupabaseService.extractUtrNumber(o).toLowerCase();
 
       final matchesQuery = q.isEmpty ||
-          id.contains(q) ||
+          displayId.contains(q) ||
+          rawId.contains(q) ||
           name.contains(q) ||
           email.contains(q) ||
           phone.contains(q) ||
@@ -99,22 +101,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   }
 
   String _getDisplayOrderId(Map<String, dynamic> o) {
-    final ordNum = (o['order_number'] ?? o['order_id'] ?? '').toString().trim();
-    if (ordNum.isNotEmpty && (ordNum.startsWith('ORD') || ordNum.startsWith('SUB') || ordNum.startsWith('CART'))) {
-      return ordNum;
-    }
-    final ref = (o['payment_reference'] ?? '').toString().trim();
-    if (ref.isNotEmpty && (ref.startsWith('ORD') || ref.startsWith('SUB') || ref.startsWith('CART'))) {
-      return ref;
-    }
-    final rawId = (o['id'] ?? '').toString().trim();
-    if (rawId.startsWith('ORD') || rawId.startsWith('SUB') || rawId.startsWith('CART')) {
-      return rawId;
-    }
-    if (rawId.length >= 8) {
-      return 'ORD-${rawId.replaceAll('-', '').substring(0, 8).toUpperCase()}';
-    }
-    return 'ORD-SUCCESS';
+    return SupabaseService.extractDisplayOrderId(o);
   }
 
   Future<void> _approveOrder(Map<String, dynamic> o) async {

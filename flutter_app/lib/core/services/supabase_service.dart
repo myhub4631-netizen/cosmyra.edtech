@@ -4784,6 +4784,9 @@ class SupabaseService {
       'Product: $pTitle',
     ].join(' | ');
 
+    final effectiveNotes = 'Order ID: $orderId | UPI Payment. $notesText. Awaiting admin approval.';
+    final effectiveRef = cleanUtr.isNotEmpty ? cleanUtr : (screenshotUrl.isNotEmpty ? screenshotUrl : orderId);
+
     final orderData = {
       'id': validOrderId,
       'order_id': orderId,
@@ -4800,12 +4803,12 @@ class SupabaseService {
       'payment_status': 'pending_verification',
       'payment_method': 'UPI',
       'payment_id': cleanUtr.isNotEmpty ? 'UTR_$cleanUtr' : (screenshotUrl.isNotEmpty ? 'SCREENSHOT_${timeMs.substring(timeMs.length - 6)}' : 'PENDING'),
-      'payment_reference': cleanUtr.isNotEmpty ? cleanUtr : (screenshotUrl.isNotEmpty ? screenshotUrl : 'PENDING'),
+      'payment_reference': effectiveRef,
       'payment_utr': effectiveUtr,
       'utr_number': effectiveUtr,
       'payment_screenshot_url': screenshotUrl,
       'screenshot_url': screenshotUrl,
-      'notes': 'UPI Payment. $notesText. Awaiting admin approval.',
+      'notes': effectiveNotes,
       'product_name': pTitle,
       'product_id': pId,
       'created_at': DateTime.now().toIso8601String(),
@@ -4832,12 +4835,12 @@ class SupabaseService {
         'status': 'pending_verification',
         'payment_method': 'UPI',
         'payment_id': cleanUtr.isNotEmpty ? 'UTR_$cleanUtr' : (screenshotUrl.isNotEmpty ? 'SCREENSHOT_${timeMs.substring(timeMs.length - 6)}' : 'PENDING'),
-        'payment_reference': cleanUtr.isNotEmpty ? cleanUtr : (screenshotUrl.isNotEmpty ? screenshotUrl : 'PENDING'),
+        'payment_reference': effectiveRef,
         'payment_utr': effectiveUtr,
         'utr_number': effectiveUtr,
         'payment_screenshot_url': screenshotUrl,
         'screenshot_url': screenshotUrl,
-        'notes': 'UPI Payment. $notesText',
+        'notes': effectiveNotes,
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       });
@@ -4862,12 +4865,12 @@ class SupabaseService {
           'status': 'pending_verification',
           'payment_method': 'UPI',
           'payment_id': cleanUtr.isNotEmpty ? 'UTR_$cleanUtr' : (screenshotUrl.isNotEmpty ? 'SCREENSHOT_${timeMs.substring(timeMs.length - 6)}' : 'PENDING'),
-          'payment_reference': cleanUtr.isNotEmpty ? cleanUtr : (screenshotUrl.isNotEmpty ? screenshotUrl : 'PENDING'),
+          'payment_reference': effectiveRef,
           'payment_utr': effectiveUtr,
           'utr_number': effectiveUtr,
           'payment_screenshot_url': screenshotUrl,
           'screenshot_url': screenshotUrl,
-          'notes': 'UPI Payment. $notesText',
+          'notes': effectiveNotes,
           'created_at': DateTime.now().toIso8601String(),
           'updated_at': DateTime.now().toIso8601String(),
         });
@@ -8527,7 +8530,7 @@ class SupabaseService {
     int index = 1,
   }) {
     final trimmed = rawId.trim();
-    if (trimmed.startsWith('CSNJ')) {
+    if (trimmed.startsWith('CSNJ') || trimmed.startsWith('ORD-') || trimmed.startsWith('ORD_') || trimmed.startsWith('SUB-') || trimmed.startsWith('CART-')) {
       return trimmed;
     }
     final d = date ?? DateTime.now();
@@ -8830,6 +8833,50 @@ class SupabaseService {
     return 'N/A (Direct Online)';
   }
 
+  /// Extract canonical human-readable Order ID (e.g. ORD-05418200) from any order record
+  static String extractDisplayOrderId(Map<String, dynamic> o) {
+    // 1. Check direct fields order_number or order_id
+    for (final key in ['order_number', 'order_id']) {
+      final val = (o[key] ?? '').toString().trim();
+      if (val.isNotEmpty && (val.startsWith('ORD') || val.startsWith('SUB') || val.startsWith('CART') || val.startsWith('CSNJ'))) {
+        return val;
+      }
+    }
+
+    // 2. Check payment_reference
+    final ref = (o['payment_reference'] ?? '').toString().trim();
+    if (ref.isNotEmpty && (ref.startsWith('ORD') || ref.startsWith('SUB') || ref.startsWith('CART') || ref.startsWith('CSNJ'))) {
+      return ref;
+    }
+
+    // 3. Search notes for explicitly saved order ID format (e.g., "Order ID: ORD-05418200" or "ORD-XXXXXX")
+    final notes = (o['notes'] ?? '').toString();
+    final match = RegExp(r'\b((?:ORD|SUB|CART|CSNJ)[-_][A-Za-z0-9]{5,16})\b', caseSensitive: false).firstMatch(notes);
+    if (match != null && match.group(1) != null) {
+      final found = match.group(1)!.trim();
+      if (found.isNotEmpty) return found.toUpperCase();
+    }
+
+    // 4. Check subject or title in logs / backups
+    final subject = (o['subject'] ?? '').toString().trim();
+    if (subject.isNotEmpty && (subject.startsWith('ORD') || subject.startsWith('SUB') || subject.startsWith('CART') || subject.startsWith('CSNJ'))) {
+      return subject;
+    }
+
+    // 5. Check direct id field if it starts with known prefixes
+    final rawId = (o['id'] ?? '').toString().trim();
+    if (rawId.startsWith('ORD') || rawId.startsWith('SUB') || rawId.startsWith('CART') || rawId.startsWith('CSNJ')) {
+      return rawId;
+    }
+
+    // 6. If rawId is non-empty hex/uuid format, format as fallback
+    if (rawId.length >= 8) {
+      return 'ORD-${rawId.replaceAll('-', '').substring(0, 8).toUpperCase()}';
+    }
+
+    return 'ORD-SUCCESS';
+  }
+
   /// Extract Payment Screenshot URL from order record
   static String? extractPaymentScreenshotUrl(Map<String, dynamic> o) {
     // 1. Direct field check across all common field names
@@ -8840,6 +8887,7 @@ class SupabaseService {
       'payment_screenshot',
       'receipt_url',
       'receipt_image',
+      'screenshotUrl',
     ]) {
       final val = (o[field] ?? '').toString().trim();
       if (val.isNotEmpty && (val.startsWith('http://') || val.startsWith('https://') || val.startsWith('data:image/'))) {
@@ -8861,7 +8909,15 @@ class SupabaseService {
     final notes = (o['notes'] ?? '').toString();
     final match = RegExp(r'(?:Screenshot|Receipt|Image|http[:\s]*|https[:\s]*)+[:\s]*(https?://[^\s\|]+)', caseSensitive: false).firstMatch(notes);
     if (match != null && match.group(1) != null) {
-      return match.group(1)!.trim();
+      final urlCandidate = match.group(1)!.trim();
+      if (urlCandidate.isNotEmpty && (urlCandidate.startsWith('http://') || urlCandidate.startsWith('https://'))) {
+        return urlCandidate;
+      }
+    }
+
+    final urlMatch = RegExp(r'(https?://[^\s\|]+\.(?:png|jpg|jpeg|webp)(?:\?[^\s\|]*)?)', caseSensitive: false).firstMatch(notes);
+    if (urlMatch != null && urlMatch.group(1) != null) {
+      return urlMatch.group(1)!.trim();
     }
 
     // 4. Check nested cart_items or extra JSON fields
@@ -9340,6 +9396,18 @@ class SupabaseService {
       final email = (o['user_email'] ?? o['student_email'] ?? '').toString();
       return !ordNo.contains('USRDEM0001') && !email.contains('student@cosmyra.edu');
     }).toList();
+
+    // Canonical normalization pass: guarantee display Order ID and payment screenshot URL on every item
+    for (var o in finalOrders) {
+      final canonicalId = extractDisplayOrderId(o);
+      o['order_id'] = canonicalId;
+      o['order_number'] = canonicalId;
+      final screenshot = extractPaymentScreenshotUrl(o);
+      if (screenshot != null && screenshot.isNotEmpty) {
+        o['payment_screenshot_url'] = screenshot;
+        o['screenshot_url'] = screenshot;
+      }
+    }
 
     // Sort all aggregated orders by created_at descending
     finalOrders.sort((a, b) {
