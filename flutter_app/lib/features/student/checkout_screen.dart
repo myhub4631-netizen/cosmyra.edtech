@@ -274,11 +274,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
     final List<Map<String, dynamic>> itemsJson = itemsToPurchase.map((it) => it.toJson()).toList();
 
     if (_selectedPaymentMethod == 'UPI') {
-      final upiId = (_paymentSettings['upi_id'] != null && _paymentSettings['upi_id'].toString().trim().isNotEmpty)
-          ? _paymentSettings['upi_id'].toString().trim()
+      final liveSettings = await SupabaseService.fetchPaymentSettings(forceRefresh: true);
+      final upiId = (liveSettings['upi_id'] ?? '').toString().trim().isNotEmpty
+          ? liveSettings['upi_id'].toString().trim()
           : 'neetjee2027@nyes';
-      final payeeName = (_paymentSettings['upi_payee_name'] != null && _paymentSettings['upi_payee_name'].toString().trim().isNotEmpty)
-          ? _paymentSettings['upi_payee_name'].toString().trim()
+      final payeeName = (liveSettings['upi_payee_name'] ?? '').toString().trim().isNotEmpty
+          ? liveSettings['upi_payee_name'].toString().trim()
           : 'Mahboob Hasan';
       final amountStr = _finalTotal.toStringAsFixed(2);
       final upiUrl = 'upi://pay?pa=$upiId&pn=${Uri.encodeComponent(payeeName)}&am=$amountStr&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
@@ -450,30 +451,55 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
 
     final user = effectiveUser;
 
+    if (_isOrderSuccess) {
+      return _buildSuccessCelebration();
+    }
+
     final List<CartItem> itemsToPurchase = _activeItem != null
         ? [_activeItem!]
         : (CartService.instance.items.isNotEmpty
             ? CartService.instance.items
             : [CartItem(id: 'ts_default', title: 'Test Series', price: 499, originalPrice: 1999)]);
 
-    final List<Map<String, dynamic>> itemsJson = itemsToPurchase.map((it) => it.toJson()).toList();
-    final upiId = (_paymentSettings['upi_id'] != null && _paymentSettings['upi_id'].toString().trim().isNotEmpty)
-        ? _paymentSettings['upi_id'].toString().trim()
-        : 'neetjee2027@nyes';
-    final payeeName = (_paymentSettings['upi_payee_name'] != null && _paymentSettings['upi_payee_name'].toString().trim().isNotEmpty)
-        ? _paymentSettings['upi_payee_name'].toString().trim()
-        : 'Mahboob Hasan';
-    final amountStr = _finalTotal.toStringAsFixed(2);
-    final upiUrl = 'upi://pay?pa=$upiId&pn=${Uri.encodeComponent(payeeName)}&am=$amountStr&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
-
-    return UpiPaymentVerificationScreen(
-      user: user,
-      items: itemsJson,
-      totalAmount: _finalTotal,
-      couponCode: CartService.instance.appliedCouponCode ?? '',
-      upiId: upiId,
-      payeeName: payeeName,
-      upiUrl: upiUrl,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/test-series'),
+        ),
+        title: Text('Checkout', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildAspirantCard(user),
+                const SizedBox(height: 16),
+                _buildSectionTitle('ORDER SUMMARY'),
+                const SizedBox(height: 12),
+                ...itemsToPurchase.map((it) => _buildOrderItemTile(it)),
+                const SizedBox(height: 16),
+                _buildCouponCard(),
+                const SizedBox(height: 16),
+                _buildSectionTitle('PAYMENT METHOD'),
+                const SizedBox(height: 12),
+                _buildPaymentMethodCard(),
+                const SizedBox(height: 16),
+                _buildPriceSummaryCard(),
+                const SizedBox(height: 100),
+              ],
+            ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: _buildBottomPayBar(),
     );
   }
 

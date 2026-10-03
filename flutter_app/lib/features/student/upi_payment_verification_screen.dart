@@ -98,16 +98,27 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
     _items = widget.items ?? (CartService.instance.items.isNotEmpty ? CartService.instance.items.map((e) => e.toJson()).toList() : []);
     _totalAmount = widget.totalAmount ?? (CartService.instance.subtotal > 0 ? CartService.instance.subtotal : 499.0);
 
-    if (widget.upiId != null && widget.upiId!.isNotEmpty) {
+    final settings = await SupabaseService.fetchPaymentSettings(forceRefresh: true);
+    final dbUpiId = (settings['upi_id'] ?? '').toString().trim();
+    final dbPayeeName = (settings['upi_payee_name'] ?? '').toString().trim();
+
+    if (dbUpiId.isNotEmpty) {
+      _upiId = dbUpiId;
+    } else if (widget.upiId != null && widget.upiId!.isNotEmpty) {
       _upiId = widget.upiId!;
-      _payeeName = widget.payeeName ?? 'Mahboob Hasan';
-      _upiUrl = widget.upiUrl ?? 'upi://pay?pa=$_upiId&pn=${Uri.encodeComponent(_payeeName)}&am=${_totalAmount.toStringAsFixed(2)}&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
     } else {
-      final settings = await SupabaseService.fetchPaymentSettings(forceRefresh: true);
-      _upiId = (settings['upi_id'] ?? 'neetjee2027@nyes').toString().trim();
-      _payeeName = (settings['upi_payee_name'] ?? 'Mahboob Hasan').toString().trim();
-      _upiUrl = 'upi://pay?pa=$_upiId&pn=${Uri.encodeComponent(_payeeName)}&am=${_totalAmount.toStringAsFixed(2)}&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
+      _upiId = 'neetjee2027@nyes';
     }
+
+    if (dbPayeeName.isNotEmpty) {
+      _payeeName = dbPayeeName;
+    } else if (widget.payeeName != null && widget.payeeName!.isNotEmpty) {
+      _payeeName = widget.payeeName!;
+    } else {
+      _payeeName = 'Mahboob Hasan';
+    }
+
+    _upiUrl = 'upi://pay?pa=$_upiId&pn=${Uri.encodeComponent(_payeeName)}&am=${_totalAmount.toStringAsFixed(2)}&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
 
     if (mounted) {
       setState(() => _isLoading = false);
