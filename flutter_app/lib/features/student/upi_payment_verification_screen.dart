@@ -33,7 +33,8 @@ class UpiPaymentVerificationScreen extends StatefulWidget {
   State<UpiPaymentVerificationScreen> createState() => _UpiPaymentVerificationScreenState();
 }
 
-class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScreen> {
+class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _utrController = TextEditingController();
   bool _isSubmitting = false;
   bool _isUploadingScreenshot = false;
@@ -48,10 +49,25 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
   late String _payeeName;
   late String _upiUrl;
   bool _isLoading = true;
+  bool _autoLaunched = false;
+
+  late AnimationController _shakeController;
+  late Animation<double> _shakeAnimation;
 
   @override
   void initState() {
     super.initState();
+    debugPrint('PAYMENT_FLOW: DEDICATED_PAYMENT_PAGE_OPENED');
+
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _shakeAnimation = Tween<double>(begin: -4.0, end: 4.0).animate(
+      CurvedAnimation(parent: _shakeController, curve: Curves.easeInOut),
+    );
+
     _initData();
   }
 
@@ -82,11 +98,21 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
 
     if (mounted) {
       setState(() => _isLoading = false);
+
+      if (!_autoLaunched) {
+        _autoLaunched = true;
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _launchUpiApp();
+          }
+        });
+      }
     }
   }
 
   @override
   void dispose() {
+    _shakeController.dispose();
     _utrController.dispose();
     super.dispose();
   }
@@ -286,6 +312,71 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
     );
   }
 
+  Widget _buildSubmitButton() {
+    return Container(
+      height: 50,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        gradient: _isSubmitting
+            ? const LinearGradient(colors: [Color(0xFF94A3B8), Color(0xFF64748B)])
+            : const LinearGradient(
+                colors: [Color(0xFFFF3B30), Color(0xFFEF4444), Color(0xFFDC2626)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+        boxShadow: [
+          BoxShadow(
+            color: _isSubmitting
+                ? Colors.black.withValues(alpha: 0.1)
+                : const Color(0xFFEF4444).withValues(alpha: 0.5),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: (_isSubmitting || _isUploadingScreenshot) ? null : _submitVerification,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_isSubmitting) ...[
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Submitting Verification...',
+                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
+                  ),
+                ] else ...[
+                  const Icon(Icons.check_circle_rounded, size: 20, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Submit Payment Verification',
+                    style: GoogleFonts.inter(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -301,7 +392,7 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: isMobile ? Colors.white : const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
@@ -349,26 +440,28 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
           alignment: Alignment.topCenter,
           child: SingleChildScrollView(
             padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 12 : 24,
+              horizontal: isMobile ? 16 : 24,
               vertical: isMobile ? 12 : 24,
             ),
             physics: const BouncingScrollPhysics(),
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 540),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x060F172A),
-                    blurRadius: 16,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
+              constraints: isMobile ? null : const BoxConstraints(maxWidth: 580),
+              decoration: isMobile
+                  ? null
+                  : BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x060F172A),
+                          blurRadius: 16,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
               child: Padding(
-                padding: EdgeInsets.all(isMobile ? 14 : 24),
+                padding: EdgeInsets.all(isMobile ? 0 : 24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -576,86 +669,9 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
 
-                    // STEP 2 Container
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFBEB),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFFDE68A)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFD97706),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'STEP 2',
-                                  style: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.w900, color: Colors.white),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Enter 12-Digit UTR / Ref Number',
-                                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800, color: const Color(0xFF92400E)),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'After payment in GPay / PhonePe / Paytm, copy the 12-digit UTR/Ref No. from transaction details and paste below:',
-                            style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF78350F), height: 1.35),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // UTR TextField Input Box
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          TextField(
-                            controller: _utrController,
-                            keyboardType: TextInputType.number,
-                            maxLength: 12,
-                            style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A), letterSpacing: 1.0),
-                            decoration: InputDecoration(
-                              hintText: 'e.g. 429182736410',
-                              hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8), letterSpacing: 0.0),
-                              counterText: '',
-                              isDense: true,
-                              filled: true,
-                              fillColor: Colors.white,
-                              prefixIcon: const Icon(Icons.confirmation_number_outlined, size: 18, color: Color(0xFF64748B)),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Option 1: Payment Screenshot Upload (Cloudflare S3)
+                    // Option 1: Payment Screenshot Upload (Placed right below Merchant UPI ID!)
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
@@ -671,7 +687,7 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
                               const Icon(Icons.cloud_upload_rounded, size: 16, color: Color(0xFF6D28D9)),
                               const SizedBox(width: 6),
                               Text(
-                                'Option 1: Upload Payment Screenshot (Cloudflare S3)',
+                                'Upload Payment Screenshot (S3)',
                                 style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w800, color: const Color(0xFF5B21B6)),
                               ),
                             ],
@@ -680,7 +696,7 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
 
                           if (_isUploadingScreenshot)
                             Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFEFF6FF),
                                 borderRadius: BorderRadius.circular(8),
@@ -690,14 +706,14 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(color: Color(0xFF2563EB), strokeWidth: 2.5),
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(color: Color(0xFF2563EB), strokeWidth: 2),
                                   ),
-                                  SizedBox(width: 10),
+                                  SizedBox(width: 8),
                                   Text(
-                                    'Uploading Receipt to Cloudflare S3...',
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
+                                    'Uploading Receipt...',
+                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
                                   ),
                                 ],
                               ),
@@ -716,10 +732,10 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
                                     borderRadius: BorderRadius.circular(6),
                                     child: Image.network(
                                       _paymentScreenshotUrl!,
-                                      width: 44,
-                                      height: 44,
+                                      width: 40,
+                                      height: 40,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (c, e, s) => Container(width: 44, height: 44, color: const Color(0xFFD1FAE5), child: const Icon(Icons.image, color: Color(0xFF059669))),
+                                      errorBuilder: (c, e, s) => Container(width: 40, height: 40, color: const Color(0xFFD1FAE5), child: const Icon(Icons.image, color: Color(0xFF059669))),
                                     ),
                                   ),
                                   const SizedBox(width: 10),
@@ -768,7 +784,7 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
                                 onTap: _pickAndUploadScreenshot,
                                 borderRadius: BorderRadius.circular(8),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(color: const Color(0xFF7C3AED), width: 1.2),
@@ -777,30 +793,30 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
                                   child: Row(
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.all(6),
+                                        padding: const EdgeInsets.all(5),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFF7C3AED),
                                           borderRadius: BorderRadius.circular(6),
                                         ),
-                                        child: const Icon(Icons.add_a_photo_rounded, size: 18, color: Colors.white),
+                                        child: const Icon(Icons.add_a_photo_rounded, size: 16, color: Colors.white),
                                       ),
-                                      const SizedBox(width: 10),
+                                      const SizedBox(width: 8),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               'Upload Payment Screenshot Receipt',
-                                              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF5B21B6)),
+                                              style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color(0xFF5B21B6)),
                                             ),
                                             Text(
                                               'Tap to select GPay / PhonePe / Paytm receipt (S3)',
-                                              style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF6D28D9)),
+                                              style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF6D28D9)),
                                             ),
                                           ],
                                         ),
                                       ),
-                                      const Icon(Icons.cloud_upload_rounded, color: Color(0xFF7C3AED), size: 20),
+                                      const Icon(Icons.cloud_upload_rounded, color: Color(0xFF7C3AED), size: 18),
                                     ],
                                   ),
                                 ),
@@ -809,73 +825,79 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
                         ],
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 14),
 
-                    // Red Submit Button
-                    Container(
-                      height: 50,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        gradient: _isSubmitting
-                            ? const LinearGradient(colors: [Color(0xFF94A3B8), Color(0xFF64748B)])
-                            : const LinearGradient(
-                                colors: [Color(0xFFFF3B30), Color(0xFFEF4444), Color(0xFFDC2626)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _isSubmitting
-                                ? Colors.black.withValues(alpha: 0.1)
-                                : const Color(0xFFEF4444).withValues(alpha: 0.5),
-                            blurRadius: 14,
-                            offset: const Offset(0, 4),
+                    // STEP 2: Minimal 12-Digit UTR Input
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD97706),
+                            borderRadius: BorderRadius.circular(5),
                           ),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(14),
-                          onTap: (_isSubmitting || _isUploadingScreenshot) ? null : _submitVerification,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                if (_isSubmitting) ...[
-                                  const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    'Submitting Verification...',
-                                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white),
-                                  ),
-                                ] else ...[
-                                  const Icon(Icons.check_circle_rounded, size: 20, color: Colors.white),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Submit Payment Verification',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 14.5,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white,
-                                      letterSpacing: 0.3,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
+                          child: Text(
+                            'STEP 2',
+                            style: GoogleFonts.inter(fontSize: 9.5, fontWeight: FontWeight.w900, color: Colors.white),
                           ),
                         ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Enter 12-Digit UTR / Ref Number:',
+                          style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w800, color: const Color(0xFF92400E)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Minimal UTR TextField Input Box
+                    TextField(
+                      controller: _utrController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 12,
+                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A), letterSpacing: 1.0),
+                      decoration: InputDecoration(
+                        hintText: 'e.g. 429182736410',
+                        hintStyle: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF94A3B8), letterSpacing: 0.0),
+                        counterText: '',
+                        isDense: true,
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        prefixIcon: const Icon(Icons.confirmation_number_outlined, size: 18, color: Color(0xFF64748B)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
                       ),
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          color: Colors.white,
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 24,
+            vertical: 10,
+          ),
+          child: Center(
+            heightFactor: 1.0,
+            child: Container(
+              constraints: isMobile ? null : const BoxConstraints(maxWidth: 580),
+              child: AnimatedBuilder(
+                animation: _shakeAnimation,
+                builder: (context, child) {
+                  return Transform.translate(
+                    offset: Offset(_shakeAnimation.value, 0),
+                    child: child,
+                  );
+                },
+                child: _buildSubmitButton(),
               ),
             ),
           ),
@@ -884,3 +906,4 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
     );
   }
 }
+

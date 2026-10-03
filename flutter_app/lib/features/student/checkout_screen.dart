@@ -333,6 +333,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
     required String upiUrl,
   }) async {
     if (context.mounted) {
+      debugPrint('PAYMENT_FLOW: OPEN_PAYMENT_VERIFICATION');
       context.push('/upi-payment-verification', extra: {
         'user': user,
         'items': items,
