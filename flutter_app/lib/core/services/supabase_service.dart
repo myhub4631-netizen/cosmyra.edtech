@@ -5019,37 +5019,20 @@ class SupabaseService {
       });
       orderInserted = true;
     } catch (e) {
-      debugPrint('Notice inserting to Supabase orders table: $e');
+      debugPrint('Notice detailed insert to orders table: $e');
       try {
         await client.from('orders').insert({
           'id': validOrderId,
-          'order_id': finalOrderId,
-          'order_number': finalOrderId,
-          'user_id': null,
+          'user_id': profileUserId,
           'user_email': user.email.trim().toLowerCase(),
-          'user_name': user.fullName,
-          'user_phone': user.phoneNumber ?? '',
-          'product_name': pTitle,
-          'product_id': pId,
-          'subtotal_amount': totalAmount,
-          'discount_amount': 0.0,
           'total_amount': totalAmount,
-          'coupon_code': couponCode.trim().toUpperCase(),
           'status': 'pending_verification',
           'payment_method': 'UPI',
-          'payment_id': cleanUtr.isNotEmpty ? 'UTR_$cleanUtr' : (screenshotUrl.isNotEmpty ? 'SCREENSHOT_${timeMs.substring(timeMs.length - 6)}' : 'PENDING'),
-          'payment_reference': effectiveRef,
-          'payment_utr': effectiveUtr,
-          'utr_number': effectiveUtr,
-          'payment_screenshot_url': screenshotUrl,
-          'screenshot_url': screenshotUrl,
-          'notes': effectiveNotes,
           'created_at': DateTime.now().toIso8601String(),
-          'updated_at': DateTime.now().toIso8601String(),
         });
         orderInserted = true;
       } catch (retryErr) {
-        debugPrint('Retry notice inserting to orders table: $retryErr');
+        debugPrint('Notice minimal insert to orders table: $retryErr');
       }
     }
 
@@ -5112,25 +5095,19 @@ class SupabaseService {
       debugPrint('Notice inserting to notification_logs: $e');
     }
 
-    // 4. Multi-channel backup insert to abandoned_carts
+    // 4. Multi-channel backup insert to abandoned_carts (strictly supported columns with embedded orderData)
     try {
+      final List<Map<String, dynamic>> cartItemsWithOrder = [
+        orderData,
+        ...items,
+      ];
       await client.from('abandoned_carts').insert({
         'user_id': profileUserId,
         'user_email': user.email.trim().toLowerCase(),
         'user_phone': user.phoneNumber ?? '',
-        'user_name': user.fullName,
-        'student_name': user.fullName,
-        'order_id': finalOrderId,
-        'order_number': finalOrderId,
-        'product_name': pTitle,
-        'cart_items': items,
+        'cart_items': cartItemsWithOrder,
         'subtotal': totalAmount,
         'recovery_status': 'order_placed',
-        'notes': 'UPI Payment. $notesText',
-        'payment_screenshot_url': screenshotUrl,
-        'screenshot_url': screenshotUrl,
-        'payment_utr': effectiveUtr,
-        'utr_number': effectiveUtr,
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       });
@@ -9573,7 +9550,6 @@ class SupabaseService {
           final createdAt = (cart['created_at'] ?? DateTime.now().toIso8601String()).toString();
           final rawCartId = (cart['id'] ?? '').toString();
           final orderIdFromCart = (cart['order_number'] ?? cart['order_id'] ?? '').toString().trim();
-          final keyToCheck = orderIdFromCart.isNotEmpty ? orderIdFromCart : rawCartId;
 
           final recStatus = (cart['recovery_status'] ?? '').toString().toLowerCase();
           final cartItems = cart['cart_items'] is List ? (cart['cart_items'] as List) : [];
@@ -9586,46 +9562,67 @@ class SupabaseService {
             effectiveStatus = recStatus;
           }
 
+          // Check if cart_items contains an embedded order dictionary
+          Map<String, dynamic>? embeddedOrder;
+          for (var item in cartItems) {
+            if (item is Map && (item['order_id'] != null || item['order_number'] != null || item['payment_utr'] != null || item['screenshot_url'] != null || item['payment_screenshot_url'] != null)) {
+              embeddedOrder = Map<String, dynamic>.from(item);
+              break;
+            }
+          }
+
+          final keyToCheck = embeddedOrder != null
+              ? (embeddedOrder['order_number'] ?? embeddedOrder['order_id'] ?? embeddedOrder['id'] ?? '').toString().trim()
+              : (orderIdFromCart.isNotEmpty ? orderIdFromCart : rawCartId);
+
           if (keyToCheck.isNotEmpty && !hasSeenKey(keyToCheck)) {
             addOrderKeys(keyToCheck);
-            final displayOrderId = orderIdFromCart.isNotEmpty
-                ? orderIdFromCart
-                : (rawCartId.length >= 8 ? 'ORD-${rawCartId.replaceAll('-', '').substring(0, 8).toUpperCase()}' : 'ORD-$rawCartId');
+            if (embeddedOrder != null) {
+              final ordNum = (embeddedOrder['order_number'] ?? embeddedOrder['order_id'] ?? keyToCheck).toString();
+              if (ordNum.isNotEmpty) addOrderKeys(ordNum);
+              embeddedOrder['order_id'] ??= ordNum;
+              embeddedOrder['order_number'] ??= ordNum;
+              orders.add(embeddedOrder);
+            } else {
+              final displayOrderId = orderIdFromCart.isNotEmpty
+                  ? orderIdFromCart
+                  : (rawCartId.length >= 8 ? 'ORD-${rawCartId.replaceAll('-', '').substring(0, 8).toUpperCase()}' : 'ORD-$rawCartId');
 
-            final screenshotUrl = extractPaymentScreenshotUrl(cart) ?? (cart['screenshot_url'] ?? cart['payment_screenshot_url'] ?? '').toString();
-            final utrStr = (cart['utr_number'] ?? cart['payment_utr'] ?? extractUtrNumber(cart)).toString();
+              final screenshotUrl = extractPaymentScreenshotUrl(cart) ?? (cart['screenshot_url'] ?? cart['payment_screenshot_url'] ?? '').toString();
+              final utrStr = (cart['utr_number'] ?? cart['payment_utr'] ?? extractUtrNumber(cart)).toString();
 
-            orders.add({
-              'id': rawCartId,
-              'order_id': displayOrderId,
-              'order_number': displayOrderId,
-              'user_id': cart['user_id']?.toString() ?? '',
-              'student_email': email,
-              'user_email': email,
-              'student_phone': phone,
-              'user_phone': phone,
-              'student_name': name,
-              'user_name': name,
-              'address': address,
-              'shipping_address': address,
-              'product_name': productTitle,
-              'items': cartItems,
-              'total_amount': (cart['subtotal'] as num?)?.toDouble() ?? 299.00,
-              'subtotal_amount': (cart['subtotal'] as num?)?.toDouble() ?? 299.00,
-              'discount_amount': 0.00,
-              'coupon_code': '',
-              'status': effectiveStatus,
-              'payment_status': effectiveStatus,
-              'payment_method': 'UPI',
-              'payment_id': utrStr.isNotEmpty && utrStr != 'N/A' ? 'UTR_$utrStr' : 'pay_cart_${rawCartId.length > 8 ? rawCartId.substring(0, 8) : rawCartId}',
-              'payment_reference': displayOrderId,
-              'payment_utr': utrStr,
-              'utr_number': utrStr,
-              'payment_screenshot_url': screenshotUrl,
-              'screenshot_url': screenshotUrl,
-              'notes': cart['notes'] ?? 'UPI Payment. UTR: $utrStr | Screenshot: ${screenshotUrl.startsWith('data:image/') ? '[Attached Receipt Image]' : screenshotUrl}',
-              'created_at': createdAt,
-            });
+              orders.add({
+                'id': rawCartId,
+                'order_id': displayOrderId,
+                'order_number': displayOrderId,
+                'user_id': cart['user_id']?.toString() ?? '',
+                'student_email': email,
+                'user_email': email,
+                'student_phone': phone,
+                'user_phone': phone,
+                'student_name': name,
+                'user_name': name,
+                'address': address,
+                'shipping_address': address,
+                'product_name': productTitle,
+                'items': cartItems,
+                'total_amount': (cart['subtotal'] as num?)?.toDouble() ?? 299.00,
+                'subtotal_amount': (cart['subtotal'] as num?)?.toDouble() ?? 299.00,
+                'discount_amount': 0.00,
+                'coupon_code': '',
+                'status': effectiveStatus,
+                'payment_status': effectiveStatus,
+                'payment_method': 'UPI',
+                'payment_id': utrStr.isNotEmpty && utrStr != 'N/A' ? 'UTR_$utrStr' : 'pay_cart_${rawCartId.length > 8 ? rawCartId.substring(0, 8) : rawCartId}',
+                'payment_reference': displayOrderId,
+                'payment_utr': utrStr,
+                'utr_number': utrStr,
+                'payment_screenshot_url': screenshotUrl,
+                'screenshot_url': screenshotUrl,
+                'notes': cart['notes'] ?? 'UPI Payment. UTR: $utrStr | Screenshot: ${screenshotUrl.startsWith('data:image/') ? '[Attached Receipt Image]' : screenshotUrl}',
+                'created_at': createdAt,
+              });
+            }
           }
         }
       }
@@ -9651,7 +9648,30 @@ class SupabaseService {
           if (parsedOrder != null) {
             final ordNum = (parsedOrder['order_number'] ?? parsedOrder['order_id'] ?? '').toString();
             final key = (parsedOrder['payment_reference'] ?? ordNum ?? parsedOrder['id'] ?? '').toString();
-            if (key.isNotEmpty && !hasSeenKey(key)) {
+
+            // Enrich existing order if already seen, or add as new order
+            final existingIndex = orders.indexWhere((existing) {
+              final exId = extractDisplayOrderId(existing);
+              return (ordNum.isNotEmpty && (exId == ordNum || existing['order_id'] == ordNum || existing['id'] == ordNum)) ||
+                     (key.isNotEmpty && (exId == key || existing['payment_reference'] == key));
+            });
+
+            if (existingIndex >= 0) {
+              final existing = orders[existingIndex];
+              final sysUtr = (parsedOrder['payment_utr'] ?? parsedOrder['utr_number'] ?? extractUtrNumber(parsedOrder)).toString().trim();
+              if (sysUtr.isNotEmpty && sysUtr != 'N/A' && !sysUtr.contains('Direct Online')) {
+                existing['payment_utr'] = sysUtr;
+                existing['utr_number'] = sysUtr;
+              }
+              final sysScreenshot = extractPaymentScreenshotUrl(parsedOrder);
+              if (sysScreenshot != null && sysScreenshot.isNotEmpty) {
+                existing['payment_screenshot_url'] = sysScreenshot;
+                existing['screenshot_url'] = sysScreenshot;
+              }
+              if (parsedOrder['notes'] != null) existing['notes'] = parsedOrder['notes'];
+              if (parsedOrder['status'] != null) existing['status'] = parsedOrder['status'];
+              if (parsedOrder['payment_status'] != null) existing['payment_status'] = parsedOrder['payment_status'];
+            } else if (key.isNotEmpty && !hasSeenKey(key)) {
               addOrderKeys(key);
               if (ordNum.isNotEmpty) addOrderKeys(ordNum);
               parsedOrder['order_id'] ??= ordNum.isNotEmpty ? ordNum : key;
