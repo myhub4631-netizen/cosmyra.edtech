@@ -141,8 +141,7 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
   Future<void> _pickAndUploadScreenshot() async {
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+        type: FileType.image,
         withData: true,
         withReadStream: true,
       );
@@ -181,8 +180,18 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Payment screenshot receipt uploaded successfully!'),
+                content: Text('✓ Payment screenshot receipt uploaded successfully!'),
                 backgroundColor: Color(0xFF10B981),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Could not read image file bytes. Please try selecting a JPG/PNG/WebP image.'),
+                backgroundColor: Color(0xFFEF4444),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -194,7 +203,7 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Screenshot upload failed: $e'),
+            content: Text('Screenshot upload error: $e'),
             backgroundColor: const Color(0xFFEF4444),
             behavior: SnackBarBehavior.floating,
           ),
