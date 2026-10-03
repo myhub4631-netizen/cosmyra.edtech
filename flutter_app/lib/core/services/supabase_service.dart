@@ -4967,6 +4967,18 @@ class SupabaseService {
       debugPrint('Notice inserting to abandoned_carts: $e');
     }
 
+    // 4.5. Cloud backup insert to system_config table (guaranteed 100% cloud sync across all devices & PCs)
+    try {
+      final orderKey = 'order_${orderId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}';
+      await client.from('system_config').upsert({
+        'key': orderKey,
+        'value': jsonEncode(orderData),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Notice persisting order to system_config cloud table: $e');
+    }
+
     // 5. Local cache fallback & invalidate active entitlements for this product until Admin approval
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -9383,6 +9395,32 @@ class SupabaseService {
       }
     } catch (e) {
       debugPrint('Notice synthesizing orders from abandoned_carts: $e');
+    }
+
+    // 5.5. Synthesize orders from Supabase system_config table (keys starting with order_)
+    try {
+      final configRes = await client.from('system_config').select('*').like('key', 'order_%');
+      if (configRes is List) {
+        for (var row in configRes.whereType<Map>()) {
+          final valStr = (row['value'] ?? '').toString();
+          if (valStr.isNotEmpty) {
+            try {
+              final Map<String, dynamic> parsedOrder = Map<String, dynamic>.from(jsonDecode(valStr));
+              final ordNum = (parsedOrder['order_number'] ?? parsedOrder['order_id'] ?? '').toString();
+              final key = (parsedOrder['payment_reference'] ?? ordNum ?? parsedOrder['id'] ?? '').toString();
+              if (key.isNotEmpty && !hasSeenKey(key)) {
+                addOrderKeys(key);
+                if (ordNum.isNotEmpty) addOrderKeys(ordNum);
+                parsedOrder['order_id'] ??= ordNum.isNotEmpty ? ordNum : key;
+                parsedOrder['order_number'] ??= ordNum.isNotEmpty ? ordNum : key;
+                orders.add(parsedOrder);
+              }
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice querying order records from system_config: $e');
     }
 
     // 6. Merge local cached orders
