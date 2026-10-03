@@ -180,10 +180,22 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
 
   Future<void> _approveOrder(Map<String, dynamic> o) async {
     final rawId = _getDisplayOrderId(o);
-    final uid = (o['user_id'] ?? o['student_id'] ?? '').toString();
+    String uid = (o['user_id'] ?? o['student_id'] ?? '').toString();
+    final email = (o['student_email'] ?? o['user_email'] ?? '').toString();
+
+    if (uid.isEmpty && email.isNotEmpty) {
+      try {
+        final profile = await SupabaseService.getProfileByEmail(email);
+        if (profile != null && profile.id.isNotEmpty) {
+          uid = profile.id;
+          o['user_id'] = uid;
+        }
+      } catch (_) {}
+    }
+
     final user = UserProfileModel(
       id: uid.isNotEmpty ? uid : 'usr_${DateTime.now().millisecondsSinceEpoch}',
-      email: (o['student_email'] ?? o['user_email'] ?? '').toString(),
+      email: email,
       fullName: (o['student_name'] ?? o['user_name'] ?? 'Student Aspirant').toString(),
     );
 

@@ -2273,10 +2273,22 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
 
   Future<void> _approveOrderPricing(Map<String, dynamic> ord) async {
     final rawId = (ord['order_number'] ?? ord['order_id'] ?? ord['id'] ?? '').toString();
-    final uid = (ord['user_id'] ?? ord['student_id'] ?? '').toString();
+    String uid = (ord['user_id'] ?? ord['student_id'] ?? '').toString();
+    final email = (ord['user_email'] ?? ord['student_email'] ?? '').toString();
+
+    if (uid.isEmpty && email.isNotEmpty) {
+      try {
+        final profile = await SupabaseService.getProfileByEmail(email);
+        if (profile != null && profile.id.isNotEmpty) {
+          uid = profile.id;
+          ord['user_id'] = uid;
+        }
+      } catch (_) {}
+    }
+
     final user = UserProfileModel(
       id: uid.isNotEmpty ? uid : 'usr_${DateTime.now().millisecondsSinceEpoch}',
-      email: (ord['user_email'] ?? ord['student_email'] ?? '').toString(),
+      email: email,
       fullName: (ord['user_name'] ?? ord['student_name'] ?? 'Student Aspirant').toString(),
     );
 

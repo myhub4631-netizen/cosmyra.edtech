@@ -8245,13 +8245,13 @@ class SupabaseService {
     final normPurchasedName = _normalizeProductKey(cleanPurchasedName);
 
     if (normTargetId.isNotEmpty) {
-      if (normPurchasedId.isNotEmpty && normPurchasedId == normTargetId) return true;
-      if (normPurchasedName.isNotEmpty && normPurchasedName == normTargetId) return true;
+      if (normPurchasedId.isNotEmpty && (normPurchasedId == normTargetId || (normPurchasedId.length >= 6 && normTargetId.contains(normPurchasedId)) || (normTargetId.length >= 6 && normPurchasedId.contains(normTargetId)))) return true;
+      if (normPurchasedName.isNotEmpty && (normPurchasedName == normTargetId || (normPurchasedName.length >= 6 && normTargetId.contains(normPurchasedName)) || (normTargetId.length >= 6 && normPurchasedName.contains(normTargetId)))) return true;
     }
 
     if (normTargetTitle.isNotEmpty) {
-      if (normPurchasedId.isNotEmpty && normPurchasedId == normTargetTitle) return true;
-      if (normPurchasedName.isNotEmpty && normPurchasedName == normTargetTitle) return true;
+      if (normPurchasedId.isNotEmpty && (normPurchasedId == normTargetTitle || (normPurchasedId.length >= 6 && normTargetTitle.contains(normPurchasedId)) || (normTargetTitle.length >= 6 && normPurchasedId.contains(normTargetTitle)))) return true;
+      if (normPurchasedName.isNotEmpty && (normPurchasedName == normTargetTitle || (normPurchasedName.length >= 6 && normTargetTitle.contains(normPurchasedName)) || (normTargetTitle.length >= 6 && normPurchasedName.contains(normTargetTitle)))) return true;
     }
 
     return false;
@@ -8437,6 +8437,87 @@ class SupabaseService {
       }
     } catch (e) {
       debugPrint('Notice checking Supabase orders for entitlement: $e');
+    }
+
+    // 3.5 Check Supabase order_items table (for completed orders)
+    try {
+      final itemsRes = await client.from('order_items').select('*, orders!inner(id, user_id, user_email, student_email, status, payment_status)');
+      if (itemsRes is List && itemsRes.isNotEmpty) {
+        for (var itemRow in itemsRes.whereType<Map>()) {
+          final parentOrder = itemRow['orders'] is Map ? itemRow['orders'] as Map : {};
+          final ordUserId = (parentOrder['user_id'] ?? '').toString();
+          final ordUserEmail = (parentOrder['user_email'] ?? parentOrder['student_email'] ?? '').toString().trim().toLowerCase();
+          final st = (parentOrder['status'] ?? parentOrder['payment_status'] ?? '').toString().trim().toLowerCase();
+          final isCompleted = st == 'completed' || st == 'approved' || st == 'verified' || st == 'paid' || st == 'success';
+          if (!isCompleted) continue;
+
+          final matchesUser = (userId.isNotEmpty && ordUserId == userId) ||
+                              (resolvedEmail.isNotEmpty && ordUserEmail == resolvedEmail);
+          if (!matchesUser) continue;
+
+          final itemPId = (itemRow['product_id'] ?? itemRow['id'] ?? '').toString().trim();
+          final itemPName = (itemRow['title'] ?? itemRow['product_name'] ?? itemRow['name'] ?? '').toString().trim();
+
+          if (_isProductMatch(
+            targetProductId: cleanProductId,
+            targetTitle: productTitle,
+            purchasedProductId: itemPId,
+            purchasedProductName: itemPName,
+          )) {
+            return true;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice checking order_items table for entitlement: $e');
+    }
+
+    // 3.6 Check aggregated fetchAdminOrders() (covers system_config cloud order logs)
+    try {
+      final allAdminOrders = await fetchAdminOrders();
+      for (var ord in allAdminOrders) {
+        final st = (ord['status'] ?? ord['payment_status'] ?? '').toString().trim().toLowerCase();
+        final isCompleted = st == 'completed' || st == 'approved' || st == 'verified' || st == 'paid' || st == 'success';
+        if (!isCompleted) continue;
+
+        final uId = (ord['user_id'] ?? ord['student_id'] ?? '').toString();
+        final uEmail = (ord['student_email'] ?? ord['user_email'] ?? '').toString().trim().toLowerCase();
+
+        final matchesUser = (userId.isNotEmpty && uId == userId) ||
+                            (resolvedEmail.isNotEmpty && uEmail.isNotEmpty && uEmail == resolvedEmail);
+        if (!matchesUser) continue;
+
+        final ordPId = (ord['product_id'] ?? '').toString().trim();
+        final ordPName = (ord['product_name'] ?? ord['title'] ?? '').toString().trim();
+
+        if (_isProductMatch(
+          targetProductId: cleanProductId,
+          targetTitle: productTitle,
+          purchasedProductId: ordPId,
+          purchasedProductName: ordPName,
+          accessType: (ord['access_type'] ?? '').toString(),
+        )) {
+          return true;
+        }
+
+        if (ord['items'] is List) {
+          for (var subIt in (ord['items'] as List).whereType<Map>()) {
+            final subPId = (subIt['id'] ?? subIt['product_id'] ?? '').toString().trim();
+            final subPName = (subIt['title'] ?? subIt['product_name'] ?? subIt['name'] ?? '').toString().trim();
+            if (_isProductMatch(
+              targetProductId: cleanProductId,
+              targetTitle: productTitle,
+              purchasedProductId: subPId,
+              purchasedProductName: subPName,
+              accessType: (subIt['access_type'] ?? '').toString(),
+            )) {
+              return true;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice checking aggregated fetchAdminOrders for entitlement: $e');
     }
 
     // 4. Check Supabase subscriptions table
@@ -9162,6 +9243,20 @@ class SupabaseService {
   }
 
   /// Verify payment & grant access in entitlements and subscriptions
+  static Future<UserProfileModel?> getProfileByEmail(String email) async {
+    final cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail.isEmpty) return null;
+    try {
+      final res = await client.from('profiles').select().eq('email', cleanEmail).maybeSingle();
+      if (res != null && res is Map<String, dynamic>) {
+        return UserProfileModel.fromJson(res);
+      }
+    } catch (e) {
+      debugPrint('Notice getting profile by email: $e');
+    }
+    return null;
+  }
+
   static Future<Map<String, dynamic>> verifyPaymentAndGrantAccess({
     required String orderId,
     required String paymentId,
@@ -9175,13 +9270,21 @@ class SupabaseService {
 
     // 1. Primary update orders table
     try {
-      await client.from('orders').update({
+      final Map<String, dynamic> updatePayload = {
         'status': 'completed',
         'payment_status': 'completed',
         'payment_id': paymentId,
         'payment_method': paymentMethod,
         'updated_at': now.toIso8601String(),
-      }).or('id.eq.$cleanOrderId,order_number.eq.$cleanOrderId,order_id.eq.$cleanOrderId,payment_reference.eq.$cleanOrderId');
+      };
+      if (user.id.isNotEmpty && !user.id.startsWith('usr_')) {
+        updatePayload['user_id'] = user.id;
+      }
+      if (user.email.isNotEmpty) {
+        updatePayload['user_email'] = user.email.trim().toLowerCase();
+        updatePayload['student_email'] = user.email.trim().toLowerCase();
+      }
+      await client.from('orders').update(updatePayload).or('id.eq.$cleanOrderId,order_number.eq.$cleanOrderId,order_id.eq.$cleanOrderId,payment_reference.eq.$cleanOrderId');
     } catch (e) {
       debugPrint('Notice updating orders table status: $e');
     }
