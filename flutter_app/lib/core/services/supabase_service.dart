@@ -4791,7 +4791,7 @@ class SupabaseService {
 
   static Map<String, dynamic> defaultPaymentSettings = {
     'upi_active': true,
-    'upi_id': 'myhub4631@apl',
+    'upi_id': 'neetjee2027@nyes',
     'upi_payee_name': 'Mahboob Hasan',
     'cashfree_active': false,
     'cashfree_app_id': '',
@@ -4803,7 +4803,6 @@ class SupabaseService {
 
   static Future<Map<String, dynamic>> fetchPaymentSettings({bool forceRefresh = false}) async {
     if (!forceRefresh && _memoryPaymentSettingsCache != null && _memoryPaymentSettingsCache!.isNotEmpty) {
-      _fetchAndCacheSettingsFromDb();
       return _memoryPaymentSettingsCache!;
     }
     return await _fetchAndCacheSettingsFromDb();
@@ -4851,7 +4850,16 @@ class SupabaseService {
     }
 
     data ??= Map<String, dynamic>.from(defaultPaymentSettings);
-    _memoryPaymentSettingsCache = data;
+    data['upi_id'] = (data['upi_id'] != null && data['upi_id'].toString().trim().isNotEmpty)
+        ? data['upi_id'].toString().trim()
+        : 'neetjee2027@nyes';
+    data['upi_payee_name'] = (data['upi_payee_name'] != null && data['upi_payee_name'].toString().trim().isNotEmpty)
+        ? data['upi_payee_name'].toString().trim()
+        : 'Mahboob Hasan';
+    data['upi_active'] = parseBool(data['upi_active'], defaultValue: true);
+    data['cashfree_active'] = parseBool(data['cashfree_active'], defaultValue: false);
+
+    _memoryPaymentSettingsCache = Map<String, dynamic>.from(data);
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -4868,7 +4876,7 @@ class SupabaseService {
     final Map<String, dynamic> full = {
       'id': 'default',
       'upi_active': upiActive,
-      'upi_id': (settings['upi_id'] ?? 'myhub4631@apl').toString().trim(),
+      'upi_id': (settings['upi_id'] ?? 'neetjee2027@nyes').toString().trim(),
       'upi_payee_name': (settings['upi_payee_name'] ?? 'Mahboob Hasan').toString().trim(),
       'cashfree_active': cashfreeActive,
       'cashfree_app_id': (settings['cashfree_app_id'] ?? '').toString().trim(),
@@ -4877,7 +4885,7 @@ class SupabaseService {
       'updated_at': DateTime.now().toIso8601String(),
     };
 
-    _memoryPaymentSettingsCache = full;
+    _memoryPaymentSettingsCache = Map<String, dynamic>.from(full);
 
     // Save to SharedPreferences locally
     try {

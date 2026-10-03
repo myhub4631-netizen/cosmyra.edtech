@@ -1822,10 +1822,10 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
   }
 
   void _showPaymentGatewayModal(BuildContext context) async {
-    final settings = await SupabaseService.fetchPaymentSettings();
+    final settings = await SupabaseService.fetchPaymentSettings(forceRefresh: true);
     bool upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: true);
-    final upiIdCtrl = TextEditingController(text: (settings['upi_id'] ?? 'neetjee27@nyes').toString());
-    final upiPayeeCtrl = TextEditingController(text: (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString());
+    final upiIdCtrl = TextEditingController(text: (settings['upi_id'] ?? 'neetjee2027@nyes').toString());
+    final upiPayeeCtrl = TextEditingController(text: (settings['upi_payee_name'] ?? 'Mahboob Hasan').toString());
 
     bool cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: true);
     final cashfreeAppIdCtrl = TextEditingController(text: (settings['cashfree_app_id'] ?? '').toString());
@@ -1907,7 +1907,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
                               controller: upiIdCtrl,
                               decoration: const InputDecoration(
                                 labelText: 'Merchant UPI ID (VPA)',
-                                hintText: 'e.g. cosmyra@ybl or neetjee27@nyes',
+                                hintText: 'e.g. cosmyra@ybl or neetjee2027@nyes',
                                 isDense: true,
                                 border: OutlineInputBorder(),
                               ),
@@ -3348,7 +3348,7 @@ class _PaymentGatewaysConfigCardState extends State<_PaymentGatewaysConfigCard> 
   @override
   void initState() {
     super.initState();
-    _upiIdCtrl = TextEditingController(text: 'myhub4631@apl');
+    _upiIdCtrl = TextEditingController(text: 'neetjee2027@nyes');
     _upiPayeeCtrl = TextEditingController(text: 'Mahboob Hasan');
     _cashfreeAppIdCtrl = TextEditingController();
     _cashfreeSecretCtrl = TextEditingController();
@@ -3369,7 +3369,7 @@ class _PaymentGatewaysConfigCardState extends State<_PaymentGatewaysConfigCard> 
     if (mounted) {
       setState(() {
         _upiActive = SupabaseService.parseBool(settings['upi_active'], defaultValue: true);
-        _upiIdCtrl.text = (settings['upi_id'] ?? 'myhub4631@apl').toString();
+        _upiIdCtrl.text = (settings['upi_id'] ?? 'neetjee2027@nyes').toString();
         _upiPayeeCtrl.text = (settings['upi_payee_name'] ?? 'Mahboob Hasan').toString();
 
         _cashfreeActive = SupabaseService.parseBool(settings['cashfree_active'], defaultValue: false);
@@ -3490,7 +3490,7 @@ class _PaymentGatewaysConfigCardState extends State<_PaymentGatewaysConfigCard> 
                           controller: _upiIdCtrl,
                           decoration: const InputDecoration(
                             labelText: 'Merchant UPI ID (VPA)',
-                            hintText: 'e.g. neetjee27@nyes',
+                            hintText: 'e.g. neetjee2027@nyes',
                             isDense: true,
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.qr_code_2_rounded, size: 20),

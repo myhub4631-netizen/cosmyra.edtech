@@ -274,8 +274,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
     final List<Map<String, dynamic>> itemsJson = itemsToPurchase.map((it) => it.toJson()).toList();
 
     if (_selectedPaymentMethod == 'UPI') {
-      final upiId = (_paymentSettings['upi_id'] ?? 'neetjee27@nyes').toString().trim();
-      final payeeName = (_paymentSettings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString().trim();
+      final upiId = (_paymentSettings['upi_id'] != null && _paymentSettings['upi_id'].toString().trim().isNotEmpty)
+          ? _paymentSettings['upi_id'].toString().trim()
+          : 'neetjee2027@nyes';
+      final payeeName = (_paymentSettings['upi_payee_name'] != null && _paymentSettings['upi_payee_name'].toString().trim().isNotEmpty)
+          ? _paymentSettings['upi_payee_name'].toString().trim()
+          : 'Mahboob Hasan';
       final amountStr = _finalTotal.toStringAsFixed(2);
       final upiUrl = 'upi://pay?pa=$upiId&pn=${Uri.encodeComponent(payeeName)}&am=$amountStr&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
 
@@ -453,8 +457,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
             : [CartItem(id: 'ts_default', title: 'Test Series', price: 499, originalPrice: 1999)]);
 
     final List<Map<String, dynamic>> itemsJson = itemsToPurchase.map((it) => it.toJson()).toList();
-    final upiId = (_paymentSettings['upi_id'] ?? 'myhub4631@apl').toString().trim();
-    final payeeName = (_paymentSettings['upi_payee_name'] ?? 'Mahboob Hasan').toString().trim();
+    final upiId = (_paymentSettings['upi_id'] != null && _paymentSettings['upi_id'].toString().trim().isNotEmpty)
+        ? _paymentSettings['upi_id'].toString().trim()
+        : 'neetjee2027@nyes';
+    final payeeName = (_paymentSettings['upi_payee_name'] != null && _paymentSettings['upi_payee_name'].toString().trim().isNotEmpty)
+        ? _paymentSettings['upi_payee_name'].toString().trim()
+        : 'Mahboob Hasan';
     final amountStr = _finalTotal.toStringAsFixed(2);
     final upiUrl = 'upi://pay?pa=$upiId&pn=${Uri.encodeComponent(payeeName)}&am=$amountStr&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
 
