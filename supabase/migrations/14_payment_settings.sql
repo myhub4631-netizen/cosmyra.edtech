@@ -6,7 +6,7 @@
 CREATE TABLE IF NOT EXISTS public.payment_settings (
   id TEXT PRIMARY KEY DEFAULT 'default',
   upi_active BOOLEAN DEFAULT true,
-  upi_id TEXT DEFAULT '1mdollar2027@okicici',
+  upi_id TEXT DEFAULT 'neetjee27@nyes',
   upi_payee_name TEXT DEFAULT 'Cosmyra Edu Platform',
   cashfree_active BOOLEAN DEFAULT true,
   cashfree_app_id TEXT DEFAULT '',
@@ -29,5 +29,5 @@ FOR ALL USING (true) WITH CHECK (true);
 
 -- Insert default payment settings
 INSERT INTO public.payment_settings (id, upi_active, upi_id, upi_payee_name, cashfree_active, cashfree_app_id, cashfree_secret_key, cashfree_environment)
-VALUES ('default', true, '1mdollar2027@okicici', 'Cosmyra Edu Platform', true, '', '', 'TEST')
+VALUES ('default', true, 'neetjee27@nyes', 'Cosmyra Edu Platform', true, '', '', 'TEST')
 ON CONFLICT (id) DO NOTHING;

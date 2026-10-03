@@ -91,7 +91,7 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
       _upiUrl = widget.upiUrl ?? 'upi://pay?pa=$_upiId&pn=${Uri.encodeComponent(_payeeName)}&am=${_totalAmount.toStringAsFixed(2)}&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
     } else {
       final settings = await SupabaseService.fetchPaymentSettings();
-      _upiId = (settings['upi_id'] ?? '1mdollar2027@okicici').toString().trim();
+      _upiId = (settings['upi_id'] ?? 'neetjee27@nyes').toString().trim();
       _payeeName = (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString().trim();
       _upiUrl = 'upi://pay?pa=$_upiId&pn=${Uri.encodeComponent(_payeeName)}&am=${_totalAmount.toStringAsFixed(2)}&tn=${Uri.encodeComponent('Cosmyra Order Enrollment')}&cu=INR';
     }
@@ -103,7 +103,7 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
         _autoLaunched = true;
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) {
-            _launchUpiApp();
+            _launchUpiApp(isAutoLaunch: true);
           }
         });
       }
@@ -117,16 +117,16 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
     super.dispose();
   }
 
-  Future<void> _launchUpiApp() async {
+  Future<void> _launchUpiApp({bool isAutoLaunch = false}) async {
     final uri = Uri.parse(_upiUrl);
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
         await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
       }
     } catch (e) {
-      if (mounted) {
+      debugPrint('UPI launch note: $e');
+      if (mounted && !isAutoLaunch) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Could not auto-open UPI App. Please scan QR code or copy UPI ID: $_upiId'),

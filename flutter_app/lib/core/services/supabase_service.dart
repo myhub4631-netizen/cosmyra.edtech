@@ -4635,7 +4635,7 @@ class SupabaseService {
 
   static Map<String, dynamic> defaultPaymentSettings = {
     'upi_active': true,
-    'upi_id': '1mdollar2027@okicici',
+    'upi_id': 'neetjee27@nyes',
     'upi_payee_name': 'Cosmyra Edu Platform',
     'cashfree_active': true,
     'cashfree_app_id': '',
@@ -4707,7 +4707,7 @@ class SupabaseService {
     final Map<String, dynamic> full = {
       'id': 'default',
       'upi_active': upiActive,
-      'upi_id': (settings['upi_id'] ?? '1mdollar2027@okicici').toString().trim(),
+      'upi_id': (settings['upi_id'] ?? 'neetjee27@nyes').toString().trim(),
       'upi_payee_name': (settings['upi_payee_name'] ?? 'Cosmyra Edu Platform').toString().trim(),
       'cashfree_active': cashfreeActive,
       'cashfree_app_id': (settings['cashfree_app_id'] ?? '').toString().trim(),
