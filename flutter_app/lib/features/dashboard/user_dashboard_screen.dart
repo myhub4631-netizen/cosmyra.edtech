@@ -1963,7 +1963,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   Widget _buildWelcomeHeader(String displayName) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1971,17 +1971,40 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             Row(
               children: [
                 Text(
-                  'Welcome back, ${displayName.split(" ").first}!',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.5),
+                  'Welcome back, ',
+                  style: GoogleFonts.outfit(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0F172A),
+                    letterSpacing: -0.5,
+                  ),
                 ),
-                const SizedBox(width: 6),
-                const Text('👋', style: TextStyle(fontSize: 22)),
+                ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [Color(0xFF4F46E5), Color(0xFF9333EA)],
+                  ).createShader(bounds),
+                  child: Text(
+                    '${displayName.split(" ").first}!',
+                    style: GoogleFonts.outfit(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text('👋', style: TextStyle(fontSize: 26)),
               ],
             ),
             const SizedBox(height: 4),
             Text(
-              "Let's continue your ${widget.activeExam} ${_currentUserProfile.targetYear} preparation.",
-              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w400),
+              "Let's continue your ${widget.activeExam} ${_currentUserProfile.targetYear} preparation journey.",
+              style: GoogleFonts.inter(
+                fontSize: 13.5,
+                color: const Color(0xFF64748B),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -1989,44 +2012,65 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.medical_services_outlined, size: 16, color: Color(0xFF10B981)),
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFECFDF5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.medical_services_outlined, size: 14, color: Color(0xFF10B981)),
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     _selectedExamFilter,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
                   ),
                   const SizedBox(width: 6),
-                  const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
+                  const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
                 ],
               ),
             ),
             const SizedBox(width: 12),
 
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFF64748B)),
+                  const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFF4F46E5)),
                   const SizedBox(width: 8),
                   Text(
                     _selectedDateRange,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
                   ),
                   const SizedBox(width: 6),
-                  const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF64748B)),
+                  const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF64748B)),
                 ],
               ),
             ),
@@ -2042,58 +2086,85 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         'title': 'Questions Attempted',
         'value': '${_userRealStats['questionsAttempted']}',
         'sub': 'Real cumulative attempts',
-        'icon': Icons.edit_document,
-        'cardBg': const Color(0xFFF0FDF4),
-        'borderColor': const Color(0xFFDCFCE7),
-        'titleColor': const Color(0xFF166534),
-        'iconBg': const Color(0xFFDCFCE7),
-        'iconColor': const Color(0xFF16A34A),
+        'icon': Icons.auto_stories_rounded,
+        'gradient': const LinearGradient(
+          colors: [Color(0xFFECFDF5), Color(0xFFD1FAE5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        'borderColor': const Color(0xFFA7F3D0),
+        'titleColor': const Color(0xFF065F46),
+        'iconBg': const Color(0xFF10B981),
+        'glowColor': const Color(0xFF10B981),
       },
       {
-        'title': 'Accuracy',
+        'title': 'Accuracy Rate',
         'value': '${_userRealStats['accuracy']}%',
         'sub': 'Overall performance',
         'icon': Icons.track_changes_rounded,
-        'cardBg': const Color(0xFFEFF6FF),
-        'borderColor': const Color(0xFFDBEAFE),
-        'titleColor': const Color(0xFF1E40AF),
-        'iconBg': const Color(0xFFDBEAFE),
-        'iconColor': const Color(0xFF2563EB),
+        'gradient': const LinearGradient(
+          colors: [Color(0xFFEEF2FF), Color(0xFFE0E7FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        'borderColor': const Color(0xFFC7D2FE),
+        'titleColor': const Color(0xFF3730A3),
+        'iconBg': const Color(0xFF4F46E5),
+        'glowColor': const Color(0xFF4F46E5),
       },
       {
         'title': 'Tests Completed',
         'value': '${_userRealStats['testsCompleted']}',
         'sub': 'Completed sessions',
-        'icon': Icons.assignment_turned_in_rounded,
-        'cardBg': const Color(0xFFF5F3FF),
+        'icon': Icons.verified_rounded,
+        'gradient': const LinearGradient(
+          colors: [Color(0xFFF3E8FF), Color(0xFFE9D5FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         'borderColor': const Color(0xFFDDD6FE),
-        'titleColor': const Color(0xFF5B21B6),
-        'iconBg': const Color(0xFFDDD6FE),
-        'iconColor': const Color(0xFF7C3AED),
+        'titleColor': const Color(0xFF6B21A8),
+        'iconBg': const Color(0xFF9333EA),
+        'glowColor': const Color(0xFF9333EA),
       },
       {
         'title': 'Study Streak',
         'value': '${_userRealStats['studyStreak']} Days',
-        'sub': 'Active Streak',
+        'sub': 'Active daily streak',
         'icon': Icons.local_fire_department_rounded,
-        'cardBg': const Color(0xFFFFF7ED),
-        'borderColor': const Color(0xFFFFEDD5),
+        'gradient': const LinearGradient(
+          colors: [Color(0xFFFFF7ED), Color(0xFFFFEDD5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        'borderColor': const Color(0xFFFDBA74),
         'titleColor': const Color(0xFF9A3412),
-        'iconBg': const Color(0xFFFFEDD5),
-        'iconColor': const Color(0xFFEA580C),
+        'iconBg': const Color(0xFFEA580C),
+        'glowColor': const Color(0xFFEA580C),
       },
     ];
 
     return Row(
-      children: metrics.map((m) {
+      children: metrics.asMap().entries.map((entry) {
+        final idx = entry.key;
+        final m = entry.value;
+        final glowColor = m['glowColor'] as Color;
+
         return Expanded(
           child: Container(
             margin: const EdgeInsets.only(right: 16),
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: m['cardBg'] as Color,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: m['borderColor'] as Color),
+              gradient: m['gradient'] as LinearGradient,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: m['borderColor'] as Color, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: glowColor.withValues(alpha: 0.14),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2103,17 +2174,30 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   children: [
                     Text(
                       m['title'] as String,
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: m['titleColor'] as Color),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: m['titleColor'] as Color,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       m['value'] as String,
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF0F172A), letterSpacing: -0.5),
+                      style: GoogleFonts.outfit(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF0F172A),
+                        letterSpacing: -0.5,
+                      ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
                       m['sub'] as String,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: (m['titleColor'] as Color).withValues(alpha: 0.8),
+                      ),
                     ),
                   ],
                 ),
@@ -2122,12 +2206,19 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   decoration: BoxDecoration(
                     color: m['iconBg'] as Color,
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: (m['iconBg'] as Color).withValues(alpha: 0.4),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: Icon(m['icon'] as IconData, color: m['iconColor'] as Color, size: 22),
+                  child: Icon(m['icon'] as IconData, color: Colors.white, size: 22),
                 ),
               ],
             ),
-          ),
+          ).animate().fadeIn(duration: 400.ms, delay: (idx * 80).ms).slideY(begin: 0.08, end: 0),
         );
       }).toList(),
     );
@@ -2353,50 +2444,40 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         'title': 'Custom Practice',
         'subtitle': 'Practice questions by selecting subjects, chapters & topics',
         'icon': Icons.track_changes_rounded,
-        'color': Colors.green,
-        'cardBg': const Color(0xFFF0FDF4),
-        'borderColor': const Color(0xFFDCFCE7),
-        'iconBg': const Color(0xFFDCFCE7),
+        'gradient': const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)]),
+        'bg': const Color(0xFFECFDF5),
         'onTap': () => context.go('/custom-practice'),
       },
       {
         'title': 'Custom Test',
         'subtitle': 'Create a full-length test and evaluate your performance',
         'icon': Icons.assignment_outlined,
-        'color': Colors.blue,
-        'cardBg': const Color(0xFFEFF6FF),
-        'borderColor': const Color(0xFFDBEAFE),
-        'iconBg': const Color(0xFFDBEAFE),
+        'gradient': const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF2563EB)]),
+        'bg': const Color(0xFFEFF6FF),
         'onTap': () => context.go('/custom-test'),
       },
       {
         'title': 'PYQ Practice',
         'subtitle': 'Practice previous year questions chapter-wise and year-wise',
         'icon': Icons.menu_book_rounded,
-        'color': Colors.purple,
-        'cardBg': const Color(0xFFF5F3FF),
-        'borderColor': const Color(0xFFDDD6FE),
-        'iconBg': const Color(0xFFDDD6FE),
+        'gradient': const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF7C3AED)]),
+        'bg': const Color(0xFFF5F3FF),
         'onTap': () => context.go('/pyq'),
       },
       {
         'title': 'NTA Questions',
         'subtitle': 'Practice NTA pattern questions for better rank',
         'icon': Icons.shield_outlined,
-        'color': Colors.orange,
-        'cardBg': const Color(0xFFFFF7ED),
-        'borderColor': const Color(0xFFFFEDD5),
-        'iconBg': const Color(0xFFFFEDD5),
+        'gradient': const LinearGradient(colors: [Color(0xFFF97316), Color(0xFFEA580C)]),
+        'bg': const Color(0xFFFFF7ED),
         'onTap': () => context.go('/nta-practice'),
       },
       {
-        'title': 'Test Series',
+        'title': 'Test Series Catalog',
         'subtitle': 'Attempt mock tests and improve your exam readiness',
         'icon': Icons.calendar_today_outlined,
-        'color': Colors.pink,
-        'cardBg': const Color(0xFFFDF2F8),
-        'borderColor': const Color(0xFFFCE7F3),
-        'iconBg': const Color(0xFFFCE7F3),
+        'gradient': const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFFD946EF)]),
+        'bg': const Color(0xFFFDF2F8),
         'onTap': () {
           if (widget.onOpenTestSeries != null) {
             widget.onOpenTestSeries!();
@@ -2410,58 +2491,83 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Quick Start', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+        Text(
+          'Quick Start Engines',
+          style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+        ),
         const SizedBox(height: 14),
         Row(
-          children: quickCards.map((c) {
-            final MaterialColor col = c['color'] as MaterialColor;
+          children: quickCards.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final c = entry.value;
+            final grad = c['gradient'] as LinearGradient;
+
             return Expanded(
               child: Container(
                 margin: const EdgeInsets.only(right: 14),
-                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFF1F5F9)),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+                    BoxShadow(
+                      color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
                   ],
                 ),
                 child: InkWell(
                   onTap: c['onTap'] as VoidCallback,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              c['title'] as String,
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: col.shade800),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                gradient: grad,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: grad.colors.first.withValues(alpha: 0.35),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: Icon(c['icon'] as IconData, size: 18, color: Colors.white),
                             ),
+                            const Icon(Icons.arrow_forward_rounded, size: 16, color: Color(0xFF94A3B8)),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          c['title'] as String,
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF0F172A),
                           ),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: c['iconBg'] as Color,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(c['icon'] as IconData, size: 16, color: col.shade600),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        c['subtitle'] as String,
-                        style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), height: 1.4),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                          maxLines: 1,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          c['subtitle'] as String,
+                          style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFF64748B), height: 1.35),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ).animate().fadeIn(duration: 400.ms, delay: (idx * 60).ms).slideY(begin: 0.06, end: 0),
             );
           }).toList(),
         ),
