@@ -9732,12 +9732,7 @@ class SupabaseService {
       debugPrint('Notice reading cached orders: $e');
     }
 
-    // Always filter out old demo placeholder orders (USRDEM0001 / student@cosmyra.edu)
-    final finalOrders = orders.where((o) {
-      final ordNo = (o['order_number'] ?? o['order_id'] ?? o['id'] ?? '').toString();
-      final email = (o['user_email'] ?? o['student_email'] ?? '').toString();
-      return !ordNo.contains('USRDEM0001') && !email.contains('student@cosmyra.edu');
-    }).toList();
+    final finalOrders = List<Map<String, dynamic>>.from(orders);
 
     // Canonical normalization pass: guarantee display Order ID and payment screenshot URL on every item
     for (var o in finalOrders) {

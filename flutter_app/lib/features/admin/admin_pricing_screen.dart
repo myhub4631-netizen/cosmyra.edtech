@@ -2276,7 +2276,7 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
     final uid = (ord['user_id'] ?? ord['student_id'] ?? '').toString();
     final user = UserProfileModel(
       id: uid.isNotEmpty ? uid : 'usr_${DateTime.now().millisecondsSinceEpoch}',
-      email: (ord['user_email'] ?? ord['student_email'] ?? 'student@cosmyra.in').toString(),
+      email: (ord['user_email'] ?? ord['student_email'] ?? '').toString(),
       fullName: (ord['user_name'] ?? ord['student_name'] ?? 'Student Aspirant').toString(),
     );
 

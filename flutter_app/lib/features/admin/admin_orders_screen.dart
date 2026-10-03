@@ -183,7 +183,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     final uid = (o['user_id'] ?? o['student_id'] ?? '').toString();
     final user = UserProfileModel(
       id: uid.isNotEmpty ? uid : 'usr_${DateTime.now().millisecondsSinceEpoch}',
-      email: (o['student_email'] ?? o['user_email'] ?? 'student@cosmyra.in').toString(),
+      email: (o['student_email'] ?? o['user_email'] ?? '').toString(),
       fullName: (o['student_name'] ?? o['user_name'] ?? 'Student Aspirant').toString(),
     );
 
@@ -681,7 +681,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     final rawId = _getDisplayOrderId(o);
     final validUuid = (o['id'] ?? '').toString();
     final name = (o['student_name'] ?? o['user_name'] ?? 'Student Aspirant').toString();
-    final email = (o['student_email'] ?? o['user_email'] ?? 'student@cosmyra.in').toString();
+    final email = (o['student_email'] ?? o['user_email'] ?? '').toString();
     final phone = (o['student_phone'] ?? o['user_phone'] ?? 'N/A').toString();
     final product = (o['product_name'] ?? 'NEET / JEE Test Package').toString();
     final amount = (o['total_amount'] ?? o['amount'] as num?)?.toDouble() ?? 299.0;

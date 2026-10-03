@@ -153,7 +153,7 @@ class CartService extends ChangeNotifier {
   Future<AutomationResult?> triggerCartRecovery({String couponCode = 'COSMYRA20'}) async {
     if (_items.isEmpty) return null;
     final user = SupabaseService.activeUserSession;
-    final email = user?.email ?? 'student@cosmyra.edu';
+    final email = user?.email ?? SupabaseService.client.auth.currentUser?.email ?? '';
     final name = user?.fullName ?? 'Student';
     final phone = user?.phoneNumber ?? '9876543210';
 

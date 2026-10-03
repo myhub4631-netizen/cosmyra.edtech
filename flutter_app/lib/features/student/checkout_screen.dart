@@ -378,13 +378,58 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
       );
     }
 
-    final user = SupabaseService.activeUserSession ??
-        UserProfileModel(
-          id: 'user_${DateTime.now().millisecondsSinceEpoch}',
-          fullName: 'Student Aspirant',
-          email: 'student@cosmyra.edtech',
-          role: 'student',
-        );
+    final authUser = SupabaseService.client.auth.currentUser;
+    if (authUser == null) {
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
+            onPressed: () => context.canPop() ? context.pop() : context.go('/login'),
+          ),
+          title: Text('Checkout', style: GoogleFonts.inter(color: const Color(0xFF0F172A), fontSize: 16)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.lock_outline_rounded, size: 64, color: Color(0xFF4F46E5)),
+                const SizedBox(height: 16),
+                Text(
+                  'Authentication Required',
+                  style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Please sign in to your account before placing an order.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => context.go('/login'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5),
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text('Sign In Now', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final meta = authUser.userMetadata ?? {};
+    final user = UserProfileModel(
+      id: authUser.id,
+      email: authUser.email ?? '',
+      fullName: (meta['full_name'] ?? meta['name'] ?? SupabaseService.activeUserSession?.fullName ?? 'Student Aspirant').toString(),
+      role: 'student',
+    );
 
     final List<CartItem> itemsToPurchase = _activeItem != null
         ? [_activeItem!]
@@ -741,7 +786,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> with SingleTickerProvid
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Email: ${user?.email ?? 'student@cosmyra.edtech'}',
+                        'Email: ${user?.email ?? ''}',
                         style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
                         overflow: TextOverflow.ellipsis,
                       ),

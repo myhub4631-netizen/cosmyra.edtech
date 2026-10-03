@@ -88,7 +88,7 @@ UserProfileModel _getEffectiveProfile() {
     final meta = user.userMetadata ?? {};
     return UserProfileModel(
       id: user.id,
-      email: user.email ?? 'student@cosmyra.edu',
+      email: user.email ?? '',
       fullName: (meta['full_name'] ?? meta['name'] ?? user.email?.split('@').first ?? 'Student').toString(),
       avatarUrl: (meta['avatar_url'] ?? meta['picture'] ?? meta['photo_url'])?.toString(),
       phoneNumber: (user.phone ?? meta['phone'] ?? meta['phone_number'])?.toString(),
