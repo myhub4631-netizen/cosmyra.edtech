@@ -4758,6 +4758,170 @@ class SupabaseService {
     return true;
   }
 
+  /// Immediately record an initial pending order to cloud storage (system_config + abandoned_carts + notification_logs + orders)
+  /// as soon as checkout or payment flow is opened on Mobile App or Web
+  static Future<Map<String, dynamic>> recordInitialPendingOrder({
+    required UserProfileModel user,
+    required List<Map<String, dynamic>> items,
+    required double totalAmount,
+    String couponCode = '',
+    String paymentMethod = 'UPI',
+    String? existingOrderId,
+  }) async {
+    final String timeMs = DateTime.now().millisecondsSinceEpoch.toString();
+    final String orderId = (existingOrderId != null && existingOrderId.trim().isNotEmpty)
+        ? existingOrderId.trim()
+        : 'ORD-${timeMs.substring(timeMs.length - 8)}';
+    final String validOrderId = toValidUuid('ord_$orderId');
+    final String? profileUserId = await _getValidOrNullProfileId(user.id, user.email, user.fullName);
+
+    final pTitle = items.isNotEmpty ? (items.first['title'] ?? 'Test Series') : 'Cosmyra NEET/JEE Course';
+    final pId = items.isNotEmpty ? (items.first['id']?.toString() ?? 'ts_neet_all_india_2026') : 'ts_neet_all_india_2026';
+
+    final orderData = {
+      'id': validOrderId,
+      'order_id': orderId,
+      'order_number': orderId,
+      'user_id': profileUserId,
+      'user_email': user.email.trim().toLowerCase(),
+      'user_name': user.fullName,
+      'user_phone': user.phoneNumber ?? '',
+      'student_email': user.email.trim().toLowerCase(),
+      'student_name': user.fullName,
+      'student_phone': user.phoneNumber ?? '',
+      'product_name': pTitle,
+      'product_id': pId,
+      'subtotal_amount': totalAmount,
+      'discount_amount': 0.0,
+      'total_amount': totalAmount,
+      'coupon_code': couponCode.trim().toUpperCase(),
+      'status': 'pending_verification',
+      'payment_status': 'pending_verification',
+      'payment_method': paymentMethod,
+      'payment_id': 'PENDING_$orderId',
+      'payment_reference': orderId,
+      'payment_utr': 'N/A',
+      'utr_number': 'N/A',
+      'notes': 'Order #$orderId | Product: $pTitle | Placed via Mobile App',
+      'created_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toIso8601String(),
+      'items': items,
+    };
+
+    // 1. Cloud persistence: system_config table (guaranteed 100% sync)
+    try {
+      final orderKey = 'order_${orderId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}';
+      try {
+        await client.from('system_config').upsert({
+          'key': orderKey,
+          'value': jsonEncode(orderData),
+          'updated_at': DateTime.now().toIso8601String(),
+        }, onConflict: 'key');
+      } catch (_) {
+        await client.from('system_config').upsert({
+          'key': orderKey,
+          'value': jsonEncode(orderData),
+        }, onConflict: 'key');
+      }
+    } catch (e) {
+      debugPrint('Notice persisting initial order to system_config: $e');
+    }
+
+    // 2. abandoned_carts table persistence
+    try {
+      await client.from('abandoned_carts').insert({
+        'user_id': profileUserId,
+        'user_email': user.email.trim().toLowerCase(),
+        'user_phone': user.phoneNumber ?? '',
+        'user_name': user.fullName,
+        'student_name': user.fullName,
+        'order_id': orderId,
+        'order_number': orderId,
+        'product_name': pTitle,
+        'cart_items': items,
+        'subtotal': totalAmount,
+        'recovery_status': 'pending_verification',
+        'notes': 'Order #$orderId placed via Mobile App',
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Notice inserting initial order to abandoned_carts: $e');
+    }
+
+    // 3. notification_logs table persistence
+    try {
+      await client.from('notification_logs').insert({
+        'user_id': profileUserId,
+        'recipient_email': user.email.trim().toLowerCase(),
+        'recipient_phone': user.phoneNumber ?? '',
+        'type': 'order_placed',
+        'channel': 'mobile_app_checkout',
+        'status': 'pending_verification',
+        'subject': orderId,
+        'message_body': jsonEncode(orderData),
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Notice inserting initial order to notification_logs: $e');
+    }
+
+    // 4. orders table primary insert with fallback
+    try {
+      await client.from('orders').insert({
+        'id': validOrderId,
+        'order_id': orderId,
+        'order_number': orderId,
+        'user_id': profileUserId,
+        'user_email': user.email.trim().toLowerCase(),
+        'user_name': user.fullName,
+        'user_phone': user.phoneNumber ?? '',
+        'product_name': pTitle,
+        'product_id': pId,
+        'subtotal_amount': totalAmount,
+        'discount_amount': 0.0,
+        'total_amount': totalAmount,
+        'coupon_code': couponCode.trim().toUpperCase(),
+        'status': 'pending_verification',
+        'payment_method': paymentMethod,
+        'payment_id': 'PENDING_$orderId',
+        'payment_reference': orderId,
+        'notes': 'Order #$orderId | Product: $pTitle',
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      try {
+        await client.from('orders').insert({
+          'id': validOrderId,
+          'order_id': orderId,
+          'order_number': orderId,
+          'user_email': user.email.trim().toLowerCase(),
+          'user_name': user.fullName,
+          'product_name': pTitle,
+          'total_amount': totalAmount,
+          'status': 'pending_verification',
+          'payment_method': paymentMethod,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      } catch (_) {}
+    }
+
+    // 5. Local SharedPreferences cache update
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (var keyName in ['cosmyra_user_orders', 'cosmyra_saved_admin_orders']) {
+        final raw = prefs.getString(keyName) ?? '[]';
+        final List<dynamic> list = jsonDecode(raw);
+        list.removeWhere((o) => (o['order_number'] ?? o['order_id'] ?? o['id']) == orderId);
+        list.insert(0, orderData);
+        await prefs.setString(keyName, jsonEncode(list));
+      }
+    } catch (_) {}
+
+    return orderData;
+  }
+
   static Future<Map<String, dynamic>> submitUpiPaymentVerification({
     required UserProfileModel user,
     required List<Map<String, dynamic>> items,
@@ -4765,10 +4929,13 @@ class SupabaseService {
     String? paymentScreenshotUrl,
     required String couponCode,
     required double totalAmount,
+    String? orderId,
   }) async {
     final String timeMs = DateTime.now().millisecondsSinceEpoch.toString();
-    final String orderId = 'ORD-${timeMs.substring(timeMs.length - 8)}';
-    final String validOrderId = toValidUuid('ord_$orderId');
+    final String finalOrderId = (orderId != null && orderId.trim().isNotEmpty)
+        ? orderId.trim()
+        : 'ORD-${timeMs.substring(timeMs.length - 8)}';
+    final String validOrderId = toValidUuid('ord_$finalOrderId');
     final String? profileUserId = await _getValidOrNullProfileId(user.id, user.email, user.fullName);
 
     final pTitle = items.isNotEmpty ? (items.first['title'] ?? 'Test Series') : 'Cosmyra NEET/JEE Course';
@@ -4786,17 +4953,20 @@ class SupabaseService {
       'Product: $pTitle',
     ].join(' | ');
 
-    final effectiveNotes = 'Order ID: $orderId | UPI Payment. $notesText. Awaiting admin approval.';
-    final effectiveRef = cleanUtr.isNotEmpty ? cleanUtr : (screenshotUrl.isNotEmpty ? screenshotUrl : orderId);
+    final effectiveNotes = 'Order ID: $finalOrderId | UPI Payment. $notesText. Awaiting admin approval.';
+    final effectiveRef = cleanUtr.isNotEmpty ? cleanUtr : (screenshotUrl.isNotEmpty ? screenshotUrl : finalOrderId);
 
     final orderData = {
       'id': validOrderId,
-      'order_id': orderId,
-      'order_number': orderId,
+      'order_id': finalOrderId,
+      'order_number': finalOrderId,
       'user_id': profileUserId,
       'user_email': user.email.trim().toLowerCase(),
       'user_name': user.fullName,
       'user_phone': user.phoneNumber ?? '',
+      'student_email': user.email.trim().toLowerCase(),
+      'student_name': user.fullName,
+      'student_phone': user.phoneNumber ?? '',
       'subtotal_amount': totalAmount,
       'discount_amount': 0.0,
       'total_amount': totalAmount,
@@ -4815,6 +4985,7 @@ class SupabaseService {
       'product_id': pId,
       'created_at': DateTime.now().toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
+      'items': items,
     };
 
     // 1. Primary insert to orders table with retry fallback
@@ -4822,8 +4993,8 @@ class SupabaseService {
     try {
       await client.from('orders').insert({
         'id': validOrderId,
-        'order_id': orderId,
-        'order_number': orderId,
+        'order_id': finalOrderId,
+        'order_number': finalOrderId,
         'user_id': profileUserId,
         'user_email': user.email.trim().toLowerCase(),
         'user_name': user.fullName,
@@ -4852,8 +5023,8 @@ class SupabaseService {
       try {
         await client.from('orders').insert({
           'id': validOrderId,
-          'order_id': orderId,
-          'order_number': orderId,
+          'order_id': finalOrderId,
+          'order_number': finalOrderId,
           'user_id': null,
           'user_email': user.email.trim().toLowerCase(),
           'user_name': user.fullName,
@@ -4891,8 +5062,8 @@ class SupabaseService {
         'product_id': pId,
         'product_title': pTitle,
         'product_type': 'test_series',
-        'order_id': orderId,
-        'order_number': orderId,
+        'order_id': finalOrderId,
+        'order_number': finalOrderId,
         'access_type': 'pending_verification',
         'valid_from': DateTime.now().toIso8601String(),
         'valid_until': DateTime.now().add(const Duration(days: 365)).toIso8601String(),
@@ -4910,8 +5081,8 @@ class SupabaseService {
           'product_id': pId,
           'product_title': pTitle,
           'product_type': 'test_series',
-          'order_id': orderId,
-          'order_number': orderId,
+          'order_id': finalOrderId,
+          'order_number': finalOrderId,
           'access_type': 'pending_verification',
           'valid_from': DateTime.now().toIso8601String(),
           'valid_until': DateTime.now().add(const Duration(days: 365)).toIso8601String(),
@@ -4924,7 +5095,7 @@ class SupabaseService {
       }
     }
 
-    // 3. Multi-channel backup insert to notification_logs (guaranteed write access across all environments)
+    // 3. Multi-channel backup insert to notification_logs
     try {
       await client.from('notification_logs').insert({
         'user_id': profileUserId,
@@ -4933,7 +5104,7 @@ class SupabaseService {
         'type': 'order_placed',
         'channel': 'order_submitted',
         'status': 'pending',
-        'subject': orderData['order_number'] ?? orderData['order_id'] ?? orderId,
+        'subject': finalOrderId,
         'message_body': jsonEncode(orderData),
         'created_at': DateTime.now().toIso8601String(),
       });
@@ -4941,7 +5112,7 @@ class SupabaseService {
       debugPrint('Notice inserting to notification_logs: $e');
     }
 
-    // 4. Multi-channel backup insert to abandoned_carts (guaranteed write access)
+    // 4. Multi-channel backup insert to abandoned_carts
     try {
       await client.from('abandoned_carts').insert({
         'user_id': profileUserId,
@@ -4949,8 +5120,8 @@ class SupabaseService {
         'user_phone': user.phoneNumber ?? '',
         'user_name': user.fullName,
         'student_name': user.fullName,
-        'order_id': orderId,
-        'order_number': orderId,
+        'order_id': finalOrderId,
+        'order_number': finalOrderId,
         'product_name': pTitle,
         'cart_items': items,
         'subtotal': totalAmount,
@@ -4969,12 +5140,19 @@ class SupabaseService {
 
     // 4.5. Cloud backup insert to system_config table (guaranteed 100% cloud sync across all devices & PCs)
     try {
-      final orderKey = 'order_${orderId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}';
-      await client.from('system_config').upsert({
-        'key': orderKey,
-        'value': jsonEncode(orderData),
-        'updated_at': DateTime.now().toIso8601String(),
-      });
+      final orderKey = 'order_${finalOrderId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}';
+      try {
+        await client.from('system_config').upsert({
+          'key': orderKey,
+          'value': jsonEncode(orderData),
+          'updated_at': DateTime.now().toIso8601String(),
+        }, onConflict: 'key');
+      } catch (_) {
+        await client.from('system_config').upsert({
+          'key': orderKey,
+          'value': jsonEncode(orderData),
+        }, onConflict: 'key');
+      }
     } catch (e) {
       debugPrint('Notice persisting order to system_config cloud table: $e');
     }
@@ -4985,7 +5163,7 @@ class SupabaseService {
       for (var keyName in ['cosmyra_user_orders', 'cosmyra_saved_admin_orders']) {
         final raw = prefs.getString(keyName) ?? '[]';
         final List<dynamic> list = jsonDecode(raw);
-        list.removeWhere((o) => (o['order_number'] ?? o['order_id'] ?? o['id']) == orderId);
+        list.removeWhere((o) => (o['order_number'] ?? o['order_id'] ?? o['id']) == finalOrderId);
         list.insert(0, orderData);
         await prefs.setString(keyName, jsonEncode(list));
       }

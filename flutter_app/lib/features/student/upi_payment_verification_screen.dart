@@ -54,6 +54,8 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
 
+  String? _activeOrderId;
+
   @override
   void initState() {
     super.initState();
@@ -84,6 +86,23 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
 
     _items = widget.items ?? (CartService.instance.items.isNotEmpty ? CartService.instance.items.map((e) => e.toJson()).toList() : []);
     _totalAmount = widget.totalAmount ?? (CartService.instance.subtotal > 0 ? CartService.instance.subtotal : 499.0);
+
+    // Immediately record an initial pending order in cloud storage so Admin Dashboard instantly sees it
+    try {
+      final initialOrd = await SupabaseService.recordInitialPendingOrder(
+        user: _user,
+        items: _items,
+        totalAmount: _totalAmount,
+        couponCode: _couponCode,
+        paymentMethod: 'UPI',
+        existingOrderId: _activeOrderId,
+      );
+      if (initialOrd['order_number'] != null) {
+        _activeOrderId = initialOrd['order_number'].toString();
+      }
+    } catch (e) {
+      debugPrint('Notice recording initial pending order: $e');
+    }
 
     if (widget.upiId != null && widget.upiId!.isNotEmpty) {
       _upiId = widget.upiId!;
@@ -238,6 +257,7 @@ class _UpiPaymentVerificationScreenState extends State<UpiPaymentVerificationScr
         paymentScreenshotUrl: _paymentScreenshotUrl,
         couponCode: _couponCode,
         totalAmount: _totalAmount,
+        orderId: _activeOrderId,
       );
 
       CartService.instance.clearCart();
