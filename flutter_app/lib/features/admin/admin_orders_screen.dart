@@ -1235,7 +1235,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
 
                                 return DataRow(
                                   selected: isSelected,
-                                  onSelectChanged: (val) => _toggleSelectOrder(rawId),
+                                  onSelectChanged: null,
                                   cells: [
                                     DataCell(
                                       Checkbox(

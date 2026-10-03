@@ -9432,6 +9432,40 @@ class SupabaseService {
       return db.compareTo(da);
     });
 
+    // Filter out blacklisted deleted orders
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<String> deletedList = prefs.getStringList('cosmyra_deleted_order_ids') ?? [];
+      if (deletedList.isNotEmpty) {
+        final Set<String> deletedSet = deletedList.map((e) => e.toLowerCase()).toSet();
+        finalOrders.removeWhere((o) {
+          final String id = (o['id'] ?? '').toString().toLowerCase();
+          final String ordId = (o['order_id'] ?? '').toString().toLowerCase();
+          final String ordNum = (o['order_number'] ?? '').toString().toLowerCase();
+          final String payRef = (o['payment_reference'] ?? '').toString().toLowerCase();
+          final String utr = (o['payment_utr'] ?? o['utr_number'] ?? '').toString().toLowerCase();
+
+          bool isDeleted = deletedSet.contains(id) ||
+              deletedSet.contains(ordId) ||
+              deletedSet.contains(ordNum) ||
+              deletedSet.contains(payRef) ||
+              (utr.isNotEmpty && deletedSet.contains(utr));
+
+          if (!isDeleted) {
+            for (var k in deletedSet) {
+              if (k.length >= 4 && (ordId.contains(k) || ordNum.contains(k) || id.contains(k))) {
+                isDeleted = true;
+                break;
+              }
+            }
+          }
+          return isDeleted;
+        });
+      }
+    } catch (e) {
+      debugPrint('Notice filtering deleted order IDs: $e');
+    }
+
     // Apply status filtering if requested
     if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'All') {
       final lowerFilter = statusFilter.trim().toLowerCase();
@@ -10329,7 +10363,7 @@ class SupabaseService {
       if (stripped.isNotEmpty) targetKeys.add(stripped);
     }
     if (orderMap != null) {
-      for (var k in ['id', 'order_id', 'order_number', 'payment_reference', 'payment_id', 'utr_number']) {
+      for (var k in ['id', 'order_id', 'order_number', 'payment_reference', 'payment_id', 'utr_number', 'payment_utr']) {
         final val = orderMap[k]?.toString().trim() ?? '';
         if (val.isNotEmpty) {
           targetKeys.add(val);
@@ -10339,6 +10373,19 @@ class SupabaseService {
           }
         }
       }
+    }
+
+    // Save to persistent blacklist in SharedPreferences
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<String> deletedList = prefs.getStringList('cosmyra_deleted_order_ids') ?? [];
+      final Set<String> updatedSet = Set<String>.from(deletedList);
+      for (var key in targetKeys) {
+        if (key.isNotEmpty) updatedSet.add(key.toLowerCase());
+      }
+      await prefs.setStringList('cosmyra_deleted_order_ids', updatedSet.toList());
+    } catch (e) {
+      debugPrint('Notice saving deleted order blacklist: $e');
     }
 
     // 1. Delete from `orders`
