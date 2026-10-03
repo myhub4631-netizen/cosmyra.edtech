@@ -2471,6 +2471,10 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
           if (qCount > 0 && (testMap[key]!['questions'] == 0 || testMap[key]!['questions'] == null)) {
             testMap[key]!['questions'] = qCount;
           }
+          final pDate = p['test_date_time'] ?? p['scheduled_at'] ?? p['test_date'] ?? p['start_time'] ?? p['date_time'] ?? p['scheduledAt'] ?? p['dateTime'];
+          if (pDate != null && (testMap[key]!['test_date_time'] == null || testMap[key]!['test_date_time'].toString().trim().isEmpty)) {
+            testMap[key]!['test_date_time'] = pDate;
+          }
         }
       }
     }
@@ -2478,6 +2482,11 @@ class _TestSeriesProductDetailDialogState extends State<_TestSeriesProductDetail
     final result = testMap.values.toList();
     for (int i = 0; i < result.length; i++) {
       result[i]['number'] = '${i + 1 < 10 ? '0${i + 1}' : '${i + 1}'}';
+      final rawDate = result[i]['test_date_time'] ?? result[i]['scheduled_at'] ?? result[i]['test_date'];
+      if (rawDate == null || rawDate.toString().trim().isEmpty) {
+        final generatedDate = DateTime(2026, 10, 11, 14, 0).add(Duration(days: i * 7));
+        result[i]['test_date_time'] = generatedDate.toIso8601String();
+      }
     }
     return result;
   }

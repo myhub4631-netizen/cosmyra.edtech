@@ -5754,7 +5754,37 @@ class SupabaseService {
           if (sId.isNotEmpty && !deletedIds.contains(sId)) {
             final idx = list.indexWhere((i) => i['id'] == sId);
             if (idx != -1) {
-              list[idx] = map; // overwrite with rich local cache data
+              // Merge local tests safely without overwriting fresh cloud test dates
+              final cloudMap = list[idx];
+              final cloudTests = (cloudMap['tests'] is List) ? List<dynamic>.from(cloudMap['tests']) : [];
+              final localTests = (map['tests'] is List) ? List<dynamic>.from(map['tests']) : [];
+
+              for (var lt in localTests) {
+                if (lt is Map) {
+                  final ltMap = Map<String, dynamic>.from(lt);
+                  final ltId = (ltMap['id'] ?? ltMap['paper_id'] ?? '').toString().trim().toLowerCase();
+                  final ltTitle = (ltMap['title'] ?? '').toString().trim().toLowerCase();
+
+                  final cIdx = cloudTests.indexWhere((ct) => ct is Map && (
+                      (ct['id']?.toString().toLowerCase().trim() ?? '') == ltId ||
+                      (ct['paper_id']?.toString().toLowerCase().trim() ?? '') == ltId ||
+                      (ct['title']?.toString().toLowerCase().trim() ?? '') == ltTitle
+                  ));
+
+                  if (cIdx != -1 && cloudTests[cIdx] is Map) {
+                    final ctMap = Map<String, dynamic>.from(cloudTests[cIdx] as Map);
+                    final pDate = ctMap['test_date_time'] ?? ctMap['scheduled_at'] ?? ctMap['test_date'] ?? ltMap['test_date_time'] ?? ltMap['scheduled_at'] ?? ltMap['test_date'];
+                    ctMap['test_date_time'] = pDate;
+                    ctMap['scheduled_at'] = pDate;
+                    ctMap['test_date'] = pDate;
+                    cloudTests[cIdx] = ctMap;
+                  } else {
+                    cloudTests.add(ltMap);
+                  }
+                }
+              }
+              cloudMap['tests'] = cloudTests;
+              list[idx] = cloudMap;
             } else {
               seenIds.add(sId);
               list.add(map);
