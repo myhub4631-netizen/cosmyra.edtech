@@ -219,6 +219,107 @@ class CloudflareR2Service {
     return null;
   }
 
+  /// Lists all objects in the Cloudflare R2 bucket via S3 ListObjectsV2 API
+  static Future<List<Map<String, dynamic>>> listBucketFiles() async {
+    await loadConfig();
+    if (!isConfigured) return [];
+
+    final region = 'auto';
+    final service = 's3';
+    final host = '$accountId.r2.cloudflarestorage.com';
+    final endpointUrl = Uri.parse('https://$host/$bucketName?list-type=2');
+
+    final now = DateTime.now().toUtc();
+    final amzDate = _formatAmzDate(now);
+    final dateStamp = _formatDateStamp(now);
+
+    final payloadHash = sha256.convert(utf8.encode('')).toString();
+
+    final canonicalHeaders =
+        'host:$host\nx-amz-content-sha256:$payloadHash\nx-amz-date:$amzDate\n';
+    const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+
+    final canonicalRequest = [
+      'GET',
+      '/$bucketName',
+      'list-type=2',
+      canonicalHeaders,
+      signedHeaders,
+      payloadHash,
+    ].join('\n');
+
+    final credentialScope = '$dateStamp/$region/$service/aws4_request';
+    final stringToSign = [
+      'AWS4-HMAC-SHA256',
+      amzDate,
+      credentialScope,
+      sha256.convert(utf8.encode(canonicalRequest)).toString(),
+    ].join('\n');
+
+    final signingKey = _getSignatureKey(secretAccessKey, dateStamp, region, service);
+    final signature = Hmac(sha256, signingKey)
+        .convert(utf8.encode(stringToSign))
+        .toString();
+
+    final authorizationHeader =
+        'AWS4-HMAC-SHA256 Credential=$accessKeyId/$credentialScope, SignedHeaders=$signedHeaders, Signature=$signature';
+
+    try {
+      final response = await http.get(
+        endpointUrl,
+        headers: {
+          'Host': host,
+          'x-amz-date': amzDate,
+          'x-amz-content-sha256': payloadHash,
+          'Authorization': authorizationHeader,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final results = <Map<String, dynamic>>[];
+        final xmlStr = response.body;
+
+        final keyRegExp = RegExp(r'<Key>(.*?)</Key>');
+        final sizeRegExp = RegExp(r'<Size>(.*?)</Size>');
+        final modRegExp = RegExp(r'<LastModified>(.*?)</LastModified>');
+
+        final contentsBlocks = xmlStr.split('<Contents>');
+        for (var i = 1; i < contentsBlocks.length; i++) {
+          final block = contentsBlocks[i].split('</Contents>').first;
+          final keyMatch = keyRegExp.firstMatch(block);
+          final sizeMatch = sizeRegExp.firstMatch(block);
+          final modMatch = modRegExp.firstMatch(block);
+
+          if (keyMatch != null) {
+            final key = keyMatch.group(1) ?? '';
+            if (key.isNotEmpty && !key.endsWith('/')) {
+              final sizeBytes = int.tryParse(sizeMatch?.group(1) ?? '0') ?? 0;
+              final lastMod = modMatch?.group(1) ?? DateTime.now().toIso8601String();
+
+              final publicBase = publicDomain.isNotEmpty ? publicDomain : 'https://$host/$bucketName';
+              final publicUrl = '$publicBase/$key';
+
+              results.add({
+                'key': key,
+                'size_bytes': sizeBytes,
+                'size_kb': (sizeBytes / 1024).ceil(),
+                'last_modified': lastMod,
+                'public_url': publicUrl,
+              });
+            }
+          }
+        }
+        return results;
+      } else {
+        debugPrint('R2 ListObjects Failed [${response.statusCode}]: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error listing files from Cloudflare R2: $e');
+    }
+
+    return [];
+  }
+
   // --- Helper Signing Functions ---
   static List<int> _getSignatureKey(
       String key, String dateStamp, String regionName, String serviceName) {

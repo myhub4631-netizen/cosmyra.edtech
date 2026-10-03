@@ -10143,6 +10143,92 @@ class SupabaseService {
       debugPrint('Notice checking storage buckets: $e');
     }
 
+    // 6.5. Aggregate all files directly from Cloudflare R2 S3 Bucket
+    try {
+      final r2Files = await CloudflareR2Service.listBucketFiles();
+      for (var r2f in r2Files) {
+        final key = (r2f['key'] ?? '').toString();
+        final pubUrl = (r2f['public_url'] ?? '').toString();
+        final sizeKb = (r2f['size_kb'] as num?)?.toInt() ?? 120;
+        final modTime = (r2f['last_modified'] ?? '').toString();
+
+        if (key.isNotEmpty && !key.endsWith('/') && !assets.any((a) => a['public_url'] == pubUrl || a['id'] == 'r2_$key')) {
+          final fileName = key.split('/').last;
+          final ext = fileName.contains('.') ? fileName.split('.').last.toLowerCase() : '';
+          final isPdf = ext == 'pdf';
+          final isSvg = ext == 'svg';
+          final isVideo = ['mp4', 'webm', 'mov', 'avi', 'mkv'].contains(ext);
+          final fType = isPdf ? 'pdf' : (isSvg ? 'svg' : (isVideo ? 'video' : 'image'));
+
+          String category = 'Cloudflare R2 Storage';
+          if (isPdf) category = 'PDF Documents & Syllabi';
+          if (fileName.toLowerCase().contains('banner') || fileName.toLowerCase().contains('cover')) {
+            category = 'Promotional Banners';
+          }
+
+          assets.add({
+            'id': 'r2_$key',
+            'title': fileName.replaceAll('_', ' ').replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), ''),
+            'file_name': fileName,
+            'file_type': fType,
+            'mime_type': isPdf
+                ? 'application/pdf'
+                : (isSvg
+                    ? 'image/svg+xml'
+                    : (isVideo ? 'video/mp4' : (ext == 'webp' ? 'image/webp' : 'image/png'))),
+            'file_size_kb': sizeKb > 0 ? sizeKb : 150,
+            'public_url': pubUrl,
+            'category': category,
+            'uploader_role': 'admin',
+            'uploader_name': 'Cloudflare R2 Bucket',
+            'created_at': modTime.isNotEmpty ? modTime : DateTime.now().toIso8601String(),
+            'tags': ['r2', fType, if (ext.isNotEmpty) ext],
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice aggregating Cloudflare R2 bucket files into media assets: $e');
+    }
+
+    // 6.6. Aggregate Question Diagrams & Solution Images from Supabase DB questions
+    try {
+      final qRes = await client
+          .from('questions')
+          .select('id, question_number, question_image')
+          .neq('question_image', '')
+          .not('question_image', 'is', null);
+
+      if (qRes.isNotEmpty) {
+        for (var q in qRes) {
+          final qImg = (q['question_image'] ?? '').toString().trim();
+          if (qImg.isNotEmpty && !assets.any((a) => a['public_url'] == qImg)) {
+            final qId = q['id']?.toString() ?? '';
+            final qNum = q['question_number']?.toString() ?? 'Q';
+            final fileName = qImg.startsWith('data:')
+                ? 'q_img_$qId.png'
+                : qImg.split('/').last.split('?').first;
+
+            assets.add({
+              'id': 'q_img_$qId',
+              'title': 'Question #$qNum Diagram',
+              'file_name': fileName,
+              'file_type': 'image',
+              'mime_type': 'image/png',
+              'file_size_kb': qImg.startsWith('data:') ? ((qImg.length * 3 / 4) / 1024).round() : 135,
+              'public_url': qImg,
+              'category': 'Question Diagrams',
+              'uploader_role': 'admin',
+              'uploader_name': 'Question Bank',
+              'created_at': DateTime.now().toIso8601String(),
+              'tags': ['question', 'diagram', 'question_bank'],
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice aggregating question images into media assets: $e');
+    }
+
     // 7. Seed defaults only if still completely empty
     if (assets.isEmpty) {
       assets.addAll(_defaultMediaAssets());
