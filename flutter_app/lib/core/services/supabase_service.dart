@@ -4886,7 +4886,8 @@ class SupabaseService {
         'product_id': pId,
         'product_title': pTitle,
         'product_type': 'test_series',
-        'order_id': orderInserted ? validOrderId : null,
+        'order_id': orderId,
+        'order_number': orderId,
         'access_type': 'pending_verification',
         'valid_from': DateTime.now().toIso8601String(),
         'valid_until': DateTime.now().add(const Duration(days: 365)).toIso8601String(),
@@ -4904,7 +4905,8 @@ class SupabaseService {
           'product_id': pId,
           'product_title': pTitle,
           'product_type': 'test_series',
-          'order_id': null,
+          'order_id': orderId,
+          'order_number': orderId,
           'access_type': 'pending_verification',
           'valid_from': DateTime.now().toIso8601String(),
           'valid_until': DateTime.now().add(const Duration(days: 365)).toIso8601String(),
@@ -4940,9 +4942,19 @@ class SupabaseService {
         'user_id': profileUserId,
         'user_email': user.email.trim().toLowerCase(),
         'user_phone': user.phoneNumber ?? '',
+        'user_name': user.fullName,
+        'student_name': user.fullName,
+        'order_id': orderId,
+        'order_number': orderId,
+        'product_name': pTitle,
         'cart_items': items,
         'subtotal': totalAmount,
         'recovery_status': 'order_placed',
+        'notes': 'UPI Payment. $notesText',
+        'payment_screenshot_url': screenshotUrl,
+        'screenshot_url': screenshotUrl,
+        'payment_utr': effectiveUtr,
+        'utr_number': effectiveUtr,
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       });
@@ -8820,16 +8832,48 @@ class SupabaseService {
 
   /// Extract Payment Screenshot URL from order record
   static String? extractPaymentScreenshotUrl(Map<String, dynamic> o) {
-    final direct = (o['payment_screenshot_url'] ?? o['screenshot_url'] ?? o['screenshot'] ?? '').toString().trim();
-    if (direct.isNotEmpty && (direct.startsWith('http://') || direct.startsWith('https://'))) {
-      return direct;
+    // 1. Direct field check across all common field names
+    for (final field in [
+      'payment_screenshot_url',
+      'screenshot_url',
+      'screenshot',
+      'payment_screenshot',
+      'receipt_url',
+      'receipt_image',
+    ]) {
+      final val = (o[field] ?? '').toString().trim();
+      if (val.isNotEmpty && (val.startsWith('http://') || val.startsWith('https://') || val.startsWith('data:image/'))) {
+        return val;
+      }
     }
 
-    // Try extracting from notes string or JSON fields
+    // 2. Check payment_reference or payment_id if they contain a URL
+    final ref = (o['payment_reference'] ?? '').toString().trim();
+    if (ref.startsWith('http://') || ref.startsWith('https://') || ref.startsWith('data:image/')) {
+      return ref;
+    }
+    final payId = (o['payment_id'] ?? '').toString().trim();
+    if (payId.startsWith('http://') || payId.startsWith('https://') || payId.startsWith('data:image/')) {
+      return payId;
+    }
+
+    // 3. Search notes text for image URL
     final notes = (o['notes'] ?? '').toString();
-    final match = RegExp(r'(?:Screenshot|Receipt|Image)[:\s]+(https?://[^\s]+)', caseSensitive: false).firstMatch(notes);
+    final match = RegExp(r'(?:Screenshot|Receipt|Image|http[:\s]*|https[:\s]*)+[:\s]*(https?://[^\s\|]+)', caseSensitive: false).firstMatch(notes);
     if (match != null && match.group(1) != null) {
       return match.group(1)!.trim();
+    }
+
+    // 4. Check nested cart_items or extra JSON fields
+    if (o['cart_items'] is List) {
+      for (var item in (o['cart_items'] as List)) {
+        if (item is Map) {
+          final itemUrl = (item['payment_screenshot_url'] ?? item['screenshot_url'] ?? item['screenshot'] ?? '').toString().trim();
+          if (itemUrl.isNotEmpty && (itemUrl.startsWith('http://') || itemUrl.startsWith('https://'))) {
+            return itemUrl;
+          }
+        }
+      }
     }
 
     return null;
@@ -9038,14 +9082,18 @@ class SupabaseService {
       if (k.isEmpty) return;
       seenKeys.add(k);
       seenKeys.add(k.toLowerCase());
-      final stripped = k.replaceAll(RegExp(r'^(ORD_|ENT_|SUB_|CART_|ord_|ent_|sub_|cart_)', caseSensitive: false), '');
+      final stripped = k.replaceAll(RegExp(r'^(ORD[_-]|ENT[_-]|SUB[_-]|CART[_-]|ord[_-]|ent[_-]|sub[_-]|cart[_-])', caseSensitive: false), '');
       if (stripped.isNotEmpty) {
         seenKeys.add(stripped);
         seenKeys.add(stripped.toLowerCase());
         seenKeys.add('ORD_$stripped');
+        seenKeys.add('ORD-$stripped');
         seenKeys.add('ENT_$stripped');
+        seenKeys.add('ENT-$stripped');
         seenKeys.add('SUB_$stripped');
+        seenKeys.add('SUB-$stripped');
         seenKeys.add('CART_$stripped');
+        seenKeys.add('CART-$stripped');
       }
     }
 
@@ -9053,7 +9101,7 @@ class SupabaseService {
       final k = rawKey.trim();
       if (k.isEmpty) return false;
       if (seenKeys.contains(k) || seenKeys.contains(k.toLowerCase())) return true;
-      final stripped = k.replaceAll(RegExp(r'^(ORD_|ENT_|SUB_|CART_|ord_|ent_|sub_|cart_)', caseSensitive: false), '');
+      final stripped = k.replaceAll(RegExp(r'^(ORD[_-]|ENT[_-]|SUB[_-]|CART[_-]|ord[_-]|ent[_-]|sub[_-]|cart[_-])', caseSensitive: false), '');
       return seenKeys.contains(stripped) || seenKeys.contains(stripped.toLowerCase());
     }
 
@@ -9067,9 +9115,11 @@ class SupabaseService {
       if (res is List) {
         for (var item in res.whereType<Map>()) {
           final m = Map<String, dynamic>.from(item);
-          final key = (m['payment_reference'] ?? m['order_number'] ?? m['order_id'] ?? m['id'] ?? '').toString();
+          final ordNum = (m['order_number'] ?? m['order_id'] ?? m['id'] ?? '').toString();
+          final key = (m['payment_reference'] ?? ordNum).toString();
           if (key.isNotEmpty && !hasSeenKey(key)) {
             addOrderKeys(key);
+            if (ordNum.isNotEmpty) addOrderKeys(ordNum);
             orders.add(m);
           }
         }
@@ -9086,11 +9136,13 @@ class SupabaseService {
           final email = (ent['user_email'] ?? '').toString();
           final title = (ent['product_title'] ?? 'NEET & JEE Test Series Package').toString();
           final createdAt = (ent['created_at'] ?? DateTime.now().toIso8601String()).toString();
-          final rawEntId = (ent['order_id'] ?? ent['id'] ?? '').toString();
+          final rawEntId = (ent['order_id'] ?? ent['order_number'] ?? ent['id'] ?? '').toString();
 
           if (rawEntId.isNotEmpty && !hasSeenKey(rawEntId)) {
             addOrderKeys(rawEntId);
-            final displayOrderId = rawEntId.length >= 8 ? 'ORD_${rawEntId.substring(0, 8).toUpperCase()}' : 'ORD_$rawEntId';
+            final displayOrderId = (rawEntId.startsWith('ORD-') || rawEntId.startsWith('ORD_'))
+                ? rawEntId
+                : (rawEntId.length >= 8 ? 'ORD-${rawEntId.replaceAll('-', '').substring(0, 8).toUpperCase()}' : 'ORD-$rawEntId');
             orders.add({
               'id': rawEntId,
               'order_id': displayOrderId,
@@ -9131,7 +9183,9 @@ class SupabaseService {
 
           if (rawSubId.isNotEmpty && !hasSeenKey(rawSubId)) {
             addOrderKeys(rawSubId);
-            final displayOrderId = rawSubId.length >= 8 ? 'SUB_${rawSubId.substring(0, 8).toUpperCase()}' : 'SUB_$rawSubId';
+            final displayOrderId = (rawSubId.startsWith('SUB-') || rawSubId.startsWith('SUB_'))
+                ? rawSubId
+                : (rawSubId.length >= 8 ? 'SUB-${rawSubId.replaceAll('-', '').substring(0, 8).toUpperCase()}' : 'SUB-$rawSubId');
             orders.add({
               'id': rawSubId,
               'order_id': displayOrderId,
@@ -9169,9 +9223,13 @@ class SupabaseService {
           if (bodyStr.isNotEmpty) {
             try {
               final Map<String, dynamic> parsedOrder = Map<String, dynamic>.from(jsonDecode(bodyStr));
-              final key = (parsedOrder['payment_reference'] ?? parsedOrder['order_number'] ?? parsedOrder['order_id'] ?? parsedOrder['id'] ?? '').toString();
+              final ordNum = (parsedOrder['order_number'] ?? parsedOrder['order_id'] ?? '').toString();
+              final key = (parsedOrder['payment_reference'] ?? ordNum ?? parsedOrder['id'] ?? '').toString();
               if (key.isNotEmpty && !hasSeenKey(key)) {
                 addOrderKeys(key);
+                if (ordNum.isNotEmpty) addOrderKeys(ordNum);
+                parsedOrder['order_id'] ??= ordNum.isNotEmpty ? ordNum : key;
+                parsedOrder['order_number'] ??= ordNum.isNotEmpty ? ordNum : key;
                 orders.add(parsedOrder);
               }
             } catch (_) {}
@@ -9186,13 +9244,17 @@ class SupabaseService {
     try {
       final cartRes = await client.from('abandoned_carts').select('*').order('created_at', ascending: false);
       if (cartRes is List) {
-        for (var cart in cartRes.whereType<Map>()) {
+        for (var rawCart in cartRes.whereType<Map>()) {
+          final cart = Map<String, dynamic>.from(rawCart);
           final email = (cart['user_email'] ?? '').toString();
           final phone = (cart['user_phone'] ?? cart['student_phone'] ?? '').toString();
           final name = (cart['user_name'] ?? cart['student_name'] ?? (email.contains('@') ? email.split('@').first : 'Student Aspirant')).toString();
           final address = (cart['address'] ?? cart['shipping_address'] ?? cart['notes'] ?? '').toString();
           final createdAt = (cart['created_at'] ?? DateTime.now().toIso8601String()).toString();
           final rawCartId = (cart['id'] ?? '').toString();
+          final orderIdFromCart = (cart['order_number'] ?? cart['order_id'] ?? '').toString().trim();
+          final keyToCheck = orderIdFromCart.isNotEmpty ? orderIdFromCart : rawCartId;
+
           final recStatus = (cart['recovery_status'] ?? '').toString().toLowerCase();
           final cartItems = cart['cart_items'] is List ? (cart['cart_items'] as List) : [];
           final productTitle = cartItems.isNotEmpty ? (cartItems[0]['title'] ?? cartItems[0]['product_name'] ?? 'NEET / JEE Test Package') : (cart['product_name'] ?? 'NEET / JEE Test Package');
@@ -9204,9 +9266,15 @@ class SupabaseService {
             effectiveStatus = recStatus;
           }
 
-          if (rawCartId.isNotEmpty && !hasSeenKey(rawCartId)) {
-            addOrderKeys(rawCartId);
-            final displayOrderId = rawCartId.length >= 8 ? 'ORD_${rawCartId.substring(0, 8).toUpperCase()}' : 'ORD_$rawCartId';
+          if (keyToCheck.isNotEmpty && !hasSeenKey(keyToCheck)) {
+            addOrderKeys(keyToCheck);
+            final displayOrderId = orderIdFromCart.isNotEmpty
+                ? orderIdFromCart
+                : (rawCartId.length >= 8 ? 'ORD-${rawCartId.replaceAll('-', '').substring(0, 8).toUpperCase()}' : 'ORD-$rawCartId');
+
+            final screenshotUrl = extractPaymentScreenshotUrl(cart) ?? (cart['screenshot_url'] ?? cart['payment_screenshot_url'] ?? '').toString();
+            final utrStr = (cart['utr_number'] ?? cart['payment_utr'] ?? extractUtrNumber(cart)).toString();
+
             orders.add({
               'id': rawCartId,
               'order_id': displayOrderId,
@@ -9229,8 +9297,13 @@ class SupabaseService {
               'status': effectiveStatus,
               'payment_status': effectiveStatus,
               'payment_method': 'UPI',
-              'payment_id': 'pay_cart_${rawCartId.length > 8 ? rawCartId.substring(0, 8) : rawCartId}',
+              'payment_id': utrStr.isNotEmpty && utrStr != 'N/A' ? 'UTR_$utrStr' : 'pay_cart_${rawCartId.length > 8 ? rawCartId.substring(0, 8) : rawCartId}',
               'payment_reference': displayOrderId,
+              'payment_utr': utrStr,
+              'utr_number': utrStr,
+              'payment_screenshot_url': screenshotUrl,
+              'screenshot_url': screenshotUrl,
+              'notes': cart['notes'] ?? 'UPI Payment. UTR: $utrStr | Screenshot: $screenshotUrl',
               'created_at': createdAt,
             });
           }

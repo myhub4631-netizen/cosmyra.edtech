@@ -98,8 +98,27 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
+  String _getDisplayOrderId(Map<String, dynamic> o) {
+    final ordNum = (o['order_number'] ?? o['order_id'] ?? '').toString().trim();
+    if (ordNum.isNotEmpty && (ordNum.startsWith('ORD') || ordNum.startsWith('SUB') || ordNum.startsWith('CART'))) {
+      return ordNum;
+    }
+    final ref = (o['payment_reference'] ?? '').toString().trim();
+    if (ref.isNotEmpty && (ref.startsWith('ORD') || ref.startsWith('SUB') || ref.startsWith('CART'))) {
+      return ref;
+    }
+    final rawId = (o['id'] ?? '').toString().trim();
+    if (rawId.startsWith('ORD') || rawId.startsWith('SUB') || rawId.startsWith('CART')) {
+      return rawId;
+    }
+    if (rawId.length >= 8) {
+      return 'ORD-${rawId.replaceAll('-', '').substring(0, 8).toUpperCase()}';
+    }
+    return 'ORD-SUCCESS';
+  }
+
   Future<void> _approveOrder(Map<String, dynamic> o) async {
-    final rawId = (o['order_number'] ?? o['order_id'] ?? o['id'] ?? '').toString();
+    final rawId = _getDisplayOrderId(o);
     final uid = (o['user_id'] ?? o['student_id'] ?? '').toString();
     final user = UserProfileModel(
       id: uid.isNotEmpty ? uid : 'usr_${DateTime.now().millisecondsSinceEpoch}',
@@ -150,7 +169,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   }
 
   Future<void> _deleteOrder(Map<String, dynamic> o) async {
-    final rawId = (o['order_number'] ?? o['order_id'] ?? o['id'] ?? '').toString();
+    final rawId = _getDisplayOrderId(o);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -333,7 +352,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   }
 
   Future<void> _showMoreInfoModal(Map<String, dynamic> o) async {
-    final rawId = (o['order_number'] ?? o['order_id'] ?? o['id'] ?? '').toString();
+    final rawId = _getDisplayOrderId(o);
     final validUuid = (o['id'] ?? '').toString();
     final name = (o['student_name'] ?? o['user_name'] ?? 'Student Aspirant').toString();
     final email = (o['student_email'] ?? o['user_email'] ?? 'student@cosmyra.in').toString();
@@ -737,7 +756,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                                 DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
                               ],
                               rows: _filteredOrders.map((o) {
-                                final rawId = (o['order_number'] ?? o['order_id'] ?? o['id'] ?? '').toString();
+                                final rawId = _getDisplayOrderId(o);
                                 final displayId = rawId.length > 18 ? '${rawId.substring(0, 15)}...' : rawId;
                                 final name = (o['student_name'] ?? o['user_name'] ?? 'Student').toString();
                                 final email = (o['student_email'] ?? o['user_email'] ?? '').toString();
