@@ -736,6 +736,7 @@ class _AdminFeatureManagerScreenState extends State<AdminFeatureManagerScreen>
           Wrap(
             spacing: 24,
             runSpacing: 16,
+            alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               // Visibility Toggle
@@ -849,8 +850,6 @@ class _AdminFeatureManagerScreenState extends State<AdminFeatureManagerScreen>
                   ),
                 ],
               ),
-
-              const Spacer(),
 
               // Edit & Preview Buttons
               Row(
