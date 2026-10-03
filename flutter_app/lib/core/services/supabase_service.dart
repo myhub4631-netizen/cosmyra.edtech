@@ -2590,6 +2590,70 @@ class SupabaseService {
     return map;
   }
 
+  static String normalizeChapterName(String name) {
+    if (name.isEmpty) return '';
+    var s = name.trim().toLowerCase();
+    s = s.replaceAll(RegExp(r'^(?:ch(?:apter)?\s*[-:_]?\s*)?\d+\s*[-:_.\)]\s*', caseSensitive: false), '');
+    s = s.replaceAll(RegExp(r'\s*\((?:class|std)\s*\d+\)', caseSensitive: false), '');
+    s = s.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    return s;
+  }
+
+  static String? inferSubjectFromChapter(String chapterName) {
+    final norm = normalizeChapterName(chapterName);
+    if (norm.isEmpty) return null;
+
+    const bioChapters = {
+      'livingworld', 'biologicalclassification', 'plantkingdom', 'animalkingdom',
+      'morphologyoffloweringplants', 'anatomyoffloweringplants', 'structuralorganisationinanimals',
+      'celltheunitoflife', 'biomolecules', 'cellcycleandcelldivision', 'transportinplants',
+      'mineralnutrition', 'photosynthesisinhigherplants', 'respirationinplants', 'plantgrowthanddevelopment',
+      'digestionandabsorption', 'breathingandexchangeofgases', 'bodyfluidsandcirculation',
+      'excretoryproductsandtheirelimination', 'locomotionandmovement', 'neuralcontrolandcoordination',
+      'chemicalcoordinationandintegration', 'reproductioninorganisms', 'sexualreproductioninfloweringplants',
+      'humanreproduction', 'reproductivehealth', 'principlesofinheritanceandvariation', 'genetics',
+      'molecularbasisofinheritance', 'evolution', 'humanhealthanddisease', 'microbesinhumanwelfare',
+      'biotechnologyprinciplesandprocesses', 'biotechnologyanditsapplications', 'organismsandpopulations',
+      'ecosystem', 'biodiversityandconservation', 'environmentalissues'
+    };
+
+    const phyChapters = {
+      'physicalworldandmeasurement', 'unitsandmeasurements', 'vectors', 'kinematics',
+      'motioninastraightline', 'motioninaplane', 'lawsofmotion', 'workenergyandpower',
+      'motionofsystemofparticles', 'rotationalmotion', 'centerofmass', 'gravitation',
+      'propertiesofbulkmatter', 'mechanicalpropertiesofsolids', 'mechanicalpropertiesoffluids',
+      'thermalpropertiesofmatter', 'thermodynamics', 'kinetictheory', 'oscillationsandwaves',
+      'simpleharmonicmotion', 'electrostatics', 'currentelectricity', 'magneticeffectsofcurrent',
+      'movingchargesandmagnetism', 'magnetismandmatter', 'electromagneticinduction',
+      'alternatingcurrent', 'electromagneticwaves', 'optics', 'rayoptics', 'waveoptics',
+      'dualnatureofmatterandradiation', 'atomsandnuclei', 'electronicdevices', 'semiconductorelectronics'
+    };
+
+    const chemChapters = {
+      'somebasicconceptsofchemistry', 'moleconcept', 'structureofatom', 'atomicstructure',
+      'classificationofelements', 'periodictable', 'chemicalbonding', 'statesofmatter',
+      'chemicalthermodynamics', 'equilibrium', 'chemicalequilibrium', 'ionicequilibrium',
+      'redoxreactions', 'hydrogen', 'sblockelements', 'pblockelements', 'organicchemistry',
+      'goc', 'hydrocarbons', 'environmentalchemistry', 'solidstate', 'solutions',
+      'electrochemistry', 'chemicalkinetics', 'surfacechemistry', 'metallurgy',
+      'dandfblockelements', 'coordinationcompounds', 'haloalkanesandhaloarenes',
+      'alcoholsphenolsandethers', 'aldehydesketonesandcarboxylicacids', 'amines',
+      'polymers', 'chemistryineverydaylife'
+    };
+
+    for (var b in bioChapters) {
+      if (norm.contains(b) || b.contains(norm)) return 'Biology';
+    }
+    for (var p in phyChapters) {
+      if (norm.contains(p) || p.contains(norm)) return 'Physics';
+    }
+    for (var c in chemChapters) {
+      if (norm.contains(c) || c.contains(norm)) return 'Chemistry';
+    }
+
+    return null;
+  }
+
   static Future<List<QuestionModel>> fetchQuestions({
     String? examId,
     String? subjectId,
@@ -2776,14 +2840,24 @@ class SupabaseService {
         }
       }
 
+      final String rawChap = (map['chapter'] ?? map['chapter_name'] ?? map['chapter_id'] ?? '').toString().trim();
       final String rawSub = (map['subject'] ?? map['subject_id'] ?? map['subject_name'] ?? map['subjectName'] ?? '').toString().trim();
-      final String finalSub = rawSub.isNotEmpty ? rawSub : 'Biology';
+      
+      String finalSub = rawSub;
+      if (finalSub.isEmpty || finalSub.toLowerCase() == 'general') {
+        final inferred = inferSubjectFromChapter(rawChap);
+        if (inferred != null) {
+          finalSub = inferred;
+        } else {
+          finalSub = 'Biology';
+        }
+      }
 
       models.add(QuestionModel(
         id: map['id']?.toString() ?? '',
         examId: map['exam']?.toString() ?? map['exam_id']?.toString() ?? 'NEET',
         subjectId: finalSub,
-        chapterId: map['chapter']?.toString() ?? map['chapter_id']?.toString() ?? 'General',
+        chapterId: rawChap.isNotEmpty ? rawChap : 'General',
         topicId: map['topic']?.toString() ?? map['topic_id']?.toString() ?? 'General',
         questionText: map['questionText']?.toString() ?? map['question_text']?.toString() ?? '',
         questionImage: map['questionImage']?.toString() ?? map['question_image']?.toString(),
@@ -2842,22 +2916,23 @@ class SupabaseService {
       }
     }
 
-    // 3. Filter by Selected Chapters
-    final Set<String> targetChapters = {};
+    // 3. Filter by Selected Chapters (using normalized chapter matching)
+    final Set<String> targetChapterNorms = {};
     if (chapterId != null && chapterId.trim().isNotEmpty) {
-      targetChapters.add(chapterId.trim().toLowerCase());
+      targetChapterNorms.add(normalizeChapterName(chapterId));
     }
     if (selectedChapters != null && selectedChapters.isNotEmpty) {
       for (var c in selectedChapters) {
-        if (c.trim().isNotEmpty) targetChapters.add(c.trim().toLowerCase());
+        final n = normalizeChapterName(c);
+        if (n.isNotEmpty) targetChapterNorms.add(n);
       }
     }
 
-    if (targetChapters.isNotEmpty) {
+    if (targetChapterNorms.isNotEmpty) {
       final chapFiltered = filtered.where((q) {
-        final qChap = q.chapterId.trim().toLowerCase();
-        for (var tc in targetChapters) {
-          if (qChap == tc || qChap.contains(tc) || tc.contains(qChap)) {
+        final qNorm = normalizeChapterName(q.chapterId);
+        for (var tc in targetChapterNorms) {
+          if (qNorm == tc || (qNorm.length >= 4 && tc.contains(qNorm)) || (tc.length >= 4 && qNorm.contains(tc))) {
             return true;
           }
         }
