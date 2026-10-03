@@ -8759,6 +8759,8 @@ class SupabaseService {
         'user_id': profileUserId,
         'user_email': user.email.trim().toLowerCase(),
         'user_phone': user.phoneNumber ?? '',
+        'order_id': customOrderId,
+        'order_number': customOrderId,
         'cart_items': items,
         'subtotal': totalAmount,
         'recovery_status': 'order_placed',
@@ -8767,6 +8769,21 @@ class SupabaseService {
       });
     } catch (e) {
       debugPrint('Notice inserting to abandoned_carts: $e');
+    }
+
+    // 4.5. Cloud backup insert to system_config table (guaranteed 100% cloud sync across all devices & PCs)
+    try {
+      final orderKey = 'order_${customOrderId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_')}';
+      await client.from('system_config').upsert({
+        'key': orderKey,
+        'value': jsonEncode({
+          ...orderData,
+          'items': items,
+        }),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Notice persisting order to system_config cloud table: $e');
     }
 
     // 5. Persist locally to user & admin order caches
@@ -9037,6 +9054,41 @@ class SupabaseService {
       debugPrint('Notice updating abandoned_carts: $e');
     }
 
+    // 4.5. Update system_config cloud order record status
+    try {
+      final configRes = await client.from('system_config').select('*').like('key', 'order_%');
+      if (configRes is List) {
+        for (var row in configRes.whereType<Map>()) {
+          final rawVal = row['value'];
+          Map<String, dynamic>? m;
+          if (rawVal is Map) {
+            m = Map<String, dynamic>.from(rawVal);
+          } else if (rawVal is String && rawVal.trim().isNotEmpty) {
+            try {
+              final decoded = jsonDecode(rawVal);
+              if (decoded is Map) m = Map<String, dynamic>.from(decoded);
+            } catch (_) {}
+          }
+          if (m != null) {
+            final ordId = (m['order_number'] ?? m['order_id'] ?? m['id'] ?? '').toString().trim();
+            if (ordId.isNotEmpty && (ordId == cleanOrderId || ordId.toLowerCase() == cleanOrderId.toLowerCase())) {
+              m['status'] = 'completed';
+              m['payment_status'] = 'completed';
+              if (paymentId.isNotEmpty) m['payment_id'] = paymentId;
+              m['updated_at'] = now.toIso8601String();
+              await client.from('system_config').upsert({
+                'key': row['key'],
+                'value': jsonEncode(m),
+                'updated_at': now.toIso8601String(),
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice updating system_config order status: $e');
+    }
+
     // 5. Multi-channel local cache update (strict ID match)
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -9303,20 +9355,26 @@ class SupabaseService {
       final logsRes = await client.from('notification_logs').select('*').eq('type', 'order_placed').order('created_at', ascending: false);
       if (logsRes is List) {
         for (var log in logsRes.whereType<Map>()) {
-          final bodyStr = (log['message_body'] ?? '').toString();
-          if (bodyStr.isNotEmpty) {
+          final rawBody = log['message_body'];
+          Map<String, dynamic>? parsedOrder;
+          if (rawBody is Map) {
+            parsedOrder = Map<String, dynamic>.from(rawBody);
+          } else if (rawBody is String && rawBody.trim().isNotEmpty) {
             try {
-              final Map<String, dynamic> parsedOrder = Map<String, dynamic>.from(jsonDecode(bodyStr));
-              final ordNum = (parsedOrder['order_number'] ?? parsedOrder['order_id'] ?? '').toString();
-              final key = (parsedOrder['payment_reference'] ?? ordNum ?? parsedOrder['id'] ?? '').toString();
-              if (key.isNotEmpty && !hasSeenKey(key)) {
-                addOrderKeys(key);
-                if (ordNum.isNotEmpty) addOrderKeys(ordNum);
-                parsedOrder['order_id'] ??= ordNum.isNotEmpty ? ordNum : key;
-                parsedOrder['order_number'] ??= ordNum.isNotEmpty ? ordNum : key;
-                orders.add(parsedOrder);
-              }
+              final decoded = jsonDecode(rawBody);
+              if (decoded is Map) parsedOrder = Map<String, dynamic>.from(decoded);
             } catch (_) {}
+          }
+          if (parsedOrder != null) {
+            final ordNum = (parsedOrder['order_number'] ?? parsedOrder['order_id'] ?? '').toString();
+            final key = (parsedOrder['payment_reference'] ?? ordNum ?? parsedOrder['id'] ?? '').toString();
+            if (key.isNotEmpty && !hasSeenKey(key)) {
+              addOrderKeys(key);
+              if (ordNum.isNotEmpty) addOrderKeys(ordNum);
+              parsedOrder['order_id'] ??= ordNum.isNotEmpty ? ordNum : key;
+              parsedOrder['order_number'] ??= ordNum.isNotEmpty ? ordNum : key;
+              orders.add(parsedOrder);
+            }
           }
         }
       }
@@ -9402,20 +9460,26 @@ class SupabaseService {
       final configRes = await client.from('system_config').select('*').like('key', 'order_%');
       if (configRes is List) {
         for (var row in configRes.whereType<Map>()) {
-          final valStr = (row['value'] ?? '').toString();
-          if (valStr.isNotEmpty) {
+          final rawVal = row['value'];
+          Map<String, dynamic>? parsedOrder;
+          if (rawVal is Map) {
+            parsedOrder = Map<String, dynamic>.from(rawVal);
+          } else if (rawVal is String && rawVal.trim().isNotEmpty) {
             try {
-              final Map<String, dynamic> parsedOrder = Map<String, dynamic>.from(jsonDecode(valStr));
-              final ordNum = (parsedOrder['order_number'] ?? parsedOrder['order_id'] ?? '').toString();
-              final key = (parsedOrder['payment_reference'] ?? ordNum ?? parsedOrder['id'] ?? '').toString();
-              if (key.isNotEmpty && !hasSeenKey(key)) {
-                addOrderKeys(key);
-                if (ordNum.isNotEmpty) addOrderKeys(ordNum);
-                parsedOrder['order_id'] ??= ordNum.isNotEmpty ? ordNum : key;
-                parsedOrder['order_number'] ??= ordNum.isNotEmpty ? ordNum : key;
-                orders.add(parsedOrder);
-              }
+              final decoded = jsonDecode(rawVal);
+              if (decoded is Map) parsedOrder = Map<String, dynamic>.from(decoded);
             } catch (_) {}
+          }
+          if (parsedOrder != null) {
+            final ordNum = (parsedOrder['order_number'] ?? parsedOrder['order_id'] ?? '').toString();
+            final key = (parsedOrder['payment_reference'] ?? ordNum ?? parsedOrder['id'] ?? '').toString();
+            if (key.isNotEmpty && !hasSeenKey(key)) {
+              addOrderKeys(key);
+              if (ordNum.isNotEmpty) addOrderKeys(ordNum);
+              parsedOrder['order_id'] ??= ordNum.isNotEmpty ? ordNum : key;
+              parsedOrder['order_number'] ??= ordNum.isNotEmpty ? ordNum : key;
+              orders.add(parsedOrder);
+            }
           }
         }
       }
