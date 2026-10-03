@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -267,7 +268,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
           ),
         );
       }
-      await SupabaseService.bulkDeleteAdminOrders([rawId], [o]);
+      unawaited(SupabaseService.bulkDeleteAdminOrders([rawId], [o]));
     }
   }
 
@@ -352,7 +353,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     }
 
     // 2. Perform fast background purge
-    await SupabaseService.bulkDeleteAdminOrders(targetIds, targetMaps);
+    unawaited(SupabaseService.bulkDeleteAdminOrders(targetIds, targetMaps));
   }
 
   void _exportSelectedCsv() {

@@ -9434,10 +9434,9 @@ class SupabaseService {
 
     // Filter out blacklisted deleted orders
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final List<String> deletedList = prefs.getStringList('cosmyra_deleted_order_ids') ?? [];
+      final deletedList = await getDeletedOrderBlacklist();
       if (deletedList.isNotEmpty) {
-        final Set<String> deletedSet = deletedList.map((e) => e.toLowerCase()).toSet();
+        final Set<String> deletedSet = deletedList.toSet();
         finalOrders.removeWhere((o) {
           final String id = (o['id'] ?? '').toString().toLowerCase();
           final String ordId = (o['order_id'] ?? '').toString().toLowerCase();
@@ -10356,6 +10355,18 @@ class SupabaseService {
     }
   }
 
+  static Future<List<String>> getDeletedOrderBlacklist() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('cosmyra_deleted_order_ids');
+      if (raw != null && raw.isNotEmpty) {
+        final List decoded = jsonDecode(raw);
+        return decoded.map((e) => e.toString().toLowerCase()).toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
   static Future<bool> bulkDeleteAdminOrders(List<String> orderIds, List<Map<String, dynamic>> orderMaps) async {
     final Set<String> targetKeys = {};
     for (var id in orderIds) {
@@ -10378,15 +10389,15 @@ class SupabaseService {
       }
     }
 
-    // 1. Immediately record all keys in SharedPreferences blacklist & purge local caches (INSTANT local persistence)
+    // 1. Save to persistent blacklist & clean local storage caches instantly
     try {
       final prefs = await SharedPreferences.getInstance();
-      final List<String> deletedList = prefs.getStringList('cosmyra_deleted_order_ids') ?? [];
-      final Set<String> updatedSet = Set<String>.from(deletedList);
+      final existing = await getDeletedOrderBlacklist();
+      final Set<String> updatedSet = Set<String>.from(existing);
       for (var key in targetKeys) {
         if (key.isNotEmpty) updatedSet.add(key.toLowerCase());
       }
-      await prefs.setStringList('cosmyra_deleted_order_ids', updatedSet.toList());
+      await prefs.setString('cosmyra_deleted_order_ids', jsonEncode(updatedSet.toList()));
 
       for (var keyName in ['cosmyra_user_orders', 'cosmyra_saved_admin_orders', 'cosmyra_abandoned_carts', 'cosmyra_entitlements']) {
         final str = prefs.getString(keyName);
@@ -10408,7 +10419,7 @@ class SupabaseService {
       debugPrint('Notice recording bulk deletion blacklist: $e');
     }
 
-    // 2. Fire-and-forget background DB delete (Non-blocking, ultra fast)
+    // 2. Fire-and-forget non-blocking DB deletion
     unawaited(Future(() async {
       final cleanKeys = targetKeys.where((k) => k.isNotEmpty).toList();
       for (var key in cleanKeys) {
