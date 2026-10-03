@@ -8879,6 +8879,12 @@ class SupabaseService {
 
   /// Extract Payment Screenshot URL from order record
   static String? extractPaymentScreenshotUrl(Map<String, dynamic> o) {
+    bool isValidUrl(String url) {
+      final u = url.trim();
+      if (u.isEmpty || u.contains('pub-r2.dev')) return false;
+      return u.startsWith('http://') || u.startsWith('https://') || u.startsWith('data:image/');
+    }
+
     // 1. Direct field check across all common field names
     for (final field in [
       'payment_screenshot_url',
@@ -8890,34 +8896,42 @@ class SupabaseService {
       'screenshotUrl',
     ]) {
       final val = (o[field] ?? '').toString().trim();
-      if (val.isNotEmpty && (val.startsWith('http://') || val.startsWith('https://') || val.startsWith('data:image/'))) {
+      if (isValidUrl(val)) {
         return val;
       }
     }
 
     // 2. Check payment_reference or payment_id if they contain a URL
     final ref = (o['payment_reference'] ?? '').toString().trim();
-    if (ref.startsWith('http://') || ref.startsWith('https://') || ref.startsWith('data:image/')) {
+    if (isValidUrl(ref)) {
       return ref;
     }
     final payId = (o['payment_id'] ?? '').toString().trim();
-    if (payId.startsWith('http://') || payId.startsWith('https://') || payId.startsWith('data:image/')) {
+    if (isValidUrl(payId)) {
       return payId;
     }
 
-    // 3. Search notes text for image URL
+    // 3. Search notes text for image URL or data URI
     final notes = (o['notes'] ?? '').toString();
+    final dataUriMatch = RegExp(r'(data:image/[a-zA-Z]+;base64,[A-Za-z0-9+/=]+)').firstMatch(notes);
+    if (dataUriMatch != null && dataUriMatch.group(1) != null) {
+      return dataUriMatch.group(1)!.trim();
+    }
+
     final match = RegExp(r'(?:Screenshot|Receipt|Image|http[:\s]*|https[:\s]*)+[:\s]*(https?://[^\s\|]+)', caseSensitive: false).firstMatch(notes);
     if (match != null && match.group(1) != null) {
       final urlCandidate = match.group(1)!.trim();
-      if (urlCandidate.isNotEmpty && (urlCandidate.startsWith('http://') || urlCandidate.startsWith('https://'))) {
+      if (isValidUrl(urlCandidate)) {
         return urlCandidate;
       }
     }
 
     final urlMatch = RegExp(r'(https?://[^\s\|]+\.(?:png|jpg|jpeg|webp)(?:\?[^\s\|]*)?)', caseSensitive: false).firstMatch(notes);
     if (urlMatch != null && urlMatch.group(1) != null) {
-      return urlMatch.group(1)!.trim();
+      final foundUrl = urlMatch.group(1)!.trim();
+      if (isValidUrl(foundUrl)) {
+        return foundUrl;
+      }
     }
 
     // 4. Check nested cart_items or extra JSON fields
@@ -8925,7 +8939,7 @@ class SupabaseService {
       for (var item in (o['cart_items'] as List)) {
         if (item is Map) {
           final itemUrl = (item['payment_screenshot_url'] ?? item['screenshot_url'] ?? item['screenshot'] ?? '').toString().trim();
-          if (itemUrl.isNotEmpty && (itemUrl.startsWith('http://') || itemUrl.startsWith('https://'))) {
+          if (isValidUrl(itemUrl)) {
             return itemUrl;
           }
         }
@@ -10119,7 +10133,7 @@ class SupabaseService {
         fileName: cleanName,
         mimeType: mimeType,
       );
-      if (r2Url != null && r2Url.isNotEmpty && !r2Url.contains('data:')) {
+      if (r2Url != null && r2Url.isNotEmpty && !r2Url.contains('pub-r2.dev')) {
         return r2Url;
       }
     } catch (e) {
@@ -10135,15 +10149,17 @@ class SupabaseService {
         fileOptions: FileOptions(contentType: mimeType, upsert: true),
       );
       final publicUrl = client.storage.from('media_assets').getPublicUrl(path);
-      if (publicUrl.isNotEmpty) {
+      if (publicUrl.isNotEmpty && !publicUrl.contains('pub-r2.dev')) {
         return publicUrl;
       }
     } catch (e) {
       debugPrint('Notice uploading to Supabase Storage media_assets bucket: $e');
     }
 
-    // 3. Fallback clean public web URL for website usage
-    return 'https://pub-r2.dev/uploads/$cleanName';
+    // 3. Fallback: Base64 Data URI (Guarantees image preview across all devices & browsers!)
+    final base64Str = base64Encode(fileBytes);
+    final effectiveMime = mimeType.isNotEmpty ? mimeType : 'image/png';
+    return 'data:$effectiveMime;base64,$base64Str';
   }
 
   static Future<bool> saveAdminMediaAsset(Map<String, dynamic> asset) async {

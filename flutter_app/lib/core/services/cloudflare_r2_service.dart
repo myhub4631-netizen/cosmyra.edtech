@@ -76,9 +76,8 @@ class CloudflareR2Service {
     final objectKey = 'uploads/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
 
     if (!isConfigured) {
-      debugPrint('Cloudflare R2 is not fully configured yet. Falling back to default R2 URL.');
-      final fallbackDomain = publicDomain.isNotEmpty ? publicDomain : 'https://pub-r2.dev';
-      return '$fallbackDomain/$objectKey';
+      debugPrint('Cloudflare R2 is not configured yet. Returning null for fallback handlers.');
+      return null;
     }
 
     final region = 'auto';
@@ -145,8 +144,7 @@ class CloudflareR2Service {
       debugPrint('Error uploading file to Cloudflare R2: $e');
     }
 
-    final publicBase = publicDomain.isNotEmpty ? publicDomain : 'https://pub-r2.dev';
-    return '$publicBase/$objectKey';
+    return null;
   }
 
   // --- Helper Signing Functions ---
