@@ -811,6 +811,21 @@ class _SubscriptionPricingScreenState extends State<SubscriptionPricingScreen> {
       {'feature': 'Price (INR)', 'trial': '₹99', 'starter': '₹249', 'pro': '₹449', 'ultimate': '₹689'},
     ];
 
+    final trialPlan = _plans.firstWhere((p) => p['id'] == 'plan_trial', orElse: () => {'price': 99});
+    final starterPlan = _plans.firstWhere((p) => p['id'] == 'plan_starter', orElse: () => {'price': 249});
+    final proPlan = _plans.firstWhere((p) => p['id'] == 'plan_pro', orElse: () => {'price': 449});
+    final ultimatePlan = _plans.firstWhere((p) => p['id'] == 'plan_ultimate', orElse: () => {'price': 689});
+
+    final trialPrice = (trialPlan['price'] as num?)?.toInt() ?? 99;
+    final starterPrice = (starterPlan['price'] as num?)?.toInt() ?? 249;
+    final proPrice = (proPlan['price'] as num?)?.toInt() ?? 449;
+    final ultimatePrice = (ultimatePlan['price'] as num?)?.toInt() ?? 689;
+
+    comparisonRows.last['trial'] = '₹$trialPrice';
+    comparisonRows.last['starter'] = '₹$starterPrice';
+    comparisonRows.last['pro'] = '₹$proPrice';
+    comparisonRows.last['ultimate'] = '₹$ultimatePrice';
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(isDesktop ? 28 : 18),
@@ -860,12 +875,12 @@ class _SubscriptionPricingScreenState extends State<SubscriptionPricingScreen> {
             child: DataTable(
               headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
               columnSpacing: isDesktop ? 32 : 18,
-              columns: const [
-                DataColumn(label: Text('Feature', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)))),
-                DataColumn(label: Text('Trial Pass (₹99)', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD97706)))),
-                DataColumn(label: Text('Starter (₹249)', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF059669)))),
-                DataColumn(label: Text('Pro (₹449) ★', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)))),
-                DataColumn(label: Text('Ultimate (₹689)', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB)))),
+              columns: [
+                const DataColumn(label: Text('Feature', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)))),
+                DataColumn(label: Text('Trial Pass (₹$trialPrice)', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFD97706)))),
+                DataColumn(label: Text('Starter (₹$starterPrice)', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF059669)))),
+                DataColumn(label: Text('Pro (₹$proPrice) ★', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)))),
+                DataColumn(label: Text('Ultimate (₹$ultimatePrice)', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2563EB)))),
               ],
               rows: comparisonRows.map((r) {
                 return DataRow(

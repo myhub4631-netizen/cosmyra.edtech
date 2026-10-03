@@ -5901,6 +5901,81 @@ class SupabaseService {
     'rec_neet_topic_booster',
   };
 
+  /// Fetch canonical Home Page content from Supabase system_config
+  static Future<Map<String, dynamic>> fetchHomePageContent() async {
+    try {
+      final res = await client
+          .from('system_config')
+          .select('value')
+          .eq('key', 'home_page_content')
+          .maybeSingle();
+      if (res != null && res['value'] != null) {
+        final val = res['value'];
+        Map<String, dynamic> contentMap = {};
+        if (val is String && val.trim().isNotEmpty) {
+          try {
+            contentMap = Map<String, dynamic>.from(jsonDecode(val) as Map);
+          } catch (_) {}
+        } else if (val is Map) {
+          contentMap = Map<String, dynamic>.from(val);
+        }
+        if (contentMap.isNotEmpty) {
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('cosmyra_cached_home_page_content', jsonEncode(contentMap));
+          } catch (_) {}
+          return contentMap;
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice loading home_page_content from system_config: $e');
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cached = prefs.getString('cosmyra_cached_home_page_content');
+      if (cached != null && cached.isNotEmpty) {
+        return Map<String, dynamic>.from(jsonDecode(cached) as Map);
+      }
+    } catch (_) {}
+
+    return {
+      'hero_title': 'Master NEET & JEE with All-India Test Series',
+      'hero_subtitle': 'Target NEET 2026 & JEE 2026 with 500+ Chapter Tests, NTA Level Mock Papers & Real-time AI Percentile Radar.',
+      'cta_text': 'Explore Test Series',
+      'hero_image_url': 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1200&auto=format&fit=crop&q=80',
+      'stats': [
+        {'value': '50,000+', 'label': 'Active Students'},
+        {'value': '500+', 'label': 'Full Length Tests'},
+        {'value': '15+ Yrs', 'label': 'NTA PYQ Banks'},
+        {'value': '98%', 'label': 'Satisfaction Rate'}
+      ],
+      'trust_badges': ['NTA Standard', 'Instant AI Solutions', 'All-India Rank Predictor'],
+      'announcement_bar': {
+        'show': true,
+        'title': '🔥 Special Offer: Get up to 85% OFF on NEET 2026 & 2027 Leader Test Series!',
+        'route': '/test-series'
+      }
+    };
+  }
+
+  /// Save Home Page content to Supabase system_config
+  static Future<bool> saveHomePageContent(Map<String, dynamic> contentMap) async {
+    try {
+      await client.from('system_config').upsert({
+        'key': 'home_page_content',
+        'value': jsonEncode(contentMap),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_cached_home_page_content', jsonEncode(contentMap));
+      return true;
+    } catch (e) {
+      debugPrint('Error saving home_page_content to system_config: $e');
+      return false;
+    }
+  }
+
   /// Fetch all real home screen recommendations without hardcoded demo data
   static Future<List<Map<String, dynamic>>> fetchHomeRecommendations() async {
     final List<Map<String, dynamic>> list = [];

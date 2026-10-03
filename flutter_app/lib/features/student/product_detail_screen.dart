@@ -478,15 +478,81 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with TickerPr
     }
 
     final result = testMap.values.toList();
+    final String sTitle = item.title.toLowerCase();
+    final String sYear = item.targetYear;
+
     for (int i = 0; i < result.length; i++) {
       result[i]['number'] = '${i + 1 < 10 ? '0${i + 1}' : '${i + 1}'}';
       final rawDate = result[i]['test_date_time'] ?? result[i]['scheduled_at'] ?? result[i]['test_date'];
-      if (rawDate == null || rawDate.toString().trim().isEmpty) {
-        final generatedDate = DateTime(2026, 10, 11, 14, 0).add(Duration(days: i * 7));
-        result[i]['test_date_time'] = generatedDate.toIso8601String();
+      var dt = parseFlexibleDateTime(rawDate);
+      if (dt == null) {
+        final int targetYr = int.tryParse(sYear) ?? 2027;
+        final int startYear = targetYr > 2000 ? targetYr - 1 : 2026;
+        int startDay = 4;
+        if (sTitle.contains('leader')) {
+          startDay = 11;
+        } else if (sTitle.contains('fst') || sTitle.contains('full')) {
+          startDay = 8;
+        } else if (sTitle.contains('beginner')) {
+          startDay = 4;
+        }
+        dt = DateTime(startYear, 10, startDay, 14, 0).add(Duration(days: i * 7));
       }
+      result[i]['test_date_time'] = dt.toIso8601String();
+      result[i]['scheduled_at'] = dt.toIso8601String();
+      result[i]['test_date'] = dt.toIso8601String();
     }
     return result;
+  }
+
+  DateTime? parseFlexibleDateTime(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is DateTime) return raw;
+    final str = raw.toString().trim();
+    if (str.isEmpty) return null;
+
+    final iso = DateTime.tryParse(str);
+    if (iso != null) return iso;
+
+    final formats = [
+      'dd MMM yyyy, hh:mm a',
+      'dd MMM yyyy, HH:mm',
+      'dd MMM yyyy',
+      'yyyy-MM-dd HH:mm:ss',
+      'yyyy-MM-dd',
+      'd MMM yyyy, hh:mm a',
+      'd MMM yyyy',
+    ];
+
+    for (var fmt in formats) {
+      try {
+        return DateFormat(fmt).parse(str);
+      } catch (_) {}
+    }
+
+    try {
+      final match = RegExp(r'(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})(?:,\s*(\d{1,2}):(\d{2})\s*(AM|PM)?)?', caseSensitive: false).firstMatch(str);
+      if (match != null) {
+        final day = int.parse(match.group(1)!);
+        final monthStr = match.group(2)!.toLowerCase();
+        final year = int.parse(match.group(3)!);
+        int hour = match.group(4) != null ? int.parse(match.group(4)!) : 14;
+        final minute = match.group(5) != null ? int.parse(match.group(5)!) : 0;
+        final ampm = match.group(6)?.toUpperCase();
+
+        if (ampm == 'PM' && hour < 12) hour += 12;
+        if (ampm == 'AM' && hour == 12) hour = 0;
+
+        const months = {
+          'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+          'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
+        };
+        final month = months[monthStr.substring(0, 3)] ?? 10;
+        return DateTime(year, month, day, hour, minute);
+      }
+    } catch (_) {}
+
+    return null;
   }
 
   void _downloadSyllabus() async {
@@ -2638,21 +2704,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with TickerPr
 
               // Parse test date & time
               final rawDateTime = t['test_date_time'] ?? t['scheduled_at'] ?? t['test_date'] ?? t['start_time'] ?? t['date_time'] ?? t['scheduledAt'] ?? t['dateTime'];
-              DateTime? dt;
-              if (rawDateTime != null) {
-                if (rawDateTime is DateTime) {
-                  dt = rawDateTime;
-                } else {
-                  dt = DateTime.tryParse(rawDateTime.toString().trim());
+              DateTime? dt = parseFlexibleDateTime(rawDateTime);
+              if (dt == null) {
+                final int targetYr = int.tryParse(item.targetYear) ?? 2027;
+                final int startYear = targetYr > 2000 ? targetYr - 1 : 2026;
+                int startDay = 4;
+                final String sTitle = item.title.toLowerCase();
+                if (sTitle.contains('leader')) {
+                  startDay = 11;
+                } else if (sTitle.contains('fst') || sTitle.contains('full')) {
+                  startDay = 8;
+                } else if (sTitle.contains('beginner')) {
+                  startDay = 4;
                 }
+                dt = DateTime(startYear, 10, startDay, 14, 0).add(Duration(days: index * 7));
               }
-              if (dt != null && dt.hour == 0 && dt.minute == 0) {
-                dt = DateTime(dt.year, dt.month, dt.day, 14, 0);
-              }
-              final bool isUpcoming = dt != null && dt.isAfter(DateTime.now());
-              final String formattedDateTime = dt != null
-                  ? DateFormat('dd MMM yyyy, hh:mm a').format(dt)
-                  : '';
+              final bool isUpcoming = dt.isAfter(DateTime.now());
+              final String formattedDateTime = DateFormat('dd MMM yyyy, hh:mm a').format(dt);
 
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
