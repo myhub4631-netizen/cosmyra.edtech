@@ -634,6 +634,20 @@ class SupabaseService {
     }
   }
 
+  static Future<void> resetPasswordForEmail(String email) async {
+    try {
+      await client.auth.resetPasswordForEmail(
+        email.trim(),
+        redirectTo: kIsWeb
+            ? '${Uri.base.origin}/login'
+            : 'cosmyraneetjee://login-callback',
+      );
+    } catch (e) {
+      debugPrint('Reset password error: $e');
+      rethrow;
+    }
+  }
+
 
 
   static UserProfileModel _ensureSuperAdminRole(UserProfileModel profile) {

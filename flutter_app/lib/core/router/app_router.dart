@@ -6,6 +6,8 @@ import '../../models/models.dart';
 import '../../models/pyq_models.dart';
 import '../../shared/widgets/not_found_screen.dart';
 import '../../features/landing/landing_page_screen.dart';
+import '../../features/auth/auth_screen.dart';
+import '../../features/auth/login_screen.dart';
 import '../../features/auth/signup_screen.dart';
 import '../../features/auth/oauth_callback_screen.dart';
 import '../../features/dashboard/user_dashboard_screen.dart';
@@ -286,18 +288,25 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/login',
-      builder: (context, state) => LandingPageScreen(
-        isLoginRoute: true,
-        onStartPracticing: () => context.go('/practice'),
-        onExploreTests: () => context.go('/mock-tests'),
-        onSignUp: () => context.go('/signup'),
-        onLogIn: () => context.go('/login'),
+      builder: (context, state) => AuthScreen(
+        initialIsLogin: true,
+        onAuthSuccess: (userProfile) {
+          final redirect = state.uri.queryParameters['redirect'];
+          if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
+            context.go(redirect);
+          } else if (userProfile.isAdmin || userProfile.isSuperAdmin) {
+            context.go('/admin');
+          } else {
+            context.go('/dashboard');
+          }
+        },
       ),
     ),
     GoRoute(
       path: '/signup',
-      builder: (context, state) => SignUpScreen(
-        onSignUpSuccess: (userProfile) {
+      builder: (context, state) => AuthScreen(
+        initialIsLogin: false,
+        onAuthSuccess: (userProfile) {
           final redirect = state.uri.queryParameters['redirect'];
           if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
             context.go(redirect);

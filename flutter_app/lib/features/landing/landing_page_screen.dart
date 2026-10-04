@@ -349,20 +349,16 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
         ),
         const SizedBox(height: 24),
 
-        if (widget.isLoginRoute || _showEmailLoginForm) ...[
-          _buildEmailLoginForm(),
-        ] else ...[
-          OutlinedButton.icon(
-            onPressed: () => setState(() => _showEmailLoginForm = true),
-            icon: const Icon(Icons.email_outlined, color: Color(0xFF4F46E5), size: 18),
-            label: Text('Log in with Email & Password', style: GoogleFonts.inter(color: const Color(0xFF4F46E5), fontWeight: FontWeight.bold, fontSize: 13.5)),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 48),
-              side: const BorderSide(color: Color(0xFFE2E8F0)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+        OutlinedButton.icon(
+          onPressed: widget.onLogIn,
+          icon: const Icon(Icons.email_outlined, color: Color(0xFF4F46E5), size: 18),
+          label: Text('Log in with Email & Password', style: GoogleFonts.inter(color: const Color(0xFF4F46E5), fontWeight: FontWeight.bold, fontSize: 13.5)),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 48),
+            side: const BorderSide(color: Color(0xFFE2E8F0)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-        ],
+        ),
       ],
     );
   }
