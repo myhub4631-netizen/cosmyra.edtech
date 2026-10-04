@@ -6071,8 +6071,41 @@ class SupabaseService {
   static String _lastLandingPageConfigJson = '';
   static final ValueNotifier<LandingPageConfigModel?> landingPageConfigNotifier = ValueNotifier<LandingPageConfigModel?>(null);
 
+  /// Synchronous instant lookup for Landing Page config (0ms delay)
+  static LandingPageConfigModel getCachedLandingPageConfigSync() {
+    if (_lastLandingPageConfigJson.isEmpty) {
+      try {
+        SharedPreferences.getInstance().then((prefs) {
+          final cachedStr = prefs.getString('cosmyra_cached_landing_page_config');
+          if (cachedStr != null && cachedStr.trim().isNotEmpty && cachedStr != _lastLandingPageConfigJson) {
+            _lastLandingPageConfigJson = cachedStr;
+            final jsonMap = jsonDecode(cachedStr) as Map<String, dynamic>;
+            _cachedLandingPageConfig = LandingPageConfigModel.fromJson(jsonMap);
+            landingPageConfigNotifier.value = _cachedLandingPageConfig;
+          }
+        });
+      } catch (_) {}
+    }
+    return _cachedLandingPageConfig;
+  }
+
   /// Fetch canonical Landing Page configuration from system_config (with instant local caching fallback)
   static Future<LandingPageConfigModel> fetchLandingPageConfig() async {
+    // 1. Instantly load from local storage if memory cache is empty
+    if (_lastLandingPageConfigJson.isEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cachedStr = prefs.getString('cosmyra_cached_landing_page_config');
+        if (cachedStr != null && cachedStr.trim().isNotEmpty) {
+          _lastLandingPageConfigJson = cachedStr;
+          final jsonMap = jsonDecode(cachedStr) as Map<String, dynamic>;
+          _cachedLandingPageConfig = LandingPageConfigModel.fromJson(jsonMap);
+          landingPageConfigNotifier.value = _cachedLandingPageConfig;
+        }
+      } catch (_) {}
+    }
+
+    // 2. Query Supabase in background to revalidate configuration
     try {
       final res = await client
           .from('system_config')
@@ -6096,33 +6129,17 @@ class SupabaseService {
             Future.microtask(() {
               landingPageConfigNotifier.value = _cachedLandingPageConfig;
             });
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('cosmyra_cached_landing_page_config', jsonStr);
+            } catch (_) {}
           }
-          try {
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('cosmyra_cached_landing_page_config', jsonStr);
-          } catch (_) {}
           return _cachedLandingPageConfig;
         }
       }
     } catch (e) {
       debugPrint('Notice loading canonical_landing_page_config from system_config: $e');
     }
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cachedStr = prefs.getString('cosmyra_cached_landing_page_config');
-      if (cachedStr != null && cachedStr.trim().isNotEmpty) {
-        if (cachedStr != _lastLandingPageConfigJson) {
-          _lastLandingPageConfigJson = cachedStr;
-          final jsonMap = jsonDecode(cachedStr) as Map<String, dynamic>;
-          _cachedLandingPageConfig = LandingPageConfigModel.fromJson(jsonMap);
-          Future.microtask(() {
-            landingPageConfigNotifier.value = _cachedLandingPageConfig;
-          });
-        }
-        return _cachedLandingPageConfig;
-      }
-    } catch (_) {}
 
     return _cachedLandingPageConfig;
   }

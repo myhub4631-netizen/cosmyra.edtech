@@ -28,18 +28,35 @@ class LandingPageScreen extends StatefulWidget {
 }
 
 class _LandingPageScreenState extends State<LandingPageScreen> {
-  LandingPageConfigModel _config = LandingPageConfigModel.defaultConfig();
+  LandingPageConfigModel _config = SupabaseService.getCachedLandingPageConfigSync();
   List<DashboardBannerModel> _banners = [];
   bool _isLoadingBanners = true;
+  int _renderStage = 1; // Stage 1: Header + Hero immediately (Frame 1)
 
   @override
   void initState() {
     super.initState();
     SupabaseService.authNotifier.addListener(_onLandingAuthChanged);
     SupabaseService.landingPageConfigNotifier.addListener(_onConfigUpdated);
+
+    // Progressive deferred rendering pipeline:
+    // Frame 1: Header + Hero (LCP candidate paint in <30ms)
+    // Frame 2: Stats & Banners
+    // Frame 3: Test Series, Features, CTA & Footer
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() => _renderStage = 2);
+        Future.delayed(const Duration(milliseconds: 60), () {
+          if (mounted) {
+            setState(() => _renderStage = 3);
+          }
+        });
+      }
+    });
+
     _initializeContent();
 
-    // Check if user is already logged in
+    // Check if user is already logged in asynchronously without blocking initial frame
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         final user = await SupabaseService.getCurrentUser();
@@ -74,13 +91,13 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
   }
 
   Future<void> _initializeContent() async {
-    // Instant cached config load
+    // Background async config revalidation (never blocks Frame 1)
     final config = await SupabaseService.fetchLandingPageConfig();
     if (mounted) {
       setState(() => _config = config);
     }
 
-    // Async banner load
+    // Async banner loading
     try {
       final bannerList = await SupabaseService.fetchBanners(onlyActive: true);
       if (mounted) {
@@ -124,9 +141,10 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
             // Header Navigation Bar
             _buildHeaderNav(context, isDesktop),
 
-            // Main Dynamic Landing Page Content
+            // Main Dynamic Landing Page Content with Progressive Below-the-Fold Mounting
             Expanded(
               child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
                 child: Column(
                   children: [
                     ..._buildOrderedSections(context, isDesktop, isTablet),
@@ -152,38 +170,75 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
           break;
         case 'stats':
           if (_config.stats.isVisible) {
-            sectionWidgets.add(_buildStatsMetricsBar(isDesktop, isTablet));
+            if (_renderStage >= 2) {
+              sectionWidgets.add(_buildStatsMetricsBar(isDesktop, isTablet));
+            } else {
+              sectionWidgets.add(_buildSectionSkeleton(height: 90));
+            }
           }
           break;
         case 'banners':
           if (_config.banners.isVisible && _banners.isNotEmpty) {
-            sectionWidgets.add(_buildBannersSection(isDesktop));
+            if (_renderStage >= 2) {
+              sectionWidgets.add(_buildBannersSection(isDesktop));
+            } else {
+              sectionWidgets.add(_buildSectionSkeleton(height: 220));
+            }
           }
           break;
         case 'test_series':
           if (_config.testSeries.isVisible) {
-            sectionWidgets.add(_buildTestSeriesSection());
+            if (_renderStage >= 3) {
+              sectionWidgets.add(_buildTestSeriesSection());
+            } else {
+              sectionWidgets.add(_buildSectionSkeleton(height: 380));
+            }
           }
           break;
         case 'features':
           if (_config.features.isVisible) {
-            sectionWidgets.add(_buildFeaturesSection(context, isDesktop, isTablet));
+            if (_renderStage >= 3) {
+              sectionWidgets.add(_buildFeaturesSection(context, isDesktop, isTablet));
+            } else {
+              sectionWidgets.add(_buildSectionSkeleton(height: 340));
+            }
           }
           break;
         case 'cta_banner':
           if (_config.ctaBanner.isVisible) {
-            sectionWidgets.add(_buildNewHereBanner(isDesktop));
+            if (_renderStage >= 3) {
+              sectionWidgets.add(_buildNewHereBanner(isDesktop));
+            } else {
+              sectionWidgets.add(_buildSectionSkeleton(height: 140));
+            }
           }
           break;
         case 'footer':
           if (_config.footer.isVisible) {
-            sectionWidgets.add(_buildLandingFooter(context, isDesktop));
+            if (_renderStage >= 3) {
+              sectionWidgets.add(_buildLandingFooter(context, isDesktop));
+            } else {
+              sectionWidgets.add(_buildSectionSkeleton(height: 120));
+            }
           }
           break;
       }
     }
 
     return sectionWidgets;
+  }
+
+  Widget _buildSectionSkeleton({required double height}) {
+    return Container(
+      width: double.infinity,
+      height: height,
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF1F5F9)),
+      ),
+    );
   }
 
   // ================= 1. HEADER NAV BAR =================
