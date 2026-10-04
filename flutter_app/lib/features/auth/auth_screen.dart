@@ -698,70 +698,35 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         constraints: const BoxConstraints(maxWidth: 460),
         child: Column(
           children: [
-            // Top bar: Back Button & Badge
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                InkWell(
-                  onTap: widget.onBackTap ?? () {
-                    if (Navigator.canPop(context)) {
-                      Navigator.pop(context);
-                    } else {
-                      context.go('/');
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.arrow_back_rounded, size: 16, color: Color(0xFF64748B)),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Home',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF64748B),
-                          ),
+            // Top bar: Badge (if enabled)
+            if (_config.showBadge && badge.isNotEmpty)
+              Align(
+                alignment: Alignment.centerRight,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFC7D2FE)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        badge,
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFF4F46E5),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-                if (_config.showBadge && badge.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEEF2FF),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFC7D2FE)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 14),
-                        const SizedBox(width: 6),
-                        Text(
-                          badge,
-                          style: GoogleFonts.inter(
-                            color: const Color(0xFF4F46E5),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1, end: 0),
+              ),
 
             const SizedBox(height: 24),
 
