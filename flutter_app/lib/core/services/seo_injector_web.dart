@@ -302,7 +302,30 @@ void _injectRawCode(String id, String rawCode, html.Element? parent, {bool inser
   final container = html.DivElement()
     ..id = id
     ..style.display = 'none';
+
   container.setInnerHtml(rawCode, treeSanitizer: html.NodeTreeSanitizer.trusted);
+
+  // Re-create script tags so the browser executes them dynamically
+  final scriptElements = container.querySelectorAll('script');
+  for (final script in scriptElements) {
+    if (script is html.ScriptElement) {
+      final newScript = html.ScriptElement();
+      if (script.type.isNotEmpty) newScript.type = script.type;
+      if (script.src != null && script.src!.isNotEmpty) {
+        newScript.src = script.src;
+        newScript.async = script.async;
+      } else {
+        newScript.text = script.text;
+      }
+      for (final attr in script.attributes.keys) {
+        final attrStr = attr.toString();
+        if (attrStr != 'src' && attrStr != 'type') {
+          newScript.setAttribute(attrStr, script.getAttribute(attrStr) ?? '');
+        }
+      }
+      script.replaceWith(newScript);
+    }
+  }
 
   if (insertAtStart && parent.children.isNotEmpty) {
     parent.insertBefore(container, parent.firstChild);
