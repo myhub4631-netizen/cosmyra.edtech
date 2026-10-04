@@ -425,7 +425,7 @@ class _AdminPromoDropdownScreenState extends State<AdminPromoDropdownScreen> {
                                         child: Stack(
                                           alignment: Alignment.centerRight,
                                           children: [
-                                            _buildTextField(_actionUrlCtrl, 'Target Link URL (e.g. https://neet-jee.in/app-release.apk)', Icons.link_rounded),
+                                            _buildTextField(_actionUrlCtrl, 'Target Download URL (Cloudflare R2 link or https://neet-jee.in/app-release.apk)', Icons.cloud_download_rounded),
                                             Positioned(
                                               right: 8,
                                               child: TextButton.icon(
@@ -437,8 +437,8 @@ class _AdminPromoDropdownScreenState extends State<AdminPromoDropdownScreen> {
                                                   foregroundColor: const Color(0xFF4F46E5),
                                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                                 ),
-                                                icon: const Icon(Icons.android_rounded, size: 14),
-                                                label: const Text('Use APK Link', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                                icon: const Icon(Icons.cloud_done_rounded, size: 14),
+                                                label: const Text('R2 APK Link', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                               ),
                                             ),
                                           ],
