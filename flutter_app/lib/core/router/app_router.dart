@@ -1082,6 +1082,22 @@ final GoRouter appRouter = GoRouter(
       redirect: (context, state) => '/admin/dashboard',
     ),
     GoRoute(
+      path: '/admin/cms/auth',
+      builder: (context, state) => const AdminAuthManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/auth-cms',
+      builder: (context, state) => const AdminAuthManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/auth-manager',
+      builder: (context, state) => const AdminAuthManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/auth_cms',
+      builder: (context, state) => const AdminAuthManagerScreen(),
+    ),
+    GoRoute(
       path: '/admin/banners',
       builder: (context, state) => AdminBannerManagerScreen(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
@@ -1287,14 +1303,6 @@ final GoRouter appRouter = GoRouter(
       ),
     ),
 
-    GoRoute(
-      path: '/admin/cms/auth',
-      builder: (context, state) => const AdminAuthManagerScreen(),
-    ),
-    GoRoute(
-      path: '/admin/auth-cms',
-      builder: (context, state) => const AdminAuthManagerScreen(),
-    ),
 
     // --- CMS & Dynamic Content Routes ---
     GoRoute(
