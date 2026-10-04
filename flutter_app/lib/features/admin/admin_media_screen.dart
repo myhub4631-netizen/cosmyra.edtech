@@ -116,6 +116,7 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
   int get _imageCount => _assets.where((a) => a['file_type'] == 'image').length;
   int get _pdfCount => _assets.where((a) => a['file_type'] == 'pdf').length;
   int get _svgCount => _assets.where((a) => a['file_type'] == 'svg').length;
+  int get _apkCount => _assets.where((a) => a['file_type'] == 'apk').length;
   double get _totalSizeMb {
     double totalKb = 0;
     for (var a in _assets) {
@@ -192,7 +193,7 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                         : () async {
                             final result = await FilePicker.platform.pickFiles(
                               type: FileType.custom,
-                              allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'pdf', 'svg', 'doc', 'docx'],
+                              allowedExtensions: ['apk', 'jpg', 'jpeg', 'png', 'webp', 'pdf', 'svg', 'doc', 'docx', 'mp4', 'zip', 'csv'],
                               withData: true,
                             );
                             if (result != null && result.files.isNotEmpty) {
@@ -200,7 +201,9 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                               setDialogState(() {
                                 pickedFile = f;
                                 final ext = (f.extension ?? '').toLowerCase();
-                                if (ext == 'pdf') {
+                                if (ext == 'apk') {
+                                  fileType = 'apk';
+                                } else if (ext == 'pdf') {
                                   fileType = 'pdf';
                                 } else if (ext == 'svg') {
                                   fileType = 'svg';
@@ -242,7 +245,7 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                           const SizedBox(height: 8),
                           Text(
                             pickedFile == null
-                                ? 'Click to browse image, PDF, or SVG'
+                                ? 'Click to browse APK app, Image, PDF, or SVG'
                                 : (isUploading ? 'Uploading: ${pickedFile!.name}' : pickedFile!.name),
                             style: GoogleFonts.inter(
                               fontSize: 13,
@@ -286,7 +289,7 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                     controller: titleCtrl,
                     enabled: !isUploading,
                     decoration: InputDecoration(
-                      hintText: 'e.g. NEET 2026 Biology Plant Cell Diagram',
+                      hintText: 'e.g. NEET 2026 Android Release v2.1.6',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     ),
@@ -299,6 +302,7 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                   DropdownButtonFormField<String>(
                     initialValue: categoryCtrl.text,
                     items: const [
+                      DropdownMenuItem(value: 'Android App Releases', child: Text('Android App Releases (.apk)')),
                       DropdownMenuItem(value: 'Question Diagrams', child: Text('Question Diagrams')),
                       DropdownMenuItem(value: 'Syllabus & Curriculum', child: Text('Syllabus & Curriculum')),
                       DropdownMenuItem(value: 'Study Notes', child: Text('Study Notes (PDF)')),
@@ -421,14 +425,21 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                                   if (publicUrl.isEmpty && pickedFile != null) {
                                     sizeKb = (pickedFile!.size / 1024).ceil();
                                     final cleanName = pickedFile!.name.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+                                    final effectiveMime = fileType == 'apk'
+                                        ? 'application/vnd.android.package-archive'
+                                        : (fileType == 'pdf'
+                                            ? 'application/pdf'
+                                            : (fileType == 'svg'
+                                                ? 'image/svg+xml'
+                                                : 'image/png'));
                                     final uploadedUrl = await SupabaseService.uploadMediaFile(
                                       fileBytes: pickedFile!.bytes,
                                       fileName: cleanName,
-                                      mimeType: fileType == 'pdf' ? 'application/pdf' : (fileType == 'svg' ? 'image/svg+xml' : 'image/png'),
+                                      mimeType: effectiveMime,
                                     );
                                     publicUrl = uploadedUrl ?? 'https://neet-jee.in/assets/uploads/$cleanName';
                                   } else if (publicUrl.isEmpty) {
-                                    final cleanName = 'asset_${DateTime.now().millisecondsSinceEpoch}.${fileType == 'pdf' ? 'pdf' : (fileType == 'svg' ? 'svg' : 'png')}';
+                                    final cleanName = 'asset_${DateTime.now().millisecondsSinceEpoch}.${fileType == 'apk' ? 'apk' : (fileType == 'pdf' ? 'pdf' : (fileType == 'svg' ? 'svg' : 'png'))}';
                                     publicUrl = 'https://neet-jee.in/assets/uploads/$cleanName';
                                   }
 
@@ -439,9 +450,9 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                                   final newAsset = {
                                     'id': 'med_${DateTime.now().millisecondsSinceEpoch}',
                                     'title': titleCtrl.text.trim(),
-                                    'file_name': pickedFile?.name ?? 'uploaded_asset.${fileType == 'pdf' ? 'pdf' : (fileType == 'svg' ? 'svg' : 'png')}',
+                                    'file_name': pickedFile?.name ?? 'uploaded_asset.${fileType == 'apk' ? 'apk' : (fileType == 'pdf' ? 'pdf' : (fileType == 'svg' ? 'svg' : 'png'))}',
                                     'file_type': fileType,
-                                    'mime_type': fileType == 'pdf' ? 'application/pdf' : (fileType == 'svg' ? 'image/svg+xml' : 'image/png'),
+                                    'mime_type': fileType == 'apk' ? 'application/vnd.android.package-archive' : (fileType == 'pdf' ? 'application/pdf' : (fileType == 'svg' ? 'image/svg+xml' : 'image/png')),
                                     'file_size_kb': sizeKb,
                                     'public_url': publicUrl,
                                     'category': categoryCtrl.text.trim(),
@@ -675,32 +686,43 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
-                  child: type == 'pdf'
+                  child: type == 'apk'
                       ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.picture_as_pdf_rounded, size: 64, color: Color(0xFFEF4444)),
+                            const Icon(Icons.android_rounded, size: 64, color: Color(0xFF059669)),
                             const SizedBox(height: 12),
-                            Text(asset['file_name'] ?? 'Document.pdf', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text(asset['file_name'] ?? 'AppRelease.apk', style: const TextStyle(fontWeight: FontWeight.bold)),
                             const SizedBox(height: 4),
-                            Text('${asset['file_size_kb']} KB • PDF Document', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            Text('${asset['file_size_kb']} KB • Android Application Package (.apk)', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                           ],
                         )
-                      : type == 'svg'
+                      : type == 'pdf'
                           ? Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.polyline_rounded, size: 64, color: Color(0xFF8B5CF6)),
+                                const Icon(Icons.picture_as_pdf_rounded, size: 64, color: Color(0xFFEF4444)),
                                 const SizedBox(height: 12),
-                                Text(asset['file_name'] ?? 'Graphic.svg', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                Text(asset['file_name'] ?? 'Document.pdf', style: const TextStyle(fontWeight: FontWeight.bold)),
                                 const SizedBox(height: 4),
-                                const Text('Vector XML / SVG Illustration', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                Text('${asset['file_size_kb']} KB • PDF Document', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                               ],
                             )
-                          : ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: _buildSafeImageThumbnail(url, fit: BoxFit.contain),
-                            ),
+                          : type == 'svg'
+                              ? Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.polyline_rounded, size: 64, color: Color(0xFF8B5CF6)),
+                                    const SizedBox(height: 12),
+                                    Text(asset['file_name'] ?? 'Graphic.svg', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 4),
+                                    const Text('Vector XML / SVG Illustration', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                  ],
+                                )
+                              : ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: _buildSafeImageThumbnail(url, fit: BoxFit.contain),
+                                ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -937,6 +959,8 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                       const SizedBox(width: 14),
                       _buildMetricCard('PDF Documents', '$_pdfCount', Icons.picture_as_pdf_outlined, const Color(0xFFEF4444), const Color(0xFFFEF2F2)),
                       const SizedBox(width: 14),
+                      _buildMetricCard('Android APKs', '$_apkCount', Icons.android_outlined, const Color(0xFF059669), const Color(0xFFECFDF5)),
+                      const SizedBox(width: 14),
                       _buildMetricCard('Vector SVGs', '$_svgCount', Icons.polyline_outlined, const Color(0xFF8B5CF6), const Color(0xFFF5F3FF)),
                       const SizedBox(width: 14),
                       _buildMetricCard('Storage Used', '${_totalSizeMb.toStringAsFixed(1)} MB', Icons.storage_rounded, const Color(0xFFD97706), const Color(0xFFFFFBEB)),
@@ -976,6 +1000,7 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
                                 ButtonSegment(value: 'all', label: Text('All')),
                                 ButtonSegment(value: 'image', label: Text('Images')),
                                 ButtonSegment(value: 'pdf', label: Text('PDFs')),
+                                ButtonSegment(value: 'apk', label: Text('APKs')),
                                 ButtonSegment(value: 'svg', label: Text('SVGs')),
                               ],
                               selected: {_selectedTypeFilter},
@@ -1101,14 +1126,16 @@ class _AdminMediaScreenState extends State<AdminMediaScreen> {
             child: Stack(
               children: [
                 Center(
-                  child: type == 'pdf'
-                      ? const Icon(Icons.picture_as_pdf_rounded, size: 48, color: Color(0xFFEF4444))
-                      : type == 'svg'
-                          ? const Icon(Icons.polyline_rounded, size: 48, color: Color(0xFF8B5CF6))
-                          : ClipRRect(
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
-                              child: _buildSafeImageThumbnail(url, height: 140),
-                            ),
+                  child: type == 'apk'
+                      ? const Icon(Icons.android_rounded, size: 48, color: Color(0xFF059669))
+                      : type == 'pdf'
+                          ? const Icon(Icons.picture_as_pdf_rounded, size: 48, color: Color(0xFFEF4444))
+                          : type == 'svg'
+                              ? const Icon(Icons.polyline_rounded, size: 48, color: Color(0xFF8B5CF6))
+                              : ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
+                                  child: _buildSafeImageThumbnail(url, height: 140),
+                                ),
                 ),
                 Positioned(
                   top: 8,
