@@ -8218,7 +8218,7 @@ class SupabaseService {
   // ADVANCED SEO & TRACKING MANAGER SERVICE METHODS
   // =========================================================================
 
-  /// Fetch Global SEO & Tracking Settings with fail-safe local cache fallback
+  /// Fetch Global SEO & Tracking Settings
   static Future<SeoGlobalSettingsModel> fetchSeoGlobalSettings() async {
     SeoGlobalSettingsModel? localSettings;
     try {
@@ -8231,95 +8231,138 @@ class SupabaseService {
       debugPrint('Local SEO cache read error: $e');
     }
 
+    // 1. Primary remote read: Fetch from app_settings (key = 'site_code_settings' or 'seo_global_settings')
+    try {
+      final appSettingRes = await client
+          .from('app_settings')
+          .select('value')
+          .or('key.eq.site_code_settings,key.eq.seo_global_settings')
+          .limit(1)
+          .maybeSingle();
+
+      if (appSettingRes != null && appSettingRes['value'] != null) {
+        final Map<String, dynamic> valMap = Map<String, dynamic>.from(appSettingRes['value'] as Map);
+        final remoteSettings = SeoGlobalSettingsModel.fromJson(valMap);
+        return remoteSettings;
+      }
+    } catch (e) {
+      debugPrint('Error fetching site_code_settings from app_settings: $e');
+    }
+
+    // 2. Secondary remote read: Try fetching from seo_global_settings table if it exists
     try {
       final res = await client.from('seo_global_settings').select('*').limit(1).maybeSingle();
       if (res != null) {
         final remoteSettings = SeoGlobalSettingsModel.fromJson(res);
-        if (localSettings != null) {
-          final merged = remoteSettings.copyWith(
-            gtmContainerId: localSettings.gtmContainerId.isNotEmpty ? localSettings.gtmContainerId : remoteSettings.gtmContainerId,
-            gtmIsEnabled: localSettings.gtmIsEnabled,
-            metaPixelId: localSettings.metaPixelId.isNotEmpty ? localSettings.metaPixelId : remoteSettings.metaPixelId,
-            metaPixelIsEnabled: localSettings.metaPixelIsEnabled,
-            bingVerificationId: localSettings.bingVerificationId.isNotEmpty ? localSettings.bingVerificationId : remoteSettings.bingVerificationId,
-            bingIsEnabled: localSettings.bingIsEnabled,
-            customCss: localSettings.customCss.isNotEmpty ? localSettings.customCss : remoteSettings.customCss,
-            customCssEnabled: localSettings.customCssEnabled,
-            customJs: localSettings.customJs.isNotEmpty ? localSettings.customJs : remoteSettings.customJs,
-            customJsEnabled: localSettings.customJsEnabled,
-            headCode: localSettings.headCode.isNotEmpty ? localSettings.headCode : remoteSettings.headCode,
-            headCodeEnabled: localSettings.headCodeEnabled,
-            bodyStartCode: localSettings.bodyStartCode.isNotEmpty ? localSettings.bodyStartCode : remoteSettings.bodyStartCode,
-            bodyStartCodeEnabled: localSettings.bodyStartCodeEnabled,
-            bodyEndCode: localSettings.bodyEndCode.isNotEmpty ? localSettings.bodyEndCode : remoteSettings.bodyEndCode,
-            bodyEndCodeEnabled: localSettings.bodyEndCodeEnabled,
-            footerCode: localSettings.footerCode.isNotEmpty ? localSettings.footerCode : remoteSettings.footerCode,
-            footerCodeEnabled: localSettings.footerCodeEnabled,
-            emergencyKillSwitch: localSettings.emergencyKillSwitch,
-            currentVersion: localSettings.currentVersion > remoteSettings.currentVersion ? localSettings.currentVersion : remoteSettings.currentVersion,
-          );
-          return merged;
-        }
         return remoteSettings;
       }
     } catch (e) {
-      debugPrint('Error fetching SEO global settings from Supabase: $e');
+      debugPrint('Notice: seo_global_settings table fetch fallback: $e');
     }
+
     return localSettings ?? SeoGlobalSettingsModel();
   }
 
-  /// Save Global SEO & Tracking Settings (100% resilient with local cache + Supabase fallback)
+  /// Save Global SEO & Site Code Settings (Strict Supabase DB persistence + diagnostic logging)
   static Future<bool> saveSeoGlobalSettings(SeoGlobalSettingsModel settings) async {
-    // 1. Save locally to SharedPreferences first so data is NEVER lost
+    final currentUser = client.auth.currentUser;
+    final isAuth = currentUser != null;
+
+    bool isAdmin = false;
+    if (isAuth) {
+      try {
+        final profileRes = await client
+            .from('profiles')
+            .select('role')
+            .eq('id', currentUser.id)
+            .maybeSingle();
+        if (profileRes != null && profileRes['role'] != null) {
+          final role = profileRes['role'].toString().toLowerCase();
+          isAdmin = role == 'admin' || role == 'superadmin' || role == 'super_admin';
+        }
+      } catch (e) {
+        debugPrint('Admin check warning: $e');
+      }
+    }
+
+    if (!isAuth) {
+      debugPrint('=== SITE_CODE_SAVE_ERROR ===');
+      debugPrint('operation: upsert');
+      debugPrint('table: app_settings');
+      debugPrint('user_id: null');
+      debugPrint('is_authenticated: false');
+      debugPrint('is_admin: false');
+      debugPrint('code: UNAUTHENTICATED');
+      debugPrint('message: Supabase Auth session does not exist');
+      debugPrint('=============================');
+      return false;
+    }
+
+    final payload = settings.toJson();
+
+    // Save locally to SharedPreferences for offline speed
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('cosmyra_seo_global_settings', jsonEncode(settings.toJson()));
+      await prefs.setString('cosmyra_seo_global_settings', jsonEncode(payload));
     } catch (e) {
       debugPrint('SharedPreferences cache error: $e');
     }
 
-    // 2. Attempt Supabase save
+    bool databaseSaved = false;
+
+    // 1. Primary Database Save: Write to app_settings key='site_code_settings' & key='seo_global_settings'
     try {
-      final payload = settings.toJson();
+      final nowIso = DateTime.now().toIso8601String();
+      final userTag = currentUser.email ?? currentUser.id;
+
+      await client.from('app_settings').upsert({
+        'key': 'site_code_settings',
+        'value': payload,
+        'description': 'Site Code Manager & Global SEO settings',
+        'updated_at': nowIso,
+        'updated_by': userTag,
+      }, onConflict: 'key');
+
+      await client.from('app_settings').upsert({
+        'key': 'seo_global_settings',
+        'value': payload,
+        'description': 'SEO Global Settings Configuration',
+        'updated_at': nowIso,
+        'updated_by': userTag,
+      }, onConflict: 'key');
+
+      databaseSaved = true;
+      debugPrint('SITE_CODE_SAVE_SUCCESS: Successfully persisted to app_settings key=site_code_settings');
+    } on PostgrestException catch (e) {
+      debugPrint('=== SITE_CODE_SAVE_ERROR ===');
+      debugPrint('operation: upsert');
+      debugPrint('table: app_settings');
+      debugPrint('user_id: ${currentUser.id}');
+      debugPrint('is_authenticated: true');
+      debugPrint('is_admin: $isAdmin');
+      debugPrint('code: ${e.code}');
+      debugPrint('message: ${e.message}');
+      debugPrint('details: ${e.details}');
+      debugPrint('hint: ${e.hint}');
+      debugPrint('=============================');
+    } catch (e) {
+      debugPrint('Unexpected error saving to app_settings: $e');
+    }
+
+    // 2. Secondary Database Save: Attempt write to seo_global_settings table if present
+    try {
       final existing = await client.from('seo_global_settings').select('id').limit(1).maybeSingle();
       if (existing != null && existing['id'] != null) {
         await client.from('seo_global_settings').update(payload).eq('id', existing['id']);
       } else {
         await client.from('seo_global_settings').insert(payload);
       }
-      return true;
+      databaseSaved = true;
     } catch (e) {
-      debugPrint('Error saving SEO global settings to Supabase: $e');
-      // If full payload failed (e.g. Postgres schema table lacks newly added columns), retry with sanitized core columns
-      try {
-        final sanitizedPayload = Map<String, dynamic>.from(settings.toJson());
-        final coreKeys = [
-          'site_name', 'website_title', 'default_meta_title', 'default_meta_description',
-          'default_keywords', 'canonical_base_url', 'default_og_title', 'default_og_description',
-          'default_og_image', 'twitter_card_type', 'twitter_site_handle', 'organization_name',
-          'organization_logo_url', 'organization_contact_email', 'organization_phone',
-          'robots_txt_content', 'sitemap_xml_enabled', 'gsc_verification_method',
-          'gsc_verification_code', 'gsc_is_active', 'ga4_measurement_id', 'ga4_is_enabled',
-          'ga4_environment', 'google_ads_conversion_id', 'google_ads_conversion_label',
-          'google_ads_is_enabled', 'adsense_publisher_id', 'adsense_is_enabled',
-          'adsense_auto_ads_enabled', 'adsense_custom_code', 'head_code', 'head_code_enabled',
-          'body_start_code', 'body_start_code_enabled', 'body_end_code', 'body_end_code_enabled',
-          'footer_code', 'footer_code_enabled', 'updated_at', 'updated_by'
-        ];
-        sanitizedPayload.removeWhere((key, value) => !coreKeys.contains(key));
-        final existing = await client.from('seo_global_settings').select('id').limit(1).maybeSingle();
-        if (existing != null && existing['id'] != null) {
-          await client.from('seo_global_settings').update(sanitizedPayload).eq('id', existing['id']);
-        } else {
-          await client.from('seo_global_settings').insert(sanitizedPayload);
-        }
-        return true;
-      } catch (err2) {
-        debugPrint('Sanitized Supabase save fallback: $err2');
-        // Return true since SharedPreferences cache saved all data successfully
-        return true;
-      }
+      debugPrint('Notice: seo_global_settings table save notice: $e');
     }
+
+    return databaseSaved;
   }
 
   /// Fetch Modular SEO Custom Scripts

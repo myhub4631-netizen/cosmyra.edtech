@@ -15,8 +15,8 @@
       } catch (e) {}
     }
 
-    // Fetch latest settings from Supabase REST API
-    fetch(SUPABASE_URL + "/rest/v1/seo_global_settings?select=*&limit=1", {
+    // Fetch latest settings from Supabase REST API (app_settings key=site_code_settings or fallback)
+    fetch(SUPABASE_URL + "/rest/v1/app_settings?key=eq.site_code_settings&select=value", {
       headers: {
         "apikey": SUPABASE_ANON,
         "Authorization": "Bearer " + SUPABASE_ANON
@@ -24,10 +24,23 @@
     })
     .then(res => res.json())
     .then(data => {
-      if (data && data.length > 0) {
-        const settings = data[0];
+      if (data && data.length > 0 && data[0].value) {
+        const settings = data[0].value;
         localStorage.setItem("cosmyra_seo_settings", JSON.stringify(settings));
         applySettings(settings);
+      } else {
+        // Fallback fetch
+        return fetch(SUPABASE_URL + "/rest/v1/seo_global_settings?select=*&limit=1", {
+          headers: {
+            "apikey": SUPABASE_ANON,
+            "Authorization": "Bearer " + SUPABASE_ANON
+          }
+        }).then(r => r.json()).then(d => {
+          if (d && d.length > 0) {
+            localStorage.setItem("cosmyra_seo_settings", JSON.stringify(d[0]));
+            applySettings(d[0]);
+          }
+        });
       }
     })
     .catch(err => {
