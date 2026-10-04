@@ -6068,6 +6068,7 @@ class SupabaseService {
   }
 
   static LandingPageConfigModel _cachedLandingPageConfig = LandingPageConfigModel.defaultConfig();
+  static String _lastLandingPageConfigJson = '';
   static final ValueNotifier<LandingPageConfigModel?> landingPageConfigNotifier = ValueNotifier<LandingPageConfigModel?>(null);
 
   /// Fetch canonical Landing Page configuration from system_config (with instant local caching fallback)
@@ -6088,11 +6089,17 @@ class SupabaseService {
           jsonMap = Map<String, dynamic>.from(raw);
         }
         if (jsonMap.isNotEmpty) {
-          _cachedLandingPageConfig = LandingPageConfigModel.fromJson(jsonMap);
-          landingPageConfigNotifier.value = _cachedLandingPageConfig;
+          final jsonStr = jsonEncode(jsonMap);
+          if (jsonStr != _lastLandingPageConfigJson) {
+            _lastLandingPageConfigJson = jsonStr;
+            _cachedLandingPageConfig = LandingPageConfigModel.fromJson(jsonMap);
+            Future.microtask(() {
+              landingPageConfigNotifier.value = _cachedLandingPageConfig;
+            });
+          }
           try {
             final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('cosmyra_cached_landing_page_config', jsonEncode(jsonMap));
+            await prefs.setString('cosmyra_cached_landing_page_config', jsonStr);
           } catch (_) {}
           return _cachedLandingPageConfig;
         }
@@ -6105,14 +6112,18 @@ class SupabaseService {
       final prefs = await SharedPreferences.getInstance();
       final cachedStr = prefs.getString('cosmyra_cached_landing_page_config');
       if (cachedStr != null && cachedStr.trim().isNotEmpty) {
-        final jsonMap = jsonDecode(cachedStr) as Map<String, dynamic>;
-        _cachedLandingPageConfig = LandingPageConfigModel.fromJson(jsonMap);
-        landingPageConfigNotifier.value = _cachedLandingPageConfig;
+        if (cachedStr != _lastLandingPageConfigJson) {
+          _lastLandingPageConfigJson = cachedStr;
+          final jsonMap = jsonDecode(cachedStr) as Map<String, dynamic>;
+          _cachedLandingPageConfig = LandingPageConfigModel.fromJson(jsonMap);
+          Future.microtask(() {
+            landingPageConfigNotifier.value = _cachedLandingPageConfig;
+          });
+        }
         return _cachedLandingPageConfig;
       }
     } catch (_) {}
 
-    landingPageConfigNotifier.value = _cachedLandingPageConfig;
     return _cachedLandingPageConfig;
   }
 

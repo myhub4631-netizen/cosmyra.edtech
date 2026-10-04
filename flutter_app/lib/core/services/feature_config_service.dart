@@ -273,7 +273,15 @@ class FeatureConfigService {
     });
   }
 
+  static String _lastRawJson = '';
+
   static void _applyRawJson(String rawJson) {
+    final cleanJson = rawJson.trim();
+    if (cleanJson.isNotEmpty && cleanJson == _lastRawJson && _features.isNotEmpty) {
+      return;
+    }
+    _lastRawJson = cleanJson;
+
     try {
       final Map<String, dynamic> data = jsonDecode(rawJson);
       final loadedMap = <String, FeatureModel>{};
@@ -345,7 +353,9 @@ class FeatureConfigService {
         );
       }
 
-      notifier.value++;
+      Future.microtask(() {
+        notifier.value++;
+      });
     } catch (e) {
       debugPrint('Error parsing feature flags JSON: $e');
     }
