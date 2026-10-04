@@ -492,6 +492,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('WEBSITE & CMS MANAGER'),
+                _buildSidebarTile('Login & Signup Manager (CMS)', Icons.lock_person_outlined, false, onTap: () => context.go('/admin/cms/auth')),
                 _buildSidebarTile('Page Manager (All Pages)', Icons.article_outlined, false, onTap: () => context.go('/admin/pages')),
                 _buildSidebarTile('Blog & Articles', Icons.edit_note_rounded, false, onTap: () => context.go('/admin/blog')),
                 _buildSidebarTile('Navigation & Menus', Icons.menu_open_rounded, false, onTap: () => context.go('/admin/navigation')),

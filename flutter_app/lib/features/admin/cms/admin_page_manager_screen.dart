@@ -176,6 +176,18 @@ class _AdminPageManagerScreenState extends State<AdminPageManagerScreen> {
           ],
         ),
         actions: [
+          OutlinedButton.icon(
+            onPressed: () => context.go('/admin/cms/auth'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF4F46E5),
+              side: const BorderSide(color: Color(0xFFC7D2FE)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            icon: const Icon(Icons.admin_panel_settings_rounded, size: 18),
+            label: const Text('Auth Page Manager', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 10),
           ElevatedButton.icon(
             onPressed: () async {
               final created = await Navigator.push<bool>(

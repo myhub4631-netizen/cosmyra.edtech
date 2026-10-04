@@ -6004,6 +6004,68 @@ class SupabaseService {
     }
   }
 
+  static AuthPageConfigModel _cachedAuthPageConfig = AuthPageConfigModel.defaultConfig();
+
+  /// Fetch canonical Auth Page configuration from system_config (with instant local caching fallback)
+  static Future<AuthPageConfigModel> fetchAuthPageConfig() async {
+    try {
+      final res = await client
+          .from('system_config')
+          .select('value')
+          .eq('key', 'canonical_auth_page_config')
+          .maybeSingle();
+
+      if (res != null && res['value'] != null) {
+        final raw = res['value'];
+        Map<String, dynamic> jsonMap = {};
+        if (raw is Map<String, dynamic>) {
+          jsonMap = raw;
+        } else if (raw is String) {
+          jsonMap = jsonDecode(raw);
+        }
+        if (jsonMap.isNotEmpty) {
+          _cachedAuthPageConfig = AuthPageConfigModel.fromJson(jsonMap);
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('cosmyra_cached_auth_page_config', jsonEncode(jsonMap));
+          return _cachedAuthPageConfig;
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice loading canonical_auth_page_config from system_config: $e');
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedStr = prefs.getString('cosmyra_cached_auth_page_config');
+      if (cachedStr != null && cachedStr.trim().isNotEmpty) {
+        final jsonMap = jsonDecode(cachedStr) as Map<String, dynamic>;
+        _cachedAuthPageConfig = AuthPageConfigModel.fromJson(jsonMap);
+        return _cachedAuthPageConfig;
+      }
+    } catch (_) {}
+
+    return _cachedAuthPageConfig;
+  }
+
+  /// Save canonical Auth Page configuration to system_config
+  static Future<bool> saveAuthPageConfig(AuthPageConfigModel config) async {
+    try {
+      _cachedAuthPageConfig = config;
+      final jsonMap = config.toJson();
+      await client.from('system_config').upsert({
+        'key': 'canonical_auth_page_config',
+        'value': jsonEncode(jsonMap),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_cached_auth_page_config', jsonEncode(jsonMap));
+      return true;
+    } catch (e) {
+      debugPrint('Error saving canonical_auth_page_config to system_config: $e');
+      return false;
+    }
+  }
+
   /// Fetch all real home screen recommendations without hardcoded demo data
   static Future<List<Map<String, dynamic>>> fetchHomeRecommendations() async {
     final List<Map<String, dynamic>> list = [];

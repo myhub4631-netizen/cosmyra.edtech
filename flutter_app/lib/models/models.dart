@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 export 'cms_models.dart';
 export 'seo_models.dart';
+export 'auth_page_config_model.dart';
 
 /// User Profile & Role Model
 class UserProfileModel {

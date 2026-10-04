@@ -10,12 +10,14 @@ class AuthScreen extends StatefulWidget {
   final Function(UserProfileModel)? onAuthSuccess;
   final bool initialIsLogin;
   final VoidCallback? onBackTap;
+  final AuthPageConfigModel? configOverride;
 
   const AuthScreen({
     Key? key,
     this.onAuthSuccess,
     this.initialIsLogin = true,
     this.onBackTap,
+    this.configOverride,
   }) : super(key: key);
 
   @override
@@ -25,6 +27,10 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateMixin {
   late bool _isLogin;
   final _formKey = GlobalKey<FormState>();
+
+  // Config State
+  AuthPageConfigModel _config = AuthPageConfigModel.defaultConfig();
+  bool _isLoadingConfig = true;
 
   // Login Controllers
   final _emailController = TextEditingController();
@@ -60,7 +66,38 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     _isLogin = widget.initialIsLogin;
+    if (widget.configOverride != null) {
+      _config = widget.configOverride!;
+      _isLoadingConfig = false;
+    } else {
+      _loadCMSConfig();
+    }
     SupabaseService.authNotifier.addListener(_onAuthNotifierChanged);
+  }
+
+  @override
+  void didUpdateWidget(AuthScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.configOverride != null) {
+      setState(() {
+        _config = widget.configOverride!;
+        _isLoadingConfig = false;
+      });
+    }
+  }
+
+  Future<void> _loadCMSConfig() async {
+    try {
+      final loaded = await SupabaseService.fetchAuthPageConfig();
+      if (mounted) {
+        setState(() {
+          _config = loaded;
+          _isLoadingConfig = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingConfig = false);
+    }
   }
 
   @override
@@ -100,7 +137,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     }
   }
 
-  // Validation getters
+  // Password validation getters
   bool get _hasMinLength => _signupPasswordController.text.length >= 8;
   bool get _hasUppercase => _signupPasswordController.text.contains(RegExp(r'[A-Z]'));
   bool get _hasNumber => _signupPasswordController.text.contains(RegExp(r'[0-9]'));
@@ -152,7 +189,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
   Future<void> _handleSignUp() async {
     if (!_formKey.currentState!.validate()) return;
-    if (!_agreeToTerms) {
+    if (_config.showTerms && !_agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Please accept the Terms of Service & Privacy Policy.'),
@@ -186,7 +223,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Account created successfully! Welcome to Cosmyra NEET | JEE.'),
+            content: const Text('Account created successfully! Welcome to Cosmyra NEET | JEE.'),
             backgroundColor: const Color(0xFF10B981),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -467,6 +504,9 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 900 && _config.layout == 'AUTH_LAYOUT_SPLIT' && _config.showHeroPanel;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: Stack(
@@ -476,8 +516,8 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             top: -120,
             left: -80,
             child: Container(
-              width: 320,
-              height: 320,
+              width: 380,
+              height: 380,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
@@ -491,11 +531,11 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
             ),
           ),
           Positioned(
-            top: 200,
-            right: -100,
+            bottom: -100,
+            right: -80,
             child: Container(
-              width: 300,
-              height: 300,
+              width: 360,
+              height: 360,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
@@ -511,384 +551,517 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
           SafeArea(
             child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 460),
-                  child: Column(
-                    children: [
-                      // Top bar: Back Button & Cosmyra Logo
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          InkWell(
-                            onTap: widget.onBackTap ?? () {
-                              if (Navigator.canPop(context)) {
-                                Navigator.pop(context);
-                              } else {
-                                context.go('/');
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.arrow_back_rounded, size: 16, color: Color(0xFF64748B)),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Home',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEEF2FF),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFFC7D2FE)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 14),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'NEET | JEE PREP',
-                                  style: GoogleFonts.inter(
-                                    color: const Color(0xFF4F46E5),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1, end: 0),
-
-                      const SizedBox(height: 24),
-
-                      // Brand Logo & Title Header
-                      Column(
-                        children: [
-                          Image.asset(
-                            'assets/images/cosmyra_logo.png',
-                            height: 44,
-                            fit: BoxFit.contain,
-                            errorBuilder: (ctx, err, stack) => Text(
-                              'COSMYRA',
-                              style: GoogleFonts.outfit(
-                                fontSize: 30,
-                                fontWeight: FontWeight.w900,
-                                color: const Color(0xFF4F46E5),
-                                letterSpacing: 1.5,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            _isLogin ? 'Welcome to Cosmyra' : 'Create Your Account',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.outfit(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              color: const Color(0xFF0F172A),
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            _isLogin
-                                ? 'Your smarter way to prepare for NEET & JEE'
-                                : 'Join 50,000+ students scoring top ranks with AI',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ).animate().fadeIn(duration: 450.ms, delay: 100.ms).slideY(begin: -0.05, end: 0),
-
-                      const SizedBox(height: 24),
-
-                      // Card Shell
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x0F000000),
-                              blurRadius: 24,
-                              offset: Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.all(24),
-                        child: Form(
-                          key: _formKey,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // Segmented Control: [ Sign In | Create Account ]
-                              Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: InkWell(
-                                        onTap: () => setState(() {
-                                          _isLogin = true;
-                                          _errorMessage = null;
-                                        }),
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: AnimatedContainer(
-                                          duration: const Duration(milliseconds: 200),
-                                          padding: const EdgeInsets.symmetric(vertical: 10),
-                                          decoration: BoxDecoration(
-                                            color: _isLogin ? Colors.white : Colors.transparent,
-                                            borderRadius: BorderRadius.circular(10),
-                                            boxShadow: _isLogin
-                                                ? const [
-                                                    BoxShadow(
-                                                      color: Color(0x0C000000),
-                                                      blurRadius: 8,
-                                                      offset: Offset(0, 2),
-                                                    ),
-                                                  ]
-                                                : [],
-                                          ),
-                                          child: Text(
-                                            'Sign In',
-                                            textAlign: TextAlign.center,
-                                            style: GoogleFonts.inter(
-                                              fontSize: 14,
-                                              fontWeight: _isLogin ? FontWeight.bold : FontWeight.w500,
-                                              color: _isLogin ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: InkWell(
-                                        onTap: () => setState(() {
-                                          _isLogin = false;
-                                          _errorMessage = null;
-                                        }),
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: AnimatedContainer(
-                                          duration: const Duration(milliseconds: 200),
-                                          padding: const EdgeInsets.symmetric(vertical: 10),
-                                          decoration: BoxDecoration(
-                                            color: !_isLogin ? Colors.white : Colors.transparent,
-                                            borderRadius: BorderRadius.circular(10),
-                                            boxShadow: !_isLogin
-                                                ? const [
-                                                    BoxShadow(
-                                                      color: Color(0x0C000000),
-                                                      blurRadius: 8,
-                                                      offset: Offset(0, 2),
-                                                    ),
-                                                  ]
-                                                : [],
-                                          ),
-                                          child: Text(
-                                            'Create Account',
-                                            textAlign: TextAlign.center,
-                                            style: GoogleFonts.inter(
-                                              fontSize: 14,
-                                              fontWeight: !_isLogin ? FontWeight.bold : FontWeight.w500,
-                                              color: !_isLogin ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              const SizedBox(height: 20),
-
-                              // GOOGLE LOGIN BUTTON (Prompt & Official Styling)
-                              InkWell(
-                                onTap: _isGoogleLoading || _isLoading ? null : _handleGoogleSignIn,
-                                borderRadius: BorderRadius.circular(14),
-                                child: Container(
-                                  height: 50,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
-                                    boxShadow: const [
-                                      BoxShadow(
-                                        color: Color(0x08000000),
-                                        blurRadius: 6,
-                                        offset: Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      if (_isGoogleLoading)
-                                        const SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.5,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4F46E5)),
-                                          ),
-                                        )
-                                      else ...[
-                                        SvgPicture.string(_googleSvg, width: 22, height: 22),
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          'Continue with Google',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                            color: const Color(0xFF1E293B),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 18),
-
-                              // Divider
-                              Row(
-                                children: [
-                                  const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                                    child: Text(
-                                      'OR WITH EMAIL',
-                                      style: GoogleFonts.inter(
-                                        color: const Color(0xFF94A3B8),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.8,
-                                      ),
-                                    ),
-                                  ),
-                                  const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
-                                ],
-                              ),
-
-                              const SizedBox(height: 18),
-
-                              // Error Banner
-                              if (_errorMessage != null) ...[
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFEF2F2),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFFFCA5A5)),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 18),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          _errorMessage!,
-                                          style: GoogleFonts.inter(color: const Color(0xFFDC2626), fontSize: 13),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                              ],
-
-                              // Animated Form Body Switcher (Login ↔ Signup)
-                              AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 250),
-                                transitionBuilder: (child, anim) => FadeTransition(
-                                  opacity: anim,
-                                  child: SlideTransition(
-                                    position: Tween<Offset>(
-                                      begin: const Offset(0, 0.03),
-                                      end: Offset.zero,
-                                    ).animate(anim),
-                                    child: child,
-                                  ),
-                                ),
-                                child: _isLogin
-                                    ? _buildLoginFormFields()
-                                    : _buildSignUpFormFields(),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ).animate().fadeIn(duration: 500.ms, delay: 200.ms).slideY(begin: 0.05, end: 0),
-
-                      const SizedBox(height: 20),
-
-                      // Bottom Switch Link
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            _isLogin ? "Don't have an account? " : "Already have an account? ",
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: const Color(0xFF64748B),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () => setState(() {
-                              _isLogin = !_isLogin;
-                              _errorMessage = null;
-                            }),
-                            child: Text(
-                              _isLogin ? 'Sign Up Free' : 'Sign In',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: const Color(0xFF4F46E5),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                  ),
-                ),
-              ),
+              child: isDesktop ? _buildDesktopSplitLayout(context) : _buildCenteredLayout(context),
             ),
           ),
         ],
       ),
     );
+  }
+
+  // ----------------------------------------------------
+  // DESKTOP SPLIT LAYOUT
+  // ----------------------------------------------------
+  Widget _buildDesktopSplitLayout(BuildContext context) {
+    final heroTitle = _isLogin ? _config.loginHeroTitle : _config.signupHeroTitle;
+    final heroSubtitle = _isLogin ? _config.loginHeroSubtitle : _config.signupHeroSubtitle;
+
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 1100),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Left Hero Branding Panel (Flex 5)
+          Expanded(
+            flex: 5,
+            child: Container(
+              padding: const EdgeInsets.all(40),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x3D4F46E5), blurRadius: 32, offset: Offset(0, 12)),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.star_rounded, color: Color(0xFFFCD34D), size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              _isLogin ? _config.loginBadge : _config.signupBadge,
+                              style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+
+                  Text(
+                    heroTitle,
+                    style: GoogleFonts.outfit(
+                      fontSize: 34,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  Text(
+                    heroSubtitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      color: Colors.white.withOpacity(0.9),
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 36),
+
+                  // Features Checkmarks
+                  _buildDesktopFeatureItem('500+ NTA-Standard Full Length & Chapter Mock Tests'),
+                  _buildDesktopFeatureItem('15-Year Solved PYQ Archives with Video Solutions'),
+                  _buildDesktopFeatureItem('Real-Time AI Error Radar & AIR Percentile Analytics'),
+                ],
+              ),
+            ).animate().fadeIn(duration: 500.ms).slideX(begin: -0.05, end: 0),
+          ),
+
+          const SizedBox(width: 40),
+
+          // Right Auth Form Card (Flex 5)
+          Expanded(
+            flex: 5,
+            child: _buildFormCard(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopFeatureItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check_rounded, color: Colors.white, size: 14),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ----------------------------------------------------
+  // CENTERED / MOBILE LAYOUT
+  // ----------------------------------------------------
+  Widget _buildCenteredLayout(BuildContext context) {
+    final title = _isLogin ? _config.loginTitle : _config.signupTitle;
+    final subtitle = _isLogin ? _config.loginSubtitle : _config.signupSubtitle;
+    final badge = _isLogin ? _config.loginBadge : _config.signupBadge;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Column(
+          children: [
+            // Top bar: Back Button & Badge
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                InkWell(
+                  onTap: widget.onBackTap ?? () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      context.go('/');
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.arrow_back_rounded, size: 16, color: Color(0xFF64748B)),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Home',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_config.showBadge && badge.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEEF2FF),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFC7D2FE)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 14),
+                        const SizedBox(width: 6),
+                        Text(
+                          badge,
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFF4F46E5),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.1, end: 0),
+
+            const SizedBox(height: 24),
+
+            // Logo & Title Header
+            Column(
+              children: [
+                Image.asset(
+                  'assets/images/cosmyra_logo.png',
+                  height: 44,
+                  fit: BoxFit.contain,
+                  errorBuilder: (ctx, err, stack) => Text(
+                    'COSMYRA',
+                    style: GoogleFonts.outfit(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w900,
+                      color: const Color(0xFF4F46E5),
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF0F172A),
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ).animate().fadeIn(duration: 450.ms, delay: 100.ms).slideY(begin: -0.05, end: 0),
+
+            const SizedBox(height: 24),
+
+            // Form Card
+            _buildFormCard(context),
+
+            const SizedBox(height: 20),
+
+            // Bottom Switcher
+            if (_config.showSignup)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _isLogin ? "Don't have an account? " : "Already have an account? ",
+                    style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
+                  ),
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      _isLogin = !_isLogin;
+                      _errorMessage = null;
+                    }),
+                    child: Text(
+                      _isLogin ? _config.signupButtonText : _config.signinButtonText,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF4F46E5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+            if (_config.showFooter && _config.footerText.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Text(
+                _config.footerText,
+                style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
+              ),
+            ],
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ----------------------------------------------------
+  // SHARED FORM CARD WIDGET
+  // ----------------------------------------------------
+  Widget _buildFormCard(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F000000),
+            blurRadius: 24,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Segmented Control Switcher
+            if (_config.showSignup) ...[
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() {
+                          _isLogin = true;
+                          _errorMessage = null;
+                        }),
+                        borderRadius: BorderRadius.circular(10),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _isLogin ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: _isLogin
+                                ? const [BoxShadow(color: Color(0x0C000000), blurRadius: 8, offset: Offset(0, 2))]
+                                : [],
+                          ),
+                          child: Text(
+                            _config.signinButtonText,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: _isLogin ? FontWeight.bold : FontWeight.w500,
+                              color: _isLogin ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() {
+                          _isLogin = false;
+                          _errorMessage = null;
+                        }),
+                        borderRadius: BorderRadius.circular(10),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: !_isLogin ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: !_isLogin
+                                ? const [BoxShadow(color: Color(0x0C000000), blurRadius: 8, offset: Offset(0, 2))]
+                                : [],
+                          ),
+                          child: Text(
+                            'Create Account',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: !_isLogin ? FontWeight.bold : FontWeight.w500,
+                              color: !_isLogin ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // GOOGLE LOGIN BUTTON
+            if (_config.showGoogleLogin) ...[
+              InkWell(
+                onTap: _isGoogleLoading || _isLoading ? null : _handleGoogleSignIn,
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFCBD5E1), width: 1.2),
+                    boxShadow: const [
+                      BoxShadow(color: Color(0x08000000), blurRadius: 6, offset: Offset(0, 2)),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (_isGoogleLoading)
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF4F46E5)),
+                        )
+                      else ...[
+                        SvgPicture.string(_googleSvg, width: 22, height: 22),
+                        const SizedBox(width: 12),
+                        Text(
+                          _config.googleButtonText,
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1E293B),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+            ],
+
+            // Divider
+            if (_config.showGoogleLogin && _config.showEmailLogin) ...[
+              Row(
+                children: [
+                  const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'OR WITH EMAIL',
+                      style: GoogleFonts.inter(
+                        color: const Color(0xFF94A3B8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                  const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+                ],
+              ),
+              const SizedBox(height: 18),
+            ],
+
+            // Error Banner
+            if (_errorMessage != null) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _errorMessage!,
+                        style: GoogleFonts.inter(color: const Color(0xFFDC2626), fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Form Fields (Sign In ↔ Sign Up)
+            if (_config.showEmailLogin)
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                transitionBuilder: (child, anim) => FadeTransition(
+                  opacity: anim,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.03),
+                      end: Offset.zero,
+                    ).animate(anim),
+                    child: child,
+                  ),
+                ),
+                child: _isLogin
+                    ? _buildLoginFormFields()
+                    : _buildSignUpFormFields(),
+              ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(duration: 500.ms, delay: 200.ms).slideY(begin: 0.05, end: 0);
   }
 
   // ----------------------------------------------------
@@ -963,17 +1136,18 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                 ),
               ],
             ),
-            GestureDetector(
-              onTap: _showForgotPasswordModal,
-              child: Text(
-                'Forgot Password?',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: const Color(0xFF4F46E5),
-                  fontWeight: FontWeight.w600,
+            if (_config.showForgotPassword)
+              GestureDetector(
+                onTap: _showForgotPasswordModal,
+                child: Text(
+                  _config.forgotPasswordText,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: const Color(0xFF4F46E5),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 22),
@@ -999,7 +1173,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Sign In',
+                        _config.signinButtonText,
                         style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                       const SizedBox(width: 8),
@@ -1140,7 +1314,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         ),
         const SizedBox(height: 8),
 
-        // Live Password Rules Badges
+        // Password Rules Badges
         Wrap(
           spacing: 8,
           runSpacing: 4,
@@ -1179,41 +1353,29 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         const SizedBox(height: 14),
 
         // Terms Checkbox
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: Checkbox(
-                value: _agreeToTerms,
-                activeColor: const Color(0xFF4F46E5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                onChanged: (val) => setState(() => _agreeToTerms = val ?? true),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text.rich(
-                TextSpan(
-                  text: 'I agree to Cosmyra\'s ',
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF475569)),
-                  children: const [
-                    TextSpan(
-                      text: 'Terms of Service',
-                      style: TextStyle(color: Color(0xFF4F46E5), fontWeight: FontWeight.bold),
-                    ),
-                    TextSpan(text: ' & '),
-                    TextSpan(
-                      text: 'Privacy Policy',
-                      style: TextStyle(color: Color(0xFF4F46E5), fontWeight: FontWeight.bold),
-                    ),
-                  ],
+        if (_config.showTerms)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: Checkbox(
+                  value: _agreeToTerms,
+                  activeColor: const Color(0xFF4F46E5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  onChanged: (val) => setState(() => _agreeToTerms = val ?? true),
                 ),
               ),
-            ),
-          ],
-        ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _config.termsText,
+                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF475569)),
+                ),
+              ),
+            ],
+          ),
         const SizedBox(height: 22),
 
         // Submit Sign Up Button
@@ -1237,7 +1399,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Create Free Account',
+                        _config.signupButtonText,
                         style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                       const SizedBox(width: 8),
@@ -1303,19 +1465,19 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
       fillColor: Colors.white,
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: const Color(0xFFCBD5E1)),
+        borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: const Color(0xFF4F46E5), width: 1.8),
+        borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.8),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: const Color(0xFFFCA5A5)),
+        borderSide: const BorderSide(color: Color(0xFFFCA5A5)),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: const Color(0xFFDC2626), width: 1.8),
+        borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.8),
       ),
     );
   }
