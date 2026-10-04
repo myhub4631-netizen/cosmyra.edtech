@@ -64,25 +64,57 @@ void applyWebSeo({
   }
 }
 
-/// Injects GA4, Google Ads, AdSense, and custom scripts into Web DOM
+/// Injects GA4, GTM, Google Ads, AdSense, Meta Pixel, Bing, Custom CSS/JS, and custom scripts into Web DOM
 void applyWebTrackingAndScripts(SeoGlobalSettingsModel settings, List<SeoCustomScriptModel> customScripts) {
   try {
+    // 0. EMERGENCY KILL SWITCH CHECK
+    if (settings.emergencyKillSwitch) {
+      // Immediately clear all custom injected scripts/styles and abort injection
+      _removeAllInjectedElements();
+      return;
+    }
+
     // 1. Google Search Console Meta Verification
     if (settings.gscIsActive && settings.gscVerificationCode.isNotEmpty) {
       _setMeta('google-site-verification', settings.gscVerificationCode);
     }
 
-    // 2. Google Analytics 4 (GA4)
+    // 2. Bing Webmaster Verification
+    if (settings.bingIsEnabled && settings.bingVerificationId.isNotEmpty) {
+      _setMeta('msvalidate.01', settings.bingVerificationId);
+    }
+
+    // 3. Google Analytics 4 (GA4)
     if (settings.ga4IsEnabled && settings.ga4MeasurementId.isNotEmpty) {
       _injectGa4(settings.ga4MeasurementId);
     }
 
-    // 3. Google AdSense
+    // 4. Google Tag Manager (GTM)
+    if (settings.gtmIsEnabled && settings.gtmContainerId.isNotEmpty) {
+      _injectGtm(settings.gtmContainerId);
+    }
+
+    // 5. Meta / Facebook Pixel
+    if (settings.metaPixelIsEnabled && settings.metaPixelId.isNotEmpty) {
+      _injectMetaPixel(settings.metaPixelId);
+    }
+
+    // 6. Google AdSense
     if (settings.adsenseIsEnabled && settings.adsensePublisherId.isNotEmpty) {
       _injectAdSense(settings.adsensePublisherId, settings.adsenseAutoAdsEnabled);
     }
 
-    // 4. Code Injection Zones
+    // 7. Custom CSS
+    if (settings.customCssEnabled && settings.customCss.trim().isNotEmpty) {
+      _injectCustomCss(settings.customCss);
+    }
+
+    // 8. Custom JS
+    if (settings.customJsEnabled && settings.customJs.trim().isNotEmpty) {
+      _injectCustomJs(settings.customJs);
+    }
+
+    // 9. Code Injection Zones
     if (settings.headCodeEnabled && settings.headCode.isNotEmpty) {
       _injectRawCode('zone-head-code', settings.headCode, html.document.head);
     }
@@ -96,7 +128,7 @@ void applyWebTrackingAndScripts(SeoGlobalSettingsModel settings, List<SeoCustomS
       _injectRawCode('zone-footer-code', settings.footerCode, html.document.body);
     }
 
-    // 5. Modular Custom Scripts
+    // 10. Modular Custom Scripts
     for (final s in customScripts.where((s) => s.isActive)) {
       html.Element? target = html.document.head;
       bool insertAtStart = false;
@@ -110,6 +142,25 @@ void applyWebTrackingAndScripts(SeoGlobalSettingsModel settings, List<SeoCustomS
     }
   } catch (e) {
     // Silent catch
+  }
+}
+
+void _removeAllInjectedElements() {
+  final ids = [
+    'cosmyra-ga4-script',
+    'cosmyra-ga4-script-init',
+    'cosmyra-gtm-script',
+    'cosmyra-meta-pixel',
+    'cosmyra-adsense-script',
+    'cosmyra-custom-css',
+    'cosmyra-custom-js',
+    'zone-head-code',
+    'zone-body-start-code',
+    'zone-body-end-code',
+    'zone-footer-code',
+  ];
+  for (final id in ids) {
+    html.document.getElementById(id)?.remove();
   }
 }
 
@@ -175,6 +226,43 @@ void _injectGa4(String ga4Id) {
   html.document.head?.append(configScript);
 }
 
+void _injectGtm(String gtmId) {
+  const scriptId = 'cosmyra-gtm-script';
+  if (html.document.getElementById(scriptId) != null) return;
+
+  final script = html.ScriptElement()
+    ..id = scriptId
+    ..text = '''
+      (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+      new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+      j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+      'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+      })(window,document,'script','dataLayer','$gtmId');
+    ''';
+  html.document.head?.append(script);
+}
+
+void _injectMetaPixel(String pixelId) {
+  const scriptId = 'cosmyra-meta-pixel';
+  if (html.document.getElementById(scriptId) != null) return;
+
+  final script = html.ScriptElement()
+    ..id = scriptId
+    ..text = '''
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '$pixelId');
+      fbq('track', 'PageView');
+    ''';
+  html.document.head?.append(script);
+}
+
 void _injectAdSense(String pubId, bool autoAds) {
   const scriptId = 'cosmyra-adsense-script';
   if (html.document.getElementById(scriptId) != null) return;
@@ -186,6 +274,24 @@ void _injectAdSense(String pubId, bool autoAds) {
     ..crossOrigin = 'anonymous'
     ..src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=$cleanPubId';
   html.document.head?.append(script);
+}
+
+void _injectCustomCss(String cssContent) {
+  const styleId = 'cosmyra-custom-css';
+  html.document.getElementById(styleId)?.remove();
+  final style = html.StyleElement()
+    ..id = styleId
+    ..text = cssContent;
+  html.document.head?.append(style);
+}
+
+void _injectCustomJs(String jsContent) {
+  const scriptId = 'cosmyra-custom-js';
+  html.document.getElementById(scriptId)?.remove();
+  final script = html.ScriptElement()
+    ..id = scriptId
+    ..text = jsContent;
+  html.document.body?.append(script);
 }
 
 void _injectRawCode(String id, String rawCode, html.Element? parent, {bool insertAtStart = false}) {

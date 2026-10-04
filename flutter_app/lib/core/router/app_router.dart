@@ -1389,6 +1389,24 @@ final GoRouter appRouter = GoRouter(
       ),
     ),
     GoRoute(
+      path: '/admin/site-code-manager',
+      builder: (context, state) => AdminSeoScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/site-configuration/site-code-manager',
+      builder: (context, state) => AdminSeoScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/site-code',
+      builder: (context, state) => AdminSeoScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
       path: '/admin/test-series-manager',
       builder: (context, state) => AdminTestSeriesManagerScreen(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),

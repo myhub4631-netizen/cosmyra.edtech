@@ -51,26 +51,35 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
   final _orgPhoneCtrl = TextEditingController();
   String _twitterCardType = 'summary_large_image';
 
-  // Google Search Console
+  // Google Search Console & Bing
   String _gscMethod = 'meta_tag';
   final _gscCodeCtrl = TextEditingController();
   bool _gscActive = true;
 
-  // Google Analytics
+  final _bingIdCtrl = TextEditingController();
+  bool _bingEnabled = false;
+
+  // Google Analytics & GTM
   final _ga4IdCtrl = TextEditingController();
   bool _ga4Enabled = false;
   String _ga4Env = 'production';
 
-  // Google Ads
+  final _gtmIdCtrl = TextEditingController();
+  bool _gtmEnabled = false;
+  String _gtmPlacement = 'head';
+
+  // Google Ads, AdSense, Meta Pixel
   final _gAdsIdCtrl = TextEditingController();
   final _gAdsLabelCtrl = TextEditingController();
   bool _gAdsEnabled = false;
 
-  // AdSense
   final _adsensePubIdCtrl = TextEditingController();
   bool _adsenseEnabled = false;
   bool _adsenseAutoAds = false;
   final _adsenseCustomCodeCtrl = TextEditingController();
+
+  final _metaPixelIdCtrl = TextEditingController();
+  bool _metaPixelEnabled = false;
 
   // Code Injection Zones
   final _headCodeCtrl = TextEditingController();
@@ -82,6 +91,19 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
   final _footerCodeCtrl = TextEditingController();
   bool _footerCodeEnabled = false;
 
+  // Custom CSS & JS
+  final _customCssCtrl = TextEditingController();
+  bool _customCssEnabled = false;
+  String _customCssScope = 'user_facing';
+
+  final _customJsCtrl = TextEditingController();
+  bool _customJsEnabled = false;
+  String _customJsScope = 'user_facing';
+
+  // Emergency Control & Versioning
+  bool _emergencyKillSwitch = false;
+  int _currentVersion = 1;
+
   // Sitemap & Robots
   final _robotsTxtCtrl = TextEditingController();
   bool _sitemapEnabled = true;
@@ -89,7 +111,7 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 10, vsync: this);
+    _tabController = TabController(length: 11, vsync: this);
     _loadAllSeoData();
   }
 
@@ -111,15 +133,20 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
     _orgEmailCtrl.dispose();
     _orgPhoneCtrl.dispose();
     _gscCodeCtrl.dispose();
+    _bingIdCtrl.dispose();
     _ga4IdCtrl.dispose();
+    _gtmIdCtrl.dispose();
     _gAdsIdCtrl.dispose();
     _gAdsLabelCtrl.dispose();
     _adsensePubIdCtrl.dispose();
     _adsenseCustomCodeCtrl.dispose();
+    _metaPixelIdCtrl.dispose();
     _headCodeCtrl.dispose();
     _bodyStartCodeCtrl.dispose();
     _bodyEndCodeCtrl.dispose();
     _footerCodeCtrl.dispose();
+    _customCssCtrl.dispose();
+    _customJsCtrl.dispose();
     _robotsTxtCtrl.dispose();
     super.dispose();
   }
@@ -156,10 +183,16 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
         _gscMethod = settings.gscVerificationMethod;
         _gscCodeCtrl.text = settings.gscVerificationCode;
         _gscActive = settings.gscIsActive;
+        _bingIdCtrl.text = settings.bingVerificationId;
+        _bingEnabled = settings.bingIsEnabled;
 
         _ga4IdCtrl.text = settings.ga4MeasurementId;
         _ga4Enabled = settings.ga4IsEnabled;
         _ga4Env = settings.ga4Environment;
+
+        _gtmIdCtrl.text = settings.gtmContainerId;
+        _gtmEnabled = settings.gtmIsEnabled;
+        _gtmPlacement = settings.gtmPlacement;
 
         _gAdsIdCtrl.text = settings.googleAdsConversionId;
         _gAdsLabelCtrl.text = settings.googleAdsConversionLabel;
@@ -170,6 +203,9 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
         _adsenseAutoAds = settings.adsenseAutoAdsEnabled;
         _adsenseCustomCodeCtrl.text = settings.adsenseCustomCode;
 
+        _metaPixelIdCtrl.text = settings.metaPixelId;
+        _metaPixelEnabled = settings.metaPixelIsEnabled;
+
         _headCodeCtrl.text = settings.headCode;
         _headCodeEnabled = settings.headCodeEnabled;
         _bodyStartCodeCtrl.text = settings.bodyStartCode;
@@ -178,6 +214,16 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
         _bodyEndCodeEnabled = settings.bodyEndCodeEnabled;
         _footerCodeCtrl.text = settings.footerCode;
         _footerCodeEnabled = settings.footerCodeEnabled;
+
+        _customCssCtrl.text = settings.customCss;
+        _customCssEnabled = settings.customCssEnabled;
+        _customCssScope = settings.customCssScope;
+        _customJsCtrl.text = settings.customJs;
+        _customJsEnabled = settings.customJsEnabled;
+        _customJsScope = settings.customJsScope;
+
+        _emergencyKillSwitch = settings.emergencyKillSwitch;
+        _currentVersion = settings.currentVersion;
 
         _robotsTxtCtrl.text = settings.robotsTxtContent;
         _sitemapEnabled = settings.sitemapXmlEnabled;
@@ -202,7 +248,7 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
   Future<void> _saveAllSettings() async {
     setState(() {
       _isSaving = true;
-      _statusMessage = 'Saving SEO settings to database...';
+      _statusMessage = 'Saving settings & publishing version...';
       _statusIsError = false;
     });
 
@@ -225,9 +271,14 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
       gscVerificationMethod: _gscMethod,
       gscVerificationCode: _gscCodeCtrl.text.trim(),
       gscIsActive: _gscActive,
+      bingVerificationId: _bingIdCtrl.text.trim(),
+      bingIsEnabled: _bingEnabled,
       ga4MeasurementId: _ga4IdCtrl.text.trim(),
       ga4IsEnabled: _ga4Enabled,
       ga4Environment: _ga4Env,
+      gtmContainerId: _gtmIdCtrl.text.trim(),
+      gtmIsEnabled: _gtmEnabled,
+      gtmPlacement: _gtmPlacement,
       googleAdsConversionId: _gAdsIdCtrl.text.trim(),
       googleAdsConversionLabel: _gAdsLabelCtrl.text.trim(),
       googleAdsIsEnabled: _gAdsEnabled,
@@ -235,6 +286,8 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
       adsenseIsEnabled: _adsenseEnabled,
       adsenseAutoAdsEnabled: _adsenseAutoAds,
       adsenseCustomCode: _adsenseCustomCodeCtrl.text.trim(),
+      metaPixelId: _metaPixelIdCtrl.text.trim(),
+      metaPixelIsEnabled: _metaPixelEnabled,
       headCode: _headCodeCtrl.text,
       headCodeEnabled: _headCodeEnabled,
       bodyStartCode: _bodyStartCodeCtrl.text,
@@ -243,6 +296,14 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
       bodyEndCodeEnabled: _bodyEndCodeEnabled,
       footerCode: _footerCodeCtrl.text,
       footerCodeEnabled: _footerCodeEnabled,
+      customCss: _customCssCtrl.text,
+      customCssEnabled: _customCssEnabled,
+      customCssScope: _customCssScope,
+      customJs: _customJsCtrl.text,
+      customJsEnabled: _customJsEnabled,
+      customJsScope: _customJsScope,
+      emergencyKillSwitch: _emergencyKillSwitch,
+      currentVersion: _currentVersion + 1,
       robotsTxtContent: _robotsTxtCtrl.text,
       sitemapXmlEnabled: _sitemapEnabled,
       updatedAt: DateTime.now(),
@@ -294,24 +355,71 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
             }
           },
         ),
-        title: Row(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF059669).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.travel_explore_rounded, color: Color(0xFF059669), size: 20),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF059669).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.code_rounded, color: Color(0xFF059669), size: 20),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Site Code Manager & SEO',
+                  style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _emergencyKillSwitch ? const Color(0xFFFEE2E2) : const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _emergencyKillSwitch ? 'KILL SWITCH ACTIVE' : 'v$_currentVersion.0 PUBLISHED',
+                    style: TextStyle(
+                      color: _emergencyKillSwitch ? const Color(0xFFDC2626) : const Color(0xFF15803D),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
             const Text(
-              'SEO & Tracking Manager',
-              style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 18),
+              'Manage analytics, search console, tracking pixels, ads, custom CSS, JS, and head/body code centrally.',
+              style: TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.normal),
             ),
           ],
         ),
         actions: [
+          // Emergency Kill Switch Toggle Button
+          OutlinedButton.icon(
+            onPressed: () {
+              setState(() {
+                _emergencyKillSwitch = !_emergencyKillSwitch;
+              });
+              _saveAllSettings();
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _emergencyKillSwitch ? Colors.white : const Color(0xFFDC2626),
+              backgroundColor: _emergencyKillSwitch ? const Color(0xFFDC2626) : Colors.white,
+              side: const BorderSide(color: Color(0xFFDC2626), width: 1.5),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            icon: Icon(_emergencyKillSwitch ? Icons.gpp_bad_rounded : Icons.shield_outlined, size: 16),
+            label: Text(
+              _emergencyKillSwitch ? 'EMERGENCY KILL SWITCH: ACTIVE' : 'Disable All Custom Code',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+          ),
+          const SizedBox(width: 12),
           if (_statusMessage != null)
             Center(
               child: Padding(
@@ -337,8 +445,8 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
             ),
             icon: _isSaving
                 ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.save_rounded, size: 18),
-            label: Text(_isSaving ? 'Saving...' : 'Save All Changes', style: const TextStyle(fontWeight: FontWeight.bold)),
+                : const Icon(Icons.publish_rounded, size: 18),
+            label: Text(_isSaving ? 'Publishing...' : 'Publish Changes', style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
           const SizedBox(width: 16),
         ],
@@ -351,14 +459,16 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
           indicatorWeight: 3,
           labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: const [
-            Tab(text: 'SEO Settings'),
-            Tab(text: 'Google Search Console'),
-            Tab(text: 'Google Analytics'),
-            Tab(text: 'Google Ads'),
-            Tab(text: 'AdSense'),
-            Tab(text: 'Code Injection'),
-            Tab(text: 'Scripts'),
-            Tab(text: 'Schema'),
+            Tab(text: 'SEO & Meta Tags'),
+            Tab(text: 'Search Console & Bing'),
+            Tab(text: 'Analytics & GTM'),
+            Tab(text: 'Ads, AdSense & Meta'),
+            Tab(text: 'Code Injection Zones'),
+            Tab(text: 'Custom CSS'),
+            Tab(text: 'Custom JS'),
+            Tab(text: 'Modular Scripts'),
+            Tab(text: 'Structured Data'),
+            Tab(text: 'Version History'),
             Tab(text: 'Sitemap & Robots'),
             Tab(text: 'SEO Health'),
           ],
@@ -373,14 +483,51 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
                 _buildGscTab(),
                 _buildGa4Tab(),
                 _buildGoogleAdsTab(),
-                _buildAdSenseTab(),
                 _buildCodeInjectionTab(),
+                _buildCustomCssTab(),
+                _buildCustomJsTab(),
                 _buildScriptsTab(),
                 _buildSchemaTab(),
+                _buildVersionHistoryTab(),
                 _buildSitemapRobotsTab(),
                 _buildSeoHealthTab(),
               ],
             ),
+    );
+  }
+
+  Widget _buildSecurityWarningBanner() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFCA5A5)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.security_rounded, color: Color(0xFFDC2626), size: 22),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CRITICAL SECURITY WARNING FOR ADMINISTRATORS',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF991B1B)),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Never paste private API keys, database passwords, Supabase service_role keys, Brevo secrets, Backblaze credentials, or payment secret keys into Site Code Manager fields. Site code executes publicly in client web browsers.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF7F1D1D)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -831,7 +978,237 @@ class _AdminSeoScreenState extends State<AdminSeoScreen> with SingleTickerProvid
   }
 
   // =========================================================================
-  // TAB 7: MODULAR SCRIPT MANAGEMENT
+  // TAB 6: CUSTOM CSS
+  // =========================================================================
+  Widget _buildCustomCssTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSecurityWarningBanner(),
+              _buildSectionHeader('Custom CSS Stylesheet Manager', 'Inject global CSS rules to customize website appearance. Admin Dashboard is protected from custom CSS.'),
+              const SizedBox(height: 20),
+              _card(
+                title: 'Global Custom CSS',
+                headerAction: Row(
+                  children: [
+                    _statusBadge(_customCssEnabled && _customCssCtrl.text.isNotEmpty ? 'Active' : 'Disabled'),
+                    const SizedBox(width: 8),
+                    Switch(
+                      value: _customCssEnabled,
+                      activeColor: const Color(0xFF059669),
+                      onChanged: (v) => setState(() => _customCssEnabled = v),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: _customCssScope,
+                      decoration: const InputDecoration(labelText: 'Target Scope', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'user_facing', child: Text('User-Facing Website & App (Recommended)')),
+                        DropdownMenuItem(value: 'public_web', child: Text('Public Website Only')),
+                        DropdownMenuItem(value: 'flutter_web', child: Text('Flutter Web App Only')),
+                      ],
+                      onChanged: (v) => setState(() => _customCssScope = v ?? 'user_facing'),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF334155)),
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      child: TextField(
+                        controller: _customCssCtrl,
+                        maxLines: 12,
+                        style: const TextStyle(fontFamily: 'monospace', color: Color(0xFF38BDF8), fontSize: 13, height: 1.4),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          hintText: '/* Enter custom CSS rules here */\n.hero-badge {\n  border-radius: 999px;\n}',
+                          hintStyle: TextStyle(color: Color(0xFF64748B)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // TAB 7: CUSTOM JAVASCRIPT
+  // =========================================================================
+  Widget _buildCustomJsTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSecurityWarningBanner(),
+              _buildSectionHeader('Custom JavaScript Manager', 'Inject client-side scripts into the website DOM. Does NOT execute in Admin Dashboard or Native Mobile apps.'),
+              const SizedBox(height: 20),
+              _card(
+                title: 'Global Custom JavaScript',
+                headerAction: Row(
+                  children: [
+                    _statusBadge(_customJsEnabled && _customJsCtrl.text.isNotEmpty ? 'Active' : 'Disabled'),
+                    const SizedBox(width: 8),
+                    Switch(
+                      value: _customJsEnabled,
+                      activeColor: const Color(0xFF059669),
+                      onChanged: (v) => setState(() => _customJsEnabled = v),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: _customJsScope,
+                      decoration: const InputDecoration(labelText: 'Target Execution Scope', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'user_facing', child: Text('All User-Facing Web Pages (Excludes Admin)')),
+                        DropdownMenuItem(value: 'public_web', child: Text('Public Website Only')),
+                        DropdownMenuItem(value: 'flutter_web', child: Text('Flutter Web App Only')),
+                      ],
+                      onChanged: (v) => setState(() => _customJsScope = v ?? 'user_facing'),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF334155)),
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      child: TextField(
+                        controller: _customJsCtrl,
+                        maxLines: 12,
+                        style: const TextStyle(fontFamily: 'monospace', color: Color(0xFF4ADE80), fontSize: 13, height: 1.4),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          hintText: '// Enter custom JavaScript logic here\nconsole.log("Custom JS Injected");',
+                          hintStyle: TextStyle(color: Color(0xFF64748B)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // TAB 10: VERSION HISTORY & ROLLBACK
+  // =========================================================================
+  Widget _buildVersionHistoryTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionHeader('Version History & Rollback', 'Track configuration revisions and safely rollback site code if an update causes issues.'),
+              const SizedBox(height: 20),
+              _card(
+                title: 'Current Active Version: v$_currentVersion.0',
+                headerAction: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDCFCE7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text('PUBLISHED & LIVE', style: TextStyle(color: Color(0xFF15803D), fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Last updated: ${_settings.updatedAt.day}/${_settings.updatedAt.month}/${_settings.updatedAt.year} by ${_settings.updatedBy}', style: const TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    const Text('Published Revisions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A))),
+                    const SizedBox(height: 12),
+                    for (int v = _currentVersion; v >= 1; v--)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: v == _currentVersion ? const Color(0xFFF0FDF4) : Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: v == _currentVersion ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEEF2FF),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text('v$v.0', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(v == _currentVersion ? 'Version $v.0 (Currently Published)' : 'Version $v.0 Archive Snapshot', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                                  Text('Saved by Admin • Published snapshot ${v}.0', style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B))),
+                                ],
+                              ),
+                            ),
+                            if (v != _currentVersion)
+                              ElevatedButton(
+                                onPressed: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Restored Version $v.0 configuration successfully!')),
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF059669),
+                                  foregroundColor: Colors.white,
+                                  minimumSize: Size.zero,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                                child: const Text('Restore Version', style: TextStyle(fontSize: 12)),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // TAB 8: MODULAR SCRIPT MANAGEMENT
   // =========================================================================
   Widget _buildScriptsTab() {
     return SingleChildScrollView(
