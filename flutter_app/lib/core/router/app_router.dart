@@ -25,6 +25,7 @@ import '../../features/student/checkout_screen.dart';
 import '../../features/student/upi_payment_verification_screen.dart';
 import '../../features/student/cart_screen.dart';
 import '../services/cart_service.dart';
+import '../services/feature_config_service.dart';
 import '../../features/tests/mock_tests_screen.dart';
 import '../../features/tests/test_screen.dart';
 import '../../features/tests/test_result_screen.dart';
@@ -168,7 +169,7 @@ final GoRouter appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
   initialLocation: '/',
   debugLogDiagnostics: true,
-  refreshListenable: SupabaseService.authNotifier,
+  refreshListenable: Listenable.merge([SupabaseService.authNotifier, FeatureConfigService.notifier]),
   errorBuilder: (context, state) => NotFoundScreen(path: state.uri.toString()),
   redirect: (BuildContext context, GoRouterState state) {
     final session = SupabaseService.activeUserSession;
@@ -231,6 +232,32 @@ final GoRouter appRouter = GoRouter(
         return isAdmin ? '/admin' : '/dashboard';
       }
       return null;
+    }
+
+    // 5. Feature Manager Route Guards: Block access if Admin set feature to Hidden
+    final bool isAdminPath = path.startsWith('/admin');
+    if (!isAdminPath) {
+      if ((path == '/pricing' || path == '/subscription') && FeatureConfigService.isHidden('premium_plans')) {
+        return '/dashboard';
+      }
+      if (path.startsWith('/custom-practice') && FeatureConfigService.isHidden('custom_practice')) {
+        return '/dashboard';
+      }
+      if (path.startsWith('/custom-test') && FeatureConfigService.isHidden('custom_test')) {
+        return '/dashboard';
+      }
+      if (path.startsWith('/pyq') && FeatureConfigService.isHidden('pyq_practice')) {
+        return '/dashboard';
+      }
+      if ((path.startsWith('/nta-practice') || path.startsWith('/nta-questions')) && FeatureConfigService.isHidden('nta_questions')) {
+        return '/dashboard';
+      }
+      if (path.startsWith('/analytics') && FeatureConfigService.isHidden('performance_analytics')) {
+        return '/dashboard';
+      }
+      if (path.startsWith('/test-series') && FeatureConfigService.isHidden('test_series')) {
+        return '/dashboard';
+      }
     }
 
     return null; // Public routes allowed

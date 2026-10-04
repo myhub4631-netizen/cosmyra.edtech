@@ -80,69 +80,72 @@ class _AppSidebarState extends State<AppSidebar> {
 
   @override
   Widget build(BuildContext context) {
-    final rawSections = [
-      {
-        'header': 'STORE & PACKAGES',
-        'items': [
-          {'index': 0, 'icon': Icons.storefront_rounded, 'label': 'Store & Packages', 'route': '/test-series', 'isStore': true, 'featureKey': 'premium_plans'},
-        ]
-      },
-      {
-        'header': 'PRACTICE ENGINE',
-        'items': [
-          {'index': 1, 'icon': Icons.track_changes_rounded, 'label': 'Practice', 'route': '/practice', 'featureKey': 'custom_practice'},
-          {'index': 2, 'icon': Icons.tune_rounded, 'label': 'Custom Practice', 'route': '/custom-practice', 'featureKey': 'custom_practice'},
-          {'index': 3, 'icon': Icons.assignment_outlined, 'label': 'Custom Test Wizard', 'route': '/custom-test', 'featureKey': 'custom_test'},
-          {'index': 4, 'icon': Icons.menu_book_rounded, 'label': '15-Yr PYQ Bank', 'route': '/pyq', 'featureKey': 'pyq_practice'},
-          {'index': 5, 'icon': Icons.verified_rounded, 'label': 'NTA Question Bank', 'route': '/nta-practice', 'featureKey': 'nta_questions'},
-        ]
-      },
-      {
-        'header': 'TESTS & ANALYTICS',
-        'items': [
-          {'index': 6, 'icon': Icons.bookmark_border_rounded, 'label': 'Bookmarks', 'route': '/mistakes', 'featureKey': ''},
-          {'index': 7, 'icon': Icons.error_outline_rounded, 'label': 'My Mistakes Radar', 'route': '/mistakes', 'featureKey': ''},
-          {'index': 8, 'icon': Icons.assignment_turned_in_rounded, 'label': 'My All Tests', 'route': '/my-tests', 'featureKey': ''},
-          {'index': 9, 'icon': Icons.dashboard_customize_rounded, 'label': 'Test Series Catalog', 'route': '/test-series', 'featureKey': 'test_series'},
-          {'index': 10, 'icon': Icons.insights_rounded, 'label': 'Performance Analytics', 'route': '/analytics', 'featureKey': 'performance_analytics'},
-          {'index': 11, 'icon': Icons.emoji_events_rounded, 'label': 'AIR Leaderboards', 'route': '/leaderboard', 'featureKey': ''},
-        ]
-      },
-      {
-        'header': 'ACCOUNT & SUPPORT',
-        'items': [
-          {'index': 12, 'icon': Icons.event_note_rounded, 'label': 'Study Schedule', 'route': '/my-tests', 'featureKey': ''},
-          {'index': 13, 'icon': Icons.person_rounded, 'label': 'My Profile', 'route': '/profile', 'featureKey': ''},
-          {'index': 14, 'icon': Icons.settings_rounded, 'label': 'Settings', 'route': '/profile', 'featureKey': ''},
-          {'index': 15, 'icon': Icons.help_outline_rounded, 'label': 'Help & Support', 'route': '/help', 'featureKey': ''},
-          {'index': 16, 'icon': Icons.logout_rounded, 'label': 'Logout', 'route': '/login', 'isLogout': true, 'featureKey': ''},
-        ]
-      },
-    ];
+    return ValueListenableBuilder<int>(
+      valueListenable: FeatureConfigService.notifier,
+      builder: (context, _, __) {
+        final rawSections = [
+          {
+            'header': 'STORE & PACKAGES',
+            'items': [
+              {'index': 0, 'icon': Icons.storefront_rounded, 'label': 'Store & Packages', 'route': '/test-series', 'isStore': true, 'featureKey': 'premium_plans'},
+            ]
+          },
+          {
+            'header': 'PRACTICE ENGINE',
+            'items': [
+              {'index': 1, 'icon': Icons.track_changes_rounded, 'label': 'Practice', 'route': '/practice', 'featureKey': ''},
+              {'index': 2, 'icon': Icons.tune_rounded, 'label': 'Custom Practice', 'route': '/custom-practice', 'featureKey': 'custom_practice'},
+              {'index': 3, 'icon': Icons.assignment_outlined, 'label': 'Custom Test Wizard', 'route': '/custom-test', 'featureKey': 'custom_test'},
+              {'index': 4, 'icon': Icons.menu_book_rounded, 'label': '15-Yr PYQ Bank', 'route': '/pyq', 'featureKey': 'pyq_practice'},
+              {'index': 5, 'icon': Icons.verified_rounded, 'label': 'NTA Question Bank', 'route': '/nta-practice', 'featureKey': 'nta_questions'},
+            ]
+          },
+          {
+            'header': 'TESTS & ANALYTICS',
+            'items': [
+              {'index': 6, 'icon': Icons.bookmark_border_rounded, 'label': 'Bookmarks', 'route': '/mistakes', 'featureKey': ''},
+              {'index': 7, 'icon': Icons.error_outline_rounded, 'label': 'My Mistakes Radar', 'route': '/mistakes', 'featureKey': ''},
+              {'index': 8, 'icon': Icons.assignment_turned_in_rounded, 'label': 'My All Tests', 'route': '/my-tests', 'featureKey': ''},
+              {'index': 9, 'icon': Icons.dashboard_customize_rounded, 'label': 'Test Series Catalog', 'route': '/test-series', 'featureKey': 'test_series'},
+              {'index': 10, 'icon': Icons.insights_rounded, 'label': 'Performance Analytics', 'route': '/analytics', 'featureKey': 'performance_analytics'},
+              {'index': 11, 'icon': Icons.emoji_events_rounded, 'label': 'AIR Leaderboards', 'route': '/leaderboard', 'featureKey': ''},
+            ]
+          },
+          {
+            'header': 'ACCOUNT & SUPPORT',
+            'items': [
+              {'index': 12, 'icon': Icons.event_note_rounded, 'label': 'Study Schedule', 'route': '/my-tests', 'featureKey': ''},
+              {'index': 13, 'icon': Icons.person_rounded, 'label': 'My Profile', 'route': '/profile', 'featureKey': ''},
+              {'index': 14, 'icon': Icons.settings_rounded, 'label': 'Settings', 'route': '/profile', 'featureKey': ''},
+              {'index': 15, 'icon': Icons.help_outline_rounded, 'label': 'Help & Support', 'route': '/help', 'featureKey': ''},
+              {'index': 16, 'icon': Icons.logout_rounded, 'label': 'Logout', 'route': '/login', 'isLogout': true, 'featureKey': ''},
+            ]
+          },
+        ];
 
-    // Filter items and sections dynamically according to FeatureConfigService visibility settings
-    final visibleSections = [];
-    for (var sec in rawSections) {
-      final rawItems = sec['items'] as List<Map<String, dynamic>>;
-      final filteredItems = rawItems.where((item) {
-        final key = (item['featureKey'] ?? '').toString();
-        if (key.isEmpty) return true;
-        return FeatureConfigService.isVisible(key);
-      }).toList();
+        // Filter items and sections dynamically according to FeatureConfigService visibility settings
+        final visibleSections = [];
+        for (var sec in rawSections) {
+          final rawItems = sec['items'] as List<Map<String, dynamic>>;
+          final filteredItems = rawItems.where((item) {
+            final key = (item['featureKey'] ?? '').toString();
+            if (key.isEmpty) return true;
+            return FeatureConfigService.isVisible(key);
+          }).toList();
 
-      if (filteredItems.isNotEmpty) {
-        visibleSections.add({
-          'header': sec['header'],
-          'items': filteredItems,
-        });
-      }
-    }
+          if (filteredItems.isNotEmpty) {
+            visibleSections.add({
+              'header': sec['header'],
+              'items': filteredItems,
+            });
+          }
+        }
 
-    return Container(
-      width: 270,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(right: BorderSide(color: Color(0xFFE2E8F0))),
+        return Container(
+          width: 270,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(right: BorderSide(color: Color(0xFFE2E8F0))),
         boxShadow: [
           BoxShadow(color: Color(0x06000000), blurRadius: 16, offset: Offset(2, 0)),
         ],
@@ -466,6 +469,8 @@ class _AppSidebarState extends State<AppSidebar> {
           ],
         ),
       ),
+    );
+      },
     );
   }
 }

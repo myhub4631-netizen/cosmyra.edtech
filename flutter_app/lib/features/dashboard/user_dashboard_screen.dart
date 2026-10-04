@@ -822,36 +822,42 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         // Right Streak, Store & Notification Bell
         Row(
           children: [
-            InkWell(
-              onTap: () => context.go('/test-series'),
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  gradient: AppGradients.primaryGradient,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF4F46E5).withValues(alpha: 0.35),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+            if (FeatureConfigService.isVisible('premium_plans')) ...[
+              InkWell(
+                onTap: () => FeatureConfigService.handleFeatureTap(
+                  context,
+                  'premium_plans',
+                  onActive: () => context.go('/test-series'),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Store',
-                      style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
-                    ),
-                  ],
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    gradient: AppGradients.primaryGradient,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF4F46E5).withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Store',
+                        style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ).animate().scale(delay: 200.ms, duration: 400.ms),
-            const SizedBox(width: 6),
+              ).animate().scale(delay: 200.ms, duration: 400.ms),
+              const SizedBox(width: 6),
+            ],
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
               decoration: BoxDecoration(
