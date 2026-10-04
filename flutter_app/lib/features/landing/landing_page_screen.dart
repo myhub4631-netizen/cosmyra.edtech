@@ -46,6 +46,7 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
   @override
   void initState() {
     super.initState();
+    print('OLD_AUTH_SCREEN_RUNTIME_ID_2026');
     SupabaseService.authNotifier.addListener(_onLandingAuthChanged);
     SupabaseService.landingPageConfigNotifier.addListener(_onConfigUpdated);
 
@@ -459,6 +460,25 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
         ),
         const SizedBox(height: 24),
         if (!isDesktop) ...[
+          // Diagnostic label for Phase 3 runtime verification
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFD97706), width: 1.5),
+            ),
+            child: Text(
+              'OLD_AUTH_SCREEN_RUNTIME_ID_2026',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF92400E),
+              ),
+            ),
+          ),
+
           // 1. Primary Login with Google Button
           SizedBox(
             width: double.infinity,

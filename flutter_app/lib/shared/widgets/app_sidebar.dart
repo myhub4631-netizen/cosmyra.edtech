@@ -57,22 +57,80 @@ class _AppSidebarState extends State<AppSidebar> {
   }
 
   void _executeNavigation(String label, String route) {
-    if (label == 'Practice' && widget.onOpenPractice != null) {
-      widget.onOpenPractice!();
-    } else if (label.contains('Custom Practice') && widget.onOpenCustomPractice != null) {
-      widget.onOpenCustomPractice!();
-    } else if (label.contains('Custom Test') && widget.onOpenCustomTest != null) {
-      widget.onOpenCustomTest!();
-    } else if (label.contains('PYQ') && widget.onOpenPyqs != null) {
-      widget.onOpenPyqs!();
-    } else if (label.contains('Mistakes') && widget.onOpenMistakes != null) {
-      widget.onOpenMistakes!();
-    } else if (label.contains('My All Tests') && widget.onOpenMyTests != null) {
-      widget.onOpenMyTests!();
-    } else if (label.contains('Test Series') && widget.onOpenTestSeries != null) {
-      widget.onOpenTestSeries!();
-    } else if (label.contains('Leaderboard') && widget.onOpenLeaderboard != null) {
-      widget.onOpenLeaderboard!();
+    if (label == 'Practice' || label.contains('Custom Practice')) {
+      FeatureConfigService.handleFeatureTap(
+        context,
+        'custom_practice',
+        onActive: () {
+          if (widget.onOpenPractice != null) {
+            widget.onOpenPractice!();
+          } else if (widget.onOpenCustomPractice != null) {
+            widget.onOpenCustomPractice!();
+          } else {
+            context.go(route);
+          }
+        },
+      );
+    } else if (label.contains('Custom Test')) {
+      FeatureConfigService.handleFeatureTap(
+        context,
+        'custom_test',
+        onActive: () {
+          if (widget.onOpenCustomTest != null) {
+            widget.onOpenCustomTest!();
+          } else {
+            context.go(route);
+          }
+        },
+      );
+    } else if (label.contains('PYQ')) {
+      FeatureConfigService.handleFeatureTap(
+        context,
+        'pyq_practice',
+        onActive: () {
+          if (widget.onOpenPyqs != null) {
+            widget.onOpenPyqs!();
+          } else {
+            context.go(route);
+          }
+        },
+      );
+    } else if (label.contains('Mistakes')) {
+      if (widget.onOpenMistakes != null) {
+        widget.onOpenMistakes!();
+      } else {
+        context.go(route);
+      }
+    } else if (label.contains('My All Tests')) {
+      if (widget.onOpenMyTests != null) {
+        widget.onOpenMyTests!();
+      } else {
+        context.go(route);
+      }
+    } else if (label.contains('Test Series')) {
+      FeatureConfigService.handleFeatureTap(
+        context,
+        'test_series',
+        onActive: () {
+          if (widget.onOpenTestSeries != null) {
+            widget.onOpenTestSeries!();
+          } else {
+            context.go(route);
+          }
+        },
+      );
+    } else if (label.contains('Leaderboard')) {
+      FeatureConfigService.handleFeatureTap(
+        context,
+        'performance_analytics',
+        onActive: () {
+          if (widget.onOpenLeaderboard != null) {
+            widget.onOpenLeaderboard!();
+          } else {
+            context.go(route);
+          }
+        },
+      );
     } else {
       context.go(route);
     }
@@ -93,7 +151,7 @@ class _AppSidebarState extends State<AppSidebar> {
           {
             'header': 'PRACTICE ENGINE',
             'items': [
-              {'index': 1, 'icon': Icons.track_changes_rounded, 'label': 'Practice', 'route': '/practice', 'featureKey': ''},
+              {'index': 1, 'icon': Icons.track_changes_rounded, 'label': 'Practice', 'route': '/practice', 'featureKey': 'custom_practice'},
               {'index': 2, 'icon': Icons.tune_rounded, 'label': 'Custom Practice', 'route': '/custom-practice', 'featureKey': 'custom_practice'},
               {'index': 3, 'icon': Icons.assignment_outlined, 'label': 'Custom Test Wizard', 'route': '/custom-test', 'featureKey': 'custom_test'},
               {'index': 4, 'icon': Icons.menu_book_rounded, 'label': '15-Yr PYQ Bank', 'route': '/pyq', 'featureKey': 'pyq_practice'},

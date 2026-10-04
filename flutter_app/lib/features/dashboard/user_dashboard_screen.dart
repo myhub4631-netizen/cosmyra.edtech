@@ -1533,94 +1533,115 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     );
   }
 
-  // 8. Mobile Bottom Navigation Bar (5 Tabs)
+  // 8. Mobile Bottom Navigation Bar (Dynamic FeatureConfigService Sync)
   Widget _buildMobileBottomNavBar() {
-    final navs = [
-      {'icon': Icons.home_rounded, 'label': 'Home'},
-      {'icon': Icons.track_changes_rounded, 'label': 'Practice'},
-      {'icon': Icons.assignment_outlined, 'label': 'Tests'},
-      {'icon': Icons.emoji_events_outlined, 'label': 'Leaderboard'},
-      {'icon': Icons.person_outline_rounded, 'label': 'Profile'},
-    ];
+    return ValueListenableBuilder<int>(
+      valueListenable: FeatureConfigService.notifier,
+      builder: (context, _, __) {
+        final rawNavs = [
+          {'icon': Icons.home_rounded, 'label': 'Home', 'key': ''},
+          {'icon': Icons.track_changes_rounded, 'label': 'Practice', 'key': 'custom_practice'},
+          {'icon': Icons.assignment_outlined, 'label': 'Tests', 'key': 'test_series'},
+          {'icon': Icons.emoji_events_outlined, 'label': 'Leaderboard', 'key': 'performance_analytics'},
+          {'icon': Icons.person_outline_rounded, 'label': 'Profile', 'key': ''},
+        ];
 
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
+        final navs = rawNavs.where((n) {
+          final key = n['key'] as String;
+          if (key.isEmpty) return true;
+          return FeatureConfigService.isVisible(key);
+        }).toList();
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: const Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.06),
-            blurRadius: 10,
-            offset: const Offset(0, -3),
-          ),
-        ],
-      ),
-      padding: EdgeInsets.only(bottom: bottomPadding),
-      child: SizedBox(
-        height: 60,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: List.generate(navs.length, (idx) {
-            final isSelected = _mobileBottomNavIndex == idx;
-            final item = navs[idx];
+        final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-            return InkWell(
-              onTap: () {
-                setState(() => _mobileBottomNavIndex = idx);
-                if (idx == 0) {
-                  // Already on home
-                } else if (idx == 1) {
-                  widget.onOpenPractice();
-                } else if (idx == 2) {
-                  if (widget.onOpenMyTests != null) {
-                    widget.onOpenMyTests!();
-                  } else {
-                    widget.onOpenMockTests();
-                  }
-                } else if (idx == 3) {
-                  if (widget.onOpenLeaderboard != null) {
-                    widget.onOpenLeaderboard!();
-                  } else {
-                    context.push('/leaderboard');
-                  }
-                } else if (idx == 4) {
-                  // Direct navigation to Profile Screen
-                  context.push('/profile');
-                }
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFFF3E8FF) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      item['icon'] as IconData,
-                      size: 20,
-                      color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      item['label'] as String,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: const Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0F172A).withOpacity(0.06),
+                blurRadius: 10,
+                offset: const Offset(0, -3),
               ),
-            );
-          }),
-        ),
-      ),
+            ],
+          ),
+          padding: EdgeInsets.only(bottom: bottomPadding),
+          child: SizedBox(
+            height: 60,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(navs.length, (idx) {
+                final isSelected = _mobileBottomNavIndex == idx;
+                final item = navs[idx];
+                final key = item['key'] as String;
+
+                return InkWell(
+                  onTap: () {
+                    setState(() => _mobileBottomNavIndex = idx);
+                    if (key.isEmpty) {
+                      if (item['label'] == 'Home') {
+                        // Already on home
+                      } else if (item['label'] == 'Profile') {
+                        context.push('/profile');
+                      }
+                    } else {
+                      FeatureConfigService.handleFeatureTap(
+                        context,
+                        key,
+                        onActive: () {
+                          if (key == 'custom_practice') {
+                            widget.onOpenPractice();
+                          } else if (key == 'test_series') {
+                            if (widget.onOpenMyTests != null) {
+                              widget.onOpenMyTests!();
+                            } else {
+                              widget.onOpenMockTests();
+                            }
+                          } else if (key == 'performance_analytics') {
+                            if (widget.onOpenLeaderboard != null) {
+                              widget.onOpenLeaderboard!();
+                            } else {
+                              context.push('/leaderboard');
+                            }
+                          }
+                        },
+                      );
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isSelected ? const Color(0xFFF3E8FF) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          item['icon'] as IconData,
+                          size: 20,
+                          color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item['label'] as String,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        );
+      },
     );
   }
 

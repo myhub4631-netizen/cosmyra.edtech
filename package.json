@@ -2,7 +2,8 @@
   "name": "cosmyra-edu-flutter-platform",
   "private": true,
   "scripts": {
-    "build": "echo 'Using pre-built public directory for Vercel deployment'",
+    "build": "cd flutter_app && flutter build web --release && rm -rf ../public/* && cp -r build/web/* ../public/",
+    "sync-public": "rm -rf public/* && cp -r flutter_app/build/web/* public/",
     "start": "cd flutter_app && flutter run -d chrome"
   }
 }

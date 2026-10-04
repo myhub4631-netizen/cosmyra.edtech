@@ -169,10 +169,31 @@ Page<dynamic> buildSmoothPage({
   );
 }
 
+class AuthRouteObserver extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    final prevName = previousRoute?.settings.name ?? previousRoute?.settings.arguments?.toString() ?? '/';
+    final nextName = route.settings.name ?? route.settings.arguments?.toString() ?? route.toString();
+    print('AUTH_NAVIGATION:\nprevious = $prevName\nnext = $nextName');
+    print('CURRENT_ROUTE:\n$nextName');
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    final prevName = oldRoute?.settings.name ?? oldRoute?.settings.arguments?.toString() ?? '/';
+    final nextName = newRoute?.settings.name ?? newRoute?.settings.arguments?.toString() ?? newRoute.toString();
+    print('AUTH_NAVIGATION:\nprevious = $prevName\nnext = $nextName');
+    print('CURRENT_ROUTE:\n$nextName');
+  }
+}
+
 final GoRouter appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
   initialLocation: '/',
   debugLogDiagnostics: true,
+  observers: [AuthRouteObserver()],
   refreshListenable: Listenable.merge([SupabaseService.authNotifier, FeatureConfigService.notifier]),
   errorBuilder: (context, state) => NotFoundScreen(path: state.uri.toString()),
   redirect: (BuildContext context, GoRouterState state) {
@@ -195,27 +216,9 @@ final GoRouter appRouter = GoRouter(
       }
     }
 
-    // 2. Protected student routes: strictly require user to be signed in
-    final protectedStudentPaths = [
-      '/dashboard',
-      '/user/dashboard',
-      '/checkout',
-      '/profile',
-      '/my-tests',
-      '/mistakes',
-      '/mistakes-bookmarks',
-      '/analytics',
-    ];
-    final bool requiresAuth = protectedStudentPaths.any((p) => path == p || path.startsWith('$p/'));
-
-    if (requiresAuth) {
-      if (!isLoggedIn) {
-        final dest = state.uri.toString();
-        return '/login?redirect=${Uri.encodeComponent(dest)}';
-      }
-    }
-
-    // 3. Auth & Landing routes: if user logs in, auto redirect to destination or dashboard/admin
+    // 2. Auth & Root routes: enforce 2-state application architecture
+    // NOT LOGGED IN  -> /login (AuthScreen)
+    // LOGGED IN      -> /dashboard or /admin
     if (path == '/' || path == '/landing' || path == '/login' || path == '/signup') {
       if (isLoggedIn) {
         final redirectParam = state.uri.queryParameters['redirect'];
@@ -225,10 +228,14 @@ final GoRouter appRouter = GoRouter(
         final role = session?.role.toLowerCase() ?? '';
         final bool isAdmin = role == 'admin' || role == 'superadmin' || (session?.isAdmin ?? false) || (session?.isSuperAdmin ?? false);
         return isAdmin ? '/admin' : '/dashboard';
+      } else {
+        if (path == '/' || path == '/landing') {
+          return '/login';
+        }
       }
     }
 
-    // 4. OAuth Callback deep link handler route
+    // 3. OAuth Callback deep link handler route
     if (path == '/login-callback') {
       if (isLoggedIn) {
         final role = session?.role.toLowerCase() ?? '';
@@ -238,13 +245,42 @@ final GoRouter appRouter = GoRouter(
       return null;
     }
 
+    // 4. Public allowed routes (legal and static dynamic pages)
+    final publicPaths = [
+      '/',
+      '/login',
+      '/signup',
+      '/landing',
+      '/login-callback',
+      '/privacy-policy',
+      '/privacy',
+      '/terms',
+      '/terms-of-service',
+      '/about-us',
+      '/contact-us',
+      '/disclaimer',
+      '/refund-policy',
+      '/shipping-policy',
+      '/cookie-policy',
+      '/faq',
+      '/careers',
+      '/help',
+      '/updates',
+    ];
+    final bool isPublicPath = publicPaths.contains(path) || path.startsWith('/pages/') || path.startsWith('/blog');
+
+    if (!isLoggedIn && !isPublicPath) {
+      final dest = state.uri.toString();
+      return '/login?redirect=${Uri.encodeComponent(dest)}';
+    }
+
     // 5. Feature Manager Route Guards: Block access if Admin set feature to Hidden
     final bool isAdminPath = path.startsWith('/admin');
     if (!isAdminPath) {
       if ((path == '/pricing' || path == '/subscription') && FeatureConfigService.isHidden('premium_plans')) {
         return '/dashboard';
       }
-      if (path.startsWith('/custom-practice') && FeatureConfigService.isHidden('custom_practice')) {
+      if ((path.startsWith('/custom-practice') || path.startsWith('/practice')) && FeatureConfigService.isHidden('custom_practice')) {
         return '/dashboard';
       }
       if (path.startsWith('/custom-test') && FeatureConfigService.isHidden('custom_test')) {
@@ -272,21 +308,23 @@ final GoRouter appRouter = GoRouter(
     // =========================================================================
     GoRoute(
       path: '/',
-      builder: (context, state) => LandingPageScreen(
-        onStartPracticing: () => context.go('/practice'),
-        onExploreTests: () => context.go('/mock-tests'),
-        onSignUp: () => context.go('/signup'),
-        onLogIn: () => context.go('/login'),
+      builder: (context, state) => AuthScreen(
+        initialIsLogin: true,
+        onAuthSuccess: (userProfile) {
+          final redirect = state.uri.queryParameters['redirect'];
+          if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
+            context.go(redirect);
+          } else if (userProfile.isAdmin || userProfile.isSuperAdmin) {
+            context.go('/admin');
+          } else {
+            context.go('/dashboard');
+          }
+        },
       ),
     ),
     GoRoute(
       path: '/landing',
-      builder: (context, state) => LandingPageScreen(
-        onStartPracticing: () => context.go('/practice'),
-        onExploreTests: () => context.go('/mock-tests'),
-        onSignUp: () => context.go('/signup'),
-        onLogIn: () => context.go('/login'),
-      ),
+      redirect: (context, state) => '/login',
     ),
     GoRoute(
       path: '/login',

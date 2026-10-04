@@ -296,13 +296,21 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       );
     }
 
-    // 0. AUTHENTICATION GUARD: If user is NOT logged in, ANY route or URL MUST render LandingPageScreen
+    // 0. AUTHENTICATION GUARD: If user is NOT logged in, ANY route or URL MUST render AuthScreen
     if (!_isLoggedIn) {
-      return LandingPageScreen(
-        onStartPracticing: _openCustomPracticeWizard,
-        onExploreTests: _startCustomTest,
-        onSignUp: _openAuthModal,
-        onLogIn: _openAuthModal,
+      return AuthScreen(
+        initialIsLogin: true,
+        onAuthSuccess: (profile) {
+          setState(() {
+            _currentUser = profile;
+            _isLoggedIn = true;
+            if (profile.isAdmin || profile.isSuperAdmin) {
+              _selectedIndex = 8;
+            } else {
+              _selectedIndex = 0;
+            }
+          });
+        },
       );
     }
 
