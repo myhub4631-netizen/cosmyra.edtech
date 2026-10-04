@@ -383,6 +383,8 @@ class FeatureConfigService {
     }
   }
 
+  static bool isFeatureEnabled(String featureKey) => isVisible(featureKey);
+
   static bool isVisible(String featureKey) {
     final f = getFeature(featureKey);
     if (f == null) {

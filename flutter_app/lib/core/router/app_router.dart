@@ -60,6 +60,7 @@ import '../../features/admin/cms/admin_blog_manager_screen.dart';
 import '../../features/admin/cms/admin_blog_editor_screen.dart';
 import '../../features/admin/cms/admin_navigation_manager_screen.dart';
 import '../../features/admin/cms/admin_auth_manager_screen.dart';
+import '../../features/admin/cms/admin_landing_page_manager_screen.dart';
 import '../../features/admin/seo/admin_seo_screen.dart';
 import '../../features/admin/admin_test_series_manager_screen.dart';
 import '../../features/admin/admin_recommendations_screen.dart';
@@ -1084,6 +1085,18 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/admin/cms/auth',
       builder: (context, state) => const AdminAuthManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/cms/landing',
+      builder: (context, state) => const AdminLandingPageManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/landing-cms',
+      builder: (context, state) => const AdminLandingPageManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/landing-manager',
+      builder: (context, state) => const AdminLandingPageManagerScreen(),
     ),
     GoRoute(
       path: '/admin/auth-cms',

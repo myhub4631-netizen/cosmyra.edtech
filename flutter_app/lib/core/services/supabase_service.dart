@@ -10,6 +10,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:app_links/app_links.dart';
 import '../../models/models.dart';
 import '../../models/pyq_models.dart';
+import '../../models/landing_page_config_model.dart';
 import 'supabase_question_mapper.dart';
 import '../../shared/widgets/latex_view.dart';
 import 'ecommerce_automation_service.dart';
@@ -6062,6 +6063,75 @@ class SupabaseService {
       return true;
     } catch (e) {
       debugPrint('Error saving canonical_auth_page_config to system_config: $e');
+      return false;
+    }
+  }
+
+  static LandingPageConfigModel _cachedLandingPageConfig = LandingPageConfigModel.defaultConfig();
+  static final ValueNotifier<LandingPageConfigModel?> landingPageConfigNotifier = ValueNotifier<LandingPageConfigModel?>(null);
+
+  /// Fetch canonical Landing Page configuration from system_config (with instant local caching fallback)
+  static Future<LandingPageConfigModel> fetchLandingPageConfig() async {
+    try {
+      final res = await client
+          .from('system_config')
+          .select('value')
+          .eq('key', 'canonical_landing_page_config')
+          .maybeSingle();
+
+      if (res != null && res['value'] != null) {
+        final raw = res['value'];
+        Map<String, dynamic> jsonMap = {};
+        if (raw is String && raw.trim().isNotEmpty) {
+          jsonMap = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+        } else if (raw is Map) {
+          jsonMap = Map<String, dynamic>.from(raw);
+        }
+        if (jsonMap.isNotEmpty) {
+          _cachedLandingPageConfig = LandingPageConfigModel.fromJson(jsonMap);
+          landingPageConfigNotifier.value = _cachedLandingPageConfig;
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('cosmyra_cached_landing_page_config', jsonEncode(jsonMap));
+          } catch (_) {}
+          return _cachedLandingPageConfig;
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice loading canonical_landing_page_config from system_config: $e');
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedStr = prefs.getString('cosmyra_cached_landing_page_config');
+      if (cachedStr != null && cachedStr.trim().isNotEmpty) {
+        final jsonMap = jsonDecode(cachedStr) as Map<String, dynamic>;
+        _cachedLandingPageConfig = LandingPageConfigModel.fromJson(jsonMap);
+        landingPageConfigNotifier.value = _cachedLandingPageConfig;
+        return _cachedLandingPageConfig;
+      }
+    } catch (_) {}
+
+    landingPageConfigNotifier.value = _cachedLandingPageConfig;
+    return _cachedLandingPageConfig;
+  }
+
+  /// Save canonical Landing Page configuration to system_config
+  static Future<bool> saveLandingPageConfig(LandingPageConfigModel config) async {
+    try {
+      _cachedLandingPageConfig = config;
+      landingPageConfigNotifier.value = config;
+      final jsonMap = config.toJson();
+      await client.from('system_config').upsert({
+        'key': 'canonical_landing_page_config',
+        'value': jsonEncode(jsonMap),
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_cached_landing_page_config', jsonEncode(jsonMap));
+      return true;
+    } catch (e) {
+      debugPrint('Error saving canonical_landing_page_config to system_config: $e');
       return false;
     }
   }
