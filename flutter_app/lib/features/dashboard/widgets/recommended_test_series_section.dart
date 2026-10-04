@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/services/supabase_service.dart';
+import '../../../core/services/feature_config_service.dart';
 
 class RecommendedTestSeriesSection extends StatefulWidget {
   final VoidCallback? onViewAll;
@@ -374,6 +375,10 @@ class _RecommendedTestSeriesSectionState extends State<RecommendedTestSeriesSect
   // GO PREMIUM BANNER (From reference image)
   // =========================================================================
   Widget _buildGoPremiumBanner(BuildContext context) {
+    if (!FeatureConfigService.isVisible('premium_plans')) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -383,7 +388,7 @@ class _RecommendedTestSeriesSectionState extends State<RecommendedTestSeriesSect
         border: Border.all(color: const Color(0xFFBBF7D0), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF16A34A).withOpacity(0.04),
+            color: const Color(0xFF16A34A).withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -443,7 +448,13 @@ class _RecommendedTestSeriesSectionState extends State<RecommendedTestSeriesSect
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            onPressed: () => context.push('/test-series'),
+            onPressed: () {
+              FeatureConfigService.handleFeatureTap(
+                context,
+                'premium_plans',
+                onActive: () => context.push('/pricing'),
+              );
+            },
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

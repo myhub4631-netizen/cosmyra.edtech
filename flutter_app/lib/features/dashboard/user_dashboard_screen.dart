@@ -13,6 +13,7 @@ import '../../core/services/feature_config_service.dart';
 import '../../core/theme/app_design_system.dart';
 import '../../shared/widgets/app_sidebar.dart';
 import '../../shared/widgets/app_header.dart';
+import '../../shared/widgets/app_avatar.dart';
 import '../auth/login_screen.dart';
 import 'widgets/recommended_test_series_section.dart';
 
@@ -56,6 +57,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   int _activeSidebarIndex = 0;
   int _mobileBottomNavIndex = 0;
 
+  bool _isLeaderboardLoading = true;
+  List<Map<String, dynamic>> _homepageLeaderboardRankings = [];
+  Map<String, dynamic>? _homepageCurrentUserRank;
+
   late UserProfileModel _currentUserProfile;
   Map<String, dynamic>? _activeAbortedSession;
   Map<String, dynamic> _userRealStats = {
@@ -86,7 +91,60 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         _activeAbortedSession = activeSession;
       });
     }
+    _loadHomepageLeaderboard();
     _checkAndShowCohortOnboarding();
+  }
+
+  Future<void> _loadHomepageLeaderboard() async {
+    if (!mounted) return;
+    setState(() => _isLeaderboardLoading = true);
+    try {
+      final periodStr = _leaderboardTab.toLowerCase();
+      final examKey = _selectedExamFilter.isNotEmpty
+          ? _selectedExamFilter
+          : (_currentUserProfile.targetExam.isNotEmpty ? _currentUserProfile.targetExam : 'NEET');
+
+      final result = await SupabaseService.fetchRealLeaderboardRankings(
+        exam: examKey,
+        isPointsMode: false,
+        currentUserId: _currentUserProfile.id,
+        timePeriod: periodStr,
+      );
+
+      final List rawRankings = result['rankings'] as List? ?? [];
+      final Map<String, dynamic>? currentUserRank =
+          (result['currentUserRank'] ?? result['currentUser']) as Map<String, dynamic>?;
+
+      final List<Map<String, dynamic>> rankingsList =
+          rawRankings.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
+      if (mounted) {
+        setState(() {
+          _homepageLeaderboardRankings = rankingsList;
+          _homepageCurrentUserRank = currentUserRank;
+          _isLeaderboardLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading homepage leaderboard: $e');
+      if (mounted) {
+        setState(() => _isLeaderboardLoading = false);
+      }
+    }
+  }
+
+  String _formatLeaderboardScore(dynamic val) {
+    if (val == null) return '0';
+    final num n = val is num ? val : (num.tryParse(val.toString()) ?? 0);
+    final str = n.toInt().toString();
+    final reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    return str.replaceAllMapped(reg, (Match m) => '${m[1]},');
+  }
+
+  String _formatLeaderboardAccuracy(dynamic val) {
+    if (val == null) return '0.0%';
+    final double d = val is num ? val.toDouble() : (double.tryParse(val.toString()) ?? 0.0);
+    return '${d.toStringAsFixed(1)}%';
   }
 
   Future<void> _checkAndShowCohortOnboarding() async {
@@ -1959,58 +2017,65 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             ),
           ),
 
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Text('👑', style: TextStyle(fontSize: 16)),
-                      SizedBox(width: 8),
-                      Text(
-                        'Go Premium',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Unlock unlimited tests, detailed analytics, and exclusive features.',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF64748B), height: 1.4),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 36,
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4F46E5),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text('Upgrade Now', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-                          SizedBox(width: 4),
-                          Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
-                        ],
+          if (FeatureConfigService.isVisible('premium_plans'))
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Text('👑', style: TextStyle(fontSize: 16)),
+                        SizedBox(width: 8),
+                        Text(
+                          'Go Premium',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Unlock 500+ mock tests, video solutions & AI error radar.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B), height: 1.4),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 36,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          FeatureConfigService.handleFeatureTap(
+                            context,
+                            'premium_plans',
+                            onActive: () => context.push('/pricing'),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4F46E5),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('Upgrade Now', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                            SizedBox(width: 4),
+                            Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -2727,7 +2792,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Leaderboard (Daily)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+            Text('Leaderboard ($_leaderboardTab)', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
             GestureDetector(
               onTap: () {
                 if (widget.onOpenLeaderboard != null) {
@@ -2763,7 +2828,12 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                 children: ['Daily', 'Weekly', 'Monthly'].map((t) {
                   final isSelected = _leaderboardTab == t;
                   return GestureDetector(
-                    onTap: () => setState(() => _leaderboardTab = t),
+                    onTap: () {
+                      if (_leaderboardTab != t) {
+                        setState(() => _leaderboardTab = t);
+                        _loadHomepageLeaderboard();
+                      }
+                    },
                     child: Container(
                       margin: const EdgeInsets.only(right: 24),
                       padding: const EdgeInsets.only(bottom: 6),
@@ -2799,16 +2869,82 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               ),
               const Divider(height: 20, color: Color(0xFFF1F5F9)),
 
-              _buildLeaderboardRow('🥇', 'Ritik Sharma', '8,420', '93.6%', false),
-              const SizedBox(height: 10),
+              if (_isLeaderboardLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator(color: Color(0xFF2563EB), strokeWidth: 2)),
+                )
+              else if (_homepageLeaderboardRankings.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: Text(
+                      'No leaderboard data available',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ),
+                )
+              else ...[
+                ...() {
+                  final List<Widget> rowWidgets = [];
+                  final currentUserId = _currentUserProfile.id;
+                  final topEntries = _homepageLeaderboardRankings.take(3).toList();
 
-              _buildLeaderboardRow('🥈', 'Ananya Singh', '7,850', '91.2%', false),
-              const SizedBox(height: 10),
+                  final bool currentUserInTop = topEntries.any((e) {
+                    final eId = e['id']?.toString() ?? '';
+                    return e['is_current_user'] == true || (eId.isNotEmpty && eId == currentUserId);
+                  });
 
-              _buildLeaderboardRow('🥉', 'Karan Verma', '7,120', '89.4%', false),
-              const SizedBox(height: 10),
+                  final List<Map<String, dynamic>> displayEntries = List.from(topEntries);
+                  if (!currentUserInTop && _homepageCurrentUserRank != null) {
+                    displayEntries.add(_homepageCurrentUserRank!);
+                  }
 
-              _buildLeaderboardRow('15', '$displayName (You)', '4,210', '72.4%', true),
+                  for (int i = 0; i < displayEntries.length; i++) {
+                    final item = displayEntries[i];
+                    final rankNum = (item['rank'] as num?)?.toInt() ?? (i + 1);
+                    String rankStr;
+                    if (rankNum == 1) {
+                      rankStr = '🥇';
+                    } else if (rankNum == 2) {
+                      rankStr = '🥈';
+                    } else if (rankNum == 3) {
+                      rankStr = '🥉';
+                    } else {
+                      rankStr = '$rankNum';
+                    }
+
+                    final rawName = (item['name'] ?? 'Aspirant').toString();
+                    final itemId = item['id']?.toString() ?? '';
+                    final isMe = item['is_current_user'] == true || (itemId.isNotEmpty && itemId == currentUserId);
+                    String displayNameStr = rawName;
+                    if (isMe && !displayNameStr.contains('(You)')) {
+                      displayNameStr = '$displayNameStr (You)';
+                    }
+
+                    final rawScore = item['score'] ?? 0;
+                    final scoreStr = _formatLeaderboardScore(rawScore);
+                    final rawAcc = item['accuracy'] ?? 0.0;
+                    final accStr = _formatLeaderboardAccuracy(rawAcc);
+                    final avatarUrl = item['avatar']?.toString();
+
+                    if (i > 0) {
+                      rowWidgets.add(const SizedBox(height: 10));
+                    }
+                    rowWidgets.add(
+                      _buildLeaderboardRow(
+                        rankStr,
+                        displayNameStr,
+                        scoreStr,
+                        accStr,
+                        isMe,
+                        avatarUrl: avatarUrl,
+                      ),
+                    );
+                  }
+                  return rowWidgets;
+                }(),
+              ],
             ],
           ),
         ),
@@ -2842,7 +2978,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     );
   }
 
-  Widget _buildLeaderboardRow(String rank, String name, String score, String accuracy, bool isHighlighted) {
+  Widget _buildLeaderboardRow(String rank, String name, String score, String accuracy, bool isHighlighted, {String? avatarUrl}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
@@ -2862,13 +2998,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               ),
             ),
           ),
-          CircleAvatar(
-            radius: 12,
+          AppAvatar(
+            avatarUrl: avatarUrl,
+            name: name,
+            size: 24,
             backgroundColor: isHighlighted ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
-            child: Text(
-              name.substring(0, 1),
-              style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
-            ),
           ),
           const SizedBox(width: 8),
           Expanded(

@@ -10280,8 +10280,28 @@ class SupabaseService {
   static Future<Map<String, dynamic>> getAdminLeaderboardSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final mode = prefs.getString('cosmyra_admin_leaderboard_mode_v2') ?? 'real';
-      final rawEntries = prefs.getString('cosmyra_admin_custom_leaderboard_v2');
+      var mode = prefs.getString('cosmyra_admin_leaderboard_mode_v2');
+      var rawEntries = prefs.getString('cosmyra_admin_custom_leaderboard_v2');
+
+      if (mode == null || rawEntries == null) {
+        try {
+          final remoteRes = await client.from('platform_settings').select('value').eq('key', 'leaderboard_config').maybeSingle();
+          if (remoteRes != null && remoteRes['value'] != null) {
+            final decoded = jsonDecode(remoteRes['value'].toString());
+            if (decoded is Map<String, dynamic>) {
+              mode ??= decoded['mode'] as String?;
+              final customEntries = decoded['custom_entries'];
+              if (customEntries is List) {
+                rawEntries ??= jsonEncode(customEntries);
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Notice fetching remote leaderboard_config: $e');
+        }
+      }
+
+      mode ??= 'real';
       List<Map<String, dynamic>> entries = [];
       if (rawEntries != null && rawEntries.isNotEmpty) {
         final decoded = jsonDecode(rawEntries);
@@ -10306,7 +10326,6 @@ class SupabaseService {
     bool forceRealtime = false,
     String timePeriod = 'all', // 'daily', 'weekly', 'monthly', 'all'
   }) async {
-    final List<Map<String, dynamic>> rankings = [];
     Map<String, dynamic>? currentUserRank;
 
     try {

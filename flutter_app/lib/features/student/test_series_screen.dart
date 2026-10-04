@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/cart_service.dart';
+import '../../core/services/feature_config_service.dart';
 import 'widgets/ecommerce_checkout_dialog.dart';
 import 'widgets/ecommerce_cart_modal.dart';
 import '../tests/test_screen.dart';
@@ -2136,6 +2137,10 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   // 7. GO PREMIUM BANNER
   // ===========================================================================
   Widget _buildGoPremiumBanner() {
+    if (!FeatureConfigService.isVisible('premium_plans')) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -2154,7 +2159,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: const Color(0xFF8B5CF6).withOpacity(0.15),
+              color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF7C3AED), size: 24),
@@ -2183,8 +2188,10 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
           // Upgrade Button
           ElevatedButton(
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Opening Premium Upgrade Plans...')),
+              FeatureConfigService.handleFeatureTap(
+                context,
+                'premium_plans',
+                onActive: () => context.push('/pricing'),
               );
             },
             style: ElevatedButton.styleFrom(
