@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/responsive_layout.dart';
+import '../../shared/widgets/promo_dropdown_banner.dart';
 import '../auth/auth_screen.dart';
 import '../landing/landing_page_screen.dart';
 import '../home/home_screen.dart';
@@ -354,7 +355,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       return AdminDashboardScreen(userProfile: _currentUser);
     }
 
-    return _buildCurrentTab();
+    return Column(
+      children: [
+        const PromoDropdownBanner(),
+        Expanded(child: _buildCurrentTab()),
+      ],
+    );
   }
 
   Widget _buildCurrentTab() {

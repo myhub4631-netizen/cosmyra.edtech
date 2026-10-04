@@ -8380,6 +8380,114 @@ class SupabaseService {
     }
   }
 
+  // ==========================================
+  // PROMO DROPDOWN & APP BANNER ENGINE
+  // ==========================================
+
+  /// Fetch Promo Dropdown Banner Settings (Admin & Website)
+  static Future<PromoDropdownModel> fetchPromoDropdownSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final localStr = prefs.getString('cosmyra_promo_dropdown_settings');
+
+      // 1. Primary Remote Read: Fetch from app_settings (key = 'promo_dropdown_banner_settings')
+      try {
+        final res = await client
+            .from('app_settings')
+            .select('value')
+            .eq('key', 'promo_dropdown_banner_settings')
+            .maybeSingle();
+
+        if (res != null && res['value'] != null) {
+          final Map<String, dynamic> valMap = (res['value'] is String)
+              ? jsonDecode(res['value'])
+              : Map<String, dynamic>.from(res['value']);
+
+          final model = PromoDropdownModel.fromJson(valMap);
+          await prefs.setString('cosmyra_promo_dropdown_settings', jsonEncode(model.toJson()));
+          return model;
+        }
+      } catch (e) {
+        debugPrint('Notice reading app_settings key=promo_dropdown_banner_settings: $e');
+      }
+
+      // 2. Secondary Remote Read: Fetch from system_config (key = 'promo_dropdown_banner_data')
+      try {
+        final res = await client
+            .from('system_config')
+            .select('value')
+            .eq('key', 'promo_dropdown_banner_data')
+            .maybeSingle();
+
+        if (res != null && res['value'] != null) {
+          final Map<String, dynamic> valMap = (res['value'] is String)
+              ? jsonDecode(res['value'])
+              : Map<String, dynamic>.from(res['value']);
+
+          final model = PromoDropdownModel.fromJson(valMap);
+          await prefs.setString('cosmyra_promo_dropdown_settings', jsonEncode(model.toJson()));
+          return model;
+        }
+      } catch (e) {
+        debugPrint('Notice reading system_config key=promo_dropdown_banner_data: $e');
+      }
+
+      // 3. Cache fallback
+      if (localStr != null && localStr.isNotEmpty) {
+        final Map<String, dynamic> localMap = jsonDecode(localStr);
+        return PromoDropdownModel.fromJson(localMap);
+      }
+    } catch (e) {
+      debugPrint('Error fetching promo dropdown settings: $e');
+    }
+
+    return PromoDropdownModel.defaultConfig();
+  }
+
+  /// Save Promo Dropdown Banner Settings (Admin)
+  static Future<bool> savePromoDropdownSettings(PromoDropdownModel model) async {
+    try {
+      final payload = model.toJson();
+      payload['updatedAt'] = DateTime.now().millisecondsSinceEpoch;
+
+      // 1. Save to local SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cosmyra_promo_dropdown_settings', jsonEncode(payload));
+
+      final activeSession = activeUserSession ?? authNotifier.value;
+      final String userEmail = activeSession?.email ?? 'admin@neet-jee.in';
+
+      // 2. Primary Database Save: Write to app_settings key='promo_dropdown_banner_settings'
+      try {
+        await client.from('app_settings').upsert({
+          'key': 'promo_dropdown_banner_settings',
+          'value': payload,
+          'description': 'Website Top Dropdown Promo Ad & App Download Banner Settings',
+          'updated_at': DateTime.now().toIso8601String(),
+          'updated_by': userEmail,
+        }, onConflict: 'key');
+      } catch (e) {
+        debugPrint('Notice saving to app_settings for promo_dropdown_banner_settings: $e');
+      }
+
+      // 3. Secondary Database Save: Write to system_config key='promo_dropdown_banner_data'
+      try {
+        await client.from('system_config').upsert({
+          'key': 'promo_dropdown_banner_data',
+          'value': payload,
+          'updated_at': DateTime.now().toIso8601String(),
+        }, onConflict: 'key');
+      } catch (e) {
+        debugPrint('Notice saving to system_config for promo_dropdown_banner_data: $e');
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error saving promo dropdown settings: $e');
+      return false;
+    }
+  }
+
   /// Save or Update Custom Script
   static Future<SeoCustomScriptModel?> saveSeoCustomScript(SeoCustomScriptModel script) async {
     try {

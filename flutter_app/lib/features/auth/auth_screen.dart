@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
+import '../../shared/widgets/promo_dropdown_banner.dart';
 
 class AuthScreen extends StatefulWidget {
   final Function(UserProfileModel)? onAuthSuccess;
@@ -509,49 +510,55 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Stack(
+      body: Column(
         children: [
-          // Background ambient gradient decor
-          Positioned(
-            top: -120,
-            left: -80,
-            child: Container(
-              width: 380,
-              height: 380,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFF4F46E5).withOpacity(0.12),
-                    const Color(0xFF7C3AED).withOpacity(0.04),
-                    Colors.transparent,
-                  ],
+          const PromoDropdownBanner(),
+          Expanded(
+            child: Stack(
+              children: [
+                // Background ambient gradient decor
+                Positioned(
+                  top: -120,
+                  left: -80,
+                  child: Container(
+                    width: 380,
+                    height: 380,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          const Color(0xFF4F46E5).withOpacity(0.12),
+                          const Color(0xFF7C3AED).withOpacity(0.04),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -100,
-            right: -80,
-            child: Container(
-              width: 360,
-              height: 360,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFF7C3AED).withOpacity(0.08),
-                    const Color(0xFF3B82F6).withOpacity(0.03),
-                    Colors.transparent,
-                  ],
+                Positioned(
+                  bottom: -100,
+                  right: -80,
+                  child: Container(
+                    width: 360,
+                    height: 360,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          const Color(0xFF7C3AED).withOpacity(0.08),
+                          const Color(0xFF3B82F6).withOpacity(0.03),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ),
-
-          SafeArea(
-            child: Center(
-              child: isDesktop ? _buildDesktopSplitLayout(context) : _buildCenteredLayout(context),
+                SafeArea(
+                  child: Center(
+                    child: isDesktop ? _buildDesktopSplitLayout(context) : _buildCenteredLayout(context),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

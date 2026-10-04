@@ -391,6 +391,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                   width: double.infinity,
                   child: ElevatedButton.icon(
+                    onPressed: () => context.go('/admin/promo-dropdown'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      elevation: 3,
+                      shadowColor: const Color(0xFF10B981).withOpacity(0.4),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.campaign_rounded, size: 18, color: Colors.white),
+                    label: const Text(
+                      '📱 Promo Dropdown & App Download (.apk) Manager',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
                     onPressed: () => context.go('/admin/cms/landing'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4F46E5),
@@ -504,6 +524,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 _buildSidebarTile('Pricing & Plans', Icons.sell_outlined, false, onTap: () => context.go('/admin/pricing')),
                 _buildSidebarTile('Coupon Management', Icons.discount_outlined, false, onTap: () => context.go('/admin/coupons')),
                 _buildSidebarTile('Banner Management', Icons.view_carousel_rounded, false, onTap: () => context.go('/admin/banners')),
+                _buildSidebarTile('📢 Promo Dropdown & App Links', Icons.campaign_rounded, false, onTap: () => context.go('/admin/promo-dropdown')),
                 _buildSidebarTile('Media & Asset Manager', Icons.perm_media_outlined, false, onTap: () => context.go('/admin/media')),
                 _buildSidebarTile('Chapters & Topics', Icons.auto_stories_rounded, false, onTap: () => context.go('/admin/chapters')),
                 _buildSidebarTile('Tags & Topics', Icons.label_outline_rounded, false, onTap: () => context.go('/admin/topics')),

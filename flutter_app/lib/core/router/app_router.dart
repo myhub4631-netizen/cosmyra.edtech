@@ -50,6 +50,7 @@ import '../../features/admin/admin_predictions_screen.dart';
 import '../../features/admin/admin_question_builder_screen.dart';
 import '../../features/admin/admin_pdf_import_screen.dart';
 import '../../features/admin/admin_banner_manager_screen.dart';
+import '../../features/admin/admin_promo_dropdown_screen.dart';
 import '../../features/legal/privacy_policy_screen.dart';
 import '../../features/admin/admin_privacy_policy_manager_screen.dart';
 import '../../features/legal/terms_of_service_screen.dart';
@@ -1151,6 +1152,24 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/admin/banners',
       builder: (context, state) => AdminBannerManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/promo-dropdown',
+      builder: (context, state) => AdminPromoDropdownScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/promo-manager',
+      builder: (context, state) => AdminPromoDropdownScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/dropdown-banner',
+      builder: (context, state) => AdminPromoDropdownScreen(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
       ),
     ),
