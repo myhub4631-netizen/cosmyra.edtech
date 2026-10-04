@@ -447,37 +447,111 @@ class _LandingPageScreenState extends State<LandingPageScreen> {
           ),
           textAlign: isDesktop && _config.hero.layoutTemplate == 'HERO_SPLIT_LEFT' ? TextAlign.left : TextAlign.center,
         ),
-        const SizedBox(height: 28),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          alignment: isDesktop && _config.hero.layoutTemplate == 'HERO_SPLIT_LEFT' ? WrapAlignment.start : WrapAlignment.center,
-          children: [
-            ElevatedButton.icon(
-              onPressed: () => context.go(_config.hero.primaryButtonDestination),
-              icon: const Icon(Icons.flash_on_rounded, size: 18),
-              label: Text(_config.hero.primaryButtonLabel, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 24),
+        if (!isDesktop) ...[
+          // Mobile Stacked Action Buttons matching exact design & routing
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: () => context.go('/signup'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF4F46E5),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 elevation: 3,
                 shadowColor: const Color(0x404F46E5),
               ),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => context.go(_config.hero.secondaryButtonDestination),
-              icon: const Icon(Icons.explore_outlined, size: 18),
-              label: Text(_config.hero.secondaryButtonLabel, style: GoogleFonts.inter(color: const Color(0xFF4F46E5), fontWeight: FontWeight.bold, fontSize: 14)),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                side: const BorderSide(color: Color(0xFFC7D2FE), width: 1.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Get Started - Free Signup',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.arrow_forward_rounded, size: 18),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton(
+              onPressed: () => context.go('/test-series'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF4F46E5),
+                side: const BorderSide(color: Color(0xFFC7D2FE), width: 1.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              child: Text(
+                'Explore Test Series',
+                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15, color: const Color(0xFF4F46E5)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton.icon(
+              onPressed: () => context.go('/login'),
+              icon: const Icon(Icons.mail_outline_rounded, size: 18, color: Color(0xFF4F46E5)),
+              label: Text(
+                'Log in with Email & Password',
+                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14, color: const Color(0xFF4F46E5)),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                backgroundColor: Colors.white,
+              ),
+            ),
+          ),
+        ] else ...[
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: isDesktop && _config.hero.layoutTemplate == 'HERO_SPLIT_LEFT' ? WrapAlignment.start : WrapAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => context.go(_config.hero.primaryButtonDestination),
+                icon: const Icon(Icons.flash_on_rounded, size: 18),
+                label: Text(_config.hero.primaryButtonLabel, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4F46E5),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 3,
+                  shadowColor: const Color(0x404F46E5),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => context.go(_config.hero.secondaryButtonDestination),
+                icon: const Icon(Icons.explore_outlined, size: 18),
+                label: Text(_config.hero.secondaryButtonLabel, style: GoogleFonts.inter(color: const Color(0xFF4F46E5), fontWeight: FontWeight.bold, fontSize: 14)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  side: const BorderSide(color: Color(0xFFC7D2FE), width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => context.go('/login'),
+                icon: const Icon(Icons.mail_outline_rounded, size: 18, color: Color(0xFF4F46E5)),
+                label: Text('Log in with Email', style: GoogleFonts.inter(color: const Color(0xFF4F46E5), fontWeight: FontWeight.bold, fontSize: 14)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 20),
         Text(
           _config.hero.studentCountText,
