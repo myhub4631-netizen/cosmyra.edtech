@@ -37,6 +37,8 @@ class _AdminAuthManagerScreenState extends State<AdminAuthManagerScreen> with Si
 
   // Shared Controllers
   final _googleButtonCtrl = TextEditingController();
+  final _googleLoginButtonCtrl = TextEditingController();
+  final _googleSignupButtonCtrl = TextEditingController();
   final _signinButtonCtrl = TextEditingController();
   final _signupButtonCtrl = TextEditingController();
   final _forgotPasswordCtrl = TextEditingController();
@@ -66,6 +68,8 @@ class _AdminAuthManagerScreenState extends State<AdminAuthManagerScreen> with Si
     _signupHeroSubtitleCtrl.dispose();
     _signupHeroImageCtrl.dispose();
     _googleButtonCtrl.dispose();
+    _googleLoginButtonCtrl.dispose();
+    _googleSignupButtonCtrl.dispose();
     _signinButtonCtrl.dispose();
     _signupButtonCtrl.dispose();
     _forgotPasswordCtrl.dispose();
@@ -102,6 +106,8 @@ class _AdminAuthManagerScreenState extends State<AdminAuthManagerScreen> with Si
     _signupHeroImageCtrl.text = cfg.signupHeroImage;
 
     _googleButtonCtrl.text = cfg.googleButtonText;
+    _googleLoginButtonCtrl.text = cfg.googleLoginButtonText;
+    _googleSignupButtonCtrl.text = cfg.googleSignupButtonText;
     _signinButtonCtrl.text = cfg.signinButtonText;
     _signupButtonCtrl.text = cfg.signupButtonText;
     _forgotPasswordCtrl.text = cfg.forgotPasswordText;
@@ -126,7 +132,9 @@ class _AdminAuthManagerScreenState extends State<AdminAuthManagerScreen> with Si
       signupHeroSubtitle: _signupHeroSubtitleCtrl.text.trim(),
       signupHeroImage: _signupHeroImageCtrl.text.trim(),
 
-      googleButtonText: _googleButtonCtrl.text.trim(),
+      googleButtonText: _googleLoginButtonCtrl.text.trim().isNotEmpty ? _googleLoginButtonCtrl.text.trim() : _googleButtonCtrl.text.trim(),
+      googleLoginButtonText: _googleLoginButtonCtrl.text.trim().isNotEmpty ? _googleLoginButtonCtrl.text.trim() : 'Login with Google',
+      googleSignupButtonText: _googleSignupButtonCtrl.text.trim().isNotEmpty ? _googleSignupButtonCtrl.text.trim() : 'Signup with Google',
       signinButtonText: _signinButtonCtrl.text.trim(),
       signupButtonText: _signupButtonCtrl.text.trim(),
       forgotPasswordText: _forgotPasswordCtrl.text.trim(),
@@ -352,9 +360,10 @@ class _AdminAuthManagerScreenState extends State<AdminAuthManagerScreen> with Si
             const SizedBox(height: 32),
             _buildSectionHeader('Button Labels & Footer Text', 'Configure button copy and legal statements.'),
             const SizedBox(height: 16),
-            _buildTextField('Google Button Text', _googleButtonCtrl, 'Continue with Google'),
-            _buildTextField('Sign In Button Text', _signinButtonCtrl, 'Sign In'),
-            _buildTextField('Signup Button Text', _signupButtonCtrl, 'Create Free Account'),
+            _buildTextField('Google Login Button Text', _googleLoginButtonCtrl, 'Login with Google'),
+            _buildTextField('Google Signup Button Text', _googleSignupButtonCtrl, 'Signup with Google'),
+            _buildTextField('Sign In Button Text', _signinButtonCtrl, 'Log In'),
+            _buildTextField('Signup Button Text', _signupButtonCtrl, 'Sign Up'),
             _buildTextField('Forgot Password Link Text', _forgotPasswordCtrl, 'Forgot Password?'),
             _buildTextField('Terms & Privacy Text', _termsTextCtrl, 'I agree to Cosmyra\'s Terms of Service & Privacy Policy'),
             _buildTextField('Footer Legal Statement', _footerTextCtrl, '© 2026 Cosmyra NEET | JEE. All rights reserved.'),

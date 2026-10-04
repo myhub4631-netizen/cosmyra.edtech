@@ -977,7 +977,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                         SvgPicture.string(_googleSvg, width: 22, height: 22),
                         const SizedBox(width: 12),
                         Text(
-                          _config.googleButtonText,
+                          _isLogin ? _config.googleLoginButtonText : _config.googleSignupButtonText,
                           style: GoogleFonts.inter(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,

@@ -15,6 +15,8 @@ class AuthPageConfigModel {
   final String signupHeroImage;
 
   final String googleButtonText;
+  final String googleLoginButtonText;
+  final String googleSignupButtonText;
   final String signinButtonText;
   final String signupButtonText;
   final String forgotPasswordText;
@@ -36,23 +38,25 @@ class AuthPageConfigModel {
 
   const AuthPageConfigModel({
     this.layout = 'AUTH_LAYOUT_SPLIT',
-    this.loginTitle = 'Welcome to Cosmyra',
-    this.loginSubtitle = 'Your smarter way to prepare for NEET & JEE',
+    this.loginTitle = 'Welcome Back',
+    this.loginSubtitle = 'Sign in to your Cosmyra NEET | JEE account',
     this.loginBadge = 'NEET | JEE PREP',
     this.loginHeroTitle = 'Practice Smarter.\nPerform Better.',
     this.loginHeroSubtitle = 'Master NEET, JEE & competitive exams with 500+ mock tests, 15-year PYQs and real-time AI error analytics.',
     this.loginHeroImage = 'assets/images/student_study_illustration.png',
 
-    this.signupTitle = 'Create Your Account',
-    this.signupSubtitle = 'Join 50,000+ aspirants scoring top ranks with AI',
+    this.signupTitle = 'Create your Cosmyra Account',
+    this.signupSubtitle = 'Join 50,000+ aspirants preparing for NEET & JEE',
     this.signupBadge = 'FREE ACCESS',
     this.signupHeroTitle = 'Transform Your Exam Preparation',
     this.signupHeroSubtitle = 'Get instant access to chapter practice, NTA mock test engine, and AI error radar.',
     this.signupHeroImage = 'assets/images/student_study_illustration.png',
 
-    this.googleButtonText = 'Continue with Google',
-    this.signinButtonText = 'Sign In',
-    this.signupButtonText = 'Create Free Account',
+    this.googleButtonText = 'Login with Google',
+    this.googleLoginButtonText = 'Login with Google',
+    this.googleSignupButtonText = 'Signup with Google',
+    this.signinButtonText = 'Log In',
+    this.signupButtonText = 'Sign Up',
     this.forgotPasswordText = 'Forgot Password?',
     this.termsText = 'I agree to Cosmyra\'s Terms of Service & Privacy Policy',
     this.footerText = '© 2026 Cosmyra NEET | JEE. All rights reserved.',
@@ -87,6 +91,8 @@ class AuthPageConfigModel {
     'signup_hero_subtitle': signupHeroSubtitle,
     'signup_hero_image': signupHeroImage,
     'google_button_text': googleButtonText,
+    'google_login_button_text': googleLoginButtonText,
+    'google_signup_button_text': googleSignupButtonText,
     'signin_button_text': signinButtonText,
     'signup_button_text': signupButtonText,
     'forgot_password_text': forgotPasswordText,
@@ -105,23 +111,26 @@ class AuthPageConfigModel {
   };
 
   factory AuthPageConfigModel.fromJson(Map<String, dynamic> json) {
+    final defaultGoogle = json['google_button_text']?.toString();
     return AuthPageConfigModel(
       layout: json['layout']?.toString() ?? 'AUTH_LAYOUT_SPLIT',
-      loginTitle: json['login_title']?.toString() ?? 'Welcome to Cosmyra',
-      loginSubtitle: json['login_subtitle']?.toString() ?? 'Your smarter way to prepare for NEET & JEE',
+      loginTitle: json['login_title']?.toString() ?? 'Welcome Back',
+      loginSubtitle: json['login_subtitle']?.toString() ?? 'Sign in to your Cosmyra NEET | JEE account',
       loginBadge: json['login_badge']?.toString() ?? 'NEET | JEE PREP',
       loginHeroTitle: json['login_hero_title']?.toString() ?? 'Practice Smarter.\nPerform Better.',
       loginHeroSubtitle: json['login_hero_subtitle']?.toString() ?? 'Master NEET, JEE & competitive exams with 500+ mock tests, 15-year PYQs and real-time AI error analytics.',
       loginHeroImage: json['login_hero_image']?.toString() ?? 'assets/images/student_study_illustration.png',
-      signupTitle: json['signup_title']?.toString() ?? 'Create Your Account',
-      signupSubtitle: json['signup_subtitle']?.toString() ?? 'Join 50,000+ aspirants scoring top ranks with AI',
+      signupTitle: json['signup_title']?.toString() ?? 'Create your Cosmyra Account',
+      signupSubtitle: json['signup_subtitle']?.toString() ?? 'Join 50,000+ aspirants preparing for NEET & JEE',
       signupBadge: json['signup_badge']?.toString() ?? 'FREE ACCESS',
       signupHeroTitle: json['signup_hero_title']?.toString() ?? 'Transform Your Exam Preparation',
       signupHeroSubtitle: json['signup_hero_subtitle']?.toString() ?? 'Get instant access to chapter practice, NTA mock test engine, and AI error radar.',
       signupHeroImage: json['signup_hero_image']?.toString() ?? 'assets/images/student_study_illustration.png',
-      googleButtonText: json['google_button_text']?.toString() ?? 'Continue with Google',
-      signinButtonText: json['signin_button_text']?.toString() ?? 'Sign In',
-      signupButtonText: json['signup_button_text']?.toString() ?? 'Create Free Account',
+      googleButtonText: defaultGoogle ?? 'Login with Google',
+      googleLoginButtonText: json['google_login_button_text']?.toString() ?? defaultGoogle ?? 'Login with Google',
+      googleSignupButtonText: json['google_signup_button_text']?.toString() ?? 'Signup with Google',
+      signinButtonText: json['signin_button_text']?.toString() ?? 'Log In',
+      signupButtonText: json['signup_button_text']?.toString() ?? 'Sign Up',
       forgotPasswordText: json['forgot_password_text']?.toString() ?? 'Forgot Password?',
       termsText: json['terms_text']?.toString() ?? 'I agree to Cosmyra\'s Terms of Service & Privacy Policy',
       footerText: json['footer_text']?.toString() ?? '© 2026 Cosmyra NEET | JEE. All rights reserved.',
