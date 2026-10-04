@@ -386,8 +386,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
                 _buildSidebarTile('Dashboard', Icons.dashboard_rounded, true, onTap: () => context.go('/admin')),
+
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.go('/admin/cms/auth'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF7C3AED),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      elevation: 3,
+                      shadowColor: const Color(0xFF7C3AED).withOpacity(0.4),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.lock_person_rounded, size: 18, color: Colors.white),
+                    label: const Text(
+                      '🔐 Login & Signup Manager (CMS)',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ),
                 
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 _buildSidebarSectionLabel('CONTENT MANAGEMENT'),
                 
                 // Prominent Separate Primary Button for Upload Questions (Step 1)
@@ -1385,6 +1406,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [
+            _buildQuickActionCard('🔐 Login & Signup Manager', 'Manage auth page text, branding & layout', Icons.lock_person_rounded, const Color(0xFF7C3AED), () {
+              context.go('/admin/cms/auth');
+            }),
             _buildQuickActionCard('💳 Payment Gateways', 'Configure UPI ID & Cashfree API keys', Icons.payment_rounded, const Color(0xFF10B981), () {
               context.go('/admin/payment-gateways');
             }),
