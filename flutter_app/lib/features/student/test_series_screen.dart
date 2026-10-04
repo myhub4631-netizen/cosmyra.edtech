@@ -1133,49 +1133,63 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             ),
           ),
 
-          // Bottom Unlock Premium Widget
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F3FF),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFDDD6FE)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: const [
-                      Text('👑', style: TextStyle(fontSize: 14)),
-                      SizedBox(width: 6),
-                      Text('Unlock All Test Series', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4C1D95))),
+          // Bottom Unlock Premium Widget (Gated & Synced with Feature Manager)
+          ValueListenableBuilder<int>(
+            valueListenable: FeatureConfigService.notifier,
+            builder: (context, _, __) {
+              if (!FeatureConfigService.isVisible('premium_plans')) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.all(16),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F3FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFDDD6FE)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: const [
+                          Text('👑', style: TextStyle(fontSize: 14)),
+                          SizedBox(width: 6),
+                          Text('Unlock All Test Series', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF4C1D95))),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _buildPremiumCheckItem('Access all test series'),
+                      _buildPremiumCheckItem('Detailed analytics'),
+                      _buildPremiumCheckItem('Rank comparison'),
+                      _buildPremiumCheckItem('Personalized recommendations'),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4F46E5),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () {
+                            FeatureConfigService.handleFeatureTap(
+                              context,
+                              'premium_plans',
+                              onActive: () => context.push('/pricing'),
+                            );
+                          },
+                          child: const Text('Get Premium', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  _buildPremiumCheckItem('Access all test series'),
-                  _buildPremiumCheckItem('Detailed analytics'),
-                  _buildPremiumCheckItem('Rank comparison'),
-                  _buildPremiumCheckItem('Personalized recommendations'),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4F46E5),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      onPressed: () {},
-                      child: const Text('Get Premium', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -2137,80 +2151,85 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   // 7. GO PREMIUM BANNER
   // ===========================================================================
   Widget _buildGoPremiumBanner() {
-    if (!FeatureConfigService.isVisible('premium_plans')) {
-      return const SizedBox.shrink();
-    }
+    return ValueListenableBuilder<int>(
+      valueListenable: FeatureConfigService.notifier,
+      builder: (context, _, __) {
+        if (!FeatureConfigService.isVisible('premium_plans')) {
+          return const SizedBox.shrink();
+        }
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFF3F0FF), Color(0xFFEEF2FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE0E7FF)),
-      ),
-      child: Row(
-        children: [
-          // Crown Icon Container
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFF3F0FF), Color(0xFFEEF2FF)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF7C3AED), size: 24),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE0E7FF)),
           ),
-          const SizedBox(width: 14),
-
-          // Banner Text
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Go Premium',
-                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5)),
+          child: Row(
+            children: [
+              // Crown Icon Container
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'Unlock all test series, detailed analysis, and exclusive features.',
-                  style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: const Color(0xFF475569)),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
+                child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFF7C3AED), size: 24),
+              ),
+              const SizedBox(width: 14),
 
-          // Upgrade Button
-          ElevatedButton(
-            onPressed: () {
-              FeatureConfigService.handleFeatureTap(
-                context,
-                'premium_plans',
-                onActive: () => context.push('/pricing'),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4F46E5),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: Row(
-              children: [
-                Text('Upgrade Now', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
-                const SizedBox(width: 4),
-                const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
-              ],
-            ),
+              // Banner Text
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Go Premium',
+                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5)),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Unlock all test series, detailed analysis, and exclusive features.',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: const Color(0xFF475569)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // Upgrade Button
+              ElevatedButton(
+                onPressed: () {
+                  FeatureConfigService.handleFeatureTap(
+                    context,
+                    'premium_plans',
+                    onActive: () => context.push('/pricing'),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4F46E5),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: Row(
+                  children: [
+                    Text('Upgrade Now', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

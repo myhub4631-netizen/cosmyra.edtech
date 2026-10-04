@@ -99,9 +99,11 @@ class FeatureConfigService {
   static const String dbKey = 'feature_flags';
   static const String prefsCacheKey = 'cosmyra_feature_flags_cache';
 
+  static final ValueNotifier<int> notifier = ValueNotifier<int>(0);
   static List<FeatureModel> _features = _defaultFeatures();
   static List<Map<String, dynamic>> _auditLogs = [];
   static bool _initialized = false;
+  static bool _pollingStarted = false;
 
   static List<FeatureModel> _defaultFeatures() {
     return [
@@ -195,6 +197,8 @@ class FeatureConfigService {
   static Future<void> init({bool forceRefresh = false}) async {
     if (_initialized && !forceRefresh) return;
 
+    _startAutoPolling();
+
     // Load from local storage cache first for zero latency startup
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -204,14 +208,22 @@ class FeatureConfigService {
       }
     } catch (_) {}
 
-    // Fetch live from Supabase system_config
+    // Fetch live from Supabase system_config / platform_settings
     try {
       final client = Supabase.instance.client;
-      final res = await client
+      var res = await client
           .from('system_config')
           .select('value')
           .eq('key', dbKey)
           .maybeSingle();
+
+      if (res == null || res['value'] == null) {
+        res = await client
+            .from('platform_settings')
+            .select('value')
+            .eq('key', dbKey)
+            .maybeSingle();
+      }
 
       if (res != null && res['value'] != null) {
         final val = res['value'];
@@ -231,12 +243,43 @@ class FeatureConfigService {
     _initialized = true;
   }
 
+  static void _startAutoPolling() {
+    if (_pollingStarted) return;
+    _pollingStarted = true;
+    Future.delayed(const Duration(seconds: 8), () async {
+      while (true) {
+        await Future.delayed(const Duration(seconds: 12));
+        try {
+          final client = Supabase.instance.client;
+          var res = await client
+              .from('system_config')
+              .select('value')
+              .eq('key', dbKey)
+              .maybeSingle();
+          if (res == null || res['value'] == null) {
+            res = await client
+                .from('platform_settings')
+                .select('value')
+                .eq('key', dbKey)
+                .maybeSingle();
+          }
+          if (res != null && res['value'] != null) {
+            final val = res['value'];
+            final String rawJson = val is String ? val : jsonEncode(val);
+            _applyRawJson(rawJson);
+          }
+        } catch (_) {}
+      }
+    });
+  }
+
   static void _applyRawJson(String rawJson) {
     try {
       final Map<String, dynamic> data = jsonDecode(rawJson);
+      final loadedMap = <String, FeatureModel>{};
+
       if (data['features'] is List) {
         final List list = data['features'];
-        final loadedMap = <String, FeatureModel>{};
         for (var item in list) {
           if (item is Map) {
             final f = FeatureModel.fromJson(Map<String, dynamic>.from(item));
@@ -245,28 +288,64 @@ class FeatureConfigService {
             }
           }
         }
+      } else {
+        // Fallback for key-value maps (e.g. {"go_premium": true/false/"hidden"})
+        data.forEach((key, val) {
+          final cleanKey = key.toString().toLowerCase().trim();
+          String vis = 'visible';
+          String st = 'active';
+          if (val == false || val == 'hidden' || val == 'disabled') {
+            vis = 'hidden';
+          } else if (val == 'coming_soon') {
+            st = 'coming_soon';
+          } else if (val == 'premium') {
+            st = 'premium';
+          }
+          loadedMap[cleanKey] = FeatureModel(
+            key: cleanKey,
+            name: key.toString(),
+            description: '',
+            visibility: vis,
+            status: st,
+          );
+        });
+      }
 
-        // Merge loaded features with default list so new keys are automatically preserved
-        final defaults = _defaultFeatures();
-        final List<FeatureModel> merged = [];
-        for (var def in defaults) {
-          if (loadedMap.containsKey(def.key)) {
-            merged.add(loadedMap.remove(def.key)!);
-          } else {
-            merged.add(def);
+      // Merge loaded features with default list so new keys are automatically preserved
+      final defaults = _defaultFeatures();
+      final List<FeatureModel> merged = [];
+      for (var def in defaults) {
+        String? matchedKey;
+        if (loadedMap.containsKey(def.key)) {
+          matchedKey = def.key;
+        } else if (def.key == 'premium_plans') {
+          for (var alias in ['go_premium', 'go_premium_enabled', 'premium', 'store_packages']) {
+            if (loadedMap.containsKey(alias)) {
+              matchedKey = alias;
+              break;
+            }
           }
         }
-        // Add any additional dynamic features configured by admin
-        merged.addAll(loadedMap.values);
 
-        merged.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-        _features = merged;
+        if (matchedKey != null) {
+          final loadedModel = loadedMap.remove(matchedKey)!;
+          merged.add(loadedModel.copyWith(key: def.key));
+        } else {
+          merged.add(def);
+        }
       }
+      merged.addAll(loadedMap.values);
+
+      merged.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      _features = merged;
+
       if (data['audit_logs'] is List) {
         _auditLogs = List<Map<String, dynamic>>.from(
           (data['audit_logs'] as List).map((e) => Map<String, dynamic>.from(e as Map)),
         );
       }
+
+      notifier.value++;
     } catch (e) {
       debugPrint('Error parsing feature flags JSON: $e');
     }
@@ -278,7 +357,27 @@ class FeatureConfigService {
 
   static FeatureModel? getFeature(String featureKey) {
     try {
-      return _features.firstWhere((f) => f.key == featureKey);
+      final keyClean = featureKey.toLowerCase().trim();
+      for (var f in _features) {
+        if (f.key.toLowerCase().trim() == keyClean) return f;
+      }
+      if (keyClean == 'premium_plans' ||
+          keyClean == 'go_premium' ||
+          keyClean == 'go_premium_enabled' ||
+          keyClean == 'premium' ||
+          keyClean == 'store_packages') {
+        for (var f in _features) {
+          final fk = f.key.toLowerCase().trim();
+          if (fk == 'premium_plans' ||
+              fk == 'go_premium' ||
+              fk == 'go_premium_enabled' ||
+              fk == 'premium' ||
+              fk == 'store_packages') {
+            return f;
+          }
+        }
+      }
+      return null;
     } catch (_) {
       return null;
     }
@@ -287,7 +386,6 @@ class FeatureConfigService {
   static bool isVisible(String featureKey) {
     final f = getFeature(featureKey);
     if (f == null) {
-      // Safe fallback: test_series is visible, development features default to visible coming_soon
       return true;
     }
     return f.isVisible;
@@ -365,7 +463,9 @@ class FeatureConfigService {
       await prefs.setString(prefsCacheKey, valStr);
     } catch (_) {}
 
-    // Save to Supabase system_config
+    notifier.value++;
+
+    // Save to Supabase system_config & platform_settings
     try {
       final client = Supabase.instance.client;
       await client.from('system_config').upsert({
@@ -373,9 +473,14 @@ class FeatureConfigService {
         'value': valStr,
         'updated_at': now,
       });
+      await client.from('platform_settings').upsert({
+        'key': dbKey,
+        'value': valStr,
+        'updated_at': now,
+      });
       return true;
     } catch (e) {
-      debugPrint('Error saving feature_flags to Supabase: $e');
+      debugPrint('Notice saving feature_flags to Supabase: $e');
       return true; // Local state saved
     }
   }

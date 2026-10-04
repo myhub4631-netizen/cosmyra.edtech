@@ -375,100 +375,105 @@ class _RecommendedTestSeriesSectionState extends State<RecommendedTestSeriesSect
   // GO PREMIUM BANNER (From reference image)
   // =========================================================================
   Widget _buildGoPremiumBanner(BuildContext context) {
-    if (!FeatureConfigService.isVisible('premium_plans')) {
-      return const SizedBox.shrink();
-    }
+    return ValueListenableBuilder<int>(
+      valueListenable: FeatureConfigService.notifier,
+      builder: (context, _, __) {
+        if (!FeatureConfigService.isVisible('premium_plans')) {
+          return const SizedBox.shrink();
+        }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0FDF4),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFBBF7D0), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF16A34A).withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Crown Icon Container
-          Container(
-            width: 44,
-            height: 44,
-            decoration: const BoxDecoration(
-              color: Color(0xFF16A34A),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 24),
-          ),
-          const SizedBox(width: 14),
-
-          // Texts
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Go Premium',
-                  style: GoogleFonts.inter(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF14532D),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Unlock unlimited tests, detailed analytics, and All India Ranking.',
-                  style: GoogleFonts.inter(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF166534),
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-
-          // Explore Plans Button
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF16A34A),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0FDF4),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFBBF7D0), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF16A34A).withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
-            ),
-            onPressed: () {
-              FeatureConfigService.handleFeatureTap(
-                context,
-                'premium_plans',
-                onActive: () => context.push('/pricing'),
-              );
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Explore Plans',
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.arrow_forward_rounded, size: 14),
-              ],
-            ),
+            ],
           ),
-        ],
-      ),
+          child: Row(
+            children: [
+              // Crown Icon Container
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF16A34A),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 14),
+
+              // Texts
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Go Premium',
+                      style: GoogleFonts.inter(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF14532D),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Unlock unlimited tests, detailed analytics, and All India Ranking.',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF166534),
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+
+              // Explore Plans Button
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () {
+                  FeatureConfigService.handleFeatureTap(
+                    context,
+                    'premium_plans',
+                    onActive: () => context.push('/pricing'),
+                  );
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Explore Plans',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.arrow_forward_rounded, size: 14),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
