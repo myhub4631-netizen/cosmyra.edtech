@@ -566,15 +566,17 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
 
     setState(() {
       _availablePapersForSelectedSeries = titles;
-      if (titles.isNotEmpty) {
-        _paperOption = 'existing';
-        _existingPaper = titles.first;
+      if (_paperOption == 'existing' && titles.isNotEmpty) {
+        if (_existingPaper.isEmpty || !titles.contains(_existingPaper)) {
+          _existingPaper = titles.first;
+        }
         _onExistingPaperSelected(_existingPaper, customPaperMapList: allCombined);
       } else {
         _paperOption = 'new';
         _existingPaper = '';
-        _paperNameCtrl.text = seriesTitle.isNotEmpty ? '$seriesTitle - Paper 1' : 'NEET 2026 Phase 1';
-        _paperCodeCtrl.text = 'P1';
+        final int nextPaperNum = titles.length + 1;
+        _paperNameCtrl.text = seriesTitle.isNotEmpty ? '$seriesTitle - Test #$nextPaperNum' : 'NEET 2026 Phase 1';
+        _paperCodeCtrl.text = 'P$nextPaperNum';
       }
     });
   }
@@ -2663,6 +2665,811 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           ),
         ],
       ),
+    );
+  }
+
+  // ==========================================
+  // CARD 2: QUESTION SOURCE SECTION (BUILD PAPER FROM EXISTING CONTENT)
+  // ==========================================
+  Widget _buildQuestionSourceSectionCard() {
+    return _buildCardContainer(
+      title: 'QUESTION SOURCE / BUILD PAPER FROM EXISTING CONTENT',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.hub_outlined, color: Color(0xFF4F46E5), size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Choose how questions will be added to this paper. Reuse existing PYQ, NTA, and Question Bank content or upload new ones.',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Source Mode Radio Buttons
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _questionSourceMode = 'new'),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _questionSourceMode == 'new' ? const Color(0xFFEEF2FF) : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _questionSourceMode == 'new' ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
+                        width: _questionSourceMode == 'new' ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Radio<String>(
+                          value: 'new',
+                          groupValue: _questionSourceMode,
+                          activeColor: const Color(0xFF4F46E5),
+                          onChanged: (val) => setState(() => _questionSourceMode = val!),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Upload / Create New Questions',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Add questions manually, from Excel/CSV, or copy & paste text.',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _questionSourceMode = 'existing';
+                      if (_step1PyqPapersList.isEmpty) _loadStep1PyqPapers();
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _questionSourceMode == 'existing' ? const Color(0xFFEEF2FF) : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _questionSourceMode == 'existing' ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
+                        width: _questionSourceMode == 'existing' ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Radio<String>(
+                          value: 'existing',
+                          groupValue: _questionSourceMode,
+                          activeColor: const Color(0xFF4F46E5),
+                          onChanged: (val) {
+                            setState(() {
+                              _questionSourceMode = val!;
+                              if (_step1PyqPapersList.isEmpty) _loadStep1PyqPapers();
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'Use Existing Content',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Reuse PYQ Papers, NTA Question Papers, and Question Banks without duplicating question rows.',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // If Use Existing Content is selected
+          if (_questionSourceMode == 'existing' || _sourceCategory == 'Test Series' || _visTestSeries) ...[
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'SELECT EXISTING CONTENT',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), letterSpacing: 0.5),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Select one or multiple existing sources to build this paper.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Source Type Chips
+                  Row(
+                    children: [
+                      _buildSourceTypeChip('pyq', 'Existing PYQ Paper', Icons.history_edu_rounded),
+                      const SizedBox(width: 8),
+                      _buildSourceTypeChip('nta', 'Existing NTA Question Paper', Icons.collections_bookmark_rounded),
+                      const SizedBox(width: 8),
+                      _buildSourceTypeChip('qbank', 'Question Bank', Icons.storage_rounded),
+                      const SizedBox(width: 8),
+                      _buildSourceTypeChip('qset', 'Question Set', Icons.auto_stories_rounded),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Active Tab Content View
+                  if (_selectedSourceType == 'pyq') _buildStep1PyqPicker(),
+                  if (_selectedSourceType == 'nta') _buildStep1NtaPicker(),
+                  if (_selectedSourceType == 'qbank') _buildStep1QBankPicker(),
+                  if (_selectedSourceType == 'qset') _buildStep1QSetPicker(),
+
+                  const SizedBox(height: 24),
+
+                  // Added Sources Summary List
+                  if (_addedSources.isNotEmpty) ...[
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'SELECTED SOURCES & CONTENT SUMMARY',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            setState(() => _selectedSourceType = 'pyq');
+                          },
+                          icon: const Icon(Icons.add_rounded, size: 16),
+                          label: const Text('+ Add Another Source'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF4F46E5),
+                            side: const BorderSide(color: Color(0xFF4F46E5)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Column(
+                      children: List.generate(_addedSources.length, (idx) {
+                        final src = _addedSources[idx];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEEF2FF),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  src['type'].toString().toUpperCase(),
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  src['name'].toString(),
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                ),
+                              ),
+                              Text(
+                                '${src['count']} questions',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                              ),
+                              const SizedBox(width: 12),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                                onPressed: () {
+                                  setState(() {
+                                    _addedSources.removeAt(idx);
+                                    _questionCountCtrl.text = _allDeduplicatedQuestions.length.toString();
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Deduplication & Live Summary Box
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFBFDBFE)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.cleaning_services_rounded, color: Color(0xFF2563EB), size: 20),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Question Source Summary',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF)),
+                              ),
+                              const Spacer(),
+                              ElevatedButton.icon(
+                                onPressed: _showStep1DeduplicatedPreviewDialog,
+                                icon: const Icon(Icons.preview_rounded, size: 16),
+                                label: const Text('View Selected Questions'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2563EB),
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              _buildSummaryStatCard('Total Selected', '$_rawTotalSelectedCount Qs', const Color(0xFF3B82F6)),
+                              const SizedBox(width: 12),
+                              _buildSummaryStatCard('Duplicates Removed', '${_rawTotalSelectedCount - _allDeduplicatedQuestions.length}', const Color(0xFFEF4444)),
+                              const SizedBox(width: 12),
+                              _buildSummaryStatCard('Final Unique Questions', '${_allDeduplicatedQuestions.length}', const Color(0xFF16A34A)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSourceTypeChip(String typeKey, String label, IconData icon) {
+    final bool selected = _selectedSourceType == typeKey;
+    return ChoiceChip(
+      avatar: Icon(icon, size: 16, color: selected ? Colors.white : const Color(0xFF4F46E5)),
+      label: Text(label),
+      selected: selected,
+      selectedColor: const Color(0xFF4F46E5),
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : const Color(0xFF1E293B),
+        fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+        fontSize: 12,
+      ),
+      onSelected: (val) {
+        if (val) {
+          setState(() {
+            _selectedSourceType = typeKey;
+            if (typeKey == 'pyq' && _step1PyqPapersList.isEmpty) _loadStep1PyqPapers();
+            if (typeKey == 'nta' && _step1NtaPapersList.isEmpty) _loadStep1NtaPapers();
+            if (typeKey == 'qbank' && _step1QBankResults.isEmpty) _loadStep1QBankQuestions();
+            if (typeKey == 'qset' && _step1QuestionSetsList.isEmpty) _loadStep1QuestionSets();
+          });
+        }
+      },
+    );
+  }
+
+  Widget _buildSummaryStatCard(String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+            const SizedBox(height: 2),
+            Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStep1PyqPicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _step1PyqSearchCtrl,
+                onChanged: (_) => _loadStep1PyqPapers(),
+                decoration: InputDecoration(
+                  hintText: 'Search PYQ papers by name, year, exam...',
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  isDense: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 140,
+              child: _buildDropdownField(
+                label: '',
+                value: _step1PyqExamFilter,
+                items: ['All', 'NEET', 'JEE Main', 'JEE Advanced'],
+                onChanged: (val) {
+                  _step1PyqExamFilter = val!;
+                  _loadStep1PyqPapers();
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_isLoadingStep1Content)
+          const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+        else if (_step1PyqPapersList.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Color(0xFF64748B)),
+                SizedBox(width: 8),
+                Text('No PYQ papers found matching filters.', style: TextStyle(color: Color(0xFF64748B))),
+              ],
+            ),
+          )
+        else
+          SizedBox(
+            height: 220,
+            child: ListView.builder(
+              itemCount: _step1PyqPapersList.length,
+              itemBuilder: (ctx, idx) {
+                final p = _step1PyqPapersList[idx];
+                final pName = p['paper_name'] ?? p['paperName'] ?? 'PYQ Paper';
+                final qCount = p['question_count'] ?? p['questions'] ?? 180;
+                final yr = p['year'] ?? '';
+                final ex = p['exam'] ?? 'NEET';
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const Icon(Icons.history_edu, color: Color(0xFF4F46E5)),
+                    title: Text(pName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    subtitle: Text('$ex $yr • $qCount Questions', style: const TextStyle(fontSize: 11)),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () => _showStep1PaperPreviewDialog(p),
+                          child: const Text('Preview', style: TextStyle(fontSize: 11)),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () => _addPaperSourceToStep1(p, 'Existing PYQ Paper'),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
+                          child: const Text('Select Paper', style: TextStyle(fontSize: 11)),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildStep1NtaPicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _step1NtaSearchCtrl,
+                onChanged: (_) => _loadStep1NtaPapers(),
+                decoration: InputDecoration(
+                  hintText: 'Search NTA question papers...',
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  isDense: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 140,
+              child: _buildDropdownField(
+                label: '',
+                value: _step1NtaExamFilter,
+                items: ['All', 'NEET', 'JEE Main'],
+                onChanged: (val) {
+                  _step1NtaExamFilter = val!;
+                  _loadStep1NtaPapers();
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_isLoadingStep1Content)
+          const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+        else if (_step1NtaPapersList.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Color(0xFF64748B)),
+                SizedBox(width: 8),
+                Text('No NTA papers found matching filters.', style: TextStyle(color: Color(0xFF64748B))),
+              ],
+            ),
+          )
+        else
+          SizedBox(
+            height: 220,
+            child: ListView.builder(
+              itemCount: _step1NtaPapersList.length,
+              itemBuilder: (ctx, idx) {
+                final p = _step1NtaPapersList[idx];
+                final pName = p['paper_name'] ?? p['paperName'] ?? 'NTA Paper';
+                final qCount = p['question_count'] ?? p['questions'] ?? 180;
+                final yr = p['year'] ?? '';
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const Icon(Icons.collections_bookmark, color: Color(0xFF059669)),
+                    title: Text(pName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    subtitle: Text('NTA $yr • $qCount Questions', style: const TextStyle(fontSize: 11)),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () => _showStep1PaperPreviewDialog(p),
+                          child: const Text('Preview', style: TextStyle(fontSize: 11)),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () => _addPaperSourceToStep1(p, 'Existing NTA Paper'),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669), foregroundColor: Colors.white),
+                          child: const Text('Select Paper', style: TextStyle(fontSize: 11)),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildStep1QBankPicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _step1QBankSearchCtrl,
+                onChanged: (_) => _loadStep1QBankQuestions(),
+                decoration: InputDecoration(
+                  hintText: 'Search questions in Question Bank...',
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  isDense: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 130,
+              child: _buildDropdownField(
+                label: '',
+                value: _step1QBankSubjectFilter,
+                items: ['Physics', 'Chemistry', 'Botany', 'Zoology'],
+                onChanged: (val) {
+                  _step1QBankSubjectFilter = val!;
+                  _loadStep1QBankQuestions();
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 110,
+              child: _buildDropdownField(
+                label: '',
+                value: _step1QBankDifficultyFilter,
+                items: ['All', 'easy', 'medium', 'hard'],
+                onChanged: (val) {
+                  _step1QBankDifficultyFilter = val!;
+                  _loadStep1QBankQuestions();
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Selected: ${_selectedQBankIdsInStep1.length} / ${_step1QBankResults.length} Results',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF4F46E5)),
+            ),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      for (var q in _step1QBankResults) {
+                        final id = q['id']?.toString() ?? '';
+                        if (id.isNotEmpty) _selectedQBankIdsInStep1.add(id);
+                      }
+                    });
+                  },
+                  child: const Text('Select All Results', style: TextStyle(fontSize: 11)),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: _selectedQBankIdsInStep1.isEmpty ? null : _addSelectedQBankQuestionsToStep1,
+                  icon: const Icon(Icons.add, size: 16),
+                  label: Text('Add Selected (${_selectedQBankIdsInStep1.length})'),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_isLoadingStep1Content)
+          const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+        else if (_step1QBankResults.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Color(0xFF64748B)),
+                SizedBox(width: 8),
+                Text('No questions found in Question Bank.', style: TextStyle(color: Color(0xFF64748B))),
+              ],
+            ),
+          )
+        else
+          SizedBox(
+            height: 220,
+            child: ListView.builder(
+              itemCount: _step1QBankResults.length,
+              itemBuilder: (ctx, idx) {
+                final q = _step1QBankResults[idx];
+                final qId = q['id']?.toString() ?? '';
+                final text = q['question_text'] ?? q['questionText'] ?? 'Question Text';
+                final isSel = _selectedQBankIdsInStep1.contains(qId);
+
+                return CheckboxListTile(
+                  value: isSel,
+                  onChanged: (val) {
+                    setState(() {
+                      if (val == true) {
+                        _selectedQBankIdsInStep1.add(qId);
+                      } else {
+                        _selectedQBankIdsInStep1.remove(qId);
+                      }
+                    });
+                  },
+                  dense: true,
+                  title: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  subtitle: Text('${q['subject'] ?? 'Physics'} • ${q['chapter'] ?? 'General'} • Difficulty: ${q['difficulty'] ?? 'Medium'}', style: const TextStyle(fontSize: 10)),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildStep1QSetPicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _step1QSetSearchCtrl,
+          onChanged: (_) => _loadStep1QuestionSets(),
+          decoration: InputDecoration(
+            hintText: 'Search question sets...',
+            prefixIcon: const Icon(Icons.search, size: 18),
+            isDense: true,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_isLoadingStep1Content)
+          const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+        else if (_step1QuestionSetsList.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(8)),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Color(0xFF64748B)),
+                SizedBox(width: 8),
+                Text('No Question Sets found.', style: TextStyle(color: Color(0xFF64748B))),
+              ],
+            ),
+          )
+        else
+          SizedBox(
+            height: 220,
+            child: ListView.builder(
+              itemCount: _step1QuestionSetsList.length,
+              itemBuilder: (ctx, idx) {
+                final s = _step1QuestionSetsList[idx];
+                final sName = s['paper_name'] ?? s['name'] ?? s['title'] ?? 'Question Set';
+                final qCount = s['question_count'] ?? s['questions'] ?? 50;
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const Icon(Icons.auto_stories, color: Color(0xFFD97706)),
+                    title: Text(sName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    subtitle: Text('$qCount Questions', style: const TextStyle(fontSize: 11)),
+                    trailing: ElevatedButton(
+                      onPressed: () => _addPaperSourceToStep1(s, 'Question Set'),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD97706), foregroundColor: Colors.white),
+                      child: const Text('Select Set', style: TextStyle(fontSize: 11)),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _showStep1PaperPreviewDialog(Map<String, dynamic> paperMap) async {
+    final String paperId = paperMap['id']?.toString() ?? '';
+    final String pName = paperMap['paper_name'] ?? paperMap['paperName'] ?? 'Paper Preview';
+    final qList = await SupabaseService.fetchQuestionsForPaper(paperId, paperName: pName);
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.preview, color: Color(0xFF4F46E5)),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Preview: $pName', style: const TextStyle(fontSize: 16))),
+            ],
+          ),
+          content: SizedBox(
+            width: 600,
+            height: 400,
+            child: qList.isEmpty
+                ? const Center(child: Text('No question text preview stored for this paper.'))
+                : ListView.builder(
+                    itemCount: qList.length,
+                    itemBuilder: (c, i) {
+                      final q = qList[i];
+                      return ListTile(
+                        leading: CircleAvatar(radius: 12, child: Text('${i + 1}', style: const TextStyle(fontSize: 10))),
+                        title: Text(q['question_text'] ?? q['questionText'] ?? 'Q${i + 1}', style: const TextStyle(fontSize: 12)),
+                        subtitle: Text('${q['subject'] ?? 'Physics'} • Difficulty: ${q['difficulty'] ?? 'Medium'}', style: const TextStyle(fontSize: 10)),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _addPaperSourceToStep1(paperMap, 'Selected Paper');
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
+              child: const Text('Use Entire Paper'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showStep1DeduplicatedPreviewDialog() {
+    final deduplicated = _allDeduplicatedQuestions;
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.cleaning_services, color: Color(0xFF16A34A)),
+              const SizedBox(width: 8),
+              Text('Deduplicated Questions (${deduplicated.length} Unique)', style: const TextStyle(fontSize: 16)),
+            ],
+          ),
+          content: SizedBox(
+            width: 700,
+            height: 450,
+            child: deduplicated.isEmpty
+                ? const Center(child: Text('No sources added yet.'))
+                : ListView.builder(
+                    itemCount: deduplicated.length,
+                    itemBuilder: (c, i) {
+                      final q = deduplicated[i];
+                      return ListTile(
+                        leading: CircleAvatar(radius: 12, backgroundColor: const Color(0xFFDCFCE7), child: Text('${i + 1}', style: const TextStyle(fontSize: 10, color: Color(0xFF15803D)))),
+                        title: Text(q['question_text'] ?? q['questionText'] ?? 'Q${i + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        subtitle: Text('${q['subject'] ?? 'Physics'} • ${q['chapter'] ?? 'General'} • Canonical ID: ${q['id'] ?? q['question_id'] ?? 'N/A'}', style: const TextStyle(fontSize: 10)),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          ],
+        );
+      },
     );
   }
 
