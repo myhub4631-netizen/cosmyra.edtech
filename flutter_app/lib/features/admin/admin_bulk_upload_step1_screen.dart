@@ -175,7 +175,6 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
         exam: _step1PyqExamFilter == 'All' ? null : _step1PyqExamFilter,
         year: _step1PyqYearFilter == 'All' ? null : _step1PyqYearFilter,
         subject: _step1PyqSubjectFilter == 'All' ? null : _step1PyqSubjectFilter,
-        paperType: _step1PyqPaperTypeFilter == 'All' ? null : _step1PyqPaperTypeFilter,
         search: _step1PyqSearchCtrl.text.trim(),
       );
       if (mounted) {
@@ -1634,16 +1633,16 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                     children: [
                       const Icon(Icons.auto_awesome_rounded, color: Color(0xFF16A34A), size: 20),
                       const SizedBox(width: 8),
-                      Text(
+                      const Text(
                         'BUILD PAPER FROM EXISTING CONTENT',
-                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF15803D)),
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Text(
+                  const Text(
                     'Reuse existing PYQ papers, NTA mock papers, or question bank questions without duplicating question records.',
-                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF166534)),
+                    style: TextStyle(fontSize: 12, color: Color(0xFF166534)),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -2376,7 +2375,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Upload Method',
+                  'Upload Method / Question Source',
                   style: TextStyle(
                     fontSize: 13,
                     color: Color(0xFF64748B),
@@ -2388,21 +2387,85 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                   title: 'Enter Questions Manually',
                   value: 'manual',
                   groupValue: _uploadMethod,
-                  onChanged: (val) => setState(() => _uploadMethod = val!),
+                  onChanged: (val) => setState(() {
+                    _uploadMethod = val!;
+                    _questionSourceMode = 'new';
+                  }),
                 ),
                 const SizedBox(height: 8),
                 _buildRadioButton(
                   title: 'Upload from Excel / CSV',
                   value: 'excel',
                   groupValue: _uploadMethod,
-                  onChanged: (val) => setState(() => _uploadMethod = val!),
+                  onChanged: (val) => setState(() {
+                    _uploadMethod = val!;
+                    _questionSourceMode = 'new';
+                  }),
                 ),
                 const SizedBox(height: 8),
                 _buildRadioButton(
                   title: 'Copy & Paste',
                   value: 'paste',
                   groupValue: _uploadMethod,
-                  onChanged: (val) => setState(() => _uploadMethod = val!),
+                  onChanged: (val) => setState(() {
+                    _uploadMethod = val!;
+                    _questionSourceMode = 'new';
+                  }),
+                ),
+                const SizedBox(height: 8),
+                _buildRadioButton(
+                  title: 'Existing PYQ Paper',
+                  value: 'pyq',
+                  groupValue: _uploadMethod,
+                  onChanged: (val) {
+                    setState(() {
+                      _uploadMethod = val!;
+                      _selectedSourceType = 'pyq';
+                      _questionSourceMode = 'existing';
+                      if (_step1PyqPapersList.isEmpty) _loadStep1PyqPapers();
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                _buildRadioButton(
+                  title: 'Existing NTA Question Paper',
+                  value: 'nta',
+                  groupValue: _uploadMethod,
+                  onChanged: (val) {
+                    setState(() {
+                      _uploadMethod = val!;
+                      _selectedSourceType = 'nta';
+                      _questionSourceMode = 'existing';
+                      if (_step1NtaPapersList.isEmpty) _loadStep1NtaPapers();
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                _buildRadioButton(
+                  title: 'Question Bank / Question Set',
+                  value: 'qbank',
+                  groupValue: _uploadMethod,
+                  onChanged: (val) {
+                    setState(() {
+                      _uploadMethod = val!;
+                      _selectedSourceType = 'qbank';
+                      _questionSourceMode = 'existing';
+                      if (_step1QBankResults.isEmpty) _loadStep1QBankQuestions();
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                _buildRadioButton(
+                  title: 'Combine Multiple Sources',
+                  value: 'combine',
+                  groupValue: _uploadMethod,
+                  onChanged: (val) {
+                    setState(() {
+                      _uploadMethod = val!;
+                      _selectedSourceType = 'combine';
+                      _questionSourceMode = 'existing';
+                    });
+                  },
                 ),
               ],
             ),

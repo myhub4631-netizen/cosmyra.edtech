@@ -7708,7 +7708,7 @@ class SupabaseService {
   }) async {
     try {
       final int offset = (page - 1) * limit;
-      var req = client.from('questions').select('*', const FetchOptions(count: CountOption.exact));
+      var req = client.from('questions').select('*');
 
       if (exam != null && exam.isNotEmpty && exam != 'All') {
         req = req.or('exam_id.ilike.%$exam%,exam_name.ilike.%$exam%');
@@ -7736,14 +7736,14 @@ class SupabaseService {
         req = req.ilike('question_text', '%${search.trim()}%');
       }
 
-      final res = await req.order('created_at', ascending: false).range(offset, offset + limit - 1);
-      final List<Map<String, dynamic>> items = res.data != null
-          ? (res.data as List).map((row) => processEnumerateInQuestionMap(Map<String, dynamic>.from(row as Map))).toList()
-          : [];
+      final List<dynamic> res = await req.order('created_at', ascending: false).range(offset, offset + limit - 1);
+      final List<Map<String, dynamic>> items = res
+          .map((row) => processEnumerateInQuestionMap(Map<String, dynamic>.from(row as Map)))
+          .toList();
 
       return {
         'items': items,
-        'totalCount': res.count ?? items.length,
+        'totalCount': items.length,
         'page': page,
         'limit': limit,
       };
