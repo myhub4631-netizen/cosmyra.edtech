@@ -315,6 +315,56 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       );
     }
 
+    final dynamic preselectedRaw = _paperData?['preselectedQuestions'] ?? _paperData?['preselected_questions'];
+    if (preselectedRaw is List && preselectedRaw.isNotEmpty) {
+      final List<QuestionItemData> preselectedItems = [];
+      for (int idx = 0; idx < preselectedRaw.length; idx++) {
+        final qMap = Map<String, dynamic>.from(preselectedRaw[idx] as Map);
+        final opts = SupabaseService.parseOptionsFromQuestionMap(qMap);
+        final List<String?> optImgs = [
+          qMap['option_image_1'] ?? qMap['option_1_image'] ?? qMap['optionImage1'],
+          qMap['option_image_2'] ?? qMap['option_2_image'] ?? qMap['optionImage2'],
+          qMap['option_image_3'] ?? qMap['option_3_image'] ?? qMap['optionImage3'],
+          qMap['option_image_4'] ?? qMap['option_4_image'] ?? qMap['optionImage4'],
+        ];
+
+        int correctIdx = -1;
+        if (qMap['correct_option_index'] != null) {
+          correctIdx = (qMap['correct_option_index'] as num).toInt();
+        } else if (qMap['correctOptionIndex'] != null) {
+          correctIdx = (qMap['correctOptionIndex'] as num).toInt();
+        }
+
+        preselectedItems.add(QuestionItemData(
+          id: qMap['id']?.toString() ?? 'q_${_paperId}_${idx + 1}',
+          number: idx + 1,
+          text: qMap['question_text'] ?? qMap['questionText'] ?? '',
+          questionImage: qMap['question_image'] ?? qMap['questionImage'],
+          options: opts,
+          optionImages: optImgs,
+          correctOptionIndex: correctIdx,
+          explanation: qMap['explanation'] ?? qMap['solution'] ?? '',
+          solutionVideoUrl: qMap['solution_video_url'] ?? qMap['solutionVideoUrl'],
+          difficulty: qMap['difficulty'] ?? 'Medium',
+          positiveMarks: qMap['marks']?.toString() ?? qMap['positiveMarks']?.toString() ?? '4',
+          negativeMarks: qMap['negative_marks']?.toString() ?? qMap['negativeMarks']?.toString() ?? '-1',
+          questionType: qMap['q_type'] ?? qMap['question_type'] ?? 'MCQ (Single Correct)',
+          subject: qMap['subject'] ?? 'Physics',
+          chapter: qMap['chapter'] ?? '',
+          topic: qMap['topic'] ?? '',
+          chapterTopic: qMap['chapter'] ?? '',
+          chapterId: qMap['chapter_id']?.toString() ?? '',
+          isSaved: true,
+          availableIn: defaultAvailableIn,
+        ));
+      }
+      if (preselectedItems.isNotEmpty) {
+        _questionsList = preselectedItems;
+        _activeStep2Tab = 'existing';
+        _existingContentSubTab = 'summary';
+      }
+    }
+
     final savedQList = await SupabaseService.fetchQuestionsForPaper(_paperId);
 
     int savedCounter = 0;

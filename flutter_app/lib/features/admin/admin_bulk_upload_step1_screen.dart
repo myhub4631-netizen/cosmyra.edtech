@@ -104,6 +104,226 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   // Active Sidebar Item tracking
   String _activeSidebarItem = 'Question & Paper Bank';
 
+  // Step 1 Question Source Section State (Existing Content Selection)
+  String _questionSourceMode = 'new'; // 'new' or 'existing'
+  String _selectedSourceType = 'pyq'; // 'pyq', 'nta', 'qbank', 'qset'
+  final List<Map<String, dynamic>> _addedSources = [];
+  bool _isLoadingStep1Content = false;
+
+  // Search Controllers for Step 1 Existing Content
+  final TextEditingController _step1PyqSearchCtrl = TextEditingController();
+  final TextEditingController _step1NtaSearchCtrl = TextEditingController();
+  final TextEditingController _step1QBankSearchCtrl = TextEditingController();
+  final TextEditingController _step1QSetSearchCtrl = TextEditingController();
+
+  String _step1PyqExamFilter = 'NEET';
+  String _step1PyqYearFilter = 'All';
+  String _step1PyqSubjectFilter = 'All';
+  String _step1PyqPaperTypeFilter = 'All';
+
+  String _step1NtaExamFilter = 'NEET';
+  String _step1NtaYearFilter = 'All';
+  String _step1NtaSessionFilter = 'All';
+
+  String _step1QBankSubjectFilter = 'Physics';
+  String _step1QBankChapterFilter = 'All';
+  String _step1QBankDifficultyFilter = 'All';
+  final Set<String> _selectedQBankIdsInStep1 = {};
+
+  List<Map<String, dynamic>> _step1PyqPapersList = [];
+  List<Map<String, dynamic>> _step1NtaPapersList = [];
+  List<Map<String, dynamic>> _step1QBankResults = [];
+  List<Map<String, dynamic>> _step1QuestionSetsList = [];
+
+  List<Map<String, dynamic>> get _allDeduplicatedQuestions {
+    final Map<String, Map<String, dynamic>> uniqueMap = {};
+    for (var src in _addedSources) {
+      final qList = src['questions'];
+      if (qList is List) {
+        for (var q in qList) {
+          if (q is Map) {
+            final qMap = Map<String, dynamic>.from(q as Map);
+            final String canonicalId = qMap['id']?.toString() ??
+                qMap['question_id']?.toString() ??
+                qMap['questionId']?.toString() ??
+                'q_${qMap['question_text']?.toString().hashCode}';
+            if (!uniqueMap.containsKey(canonicalId)) {
+              uniqueMap[canonicalId] = qMap;
+            }
+          }
+        }
+      }
+    }
+    return uniqueMap.values.toList();
+  }
+
+  int get _rawTotalSelectedCount {
+    int total = 0;
+    for (var src in _addedSources) {
+      final qList = src['questions'];
+      if (qList is List) {
+        total += qList.length;
+      }
+    }
+    return total;
+  }
+
+  Future<void> _loadStep1PyqPapers() async {
+    setState(() => _isLoadingStep1Content = true);
+    try {
+      final res = await SupabaseService.fetchExistingPYQPapers(
+        exam: _step1PyqExamFilter == 'All' ? null : _step1PyqExamFilter,
+        year: _step1PyqYearFilter == 'All' ? null : _step1PyqYearFilter,
+        subject: _step1PyqSubjectFilter == 'All' ? null : _step1PyqSubjectFilter,
+        paperType: _step1PyqPaperTypeFilter == 'All' ? null : _step1PyqPaperTypeFilter,
+        search: _step1PyqSearchCtrl.text.trim(),
+      );
+      if (mounted) {
+        setState(() {
+          _step1PyqPapersList = res;
+          _isLoadingStep1Content = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingStep1Content = false);
+    }
+  }
+
+  Future<void> _loadStep1NtaPapers() async {
+    setState(() => _isLoadingStep1Content = true);
+    try {
+      final res = await SupabaseService.fetchExistingNTAPapers(
+        exam: _step1NtaExamFilter == 'All' ? null : _step1NtaExamFilter,
+        year: _step1NtaYearFilter == 'All' ? null : _step1NtaYearFilter,
+        session: _step1NtaSessionFilter == 'All' ? null : _step1NtaSessionFilter,
+        search: _step1NtaSearchCtrl.text.trim(),
+      );
+      if (mounted) {
+        setState(() {
+          _step1NtaPapersList = res;
+          _isLoadingStep1Content = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingStep1Content = false);
+    }
+  }
+
+  Future<void> _loadStep1QBankQuestions() async {
+    setState(() => _isLoadingStep1Content = true);
+    try {
+      final res = await SupabaseService.queryQuestionBank(
+        exam: _examName,
+        subject: _step1QBankSubjectFilter == 'All' ? null : _step1QBankSubjectFilter,
+        chapter: _step1QBankChapterFilter == 'All' ? null : _step1QBankChapterFilter,
+        difficulty: _step1QBankDifficultyFilter == 'All' ? null : _step1QBankDifficultyFilter,
+        search: _step1QBankSearchCtrl.text.trim(),
+        limit: 50,
+      );
+      if (mounted) {
+        setState(() {
+          _step1QBankResults = (res['items'] as List? ?? []).cast<Map<String, dynamic>>();
+          _isLoadingStep1Content = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingStep1Content = false);
+    }
+  }
+
+  Future<void> _loadStep1QuestionSets() async {
+    setState(() => _isLoadingStep1Content = true);
+    try {
+      final res = await SupabaseService.fetchAllPapersAndTestSeries();
+      if (mounted) {
+        setState(() {
+          _step1QuestionSetsList = res;
+          _isLoadingStep1Content = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingStep1Content = false);
+    }
+  }
+
+  Future<void> _addPaperSourceToStep1(Map<String, dynamic> paperMap, String sourceType) async {
+    final String paperId = paperMap['id']?.toString() ?? '';
+    final String pName = paperMap['paper_name'] ?? paperMap['paperName'] ?? 'Selected Paper';
+
+    // Auto-fill Step 1 Paper Details from selected paper metadata!
+    setState(() {
+      _paperNameCtrl.text = pName;
+      if (paperMap['paper_code'] != null || paperMap['code'] != null) {
+        _paperCodeCtrl.text = (paperMap['paper_code'] ?? paperMap['code']).toString();
+      }
+      if (paperMap['exam'] != null) _examName = paperMap['exam'].toString();
+      if (paperMap['year'] != null) _year = paperMap['year'].toString();
+      if (paperMap['phase_session'] != null) _phaseSession = paperMap['phase_session'].toString();
+      if (paperMap['paper_type'] != null) _paperType = paperMap['paper_type'].toString();
+      if (paperMap['conducting_body'] != null) _conductingBody = paperMap['conducting_body'].toString();
+      if (paperMap['total_marks'] != null) _totalMarksCtrl.text = paperMap['total_marks'].toString();
+      if (paperMap['question_count'] != null) _questionCountCtrl.text = paperMap['question_count'].toString();
+      if (paperMap['duration_minutes'] != null) _durationCtrl.text = paperMap['duration_minutes'].toString();
+      if (paperMap['instructions'] != null) _instructionsCtrl.text = paperMap['instructions'].toString();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Fetching questions for "$pName"...'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+
+    final questions = await SupabaseService.fetchQuestionsForPaper(paperId, paperName: pName);
+
+    setState(() {
+      _addedSources.add({
+        'type': sourceType,
+        'id': paperId,
+        'name': pName,
+        'count': questions.length,
+        'paperMap': paperMap,
+        'questions': questions,
+      });
+      _questionCountCtrl.text = _allDeduplicatedQuestions.length.toString();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✓ Added "$pName" (${questions.length} questions) to paper content!'),
+        backgroundColor: const Color(0xFF16A34A),
+      ),
+    );
+  }
+
+  void _addSelectedQBankQuestionsToStep1() {
+    final selectedQuestions = _step1QBankResults.where((q) {
+      final qId = q['id']?.toString() ?? '';
+      return _selectedQBankIdsInStep1.contains(qId);
+    }).toList();
+
+    if (selectedQuestions.isEmpty) return;
+
+    setState(() {
+      _addedSources.add({
+        'type': 'Question Bank',
+        'id': 'qbank_${DateTime.now().millisecondsSinceEpoch}',
+        'name': 'Question Bank (${_step1QBankSubjectFilter} - ${selectedQuestions.length} Qs)',
+        'count': selectedQuestions.length,
+        'questions': selectedQuestions,
+      });
+      _selectedQBankIdsInStep1.clear();
+      _questionCountCtrl.text = _allDeduplicatedQuestions.length.toString();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✓ Added ${selectedQuestions.length} Question Bank items to paper content!'),
+        backgroundColor: const Color(0xFF16A34A),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -671,7 +891,17 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       'default_option_preset': _defaultOptionPreset,
       'buildPaperMethod': _buildPaperMethod,
       'build_paper_method': _buildPaperMethod,
+      'questionSourceMode': _questionSourceMode,
+      'question_source_mode': _questionSourceMode,
+      'preselectedQuestions': _allDeduplicatedQuestions,
+      'preselected_questions': _allDeduplicatedQuestions,
+      'addedSources': _addedSources,
+      'added_sources': _addedSources,
     };
+
+    if (_allDeduplicatedQuestions.isNotEmpty) {
+      paperDetails['questionCount'] = _allDeduplicatedQuestions.length;
+    }
 
     // Immediately persist created Test Series so it shows up in Test Series section
     if (_sourceCategory == 'Test Series' && effectiveTestSeriesTitle.isNotEmpty) {
@@ -811,7 +1041,12 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
 
                         const SizedBox(height: 24),
 
-                        // Card 2: Upload Options
+                        // Card 2: Question Source (Build Paper From Existing Content)
+                        _buildQuestionSourceSectionCard(),
+
+                        const SizedBox(height: 24),
+
+                        // Card 3: Upload Options
                         _buildUploadOptionsCard(),
 
                         const SizedBox(height: 24),
