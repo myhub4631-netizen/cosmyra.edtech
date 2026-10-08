@@ -5674,7 +5674,7 @@ class SupabaseService {
   static List<Map<String, dynamic>> get defaultCuratedTestSeries => const [];
 
   /// Fetch all created Test Series from Supabase, local cache, and fallback baseline
-  static Future<List<Map<String, dynamic>>> fetchAllTestSeries() async {
+  static Future<List<Map<String, dynamic>>> fetchAllTestSeries({String? exam}) async {
     final List<Map<String, dynamic>> list = [];
     final Set<String> seenIds = {};
     Set<String> deletedIds = {};
@@ -5913,6 +5913,31 @@ class SupabaseService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cosmyra_saved_test_series', jsonEncode(list));
     } catch (_) {}
+
+    if (exam != null && exam.trim().isNotEmpty && exam.trim() != 'All') {
+      final String targetExamUpper = exam.trim().toUpperCase();
+      final bool isJee = targetExamUpper.contains('JEE');
+      final bool isNeet = targetExamUpper.contains('NEET');
+
+      return list.where((item) {
+        final String itemExam = (item['exam'] ?? item['exam_name'] ?? item['exam_id'] ?? item['target_exam'] ?? item['category'] ?? '').toString().toUpperCase();
+        final String itemTitle = (item['title'] ?? item['name'] ?? '').toString().toUpperCase();
+
+        if (isJee) {
+          if (itemExam.contains('JEE') || itemExam.contains('ENGINEERING')) return true;
+          if (itemTitle.contains('JEE') && !itemTitle.contains('NEET')) return true;
+          return false;
+        }
+
+        if (isNeet) {
+          if (itemExam.contains('NEET') || itemExam.contains('MEDICAL')) return true;
+          if (itemTitle.contains('NEET') && !itemTitle.contains('JEE')) return true;
+          return false;
+        }
+
+        return itemExam.contains(targetExamUpper) || itemTitle.contains(targetExamUpper);
+      }).toList();
+    }
 
     return list;
   }
@@ -7359,7 +7384,7 @@ class SupabaseService {
   }
 
   /// Fetch all saved papers/test series records from DB and local cache
-  static Future<List<Map<String, dynamic>>> fetchAllPapersAndTestSeries() async {
+  static Future<List<Map<String, dynamic>>> fetchAllPapersAndTestSeries({String? exam}) async {
     final List<Map<String, dynamic>> papers = [];
     final Set<String> seenIds = {};
 
@@ -7469,6 +7494,31 @@ class SupabaseService {
       }
     } catch (e) {
       debugPrint('Notice reading Supabase papers table: $e');
+    }
+
+    if (exam != null && exam.trim().isNotEmpty && exam.trim() != 'All') {
+      final String targetExamUpper = exam.trim().toUpperCase();
+      final bool isJee = targetExamUpper.contains('JEE');
+      final bool isNeet = targetExamUpper.contains('NEET');
+
+      return papers.where((p) {
+        final String pExam = (p['exam'] ?? p['exam_name'] ?? p['target_exam'] ?? p['exam_id'] ?? '').toString().toUpperCase();
+        final String pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toUpperCase();
+
+        if (isJee) {
+          if (pExam.contains('JEE') || pExam.contains('ENGINEERING')) return true;
+          if (pName.contains('JEE') && !pName.contains('NEET')) return true;
+          return false;
+        }
+
+        if (isNeet) {
+          if (pExam.contains('NEET') || pExam.contains('MEDICAL')) return true;
+          if (pName.contains('NEET') && !pName.contains('JEE')) return true;
+          return false;
+        }
+
+        return pExam.contains(targetExamUpper) || pName.contains(targetExamUpper);
+      }).toList();
     }
 
     return papers;

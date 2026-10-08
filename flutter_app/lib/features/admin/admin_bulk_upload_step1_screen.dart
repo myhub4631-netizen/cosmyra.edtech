@@ -81,6 +81,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   bool _subjectChemistry = true;
   bool _subjectBotany = true;
   bool _subjectZoology = true;
+  bool _subjectMathematics = false;
 
   // Visibility / Available In Multi-Select Checkboxes
   bool _visCustomPractice = true;
@@ -233,7 +234,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   Future<void> _loadStep1QuestionSets() async {
     setState(() => _isLoadingStep1Content = true);
     try {
-      final res = await SupabaseService.fetchAllPapersAndTestSeries();
+      final res = await SupabaseService.fetchAllPapersAndTestSeries(exam: _examName);
       if (mounted) {
         setState(() {
           _step1QuestionSetsList = res;
@@ -371,8 +372,8 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
 
   Future<void> _loadCustomTestSeries() async {
     try {
-      final list = await SupabaseService.fetchAllTestSeries();
-      final papers = await SupabaseService.fetchAllPapersAndTestSeries();
+      final list = await SupabaseService.fetchAllTestSeries(exam: _examName);
+      final papers = await SupabaseService.fetchAllPapersAndTestSeries(exam: _examName);
       if (mounted) {
         setState(() {
           _loadedSeriesObjects = list;
@@ -396,6 +397,42 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     } catch (e) {
       debugPrint('Notice loading test series: $e');
     }
+  }
+
+  void _onExamChanged(String newExam) {
+    setState(() {
+      _examName = newExam;
+      _applyExamDefaults(newExam);
+
+      // 1. Reset Test Series selection & clear state
+      _testSeriesOption = 'new';
+      _existingTestSeries = '';
+      _existingPaper = '';
+      _availableTestSeriesList.clear();
+      _availablePapersForSelectedSeries.clear();
+      _loadedSeriesObjects.clear();
+      _loadedPapersList.clear();
+
+      // 2. Reset filters for PYQ, NTA, and Question Bank
+      _step1PyqExamFilter = newExam;
+      _step1NtaExamFilter = newExam;
+      _step1QBankSubjectFilter = newExam.contains('JEE') ? 'Physics' : 'Physics';
+      _step1QBankChapterFilter = 'All';
+      _step1QBankDifficultyFilter = 'All';
+
+      _step1PyqPapersList.clear();
+      _step1NtaPapersList.clear();
+      _step1QBankResults.clear();
+      _step1QuestionSetsList.clear();
+      _addedSources.clear();
+      _selectedQBankIdsInStep1.clear();
+
+      // 3. Reload Exam-scoped data
+      _loadCustomTestSeries();
+      if (_uploadMethod == 'pyq') _loadStep1PyqPapers();
+      if (_uploadMethod == 'nta') _loadStep1NtaPapers();
+      if (_uploadMethod == 'qbank') _loadStep1QBankQuestions();
+    });
   }
 
   void _applyExamDefaults(String exam, {bool preserveMarks = false}) {
@@ -721,6 +758,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           final subList = rawSubjects.map((s) => s.toString().toLowerCase()).toList();
           _subjectPhysics = subList.contains('physics');
           _subjectChemistry = subList.contains('chemistry');
+          _subjectMathematics = subList.contains('mathematics') || subList.contains('maths') || subList.contains('math');
           _subjectBotany = subList.contains('botany') || subList.contains('biology');
           _subjectZoology = subList.contains('zoology') || subList.contains('biology');
         }
@@ -866,8 +904,9 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       'subjects': [
         if (_subjectPhysics) 'Physics',
         if (_subjectChemistry) 'Chemistry',
-        if (_subjectBotany) 'Botany',
-        if (_subjectZoology) 'Zoology',
+        if (_examName.contains('JEE') && _subjectMathematics) 'Mathematics',
+        if (!_examName.contains('JEE') && _subjectBotany) 'Botany',
+        if (!_examName.contains('JEE') && _subjectZoology) 'Zoology',
       ],
       'paperShift': _paperShift,
       'instructions': _instructionsCtrl.text,
@@ -1520,10 +1559,9 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                         ? ['NEET', 'JEE Main', 'JEE Advanced', 'AIIMS']
                         : ['NEET', 'JEE Main', 'JEE Advanced', 'AIIMS', 'CUET', 'CBSE 12'],
                     onChanged: (val) {
-                      setState(() {
-                        _examName = val!;
-                        _applyExamDefaults(_examName);
-                      });
+                      if (val != null && val != _examName) {
+                        _onExamChanged(val);
+                      }
                     },
                   ),
                   _buildDropdownField(
@@ -2231,8 +2269,12 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                       children: [
                         _buildCheckboxItem('Physics', _subjectPhysics, (v) => setState(() => _subjectPhysics = v!)),
                         _buildCheckboxItem('Chemistry', _subjectChemistry, (v) => setState(() => _subjectChemistry = v!)),
-                        _buildCheckboxItem('Botany', _subjectBotany, (v) => setState(() => _subjectBotany = v!)),
-                        _buildCheckboxItem('Zoology', _subjectZoology, (v) => setState(() => _subjectZoology = v!)),
+                        if (_examName.contains('JEE'))
+                          _buildCheckboxItem('Mathematics', _subjectMathematics, (v) => setState(() => _subjectMathematics = v!))
+                        else ...[
+                          _buildCheckboxItem('Botany', _subjectBotany, (v) => setState(() => _subjectBotany = v!)),
+                          _buildCheckboxItem('Zoology', _subjectZoology, (v) => setState(() => _subjectZoology = v!)),
+                        ],
                       ],
                     ),
                   ],
