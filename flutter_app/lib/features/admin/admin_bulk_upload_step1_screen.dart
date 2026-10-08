@@ -89,6 +89,9 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   bool _visNtaQuestions = true;
   bool _visTestSeries = true;
 
+  // Build Paper Method (for Test Series existing content reuse)
+  String _buildPaperMethod = 'existing_pyq'; // 'existing_pyq', 'existing_nta', 'question_bank', 'manual'
+
   // Upload Method Radio
   String _uploadMethod = 'manual'; // 'manual', 'excel', 'paste'
 
@@ -666,6 +669,8 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       'is_test_series': _sourceCategory == 'Test Series' || availableInModules.contains('test_series'),
       'defaultOptionPreset': _defaultOptionPreset,
       'default_option_preset': _defaultOptionPreset,
+      'buildPaperMethod': _buildPaperMethod,
+      'build_paper_method': _buildPaperMethod,
     };
 
     // Immediately persist created Test Series so it shows up in Test Series section
@@ -1377,6 +1382,70 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
 
           // Conditional Test Series Card Block (When Source Category == 'Test Series')
           if (_sourceCategory == 'Test Series') ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFBBF7D0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.auto_awesome_rounded, color: Color(0xFF16A34A), size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        'BUILD PAPER FROM EXISTING CONTENT',
+                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF15803D)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Reuse existing PYQ papers, NTA mock papers, or question bank questions without duplicating question records.',
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF166534)),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: [
+                      ChoiceChip(
+                        avatar: const Icon(Icons.history_edu_rounded, size: 16),
+                        label: const Text('○ Existing PYQ Paper'),
+                        selected: _buildPaperMethod == 'existing_pyq',
+                        selectedColor: const Color(0xFFDCFCE7),
+                        onSelected: (sel) => setState(() => _buildPaperMethod = 'existing_pyq'),
+                      ),
+                      ChoiceChip(
+                        avatar: const Icon(Icons.menu_book_rounded, size: 16),
+                        label: const Text('○ Existing NTA Question Paper'),
+                        selected: _buildPaperMethod == 'existing_nta',
+                        selectedColor: const Color(0xFFDCFCE7),
+                        onSelected: (sel) => setState(() => _buildPaperMethod = 'existing_nta'),
+                      ),
+                      ChoiceChip(
+                        avatar: const Icon(Icons.quiz_rounded, size: 16),
+                        label: const Text('○ Question Bank / Question Set'),
+                        selected: _buildPaperMethod == 'question_bank',
+                        selectedColor: const Color(0xFFDCFCE7),
+                        onSelected: (sel) => setState(() => _buildPaperMethod = 'question_bank'),
+                      ),
+                      ChoiceChip(
+                        avatar: const Icon(Icons.upload_file_rounded, size: 16),
+                        label: const Text('○ Upload / Add New Questions Manually'),
+                        selected: _buildPaperMethod == 'manual',
+                        selectedColor: const Color(0xFFDCFCE7),
+                        onSelected: (sel) => setState(() => _buildPaperMethod = 'manual'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(16),

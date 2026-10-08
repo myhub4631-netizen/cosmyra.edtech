@@ -111,6 +111,66 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   bool _isSavingBatch = false;
   List<String> _paperDefaultAvailableIn = ['custom_practice', 'custom_test', 'pyq_practice', 'nta_questions', 'test_series'];
 
+  // =========================================================================
+  // TEST SERIES PAPER BUILDER - EXISTING CONTENT REUSE STATE
+  // =========================================================================
+  String _activeStep2Tab = 'existing'; // 'existing', 'manual', 'upload'
+  String _existingContentSubTab = 'pyq'; // 'pyq', 'nta', 'qbank', 'summary'
+
+  // PYQ Filters & Data
+  String _pyqExamFilter = 'All';
+  String _pyqYearFilter = 'All';
+  String _pyqSubjectFilter = 'All';
+  final TextEditingController _pyqSearchCtrl = TextEditingController();
+  List<Map<String, dynamic>> _pyqPapersList = [];
+  bool _isLoadingPyqPapers = false;
+
+  // NTA Filters & Data
+  String _ntaExamFilter = 'All';
+  String _ntaYearFilter = 'All';
+  String _ntaSessionFilter = 'All';
+  final TextEditingController _ntaSearchCtrl = TextEditingController();
+  List<Map<String, dynamic>> _ntaPapersList = [];
+  bool _isLoadingNtaPapers = false;
+
+  // Question Bank Filters & Data
+  String _qbExamFilter = 'All';
+  String _qbSubjectFilter = 'Physics';
+  String _qbChapterFilter = 'All';
+  String _qbTopicFilter = 'All';
+  String _qbDifficultyFilter = 'All';
+  String _qbSourceFilter = 'All';
+  String _qbYearFilter = 'All';
+  final TextEditingController _qbSearchCtrl = TextEditingController();
+  int _qbPage = 1;
+  int _qbTotalCount = 0;
+  List<Map<String, dynamic>> _qbResultsList = [];
+  final Set<String> _selectedQbQuestionIds = {};
+  final List<Map<String, dynamic>> _selectedQbQuestionsList = [];
+  bool _isLoadingQb = false;
+
+  // Selection Mode inside Question Bank
+  String _qbSelectionMode = 'manual'; // 'manual', 'random'
+  String _randomSubject = 'Physics';
+  String _randomChapter = 'All';
+  String _randomDifficulty = 'All';
+  int _randomCount = 30;
+  bool _isGeneratingRandom = false;
+
+  // Multi-Source Selected Questions Pool (PYQ + NTA + Question Bank)
+  final List<Map<String, dynamic>> _testSeriesSelectedQuestions = [];
+  int _duplicatesRemovedCount = 0;
+
+  // Target Subject Distribution State
+  int _targetPhysicsCount = 45;
+  int _targetChemistryCount = 45;
+  int _targetBotanyCount = 45;
+  int _targetZoologyCount = 45;
+  bool _allowIncompletePaper = false;
+
+  // Paper Preview State
+  int _previewQuestionIndex = 0;
+
   bool _hasEssentialDetails(QuestionItemData q) {
     // 1. Question text or image must be provided
     final bool hasTextOrImage = q.text.trim().isNotEmpty || (q.questionImage != null && q.questionImage!.isNotEmpty);
@@ -207,6 +267,19 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
     _paperData = widget.paperRecord ?? await SupabaseService.loadActiveUploadPaperSession();
     _paperId = _paperData?['id'] ?? 'paper_${DateTime.now().millisecondsSinceEpoch}';
+
+    final String buildMethod = (_paperData?['buildPaperMethod'] ?? _paperData?['build_paper_method'] ?? '').toString();
+    final String sourceCat = (_paperData?['source_category'] ?? _paperData?['sourceCategory'] ?? '').toString();
+
+    if (buildMethod == 'existing_pyq' || buildMethod == 'existing_nta' || buildMethod == 'question_bank' || sourceCat == 'Test Series') {
+      _activeStep2Tab = 'existing';
+      if (buildMethod == 'existing_pyq') _existingContentSubTab = 'pyq';
+      else if (buildMethod == 'existing_nta') _existingContentSubTab = 'nta';
+      else if (buildMethod == 'question_bank') _existingContentSubTab = 'qbank';
+      _loadPyqPapers();
+      _loadNtaPapers();
+      _loadQuestionBank();
+    }
 
     final String exam = _paperData?['exam'] ?? _paperData?['exam_name'] ?? 'NEET';
     final String subject = _paperData?['subject'] ?? 'Physics';
@@ -378,6 +451,517 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     }
 
     setState(() => _isLoading = false);
+  }
+
+  // =========================================================================
+  // TEST SERIES PAPER BUILDER - EXISTING CONTENT REUSE METHODS
+  // =========================================================================
+
+  Future<void> _loadPyqPapers() async {
+    setState(() => _isLoadingPyqPapers = true);
+    try {
+      final papers = await SupabaseService.fetchExistingPYQPapers(
+        exam: _pyqExamFilter,
+        year: _pyqYearFilter,
+        subject: _pyqSubjectFilter,
+        search: _pyqSearchCtrl.text,
+      );
+      if (mounted) {
+        setState(() {
+          _pyqPapersList = papers;
+          _isLoadingPyqPapers = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingPyqPapers = false);
+    }
+  }
+
+  Future<void> _loadNtaPapers() async {
+    setState(() => _isLoadingNtaPapers = true);
+    try {
+      final papers = await SupabaseService.fetchExistingNTAPapers(
+        exam: _ntaExamFilter,
+        year: _ntaYearFilter,
+        session: _ntaSessionFilter,
+        search: _ntaSearchCtrl.text,
+      );
+      if (mounted) {
+        setState(() {
+          _ntaPapersList = papers;
+          _isLoadingNtaPapers = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingNtaPapers = false);
+    }
+  }
+
+  Future<void> _loadQuestionBank() async {
+    setState(() => _isLoadingQb = true);
+    try {
+      final res = await SupabaseService.queryQuestionBank(
+        exam: _qbExamFilter,
+        subject: _qbSubjectFilter,
+        chapter: _qbChapterFilter,
+        topic: _qbTopicFilter,
+        difficulty: _qbDifficultyFilter,
+        source: _qbSourceFilter,
+        year: _qbYearFilter,
+        search: _qbSearchCtrl.text,
+        limit: 20,
+        page: _qbPage,
+      );
+      if (mounted) {
+        setState(() {
+          _qbResultsList = List<Map<String, dynamic>>.from(res['items'] ?? []);
+          _qbTotalCount = res['totalCount'] as int? ?? 0;
+          _isLoadingQb = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingQb = false);
+    }
+  }
+
+  Future<void> _attachPaperQuestionsToTestSeries(Map<String, dynamic> paper, String sourceTag) async {
+    final String pId = (paper['id'] ?? paper['paper_id'] ?? '').toString();
+    final String pName = (paper['paper_name'] ?? paper['paperName'] ?? paper['title'] ?? 'Paper').toString();
+    if (pId.isEmpty) return;
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Loading questions from "$pName"...'),
+          backgroundColor: const Color(0xFF4F46E5),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+
+    final questions = await SupabaseService.fetchQuestionsForPaper(pId, paperName: pName);
+    if (questions.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No questions found in "$pName".'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    int dupCount = 0;
+    int addedCount = 0;
+    final Set<String> existingIds = _testSeriesSelectedQuestions
+        .map((q) => (q['id'] ?? q['question_id'] ?? '').toString())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    for (var q in questions) {
+      final qMap = Map<String, dynamic>.from(q);
+      final qId = (qMap['id'] ?? qMap['question_id'] ?? '').toString();
+
+      qMap['source_badge'] = sourceTag;
+      qMap['original_paper'] = pName;
+
+      if (qId.isNotEmpty && existingIds.contains(qId)) {
+        dupCount++;
+      } else {
+        if (qId.isNotEmpty) existingIds.add(qId);
+        _testSeriesSelectedQuestions.add(qMap);
+        addedCount++;
+      }
+    }
+
+    setState(() {
+      _duplicatesRemovedCount += dupCount;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✓ Attached $addedCount questions from "$pName".' + (dupCount > 0 ? ' ($dupCount duplicate questions removed.)' : '')),
+          backgroundColor: const Color(0xFF10B981),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Future<void> _generateRandomSelection() async {
+    setState(() => _isGeneratingRandom = true);
+    try {
+      final List<String> excludeIds = _testSeriesSelectedQuestions
+          .map((q) => (q['id'] ?? '').toString())
+          .where((id) => id.isNotEmpty)
+          .toList();
+
+      final randomQuestions = await SupabaseService.getRandomQuestionsFromBank(
+        subject: _randomSubject,
+        chapter: _randomChapter,
+        difficulty: _randomDifficulty,
+        count: _randomCount,
+        excludeIds: excludeIds,
+      );
+
+      int added = 0;
+      for (var q in randomQuestions) {
+        final qMap = Map<String, dynamic>.from(q);
+        qMap['source_badge'] = '[QUESTION BANK] ${_randomSubject} → ${_randomChapter != 'All' ? _randomChapter : 'Mixed'}';
+        _testSeriesSelectedQuestions.add(qMap);
+        added++;
+      }
+
+      setState(() {
+        _isGeneratingRandom = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✓ Successfully generated $added questions for $_randomSubject!'),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isGeneratingRandom = false);
+    }
+  }
+
+  void _autoArrangeQuestionsBySubject() {
+    final Map<String, int> subjectOrder = {
+      'physics': 1,
+      'chemistry': 2,
+      'botany': 3,
+      'biology': 3,
+      'zoology': 4,
+      'mathematics': 5,
+    };
+
+    setState(() {
+      _testSeriesSelectedQuestions.sort((a, b) {
+        final subA = (a['subject'] ?? a['subject_id'] ?? '').toString().toLowerCase();
+        final subB = (b['subject'] ?? b['subject_id'] ?? '').toString().toLowerCase();
+        final orderA = subjectOrder[subA] ?? 99;
+        final orderB = subjectOrder[subB] ?? 99;
+        if (orderA != orderB) return orderA.compareTo(orderB);
+        return 0;
+      });
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✓ Questions auto-arranged by Subject (Physics → Chemistry → Botany → Zoology).'),
+          backgroundColor: Color(0xFF4F46E5),
+        ),
+      );
+    }
+  }
+
+  void _randomizeSelectedQuestionsOrder() {
+    setState(() {
+      _testSeriesSelectedQuestions.shuffle();
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✓ Question order randomized.'),
+          backgroundColor: Color(0xFF4F46E5),
+        ),
+      );
+    }
+  }
+
+  Future<void> _finalizeAndCreateTestSeriesPaper() async {
+    if (_testSeriesSelectedQuestions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select at least one question from PYQs, NTA papers, or Question Bank.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final int physicsCount = _testSeriesSelectedQuestions.where((q) => (q['subject'] ?? '').toString().toLowerCase() == 'physics').length;
+    final int chemistryCount = _testSeriesSelectedQuestions.where((q) => (q['subject'] ?? '').toString().toLowerCase() == 'chemistry').length;
+    final int botanyCount = _testSeriesSelectedQuestions.where((q) => ['botany', 'biology'].contains((q['subject'] ?? '').toString().toLowerCase())).length;
+    final int zoologyCount = _testSeriesSelectedQuestions.where((q) => (q['subject'] ?? '').toString().toLowerCase() == 'zoology').length;
+    final int totalSelected = _testSeriesSelectedQuestions.length;
+
+    if (!_allowIncompletePaper && totalSelected < 180 && (_paperData?['exam'] ?? '').toString().contains('NEET')) {
+      final bool? proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Incomplete Paper Warning'),
+          content: Text(
+            'Target NEET paper question count is 180, but you currently have $totalSelected questions selected.\n\n'
+            'Distribution:\n'
+            '• Physics: $physicsCount / 45\n'
+            '• Chemistry: $chemistryCount / 45\n'
+            '• Botany: $botanyCount / 45\n'
+            '• Zoology: $zoologyCount / 45\n\n'
+            'Do you want to allow incomplete paper creation?',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                setState(() => _allowIncompletePaper = true);
+                Navigator.pop(ctx, true);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5)),
+              child: const Text('Allow Incomplete & Create', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+      if (proceed != true) return;
+    }
+
+    setState(() => _isSavingBatch = true);
+
+    final res = await SupabaseService.createTestSeriesPaperFromExistingQuestions(
+      paperDetails: _paperData ?? {
+        'paper_name': widget.paperName,
+        'exam': 'NEET',
+        'year': 2026,
+        'questionCount': _testSeriesSelectedQuestions.length,
+      },
+      selectedQuestionItems: _testSeriesSelectedQuestions,
+      testSeriesDetails: {
+        'title': _paperData?['test_series_title'] ?? widget.paperName,
+        'description': _paperData?['test_series_desc'] ?? 'Full length test series paper',
+      },
+    );
+
+    setState(() => _isSavingBatch = false);
+
+    if (res['success'] == true && mounted) {
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 28),
+              const SizedBox(width: 10),
+              const Text('Test Series Paper Created!'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Paper Name: ${res['paperName']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text('Total Unique Questions Attached: ${res['totalQuestions']}'),
+              const SizedBox(height: 4),
+              Text('Duplicate Questions Removed: ${res['duplicatesRemoved']}', style: const TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              const Text('The Test Series paper has been published and is immediately available across Web, Mobile, and Web App!', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
+              child: const Text('Done & Return to Admin', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  void _showExistingPaperPreviewDialog(Map<String, dynamic> paper, String sourceTag) async {
+    final String pId = (paper['id'] ?? paper['paper_id'] ?? '').toString();
+    final String pName = (paper['paper_name'] ?? paper['paperName'] ?? paper['title'] ?? 'Paper Preview').toString();
+    if (pId.isEmpty) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final questions = await SupabaseService.fetchQuestionsForPaper(pId, paperName: pName);
+    if (mounted) Navigator.pop(context);
+
+    if (questions.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No questions found in "$pName".'), backgroundColor: Colors.orange),
+        );
+      }
+      return;
+    }
+
+    int previewIdx = 0;
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final currentQ = questions[previewIdx];
+          final opts = SupabaseService.parseOptionsFromQuestionMap(currentQ);
+          final String qText = currentQ['question_text'] ?? currentQ['questionText'] ?? '';
+          final String qImg = currentQ['question_image'] ?? currentQ['questionImage'] ?? '';
+          final String explanation = currentQ['explanation'] ?? currentQ['solution'] ?? '';
+          final String subject = currentQ['subject'] ?? 'Physics';
+
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Container(
+              width: 800,
+              constraints: const BoxConstraints(maxHeight: 700),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(6)),
+                                  child: Text(sourceTag, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5))),
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    pName,
+                                    style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text('Question ${previewIdx + 1} of ${questions.length} • Subject: $subject', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                          ],
+                        ),
+                      ),
+                      IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
+                    ],
+                  ),
+                  const Divider(height: 24),
+
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (qImg.isNotEmpty) ...[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(qImg, height: 180, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          LaTeXView(text: qText, style: GoogleFonts.inter(fontSize: 14.5, color: const Color(0xFF1E293B))),
+                          const SizedBox(height: 16),
+
+                          ...opts.asMap().entries.map((e) {
+                            final idx = e.key;
+                            final txt = e.value;
+                            final letter = String.fromCharCode(65 + idx);
+                            final bool isCorr = (currentQ['correct_option_index'] == idx || currentQ['correctOptionIndex'] == idx);
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isCorr ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: isCorr ? const Color(0xFF10B981) : const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 12,
+                                    backgroundColor: isCorr ? const Color(0xFF10B981) : const Color(0xFFCBD5E1),
+                                    child: Text(letter, style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(child: LaTeXView(text: txt.isNotEmpty ? txt : 'Option $letter')),
+                                  if (isCorr) const Icon(Icons.check_circle, size: 18, color: Color(0xFF10B981)),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+
+                          if (explanation.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(8)),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Explanation:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF92400E))),
+                                  const SizedBox(height: 4),
+                                  LaTeXView(text: explanation, style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFF78350F))),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: previewIdx > 0 ? () => setDialogState(() => previewIdx--) : null,
+                            icon: const Icon(Icons.arrow_back, size: 16),
+                            label: const Text('Previous'),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: previewIdx < questions.length - 1 ? () => setDialogState(() => previewIdx++) : null,
+                            icon: const Icon(Icons.arrow_forward, size: 16),
+                            label: const Text('Next'),
+                          ),
+                        ],
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _attachPaperQuestionsToTestSeries(paper, sourceTag);
+                        },
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text('Select / Attach Entire Paper'),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _saveAllQuestions({bool showToast = true}) async {
@@ -1186,22 +1770,32 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
                             // 3. Stepper Indicator Bar
                             _buildStepperBar(),
+                            const SizedBox(height: 20),
+
+                            // 3.5 Main Step 2 Mode Tabs (Existing Content / Manual / Upload)
+                            _buildStep2MainTabBar(),
                             const SizedBox(height: 24),
 
-                            // 4. KPI Summary Metric Card
-                            _buildKPISummaryCard(remainingCount, progressPercent),
-                            const SizedBox(height: 20),
+                            if (_activeStep2Tab == 'existing')
+                              _buildExistingContentTabContent(isDesktop)
+                            else if (_activeStep2Tab == 'manual') ...[
+                              // 4. KPI Summary Metric Card
+                              _buildKPISummaryCard(remainingCount, progressPercent),
+                              const SizedBox(height: 20),
 
-                            // 5. Filter / Jump Toolbar Bar
-                            _buildFilterToolbarBar(),
-                            const SizedBox(height: 20),
+                              // 5. Filter / Jump Toolbar Bar
+                              _buildFilterToolbarBar(),
+                              const SizedBox(height: 20),
 
-                            // 6. Question Cards List (Visible for current page)
-                            ..._buildVisibleQuestionCards(isDesktop),
-                            const SizedBox(height: 28),
+                              // 6. Question Cards List (Visible for current page)
+                              ..._buildVisibleQuestionCards(isDesktop),
+                              const SizedBox(height: 28),
 
-                            // 7. Pagination Footer
-                            _buildPaginationFooter(),
+                              // 7. Pagination Footer
+                              _buildPaginationFooter(),
+                            ] else ...[
+                              _buildUploadQuestionsTabContent(),
+                            ],
                             const SizedBox(height: 40),
                           ],
                         ),
@@ -1211,6 +1805,897 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // TEST SERIES PAPER BUILDER - STEP 2 TAB UI BUILDERS
+  // ===========================================================================
+
+  Widget _buildStep2MainTabBar() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildMainTabButton('existing', Icons.auto_awesome_rounded, 'Create From Existing Content'),
+            _buildMainTabButton('manual', Icons.edit_note_rounded, 'Manual Question Editor'),
+            _buildMainTabButton('upload', Icons.upload_file_rounded, 'Bulk File / PDF Upload'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainTabButton(String tabKey, IconData icon, String label) {
+    final bool isSelected = _activeStep2Tab == tabKey;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _activeStep2Tab = tabKey;
+          if (tabKey == 'existing') {
+            _loadPyqPapers();
+            _loadNtaPapers();
+            _loadQuestionBank();
+          }
+        });
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: isSelected
+              ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFF64748B)),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubTabButton(String key, IconData icon, String label) {
+    final bool isSelected = _existingContentSubTab == key;
+    return InkWell(
+      onTap: () {
+        setState(() => _existingContentSubTab = key);
+        if (key == 'pyq') _loadPyqPapers();
+        if (key == 'nta') _loadNtaPapers();
+        if (key == 'qbank') _loadQuestionBank();
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        margin: const EdgeInsets.only(right: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 15, color: isSelected ? Colors.white : const Color(0xFF64748B)),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: isSelected ? FontWeight.bold : FontWeight.w500, color: isSelected ? Colors.white : const Color(0xFF4F46E5)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExistingContentTabContent(bool isDesktop) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Sub-Navigation Tabs
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildSubTabButton('pyq', Icons.history_edu_rounded, 'Existing PYQ Papers'),
+                _buildSubTabButton('nta', Icons.menu_book_rounded, 'Existing NTA Papers'),
+                _buildSubTabButton('qbank', Icons.quiz_rounded, 'Question Bank / Sets'),
+                _buildSubTabButton('summary', Icons.assignment_rounded, 'Paper Summary & Order (${_testSeriesSelectedQuestions.length})'),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        if (_existingContentSubTab == 'pyq') _buildPyqSelectorView(),
+        if (_existingContentSubTab == 'nta') _buildNtaSelectorView(),
+        if (_existingContentSubTab == 'qbank') _buildQuestionBankSelectorView(),
+        if (_existingContentSubTab == 'summary') _buildPaperSummaryAndOrderView(),
+      ],
+    );
+  }
+
+  Widget _buildPyqSelectorView() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Search & Filter Existing PYQ Papers', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            children: [
+              SizedBox(
+                width: 250,
+                child: TextField(
+                  controller: _pyqSearchCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Search paper name, year...',
+                    prefixIcon: const Icon(Icons.search, size: 18),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onSubmitted: (_) => _loadPyqPapers(),
+                ),
+              ),
+              DropdownButton<String>(
+                value: _pyqExamFilter,
+                items: ['All', 'NEET', 'JEE Main', 'JEE Advanced', 'AIIMS'].map((e) => DropdownMenuItem(value: e, child: Text('Exam: $e'))).toList(),
+                onChanged: (v) { setState(() => _pyqExamFilter = v!); _loadPyqPapers(); },
+              ),
+              DropdownButton<String>(
+                value: _pyqYearFilter,
+                items: ['All', '2026', '2025', '2024', '2023', '2022', '2021', '2020'].map((y) => DropdownMenuItem(value: y, child: Text('Year: $y'))).toList(),
+                onChanged: (v) { setState(() => _pyqYearFilter = v!); _loadPyqPapers(); },
+              ),
+              ElevatedButton.icon(
+                onPressed: _loadPyqPapers,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Refresh PYQs'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          if (_isLoadingPyqPapers)
+            const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+          else if (_pyqPapersList.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(30),
+              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
+              child: Column(
+                children: [
+                  const Icon(Icons.description_outlined, size: 40, color: Color(0xFF94A3B8)),
+                  const SizedBox(height: 10),
+                  Text('No matching PYQ papers found', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
+                  const SizedBox(height: 4),
+                  Text('Try clearing filters or search query.', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8))),
+                ],
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _pyqPapersList.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final paper = _pyqPapersList[index];
+                final pName = paper['paper_name'] ?? paper['paperName'] ?? paper['title'] ?? 'PYQ Paper';
+                final year = paper['year']?.toString() ?? '2025';
+                final qCount = paper['question_count'] ?? paper['saved_questions_count'] ?? 180;
+                final exam = paper['exam'] ?? 'NEET';
+
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(4)),
+                                  child: Text('PYQ • $year', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF15803D))),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(pName, style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text('$exam • $qCount Questions • Physics • Chemistry • Biology', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                          ],
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () => _showExistingPaperPreviewDialog(paper, '[PYQ]'),
+                            icon: const Icon(Icons.remove_red_eye, size: 15),
+                            label: const Text('Preview'),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: () => _attachPaperQuestionsToTestSeries(paper, '[PYQ] $year $pName'),
+                            icon: const Icon(Icons.add, size: 15),
+                            label: const Text('Select / Use Entire Paper'),
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNtaSelectorView() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Search & Filter Existing NTA Question Papers', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            children: [
+              SizedBox(
+                width: 250,
+                child: TextField(
+                  controller: _ntaSearchCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Search NTA paper name...',
+                    prefixIcon: const Icon(Icons.search, size: 18),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onSubmitted: (_) => _loadNtaPapers(),
+                ),
+              ),
+              DropdownButton<String>(
+                value: _ntaExamFilter,
+                items: ['All', 'NEET', 'JEE Main'].map((e) => DropdownMenuItem(value: e, child: Text('Exam: $e'))).toList(),
+                onChanged: (v) { setState(() => _ntaExamFilter = v!); _loadNtaPapers(); },
+              ),
+              DropdownButton<String>(
+                value: _ntaYearFilter,
+                items: ['All', '2026', '2025', '2024'].map((y) => DropdownMenuItem(value: y, child: Text('Year: $y'))).toList(),
+                onChanged: (v) { setState(() => _ntaYearFilter = v!); _loadNtaPapers(); },
+              ),
+              ElevatedButton.icon(
+                onPressed: _loadNtaPapers,
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Refresh NTA Papers'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          if (_isLoadingNtaPapers)
+            const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+          else if (_ntaPapersList.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(30),
+              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
+              child: Column(
+                children: [
+                  const Icon(Icons.description_outlined, size: 40, color: Color(0xFF94A3B8)),
+                  const SizedBox(height: 10),
+                  Text('No matching NTA papers found', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF64748B))),
+                ],
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _ntaPapersList.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final paper = _ntaPapersList[index];
+                final pName = paper['paper_name'] ?? paper['paperName'] ?? paper['title'] ?? 'NTA Paper';
+                final year = paper['year']?.toString() ?? '2026';
+                final qCount = paper['question_count'] ?? paper['saved_questions_count'] ?? 180;
+
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFE2E8F0))),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(color: const Color(0xFFE0E7FF), borderRadius: BorderRadius.circular(4)),
+                                  child: Text('NTA • $year', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5))),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(pName, style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text('Phase 1 • $qCount Questions', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                          ],
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () => _showExistingPaperPreviewDialog(paper, '[NTA]'),
+                            icon: const Icon(Icons.remove_red_eye, size: 15),
+                            label: const Text('Preview'),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: () => _attachPaperQuestionsToTestSeries(paper, '[NTA] $year $pName'),
+                            icon: const Icon(Icons.add, size: 15),
+                            label: const Text('Select / Use Entire Paper'),
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuestionBankSelectorView() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Select Questions from Central Question Bank', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+              Row(
+                children: [
+                  ChoiceChip(
+                    label: const Text('Manual Selection'),
+                    selected: _qbSelectionMode == 'manual',
+                    onSelected: (s) => setState(() => _qbSelectionMode = 'manual'),
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('Random Selection Generator'),
+                    selected: _qbSelectionMode == 'random',
+                    onSelected: (s) => setState(() => _qbSelectionMode = 'random'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          if (_qbSelectionMode == 'random') ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: const Color(0xFFF0FDF4), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFBBF7D0))),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('⚡ Random Selection Criteria', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF15803D))),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 10,
+                    children: [
+                      DropdownButton<String>(
+                        value: _randomSubject,
+                        items: ['Physics', 'Chemistry', 'Botany', 'Zoology', 'Mathematics'].map((s) => DropdownMenuItem(value: s, child: Text('Subject: $s'))).toList(),
+                        onChanged: (v) => setState(() => _randomSubject = v!),
+                      ),
+                      DropdownButton<String>(
+                        value: _randomDifficulty,
+                        items: ['All', 'easy', 'medium', 'hard'].map((d) => DropdownMenuItem(value: d, child: Text('Difficulty: $d'))).toList(),
+                        onChanged: (v) => setState(() => _randomDifficulty = v!),
+                      ),
+                      SizedBox(
+                        width: 140,
+                        child: TextField(
+                          decoration: const InputDecoration(labelText: 'Question Count', border: OutlineInputBorder()),
+                          keyboardType: TextInputType.number,
+                          controller: TextEditingController(text: _randomCount.toString()),
+                          onChanged: (v) => _randomCount = int.tryParse(v) ?? 30,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: _isGeneratingRandom ? null : _generateRandomSelection,
+                        icon: _isGeneratingRandom ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.bolt, size: 16),
+                        label: const Text('[ Generate Selection ]'),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF16A34A), foregroundColor: Colors.white),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            children: [
+              SizedBox(
+                width: 250,
+                child: TextField(
+                  controller: _qbSearchCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Search question text...',
+                    prefixIcon: const Icon(Icons.search, size: 18),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onSubmitted: (_) => _loadQuestionBank(),
+                ),
+              ),
+              DropdownButton<String>(
+                value: _qbSubjectFilter,
+                items: ['All Subjects', 'Physics', 'Chemistry', 'Botany', 'Zoology', 'Mathematics'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                onChanged: (v) { setState(() => _qbSubjectFilter = v!); _loadQuestionBank(); },
+              ),
+              DropdownButton<String>(
+                value: _qbDifficultyFilter,
+                items: ['All', 'easy', 'medium', 'hard'].map((d) => DropdownMenuItem(value: d, child: Text('Diff: $d'))).toList(),
+                onChanged: (v) { setState(() => _qbDifficultyFilter = v!); _loadQuestionBank(); },
+              ),
+              ElevatedButton.icon(
+                onPressed: _loadQuestionBank,
+                icon: const Icon(Icons.filter_alt, size: 16),
+                label: const Text('Filter'),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        for (var item in _qbResultsList) {
+                          final id = (item['id'] ?? '').toString();
+                          if (id.isNotEmpty) {
+                            _selectedQbQuestionIds.add(id);
+                            if (!_selectedQbQuestionsList.any((q) => q['id'] == id)) {
+                              _selectedQbQuestionsList.add(item);
+                            }
+                          }
+                        }
+                      });
+                    },
+                    child: const Text('[ Select All Page ]'),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        _selectedQbQuestionIds.clear();
+                        _selectedQbQuestionsList.clear();
+                      });
+                    },
+                    child: const Text('[ Clear ]'),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Text('Selected: ${_selectedQbQuestionsList.length} / 180 Questions', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5))),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: _selectedQbQuestionsList.isEmpty
+                        ? null
+                        : () {
+                            int added = 0;
+                            int dups = 0;
+                            final Set<String> existingIds = _testSeriesSelectedQuestions.map((q) => q['id'].toString()).toSet();
+                            for (var item in _selectedQbQuestionsList) {
+                              final id = item['id'].toString();
+                              final Map<String, dynamic> qMap = Map<String, dynamic>.from(item);
+                              qMap['source_badge'] = '[QUESTION BANK]';
+                              if (existingIds.contains(id)) {
+                                dups++;
+                              } else {
+                                existingIds.add(id);
+                                _testSeriesSelectedQuestions.add(qMap);
+                                added++;
+                              }
+                            }
+                            setState(() => _duplicatesRemovedCount += dups);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('✓ Added $added questions to Test Series!' + (dups > 0 ? ' ($dups duplicate questions removed.)' : '')),
+                                backgroundColor: const Color(0xFF10B981),
+                              ),
+                            );
+                          },
+                    icon: const Icon(Icons.add_task, size: 16),
+                    label: const Text('[ Add Selected Questions ]'),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          if (_isLoadingQb)
+            const Center(child: Padding(padding: EdgeInsets.all(40), child: CircularProgressIndicator()))
+          else if (_qbResultsList.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(30),
+              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
+              child: Center(child: Text('No questions found in Question Bank.', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)))),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _qbResultsList.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final item = _qbResultsList[index];
+                final qId = (item['id'] ?? '').toString();
+                final text = item['question_text'] ?? item['questionText'] ?? '';
+                final subject = item['subject'] ?? 'Physics';
+                final isSelected = _selectedQbQuestionIds.contains(qId);
+
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFFF0FDF4) : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isSelected ? const Color(0xFF10B981) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: isSelected,
+                        onChanged: (val) {
+                          setState(() {
+                            if (val == true) {
+                              _selectedQbQuestionIds.add(qId);
+                              if (!_selectedQbQuestionsList.any((q) => q['id'] == qId)) _selectedQbQuestionsList.add(item);
+                            } else {
+                              _selectedQbQuestionIds.remove(qId);
+                              _selectedQbQuestionsList.removeWhere((q) => q['id'] == qId);
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(4)),
+                                  child: Text(subject, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5))),
+                                ),
+                                const SizedBox(width: 8),
+                                Text('ID: ${qId.length > 8 ? qId.substring(0, 8) : qId}', style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            LaTeXView(text: text, style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF1E293B))),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaperSummaryAndOrderView() {
+    final int pyqCount = _testSeriesSelectedQuestions.where((q) => (q['source_badge'] ?? '').toString().contains('[PYQ]')).length;
+    final int ntaCount = _testSeriesSelectedQuestions.where((q) => (q['source_badge'] ?? '').toString().contains('[NTA]')).length;
+    final int qbCount = _testSeriesSelectedQuestions.length - pyqCount - ntaCount;
+    final int totalCount = _testSeriesSelectedQuestions.length;
+
+    final int phyCount = _testSeriesSelectedQuestions.where((q) => (q['subject'] ?? '').toString().toLowerCase() == 'physics').length;
+    final int chemCount = _testSeriesSelectedQuestions.where((q) => (q['subject'] ?? '').toString().toLowerCase() == 'chemistry').length;
+    final int botCount = _testSeriesSelectedQuestions.where((q) => ['botany', 'biology'].contains((q['subject'] ?? '').toString().toLowerCase())).length;
+    final int zooCount = _testSeriesSelectedQuestions.where((q) => (q['subject'] ?? '').toString().toLowerCase() == 'zoology').length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('PAPER CONTENT SUMMARY', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                  if (_duplicatesRemovedCount > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(12)),
+                      child: Text('$_duplicatesRemovedCount duplicate questions removed', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626))),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _buildSummaryBadge('PYQ Questions', pyqCount, const Color(0xFFDCFCE7), const Color(0xFF15803D)),
+                  const SizedBox(width: 12),
+                  _buildSummaryBadge('NTA Questions', ntaCount, const Color(0xFFE0E7FF), const Color(0xFF4F46E5)),
+                  const SizedBox(width: 12),
+                  _buildSummaryBadge('Question Bank', qbCount, const Color(0xFFFEF3C7), const Color(0xFFD97706)),
+                  const SizedBox(width: 12),
+                  _buildSummaryBadge('Total Selected', totalCount, const Color(0xFF0F172A), Colors.white),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              Text('Subject Distribution Target (NEET 180 Questions)', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: const Color(0xFF475569))),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  _buildSubjectTargetChip('Physics', phyCount, 45),
+                  _buildSubjectTargetChip('Chemistry', chemCount, 45),
+                  _buildSubjectTargetChip('Botany', botCount, 45),
+                  _buildSubjectTargetChip('Zoology', zooCount, 45),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Checkbox(
+                    value: _allowIncompletePaper,
+                    onChanged: (val) => setState(() => _allowIncompletePaper = val ?? false),
+                  ),
+                  const Text('Allow incomplete paper (create even if total questions < target 180)'),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Question Order (${_testSeriesSelectedQuestions.length} Questions)', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _autoArrangeQuestionsBySubject,
+                        icon: const Icon(Icons.sort_by_alpha, size: 16),
+                        label: const Text('Auto Arrange (Subject-wise)'),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: _randomizeSelectedQuestionsOrder,
+                        icon: const Icon(Icons.shuffle, size: 16),
+                        label: const Text('Randomize Order'),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: _finalizeAndCreateTestSeriesPaper,
+                        icon: const Icon(Icons.check_circle, size: 18),
+                        label: const Text('[ Create Test Paper ]'),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              if (_testSeriesSelectedQuestions.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(30),
+                  decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8)),
+                  child: Center(child: Text('No questions added yet. Use PYQ, NTA, or Question Bank tabs to add questions.', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)))),
+                )
+              else
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _testSeriesSelectedQuestions.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final item = _testSeriesSelectedQuestions[index];
+                    final badge = (item['source_badge'] ?? '[QUESTION BANK]').toString();
+                    final text = item['question_text'] ?? item['questionText'] ?? '';
+
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0xFFE2E8F0))),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 12,
+                            backgroundColor: const Color(0xFF4F46E5),
+                            child: Text('${index + 1}', style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(4)),
+                            child: Text(badge, style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5))),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(child: LaTeXView(text: text, style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF1E293B)))),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.arrow_upward, size: 16),
+                                onPressed: index > 0
+                                    ? () {
+                                        setState(() {
+                                          final item = _testSeriesSelectedQuestions.removeAt(index);
+                                          _testSeriesSelectedQuestions.insert(index - 1, item);
+                                        });
+                                      }
+                                    : null,
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.arrow_downward, size: 16),
+                                onPressed: index < _testSeriesSelectedQuestions.length - 1
+                                    ? () {
+                                        setState(() {
+                                          final item = _testSeriesSelectedQuestions.removeAt(index);
+                                          _testSeriesSelectedQuestions.insert(index + 1, item);
+                                        });
+                                      }
+                                    : null,
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                onPressed: () {
+                                  setState(() {
+                                    _testSeriesSelectedQuestions.removeAt(index);
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryBadge(String label, int count, Color bgColor, Color textColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: textColor)),
+          Text('$count', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubjectTargetChip(String subject, int current, int target) {
+    final bool isSatisfied = current >= target;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isSatisfied ? const Color(0xFFDCFCE7) : const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: isSatisfied ? const Color(0xFF16A34A) : const Color(0xFFF97316)),
+      ),
+      child: Text('$subject: $current / $target', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: isSatisfied ? const Color(0xFF15803D) : const Color(0xFFC2410C))),
+    );
+  }
+
+  Widget _buildUploadQuestionsTabContent() {
+    return Container(
+      padding: const EdgeInsets.all(30),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Icon(Icons.cloud_upload_outlined, size: 50, color: Color(0xFF4F46E5)),
+          const SizedBox(height: 12),
+          Text('Upload Question Paper PDF / Excel / JSON', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+          const SizedBox(height: 6),
+          Text('Import new external questions file directly into this paper.', style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B))),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('PDF / Excel Bulk Import is active in Admin PDF Import menu.')),
+              );
+            },
+            icon: const Icon(Icons.file_present),
+            label: const Text('Select File to Import'),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4F46E5), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
           ),
         ],
       ),
