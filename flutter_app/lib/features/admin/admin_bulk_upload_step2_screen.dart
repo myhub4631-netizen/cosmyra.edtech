@@ -114,8 +114,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   // =========================================================================
   // TEST SERIES PAPER BUILDER - EXISTING CONTENT REUSE STATE
   // =========================================================================
-  String _activeStep2Tab = 'existing'; // 'existing', 'manual', 'upload'
-  String _existingContentSubTab = 'pyq'; // 'pyq', 'nta', 'qbank', 'summary'
+  String _activeStep2Tab = 'manual'; // Always default to manual editor
+  String _existingContentSubTab = 'pyq';
 
   // PYQ Filters & Data
   String _pyqExamFilter = 'All';
@@ -272,7 +272,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     final String sourceCat = (_paperData?['source_category'] ?? _paperData?['sourceCategory'] ?? '').toString();
 
     if (buildMethod == 'existing_pyq' || buildMethod == 'existing_nta' || buildMethod == 'question_bank' || sourceCat == 'Test Series') {
-      _activeStep2Tab = 'existing';
+      _activeStep2Tab = 'manual';
       if (buildMethod == 'existing_pyq') _existingContentSubTab = 'pyq';
       else if (buildMethod == 'existing_nta') _existingContentSubTab = 'nta';
       else if (buildMethod == 'question_bank') _existingContentSubTab = 'qbank';
@@ -360,8 +360,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       }
       if (preselectedItems.isNotEmpty) {
         _questionsList = preselectedItems;
-        _activeStep2Tab = 'existing';
-        _existingContentSubTab = 'summary';
+        _activeStep2Tab = 'manual';
       }
     }
 
@@ -1822,30 +1821,20 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                             _buildStepperBar(),
                             const SizedBox(height: 20),
 
-                            // 3.5 Main Step 2 Mode Tabs (Existing Content / Manual / Upload)
-                            _buildStep2MainTabBar(),
-                            const SizedBox(height: 24),
+                            // 4. KPI Summary Metric Card
+                            _buildKPISummaryCard(remainingCount, progressPercent),
+                            const SizedBox(height: 20),
 
-                            if (_activeStep2Tab == 'existing')
-                              _buildExistingContentTabContent(isDesktop)
-                            else if (_activeStep2Tab == 'manual') ...[
-                              // 4. KPI Summary Metric Card
-                              _buildKPISummaryCard(remainingCount, progressPercent),
-                              const SizedBox(height: 20),
+                            // 5. Filter / Jump Toolbar Bar
+                            _buildFilterToolbarBar(),
+                            const SizedBox(height: 20),
 
-                              // 5. Filter / Jump Toolbar Bar
-                              _buildFilterToolbarBar(),
-                              const SizedBox(height: 20),
+                            // 6. Question Cards List (Visible for current page)
+                            ..._buildVisibleQuestionCards(isDesktop),
+                            const SizedBox(height: 28),
 
-                              // 6. Question Cards List (Visible for current page)
-                              ..._buildVisibleQuestionCards(isDesktop),
-                              const SizedBox(height: 28),
-
-                              // 7. Pagination Footer
-                              _buildPaginationFooter(),
-                            ] else ...[
-                              _buildUploadQuestionsTabContent(),
-                            ],
+                            // 7. Pagination Footer
+                            _buildPaginationFooter(),
                             const SizedBox(height: 40),
                           ],
                         ),
