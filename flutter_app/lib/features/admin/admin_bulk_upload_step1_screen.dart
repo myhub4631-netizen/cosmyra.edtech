@@ -1677,6 +1677,104 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFBBF7D0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.auto_awesome_rounded, color: Color(0xFF16A34A), size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        'Test Series Paper Question Source *',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Select existing PYQ paper, NTA paper, or Question Bank to build this Test Series paper directly, or enter questions manually.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF166534)),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: [
+                      ChoiceChip(
+                        avatar: const Icon(Icons.history_edu_rounded, size: 16),
+                        label: const Text('Existing PYQ Paper'),
+                        selected: _uploadMethod == 'pyq',
+                        selectedColor: const Color(0xFFDCFCE7),
+                        onSelected: (sel) {
+                          if (sel) {
+                            setState(() {
+                              _uploadMethod = 'pyq';
+                              _selectedSourceType = 'pyq';
+                              _questionSourceMode = 'existing';
+                              if (_step1PyqPapersList.isEmpty) _loadStep1PyqPapers();
+                            });
+                          }
+                        },
+                      ),
+                      ChoiceChip(
+                        avatar: const Icon(Icons.menu_book_rounded, size: 16),
+                        label: const Text('Existing NTA Question Paper'),
+                        selected: _uploadMethod == 'nta',
+                        selectedColor: const Color(0xFFDCFCE7),
+                        onSelected: (sel) {
+                          if (sel) {
+                            setState(() {
+                              _uploadMethod = 'nta';
+                              _selectedSourceType = 'nta';
+                              _questionSourceMode = 'existing';
+                              if (_step1NtaPapersList.isEmpty) _loadStep1NtaPapers();
+                            });
+                          }
+                        },
+                      ),
+                      ChoiceChip(
+                        avatar: const Icon(Icons.quiz_rounded, size: 16),
+                        label: const Text('Question Bank / Question Set'),
+                        selected: _uploadMethod == 'qbank',
+                        selectedColor: const Color(0xFFDCFCE7),
+                        onSelected: (sel) {
+                          if (sel) {
+                            setState(() {
+                              _uploadMethod = 'qbank';
+                              _selectedSourceType = 'qbank';
+                              _questionSourceMode = 'existing';
+                              if (_step1QBankResults.isEmpty) _loadStep1QBankQuestions();
+                            });
+                          }
+                        },
+                      ),
+                      ChoiceChip(
+                        avatar: const Icon(Icons.edit_note_rounded, size: 16),
+                        label: const Text('Enter Questions Manually'),
+                        selected: _uploadMethod == 'manual',
+                        selectedColor: const Color(0xFFDCFCE7),
+                        onSelected: (sel) {
+                          if (sel) {
+                            setState(() {
+                              _uploadMethod = 'manual';
+                              _questionSourceMode = 'new';
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
                 color: const Color(0xFFEEF2FF),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: const Color(0xFFC7D2FE)),
