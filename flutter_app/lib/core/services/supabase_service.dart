@@ -1100,17 +1100,28 @@ class SupabaseService {
     }
   }
 
+  static String _getExamId(String exam) {
+    final e = exam.toUpperCase();
+    if (e.contains('ADV')) return '33333333-3333-3333-3333-333333333333';
+    if (e.contains('JEE')) return '22222222-2222-2222-2222-222222222222';
+    return '11111111-1111-1111-1111-111111111111';
+  }
+
   static String _getSubjectId(String exam, String subject) {
     final e = exam.toUpperCase();
     final s = subject.toUpperCase();
-    if (e.contains('NEET')) {
-      if (s.contains('PHYSICS')) return 'a1111111-1111-1111-1111-111111111111';
-      if (s.contains('CHEMISTRY')) return 'a2222222-2222-2222-2222-222222222222';
-      if (s.contains('BIOLOGY')) return 'a3333333-3333-3333-3333-333333333333';
-    } else {
+    if (e.contains('ADV')) {
+      if (s.contains('PHYSICS')) return 'a7777777-7777-7777-7777-777777777777';
+      if (s.contains('CHEMISTRY')) return 'a8888888-8888-8888-8888-888888888888';
+      if (s.contains('MATH')) return 'a9999999-9999-9999-9999-999999999999';
+    } else if (e.contains('JEE')) {
       if (s.contains('PHYSICS')) return 'a4444444-4444-4444-4444-444444444444';
       if (s.contains('CHEMISTRY')) return 'a5555555-5555-5555-5555-555555555555';
       if (s.contains('MATH')) return 'a6666666-6666-6666-6666-666666666666';
+    } else {
+      if (s.contains('PHYSICS')) return 'a1111111-1111-1111-1111-111111111111';
+      if (s.contains('CHEMISTRY')) return 'a2222222-2222-2222-2222-222222222222';
+      if (s.contains('BIOLOGY') || s.contains('BOTANY') || s.contains('ZOOLOGY')) return 'a3333333-3333-3333-3333-333333333333';
     }
     return 'a1111111-1111-1111-1111-111111111111';
   }
@@ -3058,100 +3069,123 @@ class SupabaseService {
   }
 
   static Future<String> getOrCreateValidExamId(String examName) async {
+    await ensureTaxonomySeeded();
+    final canonicalId = _getExamId(examName);
     try {
-      final existing = await client.from('exams').select('id').limit(1);
-      if (existing != null && (existing as List).isNotEmpty) {
-        return existing[0]['id'].toString();
+      final existing = await client.from('exams').select('id').eq('id', canonicalId).maybeSingle();
+      if (existing != null && existing['id'] != null) {
+        return existing['id'].toString();
       }
-      const newExamId = '11111111-1111-1111-1111-111111111111';
-      await client.from('exams').insert({
-        'id': newExamId,
-        'name': examName.isNotEmpty ? examName : 'NEET',
-        'code': 'NEET',
-        'is_active': true,
-        'display_order': 1,
-      });
-      return newExamId;
+      final byName = await client.from('exams').select('id').ilike('name', '%${examName.trim()}%').limit(1);
+      if (byName != null && (byName as List).isNotEmpty) {
+        return byName[0]['id'].toString();
+      }
     } catch (e) {
       debugPrint('Notice in getOrCreateValidExamId: $e');
     }
-    return '11111111-1111-1111-1111-111111111111';
+    return canonicalId;
   }
 
   static Future<String> getOrCreateValidSubjectId(String examId, String subjectName) async {
+    await ensureTaxonomySeeded();
     try {
-      final existing = await client.from('subjects').select('id').eq('exam_id', examId).limit(1);
+      final existing = await client
+          .from('subjects')
+          .select('id')
+          .eq('exam_id', examId)
+          .ilike('name', '%${subjectName.trim()}%')
+          .limit(1);
       if (existing != null && (existing as List).isNotEmpty) {
         return existing[0]['id'].toString();
       }
-      final anySub = await client.from('subjects').select('id').limit(1);
-      if (anySub != null && (anySub as List).isNotEmpty) {
-        return anySub[0]['id'].toString();
-      }
-      const newSubId = 'a1111111-1111-1111-1111-111111111111';
-      await client.from('subjects').insert({
-        'id': newSubId,
-        'exam_id': examId,
-        'name': subjectName.isNotEmpty ? subjectName : 'Physics',
-        'code': 'SUB_${DateTime.now().millisecondsSinceEpoch}',
-        'display_order': 1,
-      });
-      return newSubId;
     } catch (e) {
       debugPrint('Notice in getOrCreateValidSubjectId: $e');
     }
-    return 'a1111111-1111-1111-1111-111111111111';
+    String examName = 'NEET';
+    if (examId == '22222222-2222-2222-2222-222222222222') examName = 'JEE Main';
+    if (examId == '33333333-3333-3333-3333-333333333333') examName = 'JEE Advanced';
+    return _getSubjectId(examName, subjectName);
   }
 
   static Future<String> getOrCreateValidChapterId(String subjectId, String chapterName) async {
     try {
       final cleanName = chapterName.replaceAll(RegExp(r'^(Physics|Chemistry|Biology|Maths?)\s*-\s*', caseSensitive: false), '').trim();
-      final nameToSearch = cleanName.isNotEmpty ? cleanName : 'Kinematics';
+      final nameToSearch = cleanName.isNotEmpty ? cleanName : 'General';
 
       final existing = await client
+          .from('chapters')
+          .select('id')
+          .eq('subject_id', subjectId)
+          .ilike('name', nameToSearch)
+          .limit(1);
+
+      if (existing != null && (existing as List).isNotEmpty) {
+        return existing[0]['id'].toString();
+      }
+
+      final partial = await client
           .from('chapters')
           .select('id')
           .eq('subject_id', subjectId)
           .ilike('name', '%$nameToSearch%')
           .limit(1);
 
-      if (existing != null && (existing as List).isNotEmpty) {
-        return existing[0]['id'].toString();
+      if (partial != null && (partial as List).isNotEmpty) {
+        return partial[0]['id'].toString();
       }
 
-      final anySubChap = await client
-          .from('chapters')
-          .select('id')
-          .eq('subject_id', subjectId)
-          .limit(1);
-
-      if (anySubChap != null && (anySubChap as List).isNotEmpty) {
-        return anySubChap[0]['id'].toString();
-      }
-
-      final anyChap = await client
-          .from('chapters')
-          .select('id')
-          .limit(1);
-
-      if (anyChap != null && (anyChap as List).isNotEmpty) {
-        return anyChap[0]['id'].toString();
-      }
-
-      const newChapId = 'b2222222-2222-2222-2222-222222222222';
+      final newChapId = toValidUuid('chap_${subjectId.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}');
       await client.from('chapters').insert({
         'id': newChapId,
         'subject_id': subjectId,
         'name': nameToSearch,
         'code': 'CHAP_${DateTime.now().millisecondsSinceEpoch}',
-        'class_level': 11,
-        'display_order': 1,
+        'is_active': true,
+        'display_order': 99,
       });
       return newChapId;
     } catch (e) {
       debugPrint('Notice in getOrCreateValidChapterId: $e');
     }
-    return 'b2222222-2222-2222-2222-222222222222';
+    return 'b1111111-1111-1111-1111-111111111111';
+  }
+
+  static Future<String?> getOrCreateValidTopicId(String chapterId, String topicName) async {
+    final trimmed = topicName.trim();
+    if (trimmed.isEmpty || chapterId.isEmpty) return null;
+    try {
+      final existing = await client
+          .from('topics')
+          .select('id')
+          .eq('chapter_id', chapterId)
+          .ilike('name', trimmed)
+          .limit(1);
+      if (existing != null && (existing as List).isNotEmpty) {
+        return existing[0]['id'].toString();
+      }
+      final partial = await client
+          .from('topics')
+          .select('id')
+          .eq('chapter_id', chapterId)
+          .ilike('name', '%$trimmed%')
+          .limit(1);
+      if (partial != null && (partial as List).isNotEmpty) {
+        return partial[0]['id'].toString();
+      }
+      final newTopicId = toValidUuid('top_${chapterId.substring(0, 8)}_${DateTime.now().millisecondsSinceEpoch}');
+      await client.from('topics').insert({
+        'id': newTopicId,
+        'chapter_id': chapterId,
+        'name': trimmed,
+        'code': 'TOPIC_${DateTime.now().millisecondsSinceEpoch}',
+        'is_active': true,
+        'display_order': 99,
+      });
+      return newTopicId;
+    } catch (e) {
+      debugPrint('Notice in getOrCreateValidTopicId: $e');
+    }
+    return null;
   }
 
   static Future<void> ensureTaxonomySeeded() async {
@@ -3303,6 +3337,14 @@ class SupabaseService {
         );
       }
 
+      String? finalTopicId;
+      final String? passedTopicId = qMap['topic_id']?.toString() ?? qMap['topicId']?.toString();
+      if (passedTopicId != null && passedTopicId.isNotEmpty && isValidUuid(passedTopicId)) {
+        finalTopicId = passedTopicId;
+      } else if (qMap['topic'] != null && qMap['topic'].toString().trim().isNotEmpty) {
+        finalTopicId = await getOrCreateValidTopicId(finalChapterId, qMap['topic'].toString());
+      }
+
       final String pIdRaw = qMap['paper_id']?.toString() ?? qMap['paperId']?.toString() ?? '';
 
       List<String> availableInList = [];
@@ -3318,7 +3360,7 @@ class SupabaseService {
         'exam_id': finalExamId,
         'subject_id': finalSubjectId,
         'chapter_id': finalChapterId,
-        'topic_id': (qMap['topic_id'] != null && isValidUuid(qMap['topic_id'].toString())) ? qMap['topic_id'].toString() : null,
+        'topic_id': finalTopicId,
         'question_text': qMap['questionText'] ?? qMap['question_text'] ?? '',
         'question_image': qMap['questionImage'] ?? qMap['question_image'] ?? '',
         'q_type': SupabaseQuestionMapper.toDbQuestionType(qMap['qType'] ?? qMap['q_type'] ?? qMap['questionType']),

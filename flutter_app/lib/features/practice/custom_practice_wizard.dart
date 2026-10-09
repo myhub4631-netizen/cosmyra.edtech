@@ -351,7 +351,9 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
   }
 
   Future<void> _loadChapters() async {
-    final examCode = _selectedExam.contains('JEE') ? 'JEE Main' : 'NEET';
+    final examCode = _selectedExam.contains('ADV')
+        ? 'JEE Advanced'
+        : (_selectedExam.contains('JEE') ? 'JEE Main' : 'NEET');
     final subjects = _selectedExam.contains('JEE') ? ['Physics', 'Chemistry', 'Mathematics'] : ['Physics', 'Chemistry', 'Biology'];
 
     final Map<String, List<Map<String, dynamic>>> dynamicMap = {};
@@ -867,7 +869,7 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
         ),
         const SizedBox(height: 10),
 
-        // 2 Exam Cards Side by Side
+        // 3 Exam Cards Side by Side
         Row(
           children: [
             // NEET Card
@@ -877,24 +879,38 @@ class _CustomPracticeWizardModalState extends State<CustomPracticeWizardModal> {
                 isSelected: _selectedExam == 'NEET',
                 iconBgColor: const Color(0xFFEEF2FF),
                 iconWidget: CustomPaint(
-                  size: const Size(24, 24),
+                  size: const Size(20, 20),
                   painter: StethoscopeIconPainter(color: const Color(0xFFDC2626)),
                 ),
                 onTap: () => _selectExam('NEET'),
               ),
             ),
-            const SizedBox(width: 12),
-            // JEE Card
+            const SizedBox(width: 8),
+            // JEE Main Card
             Expanded(
               child: _buildExamCard(
-                title: 'JEE',
-                isSelected: _selectedExam == 'JEE',
+                title: 'JEE Main',
+                isSelected: _selectedExam == 'JEE Main' || _selectedExam == 'JEE',
                 iconBgColor: const Color(0xFFE6F4EA),
                 iconWidget: CustomPaint(
-                  size: const Size(24, 24),
+                  size: const Size(20, 20),
                   painter: DraftingCompassPainter(color: const Color(0xFF16A34A)),
                 ),
-                onTap: () => _selectExam('JEE'),
+                onTap: () => _selectExam('JEE Main'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // JEE Advanced Card
+            Expanded(
+              child: _buildExamCard(
+                title: 'JEE Adv',
+                isSelected: _selectedExam == 'JEE Advanced' || _selectedExam == 'JEE_ADV',
+                iconBgColor: const Color(0xFFFFF7ED),
+                iconWidget: CustomPaint(
+                  size: const Size(20, 20),
+                  painter: DraftingCompassPainter(color: const Color(0xFFD97706)),
+                ),
+                onTap: () => _selectExam('JEE Advanced'),
               ),
             ),
           ],
