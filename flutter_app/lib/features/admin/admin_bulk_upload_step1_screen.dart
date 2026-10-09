@@ -998,6 +998,28 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       debugPrint('Notice saving paper record: $e');
     }
 
+    final bool isExistingContent = _uploadMethod == 'pyq' ||
+        _uploadMethod == 'nta' ||
+        _uploadMethod == 'qbank' ||
+        _uploadMethod == 'combine';
+
+    if (isExistingContent) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✓ Paper "$pName" successfully created and built from existing content!'),
+          backgroundColor: const Color(0xFF16A34A),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      if (widget.onBack != null) {
+        widget.onBack!();
+      } else {
+        Navigator.of(context).maybePop();
+      }
+      return;
+    }
+
     if (widget.onProceedToStep2 != null) {
       widget.onProceedToStep2!(paperDetails);
     } else {
@@ -2871,24 +2893,37 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                 ),
               ),
 
-              // Right: Proceed Button
-              ElevatedButton.icon(
-                onPressed: _handleProceed,
-                icon: const Text(
-                  'Proceed to Add Questions',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                label: const Icon(Icons.arrow_forward_rounded, size: 18, color: Colors.white),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4F46E5),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                ),
+              // Right: Action Button
+              Builder(
+                builder: (context) {
+                  final bool isExisting = _uploadMethod == 'pyq' ||
+                      _uploadMethod == 'nta' ||
+                      _uploadMethod == 'qbank' ||
+                      _uploadMethod == 'combine';
+
+                  return ElevatedButton.icon(
+                    onPressed: _handleProceed,
+                    icon: Text(
+                      isExisting ? 'Create & Build Paper From Existing Content' : 'Proceed to Add Questions',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    label: Icon(
+                      isExisting ? Icons.check_circle_rounded : Icons.arrow_forward_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isExisting ? const Color(0xFF16A34A) : const Color(0xFF4F46E5),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -2901,12 +2936,17 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   // TIP CARD WIDGET
   // ==========================================
   Widget _buildTipCard() {
+    final bool isExisting = _uploadMethod == 'pyq' ||
+        _uploadMethod == 'nta' ||
+        _uploadMethod == 'qbank' ||
+        _uploadMethod == 'combine';
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F7FF),
+        color: isExisting ? const Color(0xFFF0FDF4) : const Color(0xFFF8F7FF),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE0E7FF)),
+        border: Border.all(color: isExisting ? const Color(0xFFBBF7D0) : const Color(0xFFE0E7FF)),
       ),
       child: Row(
         children: [
@@ -2914,24 +2954,26 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
             width: 24,
             height: 24,
             decoration: BoxDecoration(
-              color: const Color(0xFFEEF2FF),
+              color: isExisting ? const Color(0xFFDCFCE7) : const Color(0xFFEEF2FF),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFFC7D2FE)),
+              border: Border.all(color: isExisting ? const Color(0xFF86EFAC) : const Color(0xFFC7D2FE)),
             ),
-            child: const Icon(
-              Icons.error_outline_rounded,
-              color: Color(0xFF4F46E5),
+            child: Icon(
+              isExisting ? Icons.auto_awesome_rounded : Icons.error_outline_rounded,
+              color: isExisting ? const Color(0xFF16A34A) : const Color(0xFF4F46E5),
               size: 16,
             ),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Tip: After clicking "Proceed to Add Questions", you will be able to add 200 questions one by one.',
+              isExisting
+                  ? 'Tip: Existing Content Selected — Clicking "Create & Build Paper From Existing Content" will create your paper directly from existing questions. No Step 2 manual entry required.'
+                  : 'Tip: Manual Upload Selected — After clicking "Proceed to Add Questions", you will enter and edit questions in Step 2.',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF4338CA),
+                color: isExisting ? const Color(0xFF15803D) : const Color(0xFF4338CA),
               ),
             ),
           ),
