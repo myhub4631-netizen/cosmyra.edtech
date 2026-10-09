@@ -1081,12 +1081,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
 
                         const SizedBox(height: 24),
 
-                        // Card 2: Question Source (Build Paper From Existing Content)
-                        _buildQuestionSourceSectionCard(),
-
-                        const SizedBox(height: 24),
-
-                        // Card 3: Upload Options
+                        // Card 2: Upload Options
                         _buildUploadOptionsCard(),
 
                         const SizedBox(height: 24),
@@ -2405,198 +2400,434 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   // CARD 2: UPLOAD OPTIONS
   // ==========================================
   Widget _buildUploadOptionsCard() {
+    final bool isExistingMode = _questionSourceMode == 'existing' ||
+        _uploadMethod == 'pyq' ||
+        _uploadMethod == 'nta' ||
+        _uploadMethod == 'qbank' ||
+        _uploadMethod == 'combine';
+
     return _buildCardContainer(
       title: 'Upload Options',
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Left Column: Upload Method Radio Buttons
-          Expanded(
-            flex: 5,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Upload Method / Question Source',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF64748B),
-                    fontWeight: FontWeight.w500,
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left Column: Upload Method Radio Buttons
+              Expanded(
+                flex: 5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Upload Method / Question Source',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildRadioButton(
+                      title: 'Enter Questions Manually',
+                      value: 'manual',
+                      groupValue: _uploadMethod,
+                      onChanged: (val) => setState(() {
+                        _uploadMethod = val!;
+                        _questionSourceMode = 'new';
+                      }),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildRadioButton(
+                      title: 'Upload from Excel / CSV',
+                      value: 'excel',
+                      groupValue: _uploadMethod,
+                      onChanged: (val) => setState(() {
+                        _uploadMethod = val!;
+                        _questionSourceMode = 'new';
+                      }),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildRadioButton(
+                      title: 'Copy & Paste',
+                      value: 'paste',
+                      groupValue: _uploadMethod,
+                      onChanged: (val) => setState(() {
+                        _uploadMethod = val!;
+                        _questionSourceMode = 'new';
+                      }),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildRadioButton(
+                      title: 'Existing PYQ Paper',
+                      value: 'pyq',
+                      groupValue: _uploadMethod,
+                      onChanged: (val) {
+                        setState(() {
+                          _uploadMethod = val!;
+                          _selectedSourceType = 'pyq';
+                          _questionSourceMode = 'existing';
+                          if (_step1PyqPapersList.isEmpty) _loadStep1PyqPapers();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _buildRadioButton(
+                      title: 'Existing NTA Question Paper',
+                      value: 'nta',
+                      groupValue: _uploadMethod,
+                      onChanged: (val) {
+                        setState(() {
+                          _uploadMethod = val!;
+                          _selectedSourceType = 'nta';
+                          _questionSourceMode = 'existing';
+                          if (_step1NtaPapersList.isEmpty) _loadStep1NtaPapers();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _buildRadioButton(
+                      title: 'Question Bank / Question Set',
+                      value: 'qbank',
+                      groupValue: _uploadMethod,
+                      onChanged: (val) {
+                        setState(() {
+                          _uploadMethod = val!;
+                          _selectedSourceType = 'qbank';
+                          _questionSourceMode = 'existing';
+                          if (_step1QBankResults.isEmpty) _loadStep1QBankQuestions();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _buildRadioButton(
+                      title: 'Combine Multiple Sources',
+                      value: 'combine',
+                      groupValue: _uploadMethod,
+                      onChanged: (val) {
+                        setState(() {
+                          _uploadMethod = val!;
+                          _selectedSourceType = 'combine';
+                          _questionSourceMode = 'existing';
+                        });
+                      },
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                _buildRadioButton(
-                  title: 'Enter Questions Manually',
-                  value: 'manual',
-                  groupValue: _uploadMethod,
-                  onChanged: (val) => setState(() {
-                    _uploadMethod = val!;
-                    _questionSourceMode = 'new';
-                  }),
-                ),
-                const SizedBox(height: 8),
-                _buildRadioButton(
-                  title: 'Upload from Excel / CSV',
-                  value: 'excel',
-                  groupValue: _uploadMethod,
-                  onChanged: (val) => setState(() {
-                    _uploadMethod = val!;
-                    _questionSourceMode = 'new';
-                  }),
-                ),
-                const SizedBox(height: 8),
-                _buildRadioButton(
-                  title: 'Copy & Paste',
-                  value: 'paste',
-                  groupValue: _uploadMethod,
-                  onChanged: (val) => setState(() {
-                    _uploadMethod = val!;
-                    _questionSourceMode = 'new';
-                  }),
-                ),
-                const SizedBox(height: 8),
-                _buildRadioButton(
-                  title: 'Existing PYQ Paper',
-                  value: 'pyq',
-                  groupValue: _uploadMethod,
-                  onChanged: (val) {
-                    setState(() {
-                      _uploadMethod = val!;
-                      _selectedSourceType = 'pyq';
-                      _questionSourceMode = 'existing';
-                      if (_step1PyqPapersList.isEmpty) _loadStep1PyqPapers();
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                _buildRadioButton(
-                  title: 'Existing NTA Question Paper',
-                  value: 'nta',
-                  groupValue: _uploadMethod,
-                  onChanged: (val) {
-                    setState(() {
-                      _uploadMethod = val!;
-                      _selectedSourceType = 'nta';
-                      _questionSourceMode = 'existing';
-                      if (_step1NtaPapersList.isEmpty) _loadStep1NtaPapers();
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                _buildRadioButton(
-                  title: 'Question Bank / Question Set',
-                  value: 'qbank',
-                  groupValue: _uploadMethod,
-                  onChanged: (val) {
-                    setState(() {
-                      _uploadMethod = val!;
-                      _selectedSourceType = 'qbank';
-                      _questionSourceMode = 'existing';
-                      if (_step1QBankResults.isEmpty) _loadStep1QBankQuestions();
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                _buildRadioButton(
-                  title: 'Combine Multiple Sources',
-                  value: 'combine',
-                  groupValue: _uploadMethod,
-                  onChanged: (val) {
-                    setState(() {
-                      _uploadMethod = val!;
-                      _selectedSourceType = 'combine';
-                      _questionSourceMode = 'existing';
-                    });
-                  },
-                ),
-              ],
-            ),
+              ),
+
+              const SizedBox(width: 24),
+
+              // Right Column: Recommended Excel Banner Box or Existing Content Info Badge
+              Expanded(
+                flex: 5,
+                child: isExistingMode
+                    ? Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFF86EFAC)),
+                              ),
+                              child: const Icon(
+                                Icons.storage_rounded,
+                                color: Color(0xFF16A34A),
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Reuse Existing Content',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF15803D),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  const Text(
+                                    'Reuse existing PYQ, NTA, and Question Bank content without duplicating question records.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF475569),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F3FF),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE0E7FF), width: 1),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEEF2FF),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFC7D2FE)),
+                              ),
+                              child: const Icon(
+                                Icons.article_outlined,
+                                color: Color(0xFF4F46E5),
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Recommended Excel Format',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF4F46E5),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  const Text(
+                                    'Download our sample Excel file and fill your questions.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  OutlinedButton.icon(
+                                    onPressed: () {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Downloading sample Excel file...'),
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.download_rounded, size: 16, color: Color(0xFF4F46E5)),
+                                    label: const Text(
+                                      'Download Sample File',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF4F46E5),
+                                      ),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      side: const BorderSide(color: Color(0xFF4F46E5), width: 1.2),
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+            ],
           ),
 
-          const SizedBox(width: 24),
-
-          // Right Column: Recommended Excel Banner Box
-          Expanded(
-            flex: 5,
-            child: Container(
+          // If Existing Content Mode is active, render picker & selected sources summary
+          if (isExistingMode) ...[
+            const SizedBox(height: 20),
+            Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F3FF), // Soft indigo tint
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE0E7FF), width: 1),
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFCBD5E1)),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEEF2FF),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFC7D2FE)),
-                    ),
-                    child: const Icon(
-                      Icons.article_outlined,
-                      color: Color(0xFF4F46E5),
-                      size: 24,
-                    ),
+                  const Text(
+                    'SELECT EXISTING CONTENT',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), letterSpacing: 0.5),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Select one or multiple existing sources to build this paper.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Source Type Chips
+                  Row(
+                    children: [
+                      _buildSourceTypeChip('pyq', 'Existing PYQ Paper', Icons.history_edu_rounded),
+                      const SizedBox(width: 8),
+                      _buildSourceTypeChip('nta', 'Existing NTA Question Paper', Icons.collections_bookmark_rounded),
+                      const SizedBox(width: 8),
+                      _buildSourceTypeChip('qbank', 'Question Bank', Icons.storage_rounded),
+                      const SizedBox(width: 8),
+                      _buildSourceTypeChip('qset', 'Question Set', Icons.auto_stories_rounded),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Active Tab Content View
+                  if (_selectedSourceType == 'pyq') _buildStep1PyqPicker(),
+                  if (_selectedSourceType == 'nta') _buildStep1NtaPicker(),
+                  if (_selectedSourceType == 'qbank') _buildStep1QBankPicker(),
+                  if (_selectedSourceType == 'qset') _buildStep1QSetPicker(),
+
+                  const SizedBox(height: 24),
+
+                  // Added Sources Summary List
+                  if (_addedSources.isNotEmpty) ...[
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          'Recommended Excel Format',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF4F46E5),
-                          ),
+                          'SELECTED SOURCES & CONTENT SUMMARY',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                         ),
-                        const SizedBox(height: 3),
-                        const Text(
-                          'Download our sample Excel file and fill your questions.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
                         OutlinedButton.icon(
                           onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Downloading sample Excel file...'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
+                            setState(() => _selectedSourceType = 'pyq');
                           },
-                          icon: const Icon(Icons.download_rounded, size: 16, color: Color(0xFF4F46E5)),
-                          label: const Text(
-                            'Download Sample File',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF4F46E5),
-                            ),
-                          ),
+                          icon: const Icon(Icons.add_rounded, size: 16),
+                          label: const Text('+ Add Another Source'),
                           style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            side: const BorderSide(color: Color(0xFF4F46E5), width: 1.2),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
+                            foregroundColor: const Color(0xFF4F46E5),
+                            side: const BorderSide(color: Color(0xFF4F46E5)),
                           ),
                         ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    Column(
+                      children: List.generate(_addedSources.length, (idx) {
+                        final src = _addedSources[idx];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEEF2FF),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  src['type'].toString().toUpperCase(),
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  src['name'].toString(),
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                ),
+                              ),
+                              Text(
+                                '${src['count']} questions',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                              ),
+                              const SizedBox(width: 12),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                                onPressed: () {
+                                  setState(() {
+                                    _addedSources.removeAt(idx);
+                                    _questionCountCtrl.text = _allDeduplicatedQuestions.length.toString();
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Deduplication & Live Summary Box
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFBFDBFE)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.cleaning_services_rounded, color: Color(0xFF2563EB), size: 20),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Question Source Summary',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF)),
+                              ),
+                              const Spacer(),
+                              ElevatedButton.icon(
+                                onPressed: _showStep1DeduplicatedPreviewDialog,
+                                icon: const Icon(Icons.preview_rounded, size: 16),
+                                label: const Text('View Selected Questions'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2563EB),
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              _buildSummaryStatCard('Total Selected', '$_rawTotalSelectedCount Qs', const Color(0xFF3B82F6)),
+                              const SizedBox(width: 12),
+                              _buildSummaryStatCard('Duplicates Removed', '${_rawTotalSelectedCount - _allDeduplicatedQuestions.length}', const Color(0xFFEF4444)),
+                              const SizedBox(width: 12),
+                              _buildSummaryStatCard('Final Unique Questions', '${_allDeduplicatedQuestions.length}', const Color(0xFF16A34A)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -2773,311 +3004,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     );
   }
 
-  // ==========================================
-  // CARD 2: QUESTION SOURCE SECTION (BUILD PAPER FROM EXISTING CONTENT)
-  // ==========================================
-  Widget _buildQuestionSourceSectionCard() {
-    return _buildCardContainer(
-      title: 'QUESTION SOURCE / BUILD PAPER FROM EXISTING CONTENT',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.hub_outlined, color: Color(0xFF4F46E5), size: 22),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Choose how questions will be added to this paper. Reuse existing PYQ, NTA, and Question Bank content or upload new ones.',
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
 
-          // Source Mode Radio Buttons
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _questionSourceMode = 'new'),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _questionSourceMode == 'new' ? const Color(0xFFEEF2FF) : Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: _questionSourceMode == 'new' ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
-                        width: _questionSourceMode == 'new' ? 2 : 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Radio<String>(
-                          value: 'new',
-                          groupValue: _questionSourceMode,
-                          activeColor: const Color(0xFF4F46E5),
-                          onChanged: (val) => setState(() => _questionSourceMode = val!),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                'Upload / Create New Questions',
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Add questions manually, from Excel/CSV, or copy & paste text.',
-                                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: InkWell(
-                  onTap: () {
-                    setState(() {
-                      _questionSourceMode = 'existing';
-                      if (_step1PyqPapersList.isEmpty) _loadStep1PyqPapers();
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _questionSourceMode == 'existing' ? const Color(0xFFEEF2FF) : Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: _questionSourceMode == 'existing' ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
-                        width: _questionSourceMode == 'existing' ? 2 : 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Radio<String>(
-                          value: 'existing',
-                          groupValue: _questionSourceMode,
-                          activeColor: const Color(0xFF4F46E5),
-                          onChanged: (val) {
-                            setState(() {
-                              _questionSourceMode = val!;
-                              if (_step1PyqPapersList.isEmpty) _loadStep1PyqPapers();
-                            });
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                'Use Existing Content',
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Reuse PYQ Papers, NTA Question Papers, and Question Banks without duplicating question rows.',
-                                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          // If Use Existing Content is selected
-          if (_questionSourceMode == 'existing' || _sourceCategory == 'Test Series' || _visTestSeries) ...[
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFCBD5E1)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'SELECT EXISTING CONTENT',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A), letterSpacing: 0.5),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Select one or multiple existing sources to build this paper.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Source Type Chips
-                  Row(
-                    children: [
-                      _buildSourceTypeChip('pyq', 'Existing PYQ Paper', Icons.history_edu_rounded),
-                      const SizedBox(width: 8),
-                      _buildSourceTypeChip('nta', 'Existing NTA Question Paper', Icons.collections_bookmark_rounded),
-                      const SizedBox(width: 8),
-                      _buildSourceTypeChip('qbank', 'Question Bank', Icons.storage_rounded),
-                      const SizedBox(width: 8),
-                      _buildSourceTypeChip('qset', 'Question Set', Icons.auto_stories_rounded),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Active Tab Content View
-                  if (_selectedSourceType == 'pyq') _buildStep1PyqPicker(),
-                  if (_selectedSourceType == 'nta') _buildStep1NtaPicker(),
-                  if (_selectedSourceType == 'qbank') _buildStep1QBankPicker(),
-                  if (_selectedSourceType == 'qset') _buildStep1QSetPicker(),
-
-                  const SizedBox(height: 24),
-
-                  // Added Sources Summary List
-                  if (_addedSources.isNotEmpty) ...[
-                    const Divider(),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'SELECTED SOURCES & CONTENT SUMMARY',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            setState(() => _selectedSourceType = 'pyq');
-                          },
-                          icon: const Icon(Icons.add_rounded, size: 16),
-                          label: const Text('+ Add Another Source'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF4F46E5),
-                            side: const BorderSide(color: Color(0xFF4F46E5)),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Column(
-                      children: List.generate(_addedSources.length, (idx) {
-                        final src = _addedSources[idx];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEEF2FF),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  src['type'].toString().toUpperCase(),
-                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  src['name'].toString(),
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                                ),
-                              ),
-                              Text(
-                                '${src['count']} questions',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
-                              ),
-                              const SizedBox(width: 12),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
-                                onPressed: () {
-                                  setState(() {
-                                    _addedSources.removeAt(idx);
-                                    _questionCountCtrl.text = _allDeduplicatedQuestions.length.toString();
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Deduplication & Live Summary Box
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFBFDBFE)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.cleaning_services_rounded, color: Color(0xFF2563EB), size: 20),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'Question Source Summary',
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E40AF)),
-                              ),
-                              const Spacer(),
-                              ElevatedButton.icon(
-                                onPressed: _showStep1DeduplicatedPreviewDialog,
-                                icon: const Icon(Icons.preview_rounded, size: 16),
-                                label: const Text('View Selected Questions'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2563EB),
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              _buildSummaryStatCard('Total Selected', '$_rawTotalSelectedCount Qs', const Color(0xFF3B82F6)),
-                              const SizedBox(width: 12),
-                              _buildSummaryStatCard('Duplicates Removed', '${_rawTotalSelectedCount - _allDeduplicatedQuestions.length}', const Color(0xFFEF4444)),
-                              const SizedBox(width: 12),
-                              _buildSummaryStatCard('Final Unique Questions', '${_allDeduplicatedQuestions.length}', const Color(0xFF16A34A)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
   Widget _buildSourceTypeChip(String typeKey, String label, IconData icon) {
     final bool selected = _selectedSourceType == typeKey;
