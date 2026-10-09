@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/latex_view.dart';
 import '../../shared/widgets/smart_image.dart';
@@ -1291,3 +1292,126 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
     );
   }
 }
+
+class TestRunnerLoaderScreen extends StatefulWidget {
+  final String testId;
+  final String testTitle;
+  final int durationMins;
+  final Function(TestAttemptModel attempt, Map<int, String> answers)? onSubmitted;
+
+  const TestRunnerLoaderScreen({
+    super.key,
+    required this.testId,
+    required this.testTitle,
+    this.durationMins = 180,
+    this.onSubmitted,
+  });
+
+  @override
+  State<TestRunnerLoaderScreen> createState() => _TestRunnerLoaderScreenState();
+}
+
+class _TestRunnerLoaderScreenState extends State<TestRunnerLoaderScreen> {
+  bool _isLoading = true;
+  List<QuestionModel> _questions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuestions();
+  }
+
+  Future<void> _loadQuestions() async {
+    List<QuestionModel> questions = [];
+    if (widget.testId.isNotEmpty) {
+      try {
+        questions = await SupabaseService.fetchTestSeriesQuestions(paperId: widget.testId);
+      } catch (e) {
+        debugPrint('Notice loading paper questions: $e');
+      }
+    }
+
+    if (questions.isEmpty) {
+      try {
+        final allRaw = await SupabaseService.fetchAllQuestionsFromSupabase();
+        if (allRaw.isNotEmpty) {
+          questions = allRaw.take(200).map((q) => QuestionModel.fromJson(q)).toList();
+        }
+      } catch (_) {}
+    }
+
+    if (questions.isEmpty) {
+      questions = SupabaseService.getSampleQuestions(20);
+    }
+
+    if (mounted) {
+      setState(() {
+        _questions = questions;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          title: Text(widget.testTitle, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600)),
+          backgroundColor: Colors.white,
+          elevation: 0.5,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                context.go('/dashboard');
+              }
+            },
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(color: Color(0xFF2563EB)),
+              const SizedBox(height: 16),
+              Text(
+                'Preparing "${widget.testTitle}"...',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Loading test paper questions...',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return CustomTestScreen(
+      questions: _questions,
+      durationMinutes: widget.durationMins > 0 ? widget.durationMins : 180,
+      sessionId: widget.testId,
+      onTestSubmitted: (attempt, answers) {
+        if (widget.onSubmitted != null) {
+          widget.onSubmitted!(attempt, answers);
+        } else {
+          context.go('/test/${widget.testId}/result');
+        }
+      },
+    );
+  }
+}
+

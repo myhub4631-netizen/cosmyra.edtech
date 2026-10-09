@@ -713,13 +713,44 @@ final GoRouter appRouter = GoRouter(
       },
     ),
     GoRoute(
+      path: '/test/:testId',
+      builder: (context, state) {
+        final String testId = state.pathParameters['testId'] ?? 'test_1';
+        Map<String, dynamic>? extraMap;
+        if (state.extra is Map<String, dynamic>) {
+          extraMap = state.extra as Map<String, dynamic>;
+        }
+        final String title = extraMap?['title'] as String? ?? 'Leader Test Series Paper';
+        final int durationMins = (extraMap?['duration'] as num?)?.toInt() ?? 180;
+        return TestRunnerLoaderScreen(
+          testId: testId,
+          testTitle: title,
+          durationMins: durationMins,
+          onSubmitted: (attempt, answers) {
+            _lastTestAttempt = attempt;
+            _lastTestUserAnswers = answers;
+            context.go('/test/$testId/result');
+          },
+        );
+      },
+    ),
+    GoRoute(
       path: '/test/:testId/start',
       builder: (context, state) {
         final String testId = state.pathParameters['testId'] ?? 'test_1';
-        return CustomTestScreen(
-          questions: SupabaseService.getSampleQuestions(20),
-          durationMinutes: 30,
-          onTestSubmitted: (attempt, answers) {
+        Map<String, dynamic>? extraMap;
+        if (state.extra is Map<String, dynamic>) {
+          extraMap = state.extra as Map<String, dynamic>;
+        }
+        final String title = extraMap?['title'] as String? ?? 'Leader Test Series Paper';
+        final int durationMins = (extraMap?['duration'] as num?)?.toInt() ?? 180;
+        return TestRunnerLoaderScreen(
+          testId: testId,
+          testTitle: title,
+          durationMins: durationMins,
+          onSubmitted: (attempt, answers) {
+            _lastTestAttempt = attempt;
+            _lastTestUserAnswers = answers;
             context.go('/test/$testId/result');
           },
         );
