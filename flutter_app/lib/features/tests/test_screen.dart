@@ -7,6 +7,7 @@ import '../../shared/widgets/latex_view.dart';
 import '../../shared/widgets/smart_image.dart';
 import '../../shared/utils/question_copy_helper.dart';
 import '../../core/services/supabase_service.dart';
+import '../../shared/utils/neet_subject_helper.dart';
 import 'test_result_screen.dart';
 
 class CustomTestScreen extends StatefulWidget {
@@ -320,12 +321,13 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
   String get _currentSubjectName {
     if (widget.questions.isNotEmpty && _currentIndex < widget.questions.length) {
       final q = widget.questions[_currentIndex];
-      if (q.subjectId.isNotEmpty) {
-        final s = q.subjectId.trim();
-        if (!s.toLowerCase().contains('uuid') && !s.contains('-') && s.length < 25) {
-          return s;
-        }
-      }
+      final explicit = q.subjectId.isNotEmpty ? q.subjectId : null;
+      return NeetSubjectHelper.getSubjectForQuestionIndex(
+        _currentIndex,
+        widget.questions.length,
+        explicitSubject: explicit,
+        isNeet: true,
+      );
     }
     return 'Physics';
   }
@@ -443,20 +445,18 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
       }
     }
 
-    final Set<String> subjects = {};
-    for (var q in widget.questions) {
-      if (q.subjectId.isNotEmpty && !q.subjectId.contains('-') && q.subjectId.length < 25) {
-        subjects.add(q.subjectId);
-      }
-    }
-    if (subjects.isEmpty) {
-      subjects.addAll(['Physics', 'Chemistry', 'Botany']);
-    }
-    final subjectList = subjects.toList();
+    final List<String> subjectList = ['Physics', 'Chemistry', 'Botany', 'Zoology'];
     String activeModalSub = subjectList.contains(_currentSubjectName) ? _currentSubjectName : subjectList.first;
 
     return StatefulBuilder(
       builder: (modalCtx, setModalState) {
+        final List<int> filteredIndices = NeetSubjectHelper.getQuestionIndicesForSubject(
+          subject: activeModalSub,
+          totalQuestions: widget.questions.length,
+          questions: widget.questions,
+          isNeet: true,
+        );
+
         return Container(
           height: MediaQuery.of(context).size.height * 0.88,
           decoration: const BoxDecoration(
@@ -557,7 +557,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
 
               const SizedBox(height: 18),
 
-              // 5-Column Question Grid Matrix
+              // 5-Column Question Grid Matrix (Filtered for activeSubject)
               Expanded(
                 child: GridView.builder(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -566,8 +566,9 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                     mainAxisSpacing: 10,
                     childAspectRatio: 1.1,
                   ),
-                  itemCount: widget.questions.length,
-                  itemBuilder: (gridCtx, qIdx) {
+                  itemCount: filteredIndices.length,
+                  itemBuilder: (gridCtx, fIdx) {
+                    final qIdx = filteredIndices[fIdx];
                     final isCur = qIdx == _currentIndex;
                     final ans = _userAnswers[qIdx];
                     final hasAns = ans != null && ans.trim().isNotEmpty;

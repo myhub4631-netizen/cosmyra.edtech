@@ -5,6 +5,7 @@ import '../../shared/widgets/latex_view.dart';
 import '../../shared/widgets/smart_image.dart';
 import '../../shared/widgets/solution_video_player.dart';
 import '../../shared/utils/question_copy_helper.dart';
+import '../../shared/utils/neet_subject_helper.dart';
 import 'exam_config_engine.dart';
 import '../leaderboard/leaderboard_screen.dart';
 
@@ -57,16 +58,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
   }
 
   List<String> _getAvailableSubjects() {
-    final Set<String> subs = {};
-    for (var q in widget.questions) {
-      if (q.subjectId.isNotEmpty && !q.subjectId.contains('-') && q.subjectId.length < 25) {
-        subs.add(q.subjectId.trim());
-      }
-    }
-    if (subs.isEmpty) {
-      return ['Physics', 'Chemistry', 'Botany', 'Zoology'];
-    }
-    return subs.toList();
+    return ['Physics', 'Chemistry', 'Botany', 'Zoology'];
   }
 
   void _scrollToSolutions() {
