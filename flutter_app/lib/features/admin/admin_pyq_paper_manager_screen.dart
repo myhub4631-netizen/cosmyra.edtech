@@ -949,6 +949,7 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF64748B)),
                           onSelected: (val) {
+                            debugPrint('[UI Audit] Overflow menu item "$val" selected for paperId: "$paperId"');
                             if (val == 'preview') {
                               _previewAsStudent(paperId);
                             } else if (val == 'archive') {
@@ -1583,6 +1584,8 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
     final title = (paper['paper_name'] ?? paper['title'] ?? 'Paper').toString();
     final actual = _getActualQuestionCount(paper);
 
+    debugPrint('[UI Audit] _safeDeletePaper invoked for paperId: "$paperId", title: "$title"');
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1611,8 +1614,10 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
     );
 
     if (confirm == true) {
+      debugPrint('[UI Audit] User confirmed deletion dialog for paperId: "$paperId"');
       try {
         final ok = await SupabaseService.deletePaperRecord(paperId);
+        debugPrint('[UI Audit] SupabaseService.deletePaperRecord returned ok=$ok for paperId: "$paperId"');
         if (ok && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('✓ Paper "$title" deleted.'), backgroundColor: const Color(0xFF16A34A)),
@@ -1620,6 +1625,7 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
           await _loadPapers();
         }
       } catch (e) {
+        debugPrint('[UI Audit] Deletion exception for paperId: "$paperId": $e');
         if (mounted) {
           final errorMsg = e.toString().replaceAll('Exception: ', '');
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1636,6 +1642,8 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
           );
         }
       }
+    } else {
+      debugPrint('[UI Audit] User cancelled deletion dialog for paperId: "$paperId"');
     }
   }
 

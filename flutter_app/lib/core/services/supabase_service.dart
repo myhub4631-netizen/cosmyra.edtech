@@ -5126,11 +5126,17 @@ class SupabaseService {
 
   /// Delete paper record from database, system_config and local storage safely
   static Future<bool> deletePaperRecord(String paperId) async {
+    debugPrint('[DB Audit] Initiating deletePaperRecord for paperId: "$paperId"');
+    bool deletedFromSql = false;
+
     // 1. Delete from Supabase 'papers' and 'tests' tables (raising exception if FK constraint fails)
     try {
-      await client.from('papers').delete().eq('id', paperId).select();
+      final resPapers = await client.from('papers').delete().eq('id', paperId).select();
+      final affectedPapers = (resPapers as List).length;
+      if (affectedPapers > 0) deletedFromSql = true;
+      debugPrint('[DB Audit] SQL papers delete affected $affectedPapers rows for paperId: "$paperId"');
     } catch (e) {
-      debugPrint('Supabase paper delete notice: $e');
+      debugPrint('[DB Audit] Supabase paper delete notice: $e');
       final errStr = e.toString();
       if (errStr.contains('foreign key') || errStr.contains('violates foreign key constraint') || errStr.contains('42501')) {
         throw Exception('Cannot delete paper record because it has historical student attempts or dependent references. Please use Archive instead.');
@@ -5138,9 +5144,12 @@ class SupabaseService {
     }
 
     try {
-      await client.from('tests').delete().eq('id', paperId).select();
+      final resTests = await client.from('tests').delete().eq('id', paperId).select();
+      final affectedTests = (resTests as List).length;
+      if (affectedTests > 0) deletedFromSql = true;
+      debugPrint('[DB Audit] SQL tests delete affected $affectedTests rows for paperId: "$paperId"');
     } catch (e) {
-      debugPrint('Supabase test delete notice: $e');
+      debugPrint('[DB Audit] Supabase test delete notice: $e');
       final errStr = e.toString();
       if (errStr.contains('foreign key') || errStr.contains('violates foreign key constraint') || errStr.contains('42501')) {
         throw Exception('Cannot delete test record because it has historical student attempts or dependent references. Please use Archive instead.');
@@ -5149,6 +5158,7 @@ class SupabaseService {
 
     // 2. Mark in persistent tombstone set ONLY after DB delete call succeeds
     await markPaperAsDeleted(paperId);
+    debugPrint('[DB Audit] Tombstone marked for paperId: "$paperId"');
 
     // 3. Remove from system_config 'admin_custom_papers' & 'created_test_papers'
     try {
@@ -5164,25 +5174,20 @@ class SupabaseService {
               'value': list,
               'updated_at': DateTime.now().toIso8601String(),
             }, onConflict: 'key');
+            debugPrint('[DB Audit] Removed paperId: "$paperId" from system_config key: "$key" (count: $countBefore -> ${list.length})');
           }
         }
       }
     } catch (e) {
-      debugPrint('Notice deleting paper from system_config: $e');
+      debugPrint('[DB Audit] Notice deleting paper from system_config: $e');
     }
 
-    // 4. Remove from system_config 'admin_custom_test_series' (top-level and embedded)
+    // 4. Remove from system_config 'admin_custom_test_series' (embedded tests)
     try {
       final sysRes = await client.from('system_config').select('value').eq('key', 'admin_custom_test_series').maybeSingle();
       if (sysRes != null && sysRes['value'] is List) {
         final List<Map<String, dynamic>> list = (sysRes['value'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
         bool changed = false;
-
-        final countBeforeOuter = list.length;
-        list.removeWhere((s) => (s['id'] ?? s['paper_id'] ?? '').toString() == paperId);
-        if (list.length < countBeforeOuter) {
-          changed = true;
-        }
 
         for (var series in list) {
           if (series['tests'] is List) {
@@ -5193,6 +5198,7 @@ class SupabaseService {
               series['tests'] = tests;
               series['test_count'] = tests.length;
               changed = true;
+              debugPrint('[DB Audit] Removed embedded test paperId: "$paperId" from series: "${series['id']}" (count: $countBefore -> ${tests.length})');
             }
           }
         }
@@ -5205,7 +5211,7 @@ class SupabaseService {
         }
       }
     } catch (e) {
-      debugPrint('Notice updating system_config test series for deleted paper: $e');
+      debugPrint('[DB Audit] Notice updating system_config test series for deleted paper: $e');
     }
 
     // 5. Remove from local SharedPreferences cache
@@ -5221,13 +5227,14 @@ class SupabaseService {
         await prefs.setString('cosmyra_saved_papers', jsonEncode(list));
       }
     } catch (e) {
-      debugPrint('Notice deleting local paper record: $e');
+      debugPrint('[DB Audit] Notice deleting local paper record: $e');
     }
 
     _cachedDbPapers = null;
     _cachedTestSeries = null;
     _cachedQuestionModels.clear();
     _cachedPaperQuestions.clear();
+    debugPrint('[DB Audit] Successfully completed deletePaperRecord for paperId: "$paperId"');
     return true;
   }
 
@@ -8155,6 +8162,7 @@ class SupabaseService {
                   etMap['test_series_id'] ??= map['id'];
                   etMap['test_series_title'] ??= map['title'] ?? map['name'];
                   etMap['target_exam'] ??= map['exam'];
+                  etMap['is_test_series'] = true; // Mark as Test Series paper so catalogue router puts it under Test Series!
                   final etId = (etMap['id'] ?? etMap['paper_id'] ?? '').toString();
                   if (etId.isNotEmpty) {
                     final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '').toString() == etId);
@@ -8170,14 +8178,17 @@ class SupabaseService {
                 }
               }
 
-              final id = (map['id'] ?? map['paper_id'] ?? '').toString();
-              if (id.isNotEmpty) {
-                final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '').toString() == id);
-                if (idx != -1) {
-                  papers[idx] = {...papers[idx], ...map};
-                } else {
-                  seenIds.add(id);
-                  papers.add(map);
+              // Do NOT add the Test Series Container object itself as a paper!
+              if (row['key'] != 'admin_custom_test_series') {
+                final id = (map['id'] ?? map['paper_id'] ?? '').toString();
+                if (id.isNotEmpty) {
+                  final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '').toString() == id);
+                  if (idx != -1) {
+                    papers[idx] = {...papers[idx], ...map};
+                  } else {
+                    seenIds.add(id);
+                    papers.add(map);
+                  }
                 }
               }
             }
