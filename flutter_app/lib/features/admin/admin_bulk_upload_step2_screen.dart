@@ -364,7 +364,22 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       }
     }
 
-    final savedQList = await SupabaseService.fetchQuestionsForPaper(_paperId);
+    final String paperNameParam = _paperData?['paperName'] ?? _paperData?['paper_name'] ?? widget.paperName;
+    final savedQList = await SupabaseService.fetchQuestionsForPaper(_paperId, paperName: paperNameParam);
+
+    if (savedQList.isNotEmpty && _questionsList.length != savedQList.length) {
+      _questionsList = List.generate(
+        savedQList.length,
+        (index) => QuestionItemData(
+          id: 'q_${_paperId}_${index + 1}',
+          number: index + 1,
+          options: List<String>.from(defaultPresetOpts),
+          availableIn: List<String>.from(defaultAvailableIn),
+          positiveMarks: '4',
+          negativeMarks: '-1',
+        ),
+      );
+    }
 
     int savedCounter = 0;
     int firstUnsavedIndex = -1;

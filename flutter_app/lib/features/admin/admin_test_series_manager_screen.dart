@@ -8,6 +8,7 @@ import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
 import '../tests/test_screen.dart';
 import '../tests/test_result_screen.dart';
+import 'admin_bulk_upload_step2_screen.dart';
 
 class AdminTestSeriesManagerScreen extends StatefulWidget {
   final UserProfileModel? userProfile;
@@ -2999,12 +3000,33 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                             ),
                             onPressed: () {
                               Navigator.of(context).pop();
-                              try {
-                                GoRouter.of(context).go('/admin/questions/upload');
-                              } catch (_) {}
+                              final String paperTitle = (t['title'] ?? t['name'] ?? _titleCtrl.text).toString();
+                              final String paperId = (t['paper_id'] ?? t['id'] ?? '').toString();
+                              final int qCount = (t['questions'] is num && (t['questions'] as num) > 0) ? (t['questions'] as num).toInt() : 180;
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => AdminBulkUploadStep2Screen(
+                                    userProfile: SupabaseService.getMockProfile(role: 'admin'),
+                                    paperName: paperTitle,
+                                    totalQuestionsCount: qCount,
+                                    paperRecord: {
+                                      'id': paperId,
+                                      'paper_name': paperTitle,
+                                      'paperName': paperTitle,
+                                      'exam': _exam,
+                                      'sourceCategory': 'Test Series',
+                                      'source_category': 'Test Series',
+                                      'testSeriesTitle': _titleCtrl.text,
+                                      'existingTestSeries': _titleCtrl.text,
+                                      'existingPaper': paperTitle,
+                                      'questionCount': qCount,
+                                    },
+                                  ),
+                                ),
+                              );
                             },
                             icon: const Icon(Icons.upload_file_rounded, size: 14),
-                            label: const Text('Upload Questions', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                            label: const Text('Upload/Edit Qs', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                           ),
                           const SizedBox(width: 6),
                           IconButton(
