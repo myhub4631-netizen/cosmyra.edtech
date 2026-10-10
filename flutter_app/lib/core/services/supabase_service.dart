@@ -4865,18 +4865,34 @@ class SupabaseService {
 
   // ================= PAPER & BULK UPLOAD MANAGEMENT =================
 
-  /// Save or update paper details record in Supabase 'papers' table and local storage
+  /// Fetch a single paper record by ID or UUID from database/cache
+  static Future<Map<String, dynamic>?> fetchPaperById(String paperId) async {
+    if (paperId.trim().isEmpty) return null;
+    final all = await fetchAllPapersAndTestSeries(forceRefresh: true);
+    for (var p in all) {
+      final id = (p['id'] ?? p['paper_id'] ?? '').toString();
+      if (id == paperId) return p;
+    }
+    for (var p in all) {
+      final id = (p['id'] ?? p['paper_id'] ?? '').toString();
+      if (id.toLowerCase() == paperId.toLowerCase()) return p;
+    }
+    return null;
+  }
+
+  /// Save or update paper details record in Supabase 'papers' table, system_config and local storage
   static Future<Map<String, dynamic>> savePaperRecord(Map<String, dynamic> paperData) async {
     final String paperId = paperData['id'] ?? 'paper_${DateTime.now().millisecondsSinceEpoch}';
     final rawCat = paperData['sourceCategory'] ?? paperData['source_category'] ?? 'PYQ';
-    final canonical = getCanonicalCategoryAndSourceType(rawCat);
+    final canonical = getCanonicalCategoryAndSourceType(rawCat.toString());
 
     final fullData = {
+      ...paperData,
       'id': paperId,
-      'source_category': canonical['category'],
-      'category': canonical['category'],
-      'source_type': canonical['source_type'],
-      'source': canonical['source'],
+      'source_category': paperData['source_category'] ?? canonical['category'],
+      'category': paperData['category'] ?? canonical['category'],
+      'source_type': paperData['source_type'] ?? canonical['source_type'],
+      'source': paperData['source'] ?? canonical['source'],
       'exam': paperData['exam'] ?? paperData['exam_name'] ?? 'NEET',
       'year': paperData['year']?.toString() ?? '2026',
       'phase_session': paperData['phaseSession'] ?? paperData['phase_session'] ?? 'Phase 1',
@@ -4886,31 +4902,58 @@ class SupabaseService {
       'language': paperData['language'] ?? 'English',
       'conducting_body': paperData['conductingBody'] ?? paperData['conducting_body'] ?? 'NTA',
       'question_count': (paperData['questionCount'] is num) ? (paperData['questionCount'] as num).toInt() : int.tryParse(paperData['questionCount']?.toString() ?? '200') ?? 200,
+      'expected_question_count': (paperData['expected_question_count'] is num) ? (paperData['expected_question_count'] as num).toInt() : int.tryParse(paperData['expected_question_count']?.toString() ?? '200') ?? 200,
       'total_marks': (paperData['totalMarks'] is num) ? (paperData['totalMarks'] as num).toDouble() : double.tryParse(paperData['totalMarks']?.toString() ?? '720') ?? 720.0,
       'duration_minutes': (paperData['duration'] is num) ? (paperData['duration'] as num).toInt() : int.tryParse(paperData['duration']?.toString() ?? '180') ?? 180,
       'negative_marking': paperData['negativeMarking'] ?? 'Yes',
       'negative_marks': (paperData['negativeMarks'] is num) ? (paperData['negativeMarks'] as num).toDouble() : double.tryParse(paperData['negativeMarks']?.toString() ?? '-4') ?? -4.0,
       'positive_marks': (paperData['positiveMarks'] is num) ? (paperData['positiveMarks'] as num).toDouble() : double.tryParse(paperData['positiveMarks']?.toString() ?? '+4') ?? 4.0,
       'subjects': paperData['subjects'] ?? ['Physics', 'Chemistry', 'Botany', 'Zoology'],
-      'shift': paperData['shift'] ?? '',
       'instructions': paperData['instructions'] ?? '',
-      'test_series_option': paperData['testSeriesOption'] ?? paperData['test_series_option'] ?? '',
-      'existing_test_series': paperData['existingTestSeries'] ?? paperData['existing_test_series'] ?? '',
-      'new_test_series_name': paperData['newTestSeriesName'] ?? paperData['new_test_series_name'] ?? '',
-      'test_series_title': paperData['testSeriesTitle'] ?? paperData['test_series_title'] ?? (paperData['testSeriesOption'] == 'new' ? paperData['newTestSeriesName'] : paperData['existingTestSeries']) ?? '',
-      'is_test_series': paperData['is_test_series'] == true || paperData['sourceCategory'] == 'Test Series' || paperData['source_category'] == 'Test Series',
-      'status': paperData['status'] ?? 'Draft',
-      'saved_questions_count': paperData['savedQuestionsCount'] ?? paperData['saved_questions_count'] ?? 0,
+      'is_pyq': paperData['is_pyq'] == true || rawCat == 'PYQ' || paperData['source_category'] == 'PYQ',
+      'is_nta': paperData['is_nta'] == true || rawCat == 'NTA' || paperData['source_category'] == 'NTA',
+      'is_test_series': paperData['is_test_series'] == true || rawCat == 'Test Series' || paperData['source_category'] == 'Test Series',
+      'status': paperData['status'] ?? 'Published',
+      'saved_questions_count': paperData['saved_questions_count'] ?? paperData['savedQuestionsCount'] ?? 0,
+      'actual_questions_count': paperData['actual_questions_count'] ?? paperData['saved_questions_count'] ?? 0,
       'created_at': paperData['created_at'] ?? DateTime.now().toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
     };
 
+    // 1. Upsert to Supabase 'papers' table
     try {
       await client.from('papers').upsert(fullData);
     } catch (e) {
-      debugPrint('Supabase paper upsert notice (using local storage cache): $e');
+      debugPrint('Supabase paper upsert notice (using cloud system_config cache): $e');
     }
 
+    // 2. Cloud persistence to Supabase system_config table ('admin_custom_papers')
+    try {
+      List<Map<String, dynamic>> cloudPapers = [];
+      try {
+        final sysRes = await client.from('system_config').select('value').eq('key', 'admin_custom_papers').maybeSingle();
+        if (sysRes != null && sysRes['value'] is List) {
+          cloudPapers = (sysRes['value'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      } catch (_) {}
+
+      final idx = cloudPapers.indexWhere((p) => p['id'] == paperId || p['paper_id'] == paperId);
+      if (idx != -1) {
+        cloudPapers[idx] = {...cloudPapers[idx], ...fullData};
+      } else {
+        cloudPapers.insert(0, fullData);
+      }
+
+      await client.from('system_config').upsert({
+        'key': 'admin_custom_papers',
+        'value': cloudPapers,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'key');
+    } catch (e) {
+      debugPrint('Notice persisting paper to system_config: $e');
+    }
+
+    // 3. Local SharedPreferences cache
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cosmyra_active_upload_paper_session', jsonEncode(fullData));
@@ -4928,15 +4971,22 @@ class SupabaseService {
       debugPrint('Error persisting paper to SharedPreferences: $e');
     }
 
-    // Auto-register in Test Series catalog if associated with a test series
+    _cachedDbPapers = null;
+
+    // Auto-register in Test Series catalog ONLY IF explicitly marked as a test series
     final String tsTitle = (fullData['test_series_title']?.toString() ?? '').trim();
     final String existingTs = (fullData['existing_test_series']?.toString() ?? '').trim();
     final String newTs = (fullData['new_test_series_name']?.toString() ?? '').trim();
     final String targetTsTitle = tsTitle.isNotEmpty
         ? tsTitle
-        : (existingTs.isNotEmpty ? existingTs : (newTs.isNotEmpty ? newTs : (fullData['paper_name'] ?? 'NEET Test Series')));
+        : (existingTs.isNotEmpty ? existingTs : (newTs.isNotEmpty ? newTs : ''));
 
-    if (targetTsTitle.isNotEmpty || fullData['is_test_series'] == true) {
+    final bool isExplicitTestSeries = fullData['is_test_series'] == true ||
+        fullData['source_category'] == 'Test Series' ||
+        fullData['sourceCategory'] == 'Test Series' ||
+        (fullData['test_series_option']?.toString() ?? '').isNotEmpty;
+
+    if (isExplicitTestSeries && targetTsTitle.isNotEmpty) {
       try {
         final title = targetTsTitle;
         final seriesId = toValidUuid('ts_${fullData['exam']}_${fullData['year']}_$title');
@@ -5005,13 +5055,63 @@ class SupabaseService {
     return fullData;
   }
 
-  /// Delete paper record from database and local storage safely
+  /// Delete paper record from database, system_config and local storage safely
   static Future<bool> deletePaperRecord(String paperId) async {
     try {
       await client.from('papers').delete().eq('id', paperId);
     } catch (e) {
       debugPrint('Supabase paper delete notice: $e');
     }
+
+    try {
+      for (final key in ['admin_custom_papers', 'created_test_papers']) {
+        final sysRes = await client.from('system_config').select('value').eq('key', key).maybeSingle();
+        if (sysRes != null && sysRes['value'] is List) {
+          final List<Map<String, dynamic>> list = (sysRes['value'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          final countBefore = list.length;
+          list.removeWhere((p) => p['id'] == paperId || p['paper_id'] == paperId);
+          if (list.length < countBefore) {
+            await client.from('system_config').upsert({
+              'key': key,
+              'value': list,
+              'updated_at': DateTime.now().toIso8601String(),
+            }, onConflict: 'key');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice deleting paper from system_config: $e');
+    }
+
+    try {
+      final sysRes = await client.from('system_config').select('value').eq('key', 'admin_custom_test_series').maybeSingle();
+      if (sysRes != null && sysRes['value'] is List) {
+        final List<Map<String, dynamic>> list = (sysRes['value'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        bool changed = false;
+        for (var series in list) {
+          if (series['tests'] is List) {
+            final tests = (series['tests'] as List).whereType<Map>().map((t) => Map<String, dynamic>.from(t)).toList();
+            final countBefore = tests.length;
+            tests.removeWhere((t) => (t['id'] ?? t['paper_id'] ?? '').toString() == paperId);
+            if (tests.length < countBefore) {
+              series['tests'] = tests;
+              series['test_count'] = tests.length;
+              changed = true;
+            }
+          }
+        }
+        if (changed) {
+          await client.from('system_config').upsert({
+            'key': 'admin_custom_test_series',
+            'value': list,
+            'updated_at': DateTime.now().toIso8601String(),
+          }, onConflict: 'key');
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice updating system_config test series for deleted paper: $e');
+    }
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final str = prefs.getString('cosmyra_saved_papers');
@@ -5026,11 +5126,12 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Notice deleting local paper record: $e');
     }
+
     _cachedDbPapers = null;
     return true;
   }
 
-  /// Archive or restore paper record
+  /// Archive or restore paper record in database, system_config and local storage
   static Future<bool> archivePaperRecord(String paperId, {required bool isArchived}) async {
     final statusStr = isArchived ? 'Archived' : 'Published';
     try {
@@ -5038,6 +5139,62 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Supabase paper archive update notice: $e');
     }
+
+    try {
+      for (final key in ['admin_custom_papers', 'created_test_papers']) {
+        final sysRes = await client.from('system_config').select('value').eq('key', key).maybeSingle();
+        if (sysRes != null && sysRes['value'] is List) {
+          final List<Map<String, dynamic>> list = (sysRes['value'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          bool updated = false;
+          for (var p in list) {
+            if (p['id'] == paperId || p['paper_id'] == paperId) {
+              p['status'] = statusStr;
+              p['updated_at'] = DateTime.now().toIso8601String();
+              updated = true;
+            }
+          }
+          if (updated) {
+            await client.from('system_config').upsert({
+              'key': key,
+              'value': list,
+              'updated_at': DateTime.now().toIso8601String(),
+            }, onConflict: 'key');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice updating system_config paper status: $e');
+    }
+
+    try {
+      final sysRes = await client.from('system_config').select('value').eq('key', 'admin_custom_test_series').maybeSingle();
+      if (sysRes != null && sysRes['value'] is List) {
+        final List<Map<String, dynamic>> list = (sysRes['value'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        bool changed = false;
+        for (var series in list) {
+          if (series['tests'] is List) {
+            final tests = (series['tests'] as List).whereType<Map>().map((t) => Map<String, dynamic>.from(t)).toList();
+            for (var t in tests) {
+              if ((t['id'] ?? t['paper_id'] ?? '').toString() == paperId) {
+                t['status'] = statusStr;
+                changed = true;
+              }
+            }
+            if (changed) series['tests'] = tests;
+          }
+        }
+        if (changed) {
+          await client.from('system_config').upsert({
+            'key': 'admin_custom_test_series',
+            'value': list,
+            'updated_at': DateTime.now().toIso8601String(),
+          }, onConflict: 'key');
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice updating test series status for archived paper: $e');
+    }
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final str = prefs.getString('cosmyra_saved_papers');
@@ -5056,6 +5213,7 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Notice updating local paper status: $e');
     }
+
     _cachedDbPapers = null;
     return true;
   }
@@ -7860,10 +8018,21 @@ class SupabaseService {
       final res = await client
           .from('system_config')
           .select('key, value')
-          .inFilter('key', ['admin_custom_test_series', 'admin_custom_papers', 'created_test_papers']);
+          .inFilter('key', ['admin_custom_papers', 'created_test_papers', 'admin_custom_test_series']);
 
       if (res != null && (res as List).isNotEmpty) {
-        for (var row in res) {
+        final sortedRes = List<Map<String, dynamic>>.from((res as List).map((e) => Map<String, dynamic>.from(e as Map)));
+        sortedRes.sort((a, b) {
+          final kA = a['key']?.toString() ?? '';
+          final kB = b['key']?.toString() ?? '';
+          if (kA == 'admin_custom_papers') return -1;
+          if (kB == 'admin_custom_papers') return 1;
+          if (kA == 'created_test_papers') return -1;
+          if (kB == 'created_test_papers') return 1;
+          return 0;
+        });
+
+        for (var row in sortedRes) {
           final val = row['value'];
           List<dynamic> items = [];
           if (val is List) {
@@ -7876,6 +8045,7 @@ class SupabaseService {
           for (var item in items) {
             if (item is Map) {
               final map = Map<String, dynamic>.from(item);
+
               // Extract embedded tests list if test series contains embedded created tests
               if (map['tests'] is List) {
                 final embeddedTests = (map['tests'] as List).whereType<Map>().toList();
@@ -7885,19 +8055,29 @@ class SupabaseService {
                   etMap['test_series_title'] ??= map['title'] ?? map['name'];
                   etMap['target_exam'] ??= map['exam'];
                   final etId = (etMap['id'] ?? etMap['paper_id'] ?? '').toString();
-                  if (etId.isNotEmpty && !seenIds.contains(etId)) {
-                    seenIds.add(etId);
-                    papers.add(etMap);
-                  } else if (etId.isEmpty) {
+                  if (etId.isNotEmpty) {
+                    final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '').toString() == etId);
+                    if (idx != -1) {
+                      papers[idx] = {...etMap, ...papers[idx]};
+                    } else {
+                      seenIds.add(etId);
+                      papers.add(etMap);
+                    }
+                  } else {
                     papers.add(etMap);
                   }
                 }
               }
 
               final id = (map['id'] ?? map['paper_id'] ?? '').toString();
-              if (id.isNotEmpty && !seenIds.contains(id)) {
-                seenIds.add(id);
-                papers.add(map);
+              if (id.isNotEmpty) {
+                final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '').toString() == id);
+                if (idx != -1) {
+                  papers[idx] = {...papers[idx], ...map};
+                } else {
+                  seenIds.add(id);
+                  papers.add(map);
+                }
               }
             }
           }
@@ -8073,7 +8253,7 @@ class SupabaseService {
             p['exam'] ??= 'NEET';
             p['target_exam'] ??= 'NEET';
             p['year'] ??= '2026';
-            p['status'] = 'Published';
+            p['status'] ??= 'Published';
             subjCounts = {'physics': 45, 'chemistry': 45, 'biology': 90};
           } else if (actualCount >= 180 && (examName.toUpperCase().contains('NEET') || pTitle.toUpperCase().contains('NEET'))) {
             subjCounts = {'physics': 45, 'chemistry': 45, 'biology': 90};

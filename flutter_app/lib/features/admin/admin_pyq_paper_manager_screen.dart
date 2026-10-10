@@ -1507,6 +1507,26 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
                   ),
                   const SizedBox(width: 12),
                   Expanded(
+                    child: TextFormField(
+                      initialValue: year,
+                      decoration: const InputDecoration(labelText: 'Year', border: OutlineInputBorder()),
+                      onChanged: (val) => year = val,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      initialValue: phase,
+                      decoration: const InputDecoration(labelText: 'Phase / Session', border: OutlineInputBorder()),
+                      onChanged: (val) => phase = val,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: DropdownButtonFormField<String>(
                       value: status,
                       decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
@@ -1516,12 +1536,6 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                initialValue: phase,
-                decoration: const InputDecoration(labelText: 'Phase / Session', border: OutlineInputBorder()),
-                onChanged: (val) => phase = val,
-              ),
             ],
           ),
         ),
@@ -1530,14 +1544,20 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7C3AED)),
             onPressed: () async {
+              final activeCat = _getPaperCatalogue(paper);
               final updatedData = {
                 ...paper,
                 'id': paperId,
                 'paper_name': title,
+                'title': title,
                 'exam': exam,
                 'year': year,
                 'phase_session': phase,
                 'status': status,
+                'source_category': activeCat,
+                'is_pyq': activeCat == 'PYQ',
+                'is_nta': activeCat == 'NTA',
+                'is_test_series': activeCat == 'Test Series',
               };
               await SupabaseService.savePaperRecord(updatedData);
               if (mounted) {

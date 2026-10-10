@@ -1320,9 +1320,27 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/admin/papers/:paperId',
-      builder: (context, state) => AdminBulkUploadStep2Screen(
-        userProfile: SupabaseService.getMockProfile(role: 'admin'),
-      ),
+      builder: (context, state) {
+        final paperId = state.pathParameters['paperId'] ?? '';
+        return FutureBuilder<Map<String, dynamic>?>(
+          future: SupabaseService.fetchPaperById(paperId),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                backgroundColor: Color(0xFFF8FAFC),
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            final paperRecord = snapshot.data ?? {'id': paperId};
+            final paperName = (paperRecord['paper_name'] ?? paperRecord['title'] ?? 'Question Paper').toString();
+            return AdminBulkUploadStep2Screen(
+              userProfile: SupabaseService.getMockProfile(role: 'admin'),
+              paperRecord: paperRecord,
+              paperName: paperName,
+            );
+          },
+        );
+      },
     ),
     GoRoute(
       path: '/admin/mock-papers',
