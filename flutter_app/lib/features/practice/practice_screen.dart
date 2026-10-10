@@ -8,6 +8,7 @@ import '../../shared/widgets/smart_image.dart';
 import '../../shared/services/audio_feedback_service.dart';
 import '../../shared/utils/question_copy_helper.dart';
 import '../../core/services/supabase_service.dart';
+import '../../shared/utils/neet_subject_helper.dart';
 import '../tests/test_result_screen.dart';
 
 class PracticeScreen extends StatefulWidget {
@@ -351,12 +352,14 @@ class _PracticeScreenState extends State<PracticeScreen> {
   String get _currentSubjectName {
     if (widget.questions.isNotEmpty && _currentIndex < widget.questions.length) {
       final q = widget.questions[_currentIndex];
-      if (q.subjectId.isNotEmpty) {
-        final s = q.subjectId.trim();
-        if (!s.toLowerCase().contains('uuid') && !s.contains('-') && s.length < 25) {
-          return s;
-        }
-      }
+      final isNeet = !q.examId.toUpperCase().contains('JEE');
+      return NeetSubjectHelper.getSubjectForQuestionIndex(
+        _currentIndex,
+        widget.questions.length,
+        explicitSubject: q.subjectId,
+        isNeet: isNeet,
+        useBotanyZoology: true,
+      );
     }
     return 'Physics';
   }

@@ -6,6 +6,7 @@ import '../../models/pyq_models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/app_sidebar.dart';
 import '../../shared/widgets/app_header.dart';
+import '../../shared/utils/neet_subject_helper.dart';
 
 class ChapterItem {
   final String id;
@@ -377,7 +378,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
       }
     });
 
-    final questions = await SupabaseService.fetchPYQQuestions(
+    final rawQuestions = await SupabaseService.fetchPYQQuestions(
       exam: _selectedExam,
       subjects: activeSubjects.isEmpty ? _selectedSubjects.toList() : activeSubjects,
       chapterIds: selectedChapterIds,
@@ -386,6 +387,8 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
       difficulty: _difficulty,
       limit: _questionCount,
     );
+
+    final questions = NeetSubjectHelper.sortQuestionsForNEET(rawQuestions);
 
     setState(() => _isStarting = false);
 

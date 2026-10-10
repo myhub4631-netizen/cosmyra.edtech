@@ -2,6 +2,22 @@ import 'package:flutter/foundation.dart';
 
 /// Helper utility for NEET & JEE Subject-Wise Question Ordering and Test Grid Mapping
 class NeetSubjectHelper {
+  /// Map UUIDs, codes, or raw string identifiers to canonical subject names
+  static String getSubjectNameFromId(String rawId) {
+    if (rawId.trim().isEmpty) return '';
+    final s = rawId.trim().toLowerCase();
+
+    // Canonical UUID & Code Mappings
+    if (s.contains('a1111111') || s.contains('phys')) return 'Physics';
+    if (s.contains('a2222222') || s.contains('chem')) return 'Chemistry';
+    if (s.contains('a4444444') || s.contains('botan')) return 'Botany';
+    if (s.contains('a5555555') || s.contains('zool')) return 'Zoology';
+    if (s.contains('a3333333') || s.contains('bio')) return 'Biology';
+    if (s.contains('a6666666') || s.contains('math')) return 'Mathematics';
+
+    return rawId;
+  }
+
   /// Calculate subject distribution & ranges for NEET paper of any question count
   static Map<String, dynamic> getNEETSubjectDistribution(int totalQuestions) {
     int p = (totalQuestions * 0.25).round();
@@ -32,10 +48,16 @@ class NeetSubjectHelper {
     bool isNeet = true,
     bool useBotanyZoology = true,
   }) {
-    // 1. Check explicit subject if provided and not a UUID
+    // 1. Resolve explicit subject if provided
     if (explicitSubject != null && explicitSubject.trim().isNotEmpty) {
+      final mapped = getSubjectNameFromId(explicitSubject);
+      if (mapped.isNotEmpty && mapped != explicitSubject) {
+        if (mapped == 'Botany' && !useBotanyZoology) return 'Biology';
+        if (mapped == 'Zoology' && !useBotanyZoology) return 'Biology';
+        return mapped;
+      }
       final s = explicitSubject.trim().toLowerCase();
-      if (!s.contains('-') && !s.contains('uuid') && s.length < 30) {
+      if (!s.contains('uuid') && s.length < 30) {
         if (s.contains('physic')) return 'Physics';
         if (s.contains('chemist')) return 'Chemistry';
         if (s.contains('botany')) return useBotanyZoology ? 'Botany' : 'Biology';
@@ -61,7 +83,7 @@ class NeetSubjectHelper {
       }
       return 'Biology';
     } else {
-      // JEE or General
+      // JEE Main / Advanced
       final int perSub = (totalQuestions / 3).round();
       if (qNum <= perSub) return 'Physics';
       if (qNum <= perSub * 2) return 'Chemistry';
@@ -91,10 +113,10 @@ class NeetSubjectHelper {
       if (i < questions.length) {
         final q = questions[i];
         if (q is Map) {
-          explicitSub = (q['subject'] ?? q['subject_name'] ?? q['subjectId'] ?? '').toString();
+          explicitSub = (q['subject'] ?? q['subject_name'] ?? q['subjectId'] ?? q['subject_id'] ?? '').toString();
         } else {
           try {
-            explicitSub = (q.subject ?? q.subjectName ?? q.subjectId ?? '').toString();
+            explicitSub = (q.subjectId ?? q.subject ?? q.subjectName ?? '').toString();
           } catch (_) {}
         }
       }
@@ -158,24 +180,27 @@ class NeetSubjectHelper {
 
     final List<T> sorted = List<T>.from(questions);
     sorted.sort((a, b) {
-      String subA = '';
-      String subB = '';
+      String rawSubA = '';
+      String rawSubB = '';
 
       if (a is Map) {
-        subA = (a['subject'] ?? a['subject_name'] ?? a['subjectId'] ?? '').toString().toLowerCase();
+        rawSubA = (a['subject'] ?? a['subject_name'] ?? a['subjectId'] ?? a['subject_id'] ?? '').toString();
       } else {
         try {
-          subA = (a as dynamic).subject?.toString().toLowerCase() ?? '';
+          rawSubA = (a as dynamic).subjectId?.toString() ?? (a as dynamic).subject?.toString() ?? '';
         } catch (_) {}
       }
 
       if (b is Map) {
-        subB = (b['subject'] ?? b['subject_name'] ?? b['subjectId'] ?? '').toString().toLowerCase();
+        rawSubB = (b['subject'] ?? b['subject_name'] ?? b['subjectId'] ?? b['subject_id'] ?? '').toString();
       } else {
         try {
-          subB = (b as dynamic).subject?.toString().toLowerCase() ?? '';
+          rawSubB = (b as dynamic).subjectId?.toString() ?? (b as dynamic).subject?.toString() ?? '';
         } catch (_) {}
       }
+
+      final subA = getSubjectNameFromId(rawSubA).toLowerCase();
+      final subB = getSubjectNameFromId(rawSubB).toLowerCase();
 
       int rankA = 99;
       int rankB = 99;
@@ -185,7 +210,35 @@ class NeetSubjectHelper {
         if (subB.contains(k) && v < rankB) rankB = v;
       });
 
-      return rankA.compareTo(rankB);
+      if (rankA != rankB) {
+        return rankA.compareTo(rankB);
+      }
+
+      // If ranks are equal, sort by question number if available
+      int qNumA = 0;
+      int qNumB = 0;
+
+      if (a is Map) {
+        qNumA = int.tryParse((a['question_number'] ?? a['questionNumber'] ?? 0).toString()) ?? 0;
+      } else {
+        try {
+          qNumA = (a as dynamic).questionNumber ?? 0;
+        } catch (_) {}
+      }
+
+      if (b is Map) {
+        qNumB = int.tryParse((b['question_number'] ?? b['questionNumber'] ?? 0).toString()) ?? 0;
+      } else {
+        try {
+          qNumB = (b as dynamic).questionNumber ?? 0;
+        } catch (_) {}
+      }
+
+      if (qNumA > 0 && qNumB > 0) {
+        return qNumA.compareTo(qNumB);
+      }
+
+      return 0;
     });
 
     return sorted;

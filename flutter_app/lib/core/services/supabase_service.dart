@@ -12,6 +12,7 @@ import '../../models/models.dart';
 import '../../models/pyq_models.dart';
 import '../../models/landing_page_config_model.dart';
 import 'supabase_question_mapper.dart';
+import '../../shared/utils/neet_subject_helper.dart';
 import '../../shared/widgets/latex_view.dart';
 import 'ecommerce_automation_service.dart';
 import 'cloudflare_r2_service.dart';
@@ -4732,14 +4733,17 @@ class SupabaseService {
       return true;
     }).toList();
 
-    if (limit <= filtered.length) {
-      return filtered.sublist(0, limit);
+    final sortedFiltered = NeetSubjectHelper.sortQuestionsForNEET(filtered);
+
+    if (limit <= sortedFiltered.length) {
+      return sortedFiltered.sublist(0, limit);
     }
-    if (filtered.isNotEmpty) {
-      return filtered;
+    if (sortedFiltered.isNotEmpty) {
+      return sortedFiltered;
     }
-    // Fallback: Return all available PYQs
-    return allQuestions.take(limit).toList();
+    // Fallback: Return sorted available PYQs
+    final sortedAll = NeetSubjectHelper.sortQuestionsForNEET(allQuestions);
+    return sortedAll.take(limit).toList();
   }
 
   /// Save PYQ session result to Supabase DB and local history
