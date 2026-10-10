@@ -10,11 +10,13 @@ import '../../models/models.dart';
 class AdminPyqPaperManagerScreen extends StatefulWidget {
   final UserProfileModel? userProfile;
   final VoidCallback? onBack;
+  final String initialCatalogue; // 'PYQ', 'NTA', or 'Test Series'
 
   const AdminPyqPaperManagerScreen({
     Key? key,
     this.userProfile,
     this.onBack,
+    this.initialCatalogue = 'PYQ',
   }) : super(key: key);
 
   @override
@@ -24,6 +26,7 @@ class AdminPyqPaperManagerScreen extends StatefulWidget {
 class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _allPapers = [];
+  late String _activeCatalogue;
   
   // Search and Filters
   String _searchQuery = '';
@@ -43,7 +46,33 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
   @override
   void initState() {
     super.initState();
+    _activeCatalogue = widget.initialCatalogue;
     _loadPapers();
+  }
+
+  String _getPaperCatalogue(Map<String, dynamic> p) {
+    final cat = (p['source_category'] ?? p['sourceCategory'] ?? p['category'] ?? p['paper_type'] ?? '').toString().toUpperCase();
+    final title = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toLowerCase();
+    final id = (p['id'] ?? p['paper_id'] ?? '').toString().toLowerCase();
+    final isPyq = p['is_pyq'] == true;
+    final isNta = p['is_nta'] == true;
+    final isTestSeries = p['is_test_series'] == true;
+
+    if (isTestSeries || cat == 'TEST_SERIES' || cat == 'TEST SERIES' || title.contains('test series') || title.contains('mock test') || title.contains('fst')) {
+      return 'Test Series';
+    }
+    if (isNta || cat == 'NTA' || (title.contains('nta') && !title.contains('pyq') && !isPyq)) {
+      return 'NTA';
+    }
+    if (isPyq || cat == 'PYQ' || id.startsWith('neet_') || id.startsWith('jee_') || title.contains('official pyq') || title.contains('phase 1') || title.contains('re-neet') || title.contains('paper 1') || title.contains('pyq')) {
+      return 'PYQ';
+    }
+    if (title.contains('test') || title.contains('series')) return 'Test Series';
+    return 'PYQ';
+  }
+
+  List<Map<String, dynamic>> get _cataloguePapers {
+    return _allPapers.where((p) => _getPaperCatalogue(p) == _activeCatalogue).toList();
   }
 
   Future<void> _loadPapers() async {
@@ -58,7 +87,7 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
   }
 
   List<Map<String, dynamic>> get _filteredPapers {
-    var list = _allPapers.where((p) {
+    var list = _cataloguePapers.where((p) {
       final title = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toLowerCase();
       final id = (p['id'] ?? p['paper_id'] ?? '').toString().toLowerCase();
       final code = (p['paper_code'] ?? p['paperCode'] ?? '').toString().toLowerCase();
@@ -153,14 +182,38 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
     return format['totalQuestions'] as int? ?? 180;
   }
 
-  int get _totalPapersCount => _allPapers.length;
-  int get _totalQuestionsCount => _allPapers.fold(0, (sum, p) => sum + _getActualQuestionCount(p));
-  int get _validPapersCount => _allPapers.where((p) {
+  int get _totalPapersCount => _cataloguePapers.length;
+  int get _totalQuestionsCount => _cataloguePapers.fold(0, (sum, p) => sum + _getActualQuestionCount(p));
+  int get _validPapersCount => _cataloguePapers.where((p) {
     final act = _getActualQuestionCount(p);
     final exp = _getExpectedQuestionCount(p);
     return act >= exp && act > 0;
   }).length;
-  int get _incompletePapersCount => _allPapers.length - _validPapersCount;
+  int get _incompletePapersCount => _cataloguePapers.length - _validPapersCount;
+
+  String get _catalogueTitle {
+    switch (_activeCatalogue) {
+      case 'NTA':
+        return 'NTA Paper Manager';
+      case 'Test Series':
+        return 'Test Series Manager';
+      case 'PYQ':
+      default:
+        return 'PYQ Paper Manager';
+    }
+  }
+
+  String get _catalogueSubtitle {
+    switch (_activeCatalogue) {
+      case 'NTA':
+        return 'Verified NTA Papers & Question Banks for NEET, JEE Main & JEE Advanced';
+      case 'Test Series':
+        return 'Custom Tests & Series Papers (Beginner, Leader, Full Syllabus)';
+      case 'PYQ':
+      default:
+        return 'Genuine Previous Year Question Papers for NEET, JEE Main & JEE Advanced';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -203,14 +256,14 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
-                  'PYQ Paper Manager',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  _catalogueTitle,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                 ),
                 Text(
-                  'Centralized CRUD Catalogue for NEET, JEE Main & JEE Advanced Papers',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                  _catalogueSubtitle,
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                 ),
               ],
             ),
@@ -246,7 +299,7 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
           ElevatedButton.icon(
             onPressed: () => _openCreatePaperDialog(),
             icon: const Icon(Icons.add, size: 18, color: Colors.white),
-            label: const Text('Create Paper', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
+            label: Text('Create $_activeCatalogue Paper', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF7C3AED),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -265,6 +318,10 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // 0. Three-Section Admin Navigation Tabs
+                    _buildCatalogueTabs(),
+                    const SizedBox(height: 16),
+
                     // 1. Metric Cards Header
                     _buildStatsRow(),
                     const SizedBox(height: 20),
@@ -289,6 +346,100 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
     );
   }
 
+  Widget _buildCatalogueTabs() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E8F0),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          _buildTabButton('PYQ', '📚 PYQ Papers', 'Official PYQ Papers'),
+          const SizedBox(width: 4),
+          _buildTabButton('NTA', '🏛️ NTA Papers', 'Official NTA Question Banks'),
+          const SizedBox(width: 4),
+          _buildTabButton('Test Series', '📝 Test Series Papers', 'Custom Practice Series'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabButton(String key, String title, String subtitle) {
+    final isSelected = _activeCatalogue == key;
+    final count = _allPapers.where((p) => _getPaperCatalogue(p) == key).length;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          if (_activeCatalogue != key) {
+            setState(() {
+              _activeCatalogue = key;
+              _currentPage = 1;
+              _selectedPaperIds.clear();
+            });
+            final pathSegment = key == 'PYQ' ? 'pyq' : (key == 'NTA' ? 'nta' : 'test-series');
+            try {
+              GoRouter.of(context).go('/admin/papers/$pathSegment');
+            } catch (_) {}
+          }
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isSelected
+                ? [const BoxShadow(color: Color(0x0F000000), blurRadius: 4, offset: Offset(0, 2))]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      color: isSelected ? const Color(0xFF7C3AED) : const Color(0xFF475569),
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isSelected ? const Color(0xFF6B21A8) : const Color(0xFF94A3B8),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFFEDE9FE) : const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? const Color(0xFF6D28D9) : const Color(0xFF334155),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ==========================================
   // 1. STATS HEADER ROW
   // ==========================================
@@ -298,7 +449,7 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
       children: [
         Expanded(
           child: _buildStatCard(
-            'Total PYQ Papers',
+            'Total $_activeCatalogue Papers',
             '$_totalPapersCount',
             'NEET & JEE Catalogues',
             Icons.folder_copy_outlined,
@@ -550,12 +701,12 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
           border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
         child: Column(
-          children: const [
-            Icon(Icons.folder_off_outlined, size: 48, color: Color(0xFF94A3B8)),
-            SizedBox(height: 12),
-            Text('No PYQ papers found matching your criteria.', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
-            SizedBox(height: 4),
-            Text('Try clearing search filters or create a new PYQ paper record.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+          children: [
+            const Icon(Icons.folder_off_outlined, size: 48, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 12),
+            Text('No $_activeCatalogue papers found matching your criteria.', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+            const SizedBox(height: 4),
+            Text('Try clearing search filters or create a new $_activeCatalogue paper record.', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
           ],
         ),
       );
@@ -1126,7 +1277,11 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
                       'total_marks': totalMarks,
                       'status': status,
                       'instructions': instructions,
-                      'source_category': 'PYQ',
+                      'source_category': _activeCatalogue,
+                      'is_pyq': _activeCatalogue == 'PYQ',
+                      'is_nta': _activeCatalogue == 'NTA',
+                      'is_test_series': _activeCatalogue == 'Test Series',
+                      if (_activeCatalogue == 'Test Series') 'series_name': paperType,
                       'saved_questions_count': 0,
                     };
 
@@ -1492,7 +1647,7 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
   // ==========================================
   Future<void> _exportCsvCatalogue() async {
     final List<List<dynamic>> rows = [
-      ['ID', 'Exam', 'Year', 'Phase_Session', 'Title', 'Code', 'Expected_Questions', 'Actual_Questions', 'Status', 'Created_At'],
+      ['ID', 'Exam', 'Year', 'Phase_Session', 'Title', 'Code', 'Catalogue_Category', 'Expected_Questions', 'Actual_Questions', 'Status', 'Created_At'],
     ];
 
     for (var p in _filteredPapers) {
@@ -1503,6 +1658,7 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
         p['phase_session'] ?? '',
         p['paper_name'] ?? p['title'] ?? '',
         p['paper_code'] ?? '',
+        _getPaperCatalogue(p),
         _getExpectedQuestionCount(p),
         _getActualQuestionCount(p),
         p['status'] ?? 'Published',
@@ -1513,7 +1669,7 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
     final csvData = const ListToCsvConverter().convert(rows);
     Clipboard.setData(ClipboardData(text: csvData));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✓ Paper catalogue CSV copied to clipboard!'), backgroundColor: Color(0xFF16A34A)),
+      SnackBar(content: Text('✓ $_activeCatalogue paper catalogue CSV copied to clipboard!'), backgroundColor: const Color(0xFF16A34A)),
     );
   }
 
@@ -1535,6 +1691,10 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
                 'year': row[2].toString(),
                 'phase_session': row[3].toString(),
                 'paper_name': row[4].toString(),
+                'source_category': _activeCatalogue,
+                'is_pyq': _activeCatalogue == 'PYQ',
+                'is_nta': _activeCatalogue == 'NTA',
+                'is_test_series': _activeCatalogue == 'Test Series',
                 'status': 'Published',
               };
               await SupabaseService.savePaperRecord(paperData);
@@ -1543,7 +1703,7 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
           }
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('✓ Successfully imported $importedCount paper metadata records!'), backgroundColor: const Color(0xFF16A34A)),
+              SnackBar(content: Text('✓ Successfully imported $importedCount $_activeCatalogue paper metadata records!'), backgroundColor: const Color(0xFF16A34A)),
             );
             _loadPapers();
           }

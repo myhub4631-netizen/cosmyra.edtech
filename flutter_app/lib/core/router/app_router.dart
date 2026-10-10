@@ -1284,14 +1284,31 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/admin/papers',
-      builder: (context, state) => AdminPyqPaperManagerScreen(
-        userProfile: SupabaseService.getMockProfile(role: 'admin'),
-      ),
+      redirect: (context, state) => '/admin/papers/pyq',
     ),
     GoRoute(
       path: '/admin/pyq-papers',
+      redirect: (context, state) => '/admin/papers/pyq',
+    ),
+    GoRoute(
+      path: '/admin/papers/pyq',
       builder: (context, state) => AdminPyqPaperManagerScreen(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        initialCatalogue: 'PYQ',
+      ),
+    ),
+    GoRoute(
+      path: '/admin/papers/nta',
+      builder: (context, state) => AdminPyqPaperManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        initialCatalogue: 'NTA',
+      ),
+    ),
+    GoRoute(
+      path: '/admin/papers/test-series',
+      builder: (context, state) => AdminPyqPaperManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        initialCatalogue: 'Test Series',
       ),
     ),
     GoRoute(
