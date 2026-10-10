@@ -7287,11 +7287,46 @@ class SupabaseService {
     return false;
   }
 
+  /// Resolve canonical paper title for a given paper ID or paper UUID
+  static Future<String> resolvePaperTitle(String paperId) async {
+    final cleanId = paperId.trim();
+    if (cleanId.isEmpty) return '';
+    try {
+      final allSeries = await fetchAllTestSeries();
+      for (var s in allSeries) {
+        if (s['tests'] is List) {
+          for (var t in (s['tests'] as List)) {
+            if (t is Map) {
+              final tId = (t['id'] ?? t['paper_id'] ?? '').toString().trim();
+              if (tId == cleanId || tId.toLowerCase() == cleanId.toLowerCase()) {
+                final String title = (t['title'] ?? t['name'] ?? '').toString().trim();
+                if (title.isNotEmpty) return title;
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    return cleanId;
+  }
+
   /// Fetch saved questions for a given paper ID or paper name
-  static Future<List<Map<String, dynamic>>> fetchQuestionsForPaper(String paperId, {String? paperName}) async {
+  static Future<List<Map<String, dynamic>>> fetchQuestionsForPaper(String paperId, {String? paperName, bool forceRefresh = false}) async {
+    final cacheKey = '${paperId}_${paperName ?? ''}';
+    if (!forceRefresh &&
+        _cachedPaperQuestions.containsKey(cacheKey) &&
+        _cachedPaperQuestions[cacheKey]!.isNotEmpty &&
+        _paperQuestionsCacheTime.containsKey(cacheKey) &&
+        DateTime.now().difference(_paperQuestionsCacheTime[cacheKey]!) < _cacheTtl) {
+      return _cachedPaperQuestions[cacheKey]!;
+    }
+
     final List<Map<String, dynamic>> results = [];
     final String paperUuid = toValidUuid(paperId);
-    final String targetName = (paperName ?? paperId).trim();
+    String targetName = (paperName ?? '').trim();
+    if (targetName.isEmpty || targetName == paperId) {
+      targetName = await resolvePaperTitle(paperId);
+    }
 
     // 0. Check relational join table `paper_questions` first for multi-paper question references
     try {
@@ -7370,25 +7405,28 @@ class SupabaseService {
       debugPrint('Notice reading local paper questions: $e');
     }
 
-    // 2. Query Supabase DB questions table with paper column or target name filters
+    // 2. Query Supabase DB questions table with resolved paper title or paper ID filters
     try {
       final List<Map<String, dynamic>> dbQuestions = [];
-      
-      // Query by paper column in questions table
-      if (targetName.isNotEmpty && targetName != paperId) {
+      final Set<String> paperFilters = {
+        if (targetName.isNotEmpty) targetName,
+        paperId,
+        paperUuid,
+        if (paperId == '6237b088-76ac-4eaf-a03e-623776ac5eaf') 'NEET 2027 Leader Test Series - Paper 1',
+      };
+
+      for (final filter in paperFilters) {
+        if (filter.isEmpty) continue;
         try {
-          final res = await client.from('questions').select().eq('paper', targetName).order('created_at', ascending: true).limit(300);
+          final res = await client
+              .from('questions')
+              .select()
+              .eq('paper', filter)
+              .order('created_at', ascending: true)
+              .limit(300);
           if (res != null && (res as List).isNotEmpty) {
             dbQuestions.addAll((res as List).map((row) => Map<String, dynamic>.from(row as Map)));
-          }
-        } catch (_) {}
-      }
-      
-      if (dbQuestions.isEmpty && paperId.isNotEmpty) {
-        try {
-          final res = await client.from('questions').select().eq('paper', paperId).order('created_at', ascending: true).limit(300);
-          if (res != null && (res as List).isNotEmpty) {
-            dbQuestions.addAll((res as List).map((row) => Map<String, dynamic>.from(row as Map)));
+            break;
           }
         } catch (_) {}
       }
@@ -7481,9 +7519,11 @@ class SupabaseService {
         final bool isPaperMatch = pId == paperId ||
             pId == paperUuid ||
             pId == toValidUuid(paperId) ||
-            (pName.isNotEmpty && (pName.toLowerCase().trim() == paperId.toLowerCase().trim() || pName.toLowerCase().trim() == targetName.toLowerCase().trim())) ||
-            (targetName.contains('Leader Test Series') && (dbQ['year'] == 2027 || dbQ['created_at']?.toString().startsWith('2026-10-01') == true)) ||
-            (paperId == '6237b088-76ac-4eaf-a03e-623776ac5eaf' && (dbQ['year'] == 2027 || dbQ['created_at']?.toString().startsWith('2026-10-01') == true)) ||
+            (pName.isNotEmpty && (
+                pName.toLowerCase().trim() == paperId.toLowerCase().trim() ||
+                pName.toLowerCase().trim() == targetName.toLowerCase().trim()
+            )) ||
+            (paperId == '6237b088-76ac-4eaf-a03e-623776ac5eaf' || targetName.contains('Paper 1')) && (dbQ['year'] == 2027 || dbQ['created_at']?.toString().startsWith('2026-10-01') == true) ||
             (dbQ['id']?.toString().startsWith('q_${paperId}_') == true) ||
             (dbQ['id']?.toString() == toValidUuid('q_${paperId}_${dbQ['question_number'] ?? dbQ['questionNumber']}'));
 
@@ -7513,6 +7553,11 @@ class SupabaseService {
       final numB = (b['question_number'] ?? b['questionNumber'] ?? 999) as int;
       return numA.compareTo(numB);
     });
+
+    if (results.isNotEmpty) {
+      _cachedPaperQuestions[cacheKey] = results;
+      _paperQuestionsCacheTime[cacheKey] = DateTime.now();
+    }
 
     return results;
   }
@@ -7731,8 +7776,6 @@ class SupabaseService {
 
       // If specific paperId is requested and has 0 questions, return [] to preserve empty paper state
       if (rawMaps.isEmpty) {
-        _cachedQuestionModels[cacheKey] = [];
-        _questionModelsCacheTime[cacheKey] = DateTime.now();
         return [];
       }
     } else {
@@ -7754,8 +7797,6 @@ class SupabaseService {
     }
 
     if (rawMaps.isEmpty) {
-      _cachedQuestionModels[cacheKey] = [];
-      _questionModelsCacheTime[cacheKey] = DateTime.now();
       return [];
     }
 

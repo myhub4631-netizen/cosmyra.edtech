@@ -1294,6 +1294,8 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
   }
 }
 
+enum TestLoaderState { loading, ready, empty, notFound, accessDenied, error }
+
 class TestRunnerLoaderScreen extends StatefulWidget {
   final String testId;
   final String testTitle;
@@ -1313,8 +1315,9 @@ class TestRunnerLoaderScreen extends StatefulWidget {
 }
 
 class _TestRunnerLoaderScreenState extends State<TestRunnerLoaderScreen> {
-  bool _isLoading = true;
+  TestLoaderState _state = TestLoaderState.loading;
   List<QuestionModel> _questions = [];
+  String _errorMessage = '';
 
   @override
   void initState() {
@@ -1323,26 +1326,51 @@ class _TestRunnerLoaderScreenState extends State<TestRunnerLoaderScreen> {
   }
 
   Future<void> _loadQuestions() async {
-    List<QuestionModel> questions = [];
-    if (widget.testId.isNotEmpty) {
-      try {
-        questions = await SupabaseService.fetchTestSeriesQuestions(paperId: widget.testId);
-      } catch (e) {
-        debugPrint('Notice loading paper questions: $e');
+    if (!mounted) return;
+    setState(() {
+      _state = TestLoaderState.loading;
+      _errorMessage = '';
+    });
+
+    if (widget.testId.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _state = TestLoaderState.notFound;
+          _errorMessage = 'Invalid test paper ID.';
+        });
       }
+      return;
     }
 
-    if (mounted) {
+    try {
+      final questions = await SupabaseService.fetchTestSeriesQuestions(paperId: widget.testId);
+
+      if (!mounted) return;
+
+      if (questions.isNotEmpty) {
+        setState(() {
+          _questions = questions;
+          _state = TestLoaderState.ready;
+        });
+      } else {
+        setState(() {
+          _questions = [];
+          _state = TestLoaderState.empty;
+        });
+      }
+    } catch (e) {
+      debugPrint('Notice loading paper questions: $e');
+      if (!mounted) return;
       setState(() {
-        _questions = questions;
-        _isLoading = false;
+        _errorMessage = e.toString();
+        _state = TestLoaderState.error;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    if (_state == TestLoaderState.loading) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
         appBar: AppBar(
@@ -1388,7 +1416,124 @@ class _TestRunnerLoaderScreenState extends State<TestRunnerLoaderScreen> {
       );
     }
 
-    if (_questions.isEmpty) {
+    if (_state == TestLoaderState.error || _state == TestLoaderState.notFound || _state == TestLoaderState.accessDenied) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          title: Text(
+            widget.testTitle.isNotEmpty ? widget.testTitle : 'Test Paper',
+            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+          ),
+          backgroundColor: Colors.white,
+          elevation: 0.5,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                context.go('/test-series');
+              }
+            },
+          ),
+        ),
+        body: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 520),
+            margin: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(color: Color(0x0F000000), blurRadius: 20, offset: Offset(0, 4)),
+              ],
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEE2E2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.error_outline_rounded, size: 40, color: Color(0xFFDC2626)),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Failed to load test paper',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF0F172A),
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _errorMessage.isNotEmpty ? _errorMessage : 'A temporary connection error occurred. Please check your network and try again.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        ),
+                        onPressed: () {
+                          if (Navigator.of(context).canPop()) {
+                            Navigator.of(context).pop();
+                          } else {
+                            context.go('/test-series');
+                          }
+                        },
+                        icon: const Icon(Icons.arrow_back_rounded, size: 18, color: Color(0xFF475569)),
+                        label: Text(
+                          'Back',
+                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                        ),
+                        onPressed: _loadQuestions,
+                        icon: const Icon(Icons.refresh_rounded, size: 18),
+                        label: Text(
+                          'Retry',
+                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_state == TestLoaderState.empty || _questions.isEmpty) {
       return Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
         appBar: AppBar(
