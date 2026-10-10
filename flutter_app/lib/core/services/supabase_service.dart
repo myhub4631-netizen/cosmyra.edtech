@@ -7604,20 +7604,36 @@ class SupabaseService {
         if (paperId.contains('2026') || targetName.contains('2026') || targetName.contains('Phase 1')) 'NEET 2026 Paper 1',
       };
 
-      for (final filter in paperFilters) {
-        if (filter.isEmpty) continue;
+      if (paperId == '49bfe774-1e41-495e-a029-49bf1e41595e' || paperId == 'neet_2026_phase_1' || targetName.contains('NEET 2026')) {
         try {
           final res = await client
               .from('questions')
               .select()
-              .eq('paper', filter)
+              .or('paper.eq.NEET 2026 Paper 1,paper.eq.NEET 2026 Phase 1')
               .order('created_at', ascending: true)
               .limit(300);
           if (res != null && (res as List).isNotEmpty) {
             dbQuestions.addAll((res as List).map((row) => Map<String, dynamic>.from(row as Map)));
-            break;
           }
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Notice querying NEET 2026 questions: $e');
+        }
+      } else {
+        for (final filter in paperFilters) {
+          if (filter.isEmpty) continue;
+          try {
+            final res = await client
+                .from('questions')
+                .select()
+                .eq('paper', filter)
+                .order('created_at', ascending: true)
+                .limit(300);
+            if (res != null && (res as List).isNotEmpty) {
+              dbQuestions.addAll((res as List).map((row) => Map<String, dynamic>.from(row as Map)));
+              break;
+            }
+          } catch (_) {}
+        }
       }
 
       if (dbQuestions.isEmpty && paperId.isNotEmpty) {

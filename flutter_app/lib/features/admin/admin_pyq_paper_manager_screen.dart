@@ -776,6 +776,11 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
+                          icon: const Icon(Icons.remove_red_eye_outlined, size: 18, color: Color(0xFF7C3AED)),
+                          onPressed: () => _previewAsStudent(paperId),
+                          tooltip: 'View as Student (Admin Preview)',
+                        ),
+                        IconButton(
                           icon: const Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF4F46E5)),
                           onPressed: () => _openInspectPaperModal(p),
                           tooltip: 'Inspect Details & Audit',
@@ -1479,7 +1484,7 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
   }
 
   void _previewAsStudent(String paperId) {
-    context.go('/pyq');
+    context.go('/admin/papers/preview/$paperId');
   }
 
   // ==========================================
