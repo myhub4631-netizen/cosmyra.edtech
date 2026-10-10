@@ -1611,12 +1611,30 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
     );
 
     if (confirm == true) {
-      final ok = await SupabaseService.deletePaperRecord(paperId);
-      if (ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✓ Paper "$title" deleted.'), backgroundColor: const Color(0xFF16A34A)),
-        );
-        _loadPapers();
+      try {
+        final ok = await SupabaseService.deletePaperRecord(paperId);
+        if (ok && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('✓ Paper "$title" deleted.'), backgroundColor: const Color(0xFF16A34A)),
+          );
+          await _loadPapers();
+        }
+      } catch (e) {
+        if (mounted) {
+          final errorMsg = e.toString().replaceAll('Exception: ', '');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Deletion Blocked: $errorMsg'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 6),
+              action: SnackBarAction(
+                label: 'Archive Instead',
+                textColor: Colors.white,
+                onPressed: () => _toggleArchivePaper(paperId, true),
+              ),
+            ),
+          );
+        }
       }
     }
   }

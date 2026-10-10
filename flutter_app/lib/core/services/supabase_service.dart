@@ -4883,6 +4883,7 @@ class SupabaseService {
   /// Save or update paper details record in Supabase 'papers' table, system_config and local storage
   static Future<Map<String, dynamic>> savePaperRecord(Map<String, dynamic> paperData) async {
     final String paperId = paperData['id'] ?? 'paper_${DateTime.now().millisecondsSinceEpoch}';
+    await unmarkPaperAsDeleted(paperId);
     final rawCat = paperData['sourceCategory'] ?? paperData['source_category'] ?? 'PYQ';
     final canonical = getCanonicalCategoryAndSourceType(rawCat.toString());
 
@@ -5055,14 +5056,86 @@ class SupabaseService {
     return fullData;
   }
 
+  /// Get persistent deleted paper IDs tombstone set from SharedPreferences and system_config
+  static Future<Set<String>> getDeletedPaperIds() async {
+    final Set<String> deleted = {};
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('cosmyra_deleted_paper_ids');
+      if (list != null) deleted.addAll(list);
+    } catch (_) {}
+
+    try {
+      final res = await client.from('system_config').select('value').eq('key', 'admin_deleted_paper_ids').maybeSingle();
+      if (res != null && res['value'] is List) {
+        final cloudList = (res['value'] as List).map((e) => e.toString()).toList();
+        deleted.addAll(cloudList);
+      }
+    } catch (_) {}
+
+    return deleted;
+  }
+
+  /// Mark paper ID as deleted in tombstone storage (cloud and local)
+  static Future<void> markPaperAsDeleted(String paperId) async {
+    final current = await getDeletedPaperIds();
+    current.add(paperId);
+    final list = current.toList();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('cosmyra_deleted_paper_ids', list);
+    } catch (_) {}
+
+    try {
+      await client.from('system_config').upsert({
+        'key': 'admin_deleted_paper_ids',
+        'value': list,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'key');
+    } catch (e) {
+      debugPrint('Notice saving deleted paper tombstone: $e');
+    }
+  }
+
+  /// Remove paper ID from deleted tombstone set if recreated or restored
+  static Future<void> unmarkPaperAsDeleted(String paperId) async {
+    final current = await getDeletedPaperIds();
+    if (current.contains(paperId)) {
+      current.remove(paperId);
+      final list = current.toList();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList('cosmyra_deleted_paper_ids', list);
+      } catch (_) {}
+
+      try {
+        await client.from('system_config').upsert({
+          'key': 'admin_deleted_paper_ids',
+          'value': list,
+          'updated_at': DateTime.now().toIso8601String(),
+        }, onConflict: 'key');
+      } catch (_) {}
+    }
+  }
+
   /// Delete paper record from database, system_config and local storage safely
   static Future<bool> deletePaperRecord(String paperId) async {
+    // 1. Mark in persistent tombstone set
+    await markPaperAsDeleted(paperId);
+
+    // 2. Delete from Supabase 'papers' table (raising exception if FK constraint fails)
     try {
       await client.from('papers').delete().eq('id', paperId);
     } catch (e) {
       debugPrint('Supabase paper delete notice: $e');
+      final errStr = e.toString();
+      if (errStr.contains('foreign key') || errStr.contains('violates foreign key constraint') || errStr.contains('42501')) {
+        throw Exception('Cannot delete paper record because it has historical student attempts or dependent references. Please use Archive instead.');
+      }
     }
 
+    // 3. Remove from system_config 'admin_custom_papers' & 'created_test_papers'
     try {
       for (final key in ['admin_custom_papers', 'created_test_papers']) {
         final sysRes = await client.from('system_config').select('value').eq('key', key).maybeSingle();
@@ -5083,6 +5156,7 @@ class SupabaseService {
       debugPrint('Notice deleting paper from system_config: $e');
     }
 
+    // 4. Remove from system_config 'admin_custom_test_series'
     try {
       final sysRes = await client.from('system_config').select('value').eq('key', 'admin_custom_test_series').maybeSingle();
       if (sysRes != null && sysRes['value'] is List) {
@@ -5112,6 +5186,7 @@ class SupabaseService {
       debugPrint('Notice updating system_config test series for deleted paper: $e');
     }
 
+    // 5. Remove from local SharedPreferences cache
     try {
       final prefs = await SharedPreferences.getInstance();
       final str = prefs.getString('cosmyra_saved_papers');
@@ -7993,6 +8068,7 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>> fetchAllPapersAndTestSeries({String? exam, bool forceRefresh = false}) async {
     final List<Map<String, dynamic>> papers = [];
     final Set<String> seenIds = {};
+    final Set<String> deletedPaperIds = await getDeletedPaperIds();
 
     // 1. SharedPreferences local cache
     try {
@@ -8200,6 +8276,7 @@ class SupabaseService {
 
     for (var cop in canonicalOfficialPapers) {
       final String copId = cop['id'].toString();
+      if (deletedPaperIds.contains(copId)) continue;
       final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '') == copId);
       if (idx == -1) {
         papers.insert(0, cop);
@@ -8288,6 +8365,7 @@ class SupabaseService {
     final Set<String> seenKeys = {};
     for (var p in papers) {
       final id = (p['id'] ?? p['paper_id'] ?? '').toString().trim();
+      if (deletedPaperIds.contains(id)) continue;
       final title = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().trim();
       final key = '${id}_$title'.toLowerCase();
       if (id == '49bfe774-1e41-495e-a029-49bf1e41595e' || id == 'neet_2026_phase_1') {
