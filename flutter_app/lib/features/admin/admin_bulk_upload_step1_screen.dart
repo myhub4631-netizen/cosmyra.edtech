@@ -436,12 +436,21 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   }
 
   void _applyExamDefaults(String exam, {bool preserveMarks = false}) {
+    final format = ExamPaperFormatConfig.getPaperFormat(
+      exam: exam,
+      sourceCategory: _sourceCategory,
+      year: _year,
+      paperType: _paperType,
+    );
+
+    final int targetCount = format['totalQuestions'] as int;
+
     if (exam.contains('JEE')) {
       _conductingBody = 'NTA';
       _paperType = 'Engineering';
       if (!preserveMarks) {
-        _questionCountCtrl.text = '90';
-        _totalMarksCtrl.text = '300';
+        _questionCountCtrl.text = targetCount.toString();
+        _totalMarksCtrl.text = exam.contains('ADVANCED') ? '180' : '300';
         _durationCtrl.text = '180';
         _positiveMarksCtrl.text = '+4';
         _negativeMarksCtrl.text = '-1';
@@ -454,9 +463,9 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       _conductingBody = 'NTA';
       _paperType = 'Medical (UG)';
       if (!preserveMarks) {
-        _questionCountCtrl.text = '180';
+        _questionCountCtrl.text = targetCount.toString();
         _totalMarksCtrl.text = '720';
-        _durationCtrl.text = '180';
+        _durationCtrl.text = targetCount >= 200 ? '200' : '180';
         _positiveMarksCtrl.text = '+4';
         _negativeMarksCtrl.text = '-1';
       }

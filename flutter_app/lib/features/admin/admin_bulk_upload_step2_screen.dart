@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -219,11 +220,40 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     super.dispose();
   }
 
+  int get expectedQuestionCount {
+    final String exam = _paperData?['exam'] ?? _paperData?['exam_name'] ?? 'NEET';
+    final String sourceCat = (_paperData?['source_category'] ?? _paperData?['sourceCategory'] ?? '').toString();
+    final String yearStr = (_paperData?['year'] ?? '').toString();
+    final String paperName = (_paperData?['paperName'] ?? _paperData?['paper_name'] ?? widget.paperName).toString();
+    final int? rawCount = int.tryParse(_paperData?['question_count']?.toString() ?? '');
+    final int? widgetCount = widget.totalQuestionsCount > 0 ? widget.totalQuestionsCount : null;
+
+    final format = ExamPaperFormatConfig.getPaperFormat(
+      exam: exam,
+      sourceCategory: sourceCat,
+      year: yearStr,
+      paperName: paperName,
+      customCount: rawCount ?? widgetCount,
+    );
+    return format['totalQuestions'] as int;
+  }
+
+  int get loadedQuestionCount => _questionsList.where((q) => q.text.trim().isNotEmpty || (q.questionImage != null && q.questionImage!.isNotEmpty)).length;
+
+  int get savedQuestionCount => _questionsList.where((q) => q.isSaved && (q.text.trim().isNotEmpty || (q.questionImage != null && q.questionImage!.isNotEmpty))).length;
+
+  int get pendingQuestionCount => math.max(0, expectedQuestionCount - savedQuestionCount);
+
+  double get completionPercentage => expectedQuestionCount > 0
+      ? ((savedQuestionCount / expectedQuestionCount) * 100).clamp(0.0, 100.0)
+      : 0.0;
+
   @override
   void initState() {
     super.initState();
+    final int initialCount = expectedQuestionCount;
     _questionsList = List.generate(
-      widget.totalQuestionsCount,
+      initialCount,
       (index) => QuestionItemData(
         id: 'q_temp_${index + 1}',
         number: index + 1,
@@ -290,7 +320,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       debugPrint('Notice loading db chapters for step2: $e');
     }
 
-    final int qCount = (int.tryParse(_paperData?['question_count']?.toString() ?? '') ?? widget.totalQuestionsCount).clamp(1, 1000);
+    final String paperNameParam = _paperData?['paperName'] ?? _paperData?['paper_name'] ?? widget.paperName;
+    final savedQList = await SupabaseService.fetchQuestionsForPaper(_paperId, paperName: paperNameParam);
+
+    final int targetTotal = expectedQuestionCount;
+    final int qCount = math.max(targetTotal, savedQList.length);
 
     final dynamic paperAvailRaw = widget.paperRecord?['available_in'] ?? widget.paperRecord?['availableIn'] ?? _paperData?['available_in'] ?? _paperData?['availableIn'];
     final List<String> defaultAvailableIn = (paperAvailRaw is List && paperAvailRaw.isNotEmpty)
@@ -364,22 +398,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       }
     }
 
-    final String paperNameParam = _paperData?['paperName'] ?? _paperData?['paper_name'] ?? widget.paperName;
-    final savedQList = await SupabaseService.fetchQuestionsForPaper(_paperId, paperName: paperNameParam);
 
-    if (savedQList.isNotEmpty && _questionsList.length != savedQList.length) {
-      _questionsList = List.generate(
-        savedQList.length,
-        (index) => QuestionItemData(
-          id: 'q_${_paperId}_${index + 1}',
-          number: index + 1,
-          options: List<String>.from(defaultPresetOpts),
-          availableIn: List<String>.from(defaultAvailableIn),
-          positiveMarks: '4',
-          negativeMarks: '-1',
-        ),
-      );
-    }
 
     int savedCounter = 0;
     int firstUnsavedIndex = -1;
@@ -1796,8 +1815,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isDesktop = screenWidth >= 900;
 
-    final int remainingCount = _questionsList.length - _addedCount;
-    final double progressPercent = _questionsList.isEmpty ? 0 : (_addedCount / _questionsList.length);
+    final int remainingCount = pendingQuestionCount;
+    final double progressPercent = completionPercentage / 100.0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -2897,7 +2916,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
             ),
             const SizedBox(height: 4),
             Text(
-              'Add all questions for ${widget.paperName}. Total ${widget.totalQuestionsCount} questions.',
+              'Add all questions for ${widget.paperName}. Target total: $expectedQuestionCount questions ($savedQuestionCount saved, $pendingQuestionCount pending).',
               style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w400, color: const Color(0xFF64748B)),
             ),
           ],
@@ -3054,7 +3073,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                   children: [
                     Text('Total Questions', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
                     const SizedBox(height: 4),
-                    Text('${widget.totalQuestionsCount}', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
+                    Text('$expectedQuestionCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
                   ],
                 ),
               ),
@@ -3069,7 +3088,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                     children: [
                       Text('Added', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
                       const SizedBox(height: 4),
-                      Text('$_addedCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
+                      Text('$savedQuestionCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
                     ],
                   ),
                 ),

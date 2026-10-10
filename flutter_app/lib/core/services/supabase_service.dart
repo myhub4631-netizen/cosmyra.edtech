@@ -16,6 +16,104 @@ import '../../shared/widgets/latex_view.dart';
 import 'ecommerce_automation_service.dart';
 import 'cloudflare_r2_service.dart';
 
+class ExamPaperFormatConfig {
+  static Map<String, dynamic> getPaperFormat({
+    required String exam,
+    String? sourceCategory,
+    String? year,
+    String? paperType,
+    String? paperName,
+    int? customCount,
+  }) {
+    final String examUpper = exam.trim().toUpperCase();
+    final String catUpper = (sourceCategory ?? '').trim().toUpperCase();
+    final String nameUpper = (paperName ?? '').trim().toUpperCase();
+    final int yearNum = int.tryParse(year ?? '') ?? 0;
+
+    // 1. NEET Exam Formats
+    if (examUpper.contains('NEET')) {
+      // A. NEET PYQs from 2021 to 2025: 200 questions per paper
+      if (catUpper.contains('PYQ') || catUpper.contains('PREVIOUS') || nameUpper.contains('PYQ')) {
+        if (yearNum >= 2021 && yearNum <= 2025) {
+          return {
+            'totalQuestions': 200,
+            'physicsCount': 50,
+            'chemistryCount': 50,
+            'botanyCount': 50,
+            'zoologyCount': 50,
+            'formatName': 'NEET NTA PYQ Pattern (200 Questions)',
+          };
+        }
+        if (yearNum > 0 && yearNum < 2021) {
+          return {
+            'totalQuestions': 180,
+            'physicsCount': 45,
+            'chemistryCount': 45,
+            'botanyCount': 45,
+            'zoologyCount': 45,
+            'formatName': 'NEET Classic PYQ Pattern (180 Questions)',
+          };
+        }
+      }
+
+      // B. NTA Question Bank Papers: 200 questions per paper
+      if (catUpper.contains('NTA') || nameUpper.contains('NTA')) {
+        return {
+          'totalQuestions': 200,
+          'physicsCount': 50,
+          'chemistryCount': 50,
+          'botanyCount': 50,
+          'zoologyCount': 50,
+          'formatName': 'NTA Pattern Mock (200 Questions)',
+        };
+      }
+
+      // C. NEET 2026 Paper 1 and standard NEET Test Series / Mock Papers: 180 questions
+      return {
+        'totalQuestions': 180,
+        'physicsCount': 45,
+        'chemistryCount': 45,
+        'botanyCount': 45,
+        'zoologyCount': 45,
+        'formatName': 'NEET Standard Format (180 Questions)',
+      };
+    }
+
+    // 2. JEE Main Formats
+    if (examUpper.contains('JEE MAIN') || (examUpper.contains('JEE') && !examUpper.contains('ADVANCED'))) {
+      return {
+        'totalQuestions': 75,
+        'physicsCount': 25,
+        'chemistryCount': 25,
+        'mathematicsCount': 25,
+        'formatName': 'JEE Main Format (75 Questions)',
+      };
+    }
+
+    // 3. JEE Advanced Formats
+    if (examUpper.contains('JEE ADVANCED') || examUpper.contains('ADVANCED')) {
+      return {
+        'totalQuestions': 54,
+        'physicsCount': 18,
+        'chemistryCount': 18,
+        'mathematicsCount': 18,
+        'formatName': 'JEE Advanced Format (54 Questions)',
+      };
+    }
+
+    // 4. Custom fallback if valid explicit count provided
+    final int total = (customCount != null && customCount > 0) ? customCount : 180;
+    return {
+      'totalQuestions': total,
+      'physicsCount': (total / 4).round(),
+      'chemistryCount': (total / 4).round(),
+      'botanyCount': (total / 4).round(),
+      'zoologyCount': (total / 4).round(),
+      'formatName': 'Custom Format ($total Questions)',
+    };
+  }
+}
+
 class SupabaseService {
   // Supports dynamic injection via --dart-define=SUPABASE_URL=... and --dart-define=SUPABASE_ANON_KEY=...
   static const String supabaseUrl = String.fromEnvironment(
