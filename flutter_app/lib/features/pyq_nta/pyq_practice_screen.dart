@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../../models/models.dart';
 import '../../models/pyq_models.dart';
 import '../../core/services/supabase_service.dart';
@@ -10,28 +12,42 @@ class ChapterItem {
   final String name;
   final List<TopicItem> topics;
   bool isExpanded;
+  bool isSelected;
 
   ChapterItem({
     required this.id,
     required this.name,
     required this.topics,
     this.isExpanded = true,
+    this.isSelected = false,
   });
 
-  bool get isFullySelected => topics.isNotEmpty && topics.every((t) => t.isSelected);
-  bool get isPartiallySelected => topics.any((t) => t.isSelected) && !isFullySelected;
+  bool get isFullySelected {
+    if (topics.isEmpty) return isSelected;
+    return isSelected || topics.every((t) => t.isSelected);
+  }
+
+  bool get isPartiallySelected {
+    if (topics.isEmpty) return false;
+    return !isFullySelected && topics.any((t) => t.isSelected);
+  }
+
   int get selectedTopicCount => topics.where((t) => t.isSelected).length;
 }
 
 class TopicItem {
   final String id;
   final String name;
+  final String chapterId;
+  final String chapterName;
   bool isSelected;
 
   TopicItem({
     required this.id,
     required this.name,
-    this.isSelected = true,
+    required this.chapterId,
+    required this.chapterName,
+    this.isSelected = false,
   });
 }
 
@@ -59,14 +75,15 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
   late String _selectedExam;
   late Set<String> _selectedSubjects;
   PYQPracticeMode _selectedMode = PYQPracticeMode.chapterWise;
-  
+
   bool _allYears = true;
   Set<int> _selectedYears = {2025};
-  
+
   int _questionCount = 20;
   String _difficulty = 'Medium';
 
   bool _isLoadingStats = true;
+  bool _isLoadingTaxonomy = true;
   bool _isStarting = false;
 
   int _availableQuestionsCount = 1248;
@@ -79,10 +96,12 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
 
   String _searchQuery = '';
   int _activeViewTab = 0; // 0 = Chapters, 1 = Topics
-  
+
   // Multi-Subject Chapters Map (PCB for NEET, PCM for JEE)
   Map<String, List<ChapterItem>> _subjectChaptersMap = {};
   String _activeStep2Subject = 'Physics';
+
+  List<Map<String, dynamic>> _savedPresets = [];
 
   @override
   void initState() {
@@ -94,9 +113,37 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     _activeStep2Subject = 'Physics';
     _loadStats();
     _initChapters();
+    _loadSavedPresets();
+  }
+
+  Future<void> _loadSavedPresets() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString('pyq_practice_presets');
+      if (str != null && str.isNotEmpty) {
+        final List list = jsonDecode(str);
+        if (mounted) {
+          setState(() {
+            _savedPresets = List<Map<String, dynamic>>.from(list);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading saved presets: $e');
+    }
+  }
+
+  Future<void> _savePresetToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('pyq_practice_presets', jsonEncode(_savedPresets));
+    } catch (e) {
+      debugPrint('Error saving preset to prefs: $e');
+    }
   }
 
   Future<void> _initChapters() async {
+    setState(() => _isLoadingTaxonomy = true);
     final isNeet = _selectedExam.contains('NEET');
     final examCode = isNeet ? 'NEET' : 'JEE Main';
     final subjects = isNeet ? ['Physics', 'Chemistry', 'Biology'] : ['Physics', 'Chemistry', 'Mathematics'];
@@ -111,31 +158,45 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         includeInactive: false,
       );
 
+      // Preserve existing selections if already present
+      final existingChapters = _subjectChaptersMap[sub] ?? [];
+      final Set<String> selChapterIds = { for (var c in existingChapters.where((c) => c.isSelected)) c.id };
+      final Set<String> selTopicIds = {};
+      for (var c in existingChapters) {
+        for (var t in c.topics.where((t) => t.isSelected)) {
+          selTopicIds.add(t.id);
+        }
+      }
+
       final List<ChapterItem> chapterItems = rawChapters.map((cMap) {
+        final cId = (cMap['id'] ?? '').toString();
+        final cName = (cMap['name'] ?? '').toString();
+
         final rawTopics = (cMap['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
         final topicItems = rawTopics.map((tMap) {
+          final tId = (tMap['id'] ?? '').toString();
           return TopicItem(
-            id: tMap['id'] ?? '',
-            name: tMap['name'] ?? '',
-            isSelected: true,
+            id: tId,
+            name: (tMap['name'] ?? '').toString(),
+            chapterId: cId,
+            chapterName: cName,
+            isSelected: selTopicIds.contains(tId),
           );
         }).toList();
 
+        final isChapSel = selChapterIds.contains(cId) || (topicItems.isNotEmpty && topicItems.every((t) => t.isSelected));
+
         return ChapterItem(
-          id: cMap['id'] ?? '',
-          name: cMap['name'] ?? '',
+          id: cId,
+          name: cName,
           isExpanded: false,
+          isSelected: isChapSel,
           topics: topicItems,
         );
       }).toList();
 
       if (chapterItems.isNotEmpty) {
-        chapterItems.first = ChapterItem(
-          id: chapterItems.first.id,
-          name: chapterItems.first.name,
-          isExpanded: true,
-          topics: chapterItems.first.topics,
-        );
+        chapterItems.first.isExpanded = true;
       }
 
       newMap[sub] = chapterItems;
@@ -147,6 +208,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         if (!_subjectChaptersMap.containsKey(_activeStep2Subject) && _subjectChaptersMap.isNotEmpty) {
           _activeStep2Subject = _subjectChaptersMap.keys.first;
         }
+        _isLoadingTaxonomy = false;
       });
     }
   }
@@ -177,6 +239,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         _selectedSubjects = {'Physics', 'Chemistry', 'Mathematics'};
         _activeStep2Subject = 'Physics';
       }
+      _subjectChaptersMap.clear();
       _initChapters();
     });
     _loadStats();
@@ -201,7 +264,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
   int get _totalSelectedChaptersCount {
     int total = 0;
     _subjectChaptersMap.forEach((sub, chapters) {
-      total += chapters.where((c) => c.topics.any((t) => t.isSelected)).length;
+      total += chapters.where((c) => c.isFullySelected || c.isPartiallySelected).length;
     });
     return total;
   }
@@ -222,12 +285,51 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
   void _toggleSelectAllActiveSubjectChapters(bool? val) {
     final select = val ?? !_areAllActiveSubjectChaptersSelected;
     setState(() {
-      for (var c in _activeChapters) {
+      final targetChapters = _searchQuery.isEmpty
+          ? _activeChapters
+          : _activeChapters.where((c) =>
+              c.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              c.topics.any((t) => t.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+            ).toList();
+
+      for (var c in targetChapters) {
+        c.isSelected = select;
         for (var t in c.topics) {
           t.isSelected = select;
         }
       }
     });
+  }
+
+  void _toggleChapterSelection(ChapterItem chapter, bool? val) {
+    setState(() {
+      final select = val ?? !chapter.isFullySelected;
+      chapter.isSelected = select;
+      for (var t in chapter.topics) {
+        t.isSelected = select;
+      }
+    });
+  }
+
+  void _toggleTopicSelection(TopicItem topic, bool? val) {
+    setState(() {
+      final select = val ?? !topic.isSelected;
+      topic.isSelected = select;
+      _syncChapterFromTopics(topic.chapterId);
+    });
+  }
+
+  void _syncChapterFromTopics(String chapterId) {
+    for (var sub in _subjectChaptersMap.keys) {
+      for (var c in _subjectChaptersMap[sub]!) {
+        if (c.id == chapterId) {
+          if (c.topics.isNotEmpty) {
+            c.isSelected = c.topics.every((t) => t.isSelected);
+          }
+          return;
+        }
+      }
+    }
   }
 
   String _formatTimeSpent(int seconds) {
@@ -240,10 +342,11 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
   }
 
   Future<void> _startPYQSession(bool isTestMode) async {
-    if (_totalSelectedTopicsCount == 0) {
+    final hasSelection = _totalSelectedChaptersCount > 0 || _totalSelectedTopicsCount > 0;
+    if (!hasSelection) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select at least one topic across subjects to start.'),
+          content: Text('Please select at least one chapter or topic to start.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -252,14 +355,33 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
 
     setState(() => _isStarting = true);
 
-    final activeSelectedSubjects = _subjectChaptersMap.entries
-        .where((entry) => entry.value.any((c) => c.topics.any((t) => t.isSelected)))
-        .map((entry) => entry.key)
-        .toList();
+    final List<String> selectedChapterIds = [];
+    final List<String> selectedTopicIds = [];
+    final List<String> activeSubjects = [];
+
+    _subjectChaptersMap.forEach((sub, chapters) {
+      bool subjectSelected = false;
+      for (var c in chapters) {
+        if (c.isFullySelected || c.isPartiallySelected || c.isSelected) {
+          selectedChapterIds.add(c.id);
+          subjectSelected = true;
+          for (var t in c.topics) {
+            if (t.isSelected) {
+              selectedTopicIds.add(t.id);
+            }
+          }
+        }
+      }
+      if (subjectSelected) {
+        activeSubjects.add(sub);
+      }
+    });
 
     final questions = await SupabaseService.fetchPYQQuestions(
       exam: _selectedExam,
-      subjects: activeSelectedSubjects.isEmpty ? _selectedSubjects.toList() : activeSelectedSubjects,
+      subjects: activeSubjects.isEmpty ? _selectedSubjects.toList() : activeSubjects,
+      chapterIds: selectedChapterIds,
+      topicIds: selectedTopicIds,
       years: _allYears ? null : _selectedYears.toList(),
       difficulty: _difficulty,
       limit: _questionCount,
@@ -272,7 +394,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     if (questions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No PYQs available for the selected topics.'),
+          content: Text('No PYQs available matching your selected chapters/topics and filters.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -286,6 +408,221 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     } else if (widget.onStartPractice != null) {
       widget.onStartPractice!(questions, timerMins);
     }
+  }
+
+  void _showSavePresetDialog() {
+    final List<String> selChapIds = [];
+    final List<String> selTopIds = [];
+    _subjectChaptersMap.forEach((sub, chapters) {
+      for (var c in chapters) {
+        if (c.isSelected || c.isFullySelected || c.isPartiallySelected) {
+          selChapIds.add(c.id);
+          for (var t in c.topics) {
+            if (t.isSelected) selTopIds.add(t.id);
+          }
+        }
+      }
+    });
+
+    if (selChapIds.isEmpty && selTopIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select chapters or topics before saving a preset.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final defaultName = '$_selectedExam Custom (${selChapIds.length} Chaps)';
+    final controller = TextEditingController(text: defaultName);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Save Practice Preset', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Save your current exam, subjects, chapter & topic selections for quick 1-tap practice later.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: 'Preset Name',
+                hintText: 'e.g. Mechanics & Optics Focus',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = controller.text.trim().isEmpty ? defaultName : controller.text.trim();
+              final preset = {
+                'id': 'preset_${DateTime.now().millisecondsSinceEpoch}',
+                'name': name,
+                'exam': _selectedExam,
+                'subjects': _selectedSubjects.toList(),
+                'chapterIds': selChapIds,
+                'topicIds': selTopIds,
+                'questionCount': _questionCount,
+                'difficulty': _difficulty,
+                'years': _selectedYears.toList(),
+                'allYears': _allYears,
+                'createdAt': DateTime.now().toIso8601String(),
+              };
+              setState(() {
+                _savedPresets.insert(0, preset);
+              });
+              _savePresetToPrefs();
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Preset "$name" saved successfully!'),
+                  backgroundColor: const Color(0xFF16A34A),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF7C3AED),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Save Preset', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSavedPresetsDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Saved Presets', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: _savedPresets.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Text(
+                    'No saved presets yet.\nMake a chapter/topic selection and tap "Save Preset".',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _savedPresets.length,
+                  itemBuilder: (context, index) {
+                    final p = _savedPresets[index];
+                    final chapCount = (p['chapterIds'] as List?)?.length ?? 0;
+                    final topCount = (p['topicIds'] as List?)?.length ?? 0;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: ListTile(
+                        title: Text(
+                          p['name'] ?? 'Saved Preset',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          '${p['exam']} • $chapCount Chapters • $topCount Topics',
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                              onPressed: () {
+                                setState(() {
+                                  _savedPresets.removeAt(index);
+                                });
+                                _savePresetToPrefs();
+                                Navigator.pop(ctx);
+                                _showSavedPresetsDialog();
+                              },
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                _loadPreset(p);
+                                Navigator.pop(ctx);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF7C3AED),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: const Text('Apply', style: TextStyle(fontSize: 12, color: Colors.white)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _loadPreset(Map<String, dynamic> preset) {
+    final String exam = preset['exam'] ?? _selectedExam;
+    final List chapIds = preset['chapterIds'] ?? [];
+    final List topIds = preset['topicIds'] ?? [];
+
+    setState(() {
+      _selectedExam = exam;
+      if (preset['questionCount'] != null) _questionCount = preset['questionCount'];
+      if (preset['difficulty'] != null) _difficulty = preset['difficulty'];
+      if (preset['years'] != null) {
+        _selectedYears = Set<int>.from(preset['years']);
+      }
+      if (preset['allYears'] != null) {
+        _allYears = preset['allYears'];
+      }
+
+      _subjectChaptersMap.forEach((sub, chapters) {
+        for (var c in chapters) {
+          final matchChap = chapIds.contains(c.id);
+          c.isSelected = matchChap;
+          for (var t in c.topics) {
+            t.isSelected = topIds.contains(t.id) || matchChap;
+          }
+        }
+      });
+      _currentStep = 2;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Preset "${preset['name']}" applied!'),
+        backgroundColor: const Color(0xFF7C3AED),
+      ),
+    );
   }
 
   void _showCustomQuestionCountDialog() {
@@ -379,17 +716,24 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                                     },
                                   ),
                                   const SizedBox(width: 8),
-                                  Text(
+                                  const Text(
                                     'PYQ Practice Engine',
-                                    style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 16),
+                                    style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 16),
                                   ),
                                   const Spacer(),
+                                  if (_savedPresets.isNotEmpty) ...[
+                                    TextButton.icon(
+                                      onPressed: _showSavedPresetsDialog,
+                                      icon: const Icon(Icons.bookmarks_outlined, size: 16, color: Color(0xFF7C3AED)),
+                                      label: Text(
+                                        'Presets (${_savedPresets.length})',
+                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                  ],
                                   OutlinedButton.icon(
-                                    onPressed: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Preset saved successfully!')),
-                                      );
-                                    },
+                                    onPressed: _showSavePresetDialog,
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: const Color(0xFF7C3AED),
                                       side: const BorderSide(color: Color(0xFF7C3AED), width: 1.2),
@@ -404,7 +748,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                               const SizedBox(height: 6),
                               Text(
                                 _currentStep == 1
-                                    ? 'Practice previous year questions chapter-wise and year-wise to ace NEET'
+                                    ? 'Practice previous year questions chapter-wise and year-wise to ace NEET / JEE'
                                     : 'Practice previous year questions chapter-wise and topic-wise',
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
@@ -959,7 +1303,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  '🎯 Start PYQ Practice',
+                  '🎯 Select Chapters & Topics',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
               ],
@@ -982,7 +1326,10 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
 
     final filteredChapters = _searchQuery.isEmpty
         ? currentChapters
-        : currentChapters.where((c) => c.name.toLowerCase().contains(_searchQuery.toLowerCase()) || c.topics.any((t) => t.name.toLowerCase().contains(_searchQuery.toLowerCase()))).toList();
+        : currentChapters.where((c) =>
+            c.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            c.topics.any((t) => t.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+          ).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -999,7 +1346,6 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
             children: availableSubjects.map((sub) {
               final isSel = _activeStep2Subject == sub;
               final subChapters = _subjectChaptersMap[sub] ?? [];
-              final subTopicCount = subChapters.fold(0, (s, c) => s + c.topics.length);
 
               IconData iconData = Icons.science_outlined;
               Color activeColor = const Color(0xFF7C3AED);
@@ -1224,13 +1570,18 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                       child: TextField(
                         onChanged: (v) => setState(() => _searchQuery = v),
                         decoration: InputDecoration(
-                          hintText: 'Search $activeSubject chapters...',
+                          hintText: _activeViewTab == 0 ? 'Search $activeSubject chapters...' : 'Search $activeSubject topics...',
                           hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                           border: InputBorder.none,
                           isDense: true,
                         ),
                       ),
                     ),
+                    if (_searchQuery.isNotEmpty)
+                      GestureDetector(
+                        onTap: () => setState(() => _searchQuery = ''),
+                        child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
+                      ),
                   ],
                 ),
               ),
@@ -1248,7 +1599,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                 icon: const Icon(Icons.tune_rounded, size: 18, color: Color(0xFF64748B)),
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Filter parameters applied.')),
+                    const SnackBar(content: Text('Filter parameters active.')),
                   );
                 },
               ),
@@ -1283,7 +1634,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
             Row(
               children: [
                 Text(
-                  '${currentChapters.where((c) => c.topics.any((t) => t.isSelected)).length} selected',
+                  '${currentChapters.where((c) => c.isFullySelected || c.isPartiallySelected).length} selected',
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
                 ),
                 const SizedBox(width: 4),
@@ -1294,121 +1645,251 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         ),
         const SizedBox(height: 12),
 
-        // Accordion Chapter Cards List
-        ...filteredChapters.map((chapter) {
-          final isFully = chapter.isFullySelected;
-          final isPartial = chapter.isPartiallySelected;
+        if (_isLoadingTaxonomy)
+          const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+        else if (_activeViewTab == 0)
+          _buildChaptersView(filteredChapters)
+        else
+          _buildTopicsView(currentChapters),
 
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildChaptersView(List<ChapterItem> filteredChapters) {
+    if (filteredChapters.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        alignment: Alignment.center,
+        child: Text(
+          _searchQuery.isNotEmpty ? 'No chapters match "$_searchQuery"' : 'No chapters available for $_activeStep2Subject.',
+          style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+        ),
+      );
+    }
+
+    return Column(
+      children: filteredChapters.map((chapter) {
+        final isFully = chapter.isFullySelected;
+        final isPartial = chapter.isPartiallySelected;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isFully ? const Color(0xFF7C3AED) : (isPartial ? const Color(0xFFA78BFA) : const Color(0xFFE2E8F0)),
+              width: isFully || isPartial ? 1.5 : 1,
             ),
-            child: Column(
-              children: [
-                // Chapter Main Row
-                InkWell(
-                  onTap: () {
-                    setState(() => chapter.isExpanded = !chapter.isExpanded);
-                  },
-                  borderRadius: BorderRadius.circular(16),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    child: Row(
+          ),
+          child: Column(
+            children: [
+              // Chapter Main Row
+              InkWell(
+                onTap: () {
+                  setState(() => chapter.isExpanded = !chapter.isExpanded);
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: Checkbox(
+                          value: isFully ? true : (isPartial ? null : false),
+                          tristate: true,
+                          activeColor: const Color(0xFF7C3AED),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          onChanged: (val) => _toggleChapterSelection(chapter, val),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              chapter.name,
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            ),
+                            if (chapter.topics.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 2),
+                                child: Text(
+                                  'Chapter level selection',
+                                  style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        chapter.topics.isNotEmpty
+                            ? '${chapter.selectedTopicCount} / ${chapter.topics.length} Topics'
+                            : (chapter.isSelected ? 'Selected' : '0 Topics'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: (chapter.isSelected || isFully || isPartial) ? const Color(0xFF7C3AED) : const Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        chapter.isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        color: const Color(0xFF94A3B8),
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Expanded Topics List
+              if (chapter.isExpanded && chapter.topics.isNotEmpty) ...[
+                const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                Padding(
+                  padding: const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 8),
+                  child: Column(
+                    children: chapter.topics.map((topic) {
+                      return InkWell(
+                        onTap: () => _toggleTopicSelection(topic, null),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: Checkbox(
+                                  value: topic.isSelected,
+                                  activeColor: const Color(0xFF7C3AED),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                  onChanged: (val) => _toggleTopicSelection(topic, val),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  topic.name,
+                                  style: const TextStyle(fontSize: 13, color: Color(0xFF334155), fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFFCBD5E1)),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildTopicsView(List<ChapterItem> chapters) {
+    final List<TopicItem> allTopics = [];
+    for (var c in chapters) {
+      allTopics.addAll(c.topics);
+    }
+
+    final filteredTopics = _searchQuery.isEmpty
+        ? allTopics
+        : allTopics.where((t) =>
+            t.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+            t.chapterName.toLowerCase().contains(_searchQuery.toLowerCase())
+          ).toList();
+
+    if (allTopics.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        alignment: Alignment.center,
+        child: Column(
+          children: [
+            const Icon(Icons.format_list_bulleted_outlined, size: 40, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 12),
+            Text(
+              'No topics listed for $_activeStep2Subject yet.',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'You can select chapters directly to practice questions.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (filteredTopics.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(24),
+        alignment: Alignment.center,
+        child: Text(
+          'No topics match "$_searchQuery"',
+          style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+        ),
+      );
+    }
+
+    return Column(
+      children: filteredTopics.map((topic) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: topic.isSelected ? const Color(0xFF7C3AED) : const Color(0xFFE2E8F0)),
+          ),
+          child: InkWell(
+            onTap: () => _toggleTopicSelection(topic, null),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: Checkbox(
+                      value: topic.isSelected,
+                      activeColor: const Color(0xFF7C3AED),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      onChanged: (val) => _toggleTopicSelection(topic, val),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: Checkbox(
-                            value: isFully ? true : (isPartial ? null : false),
-                            tristate: true,
-                            activeColor: const Color(0xFF7C3AED),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                            onChanged: (val) {
-                              setState(() {
-                                final select = val ?? true;
-                                for (var t in chapter.topics) {
-                                  t.isSelected = select;
-                                }
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            chapter.name,
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                          ),
-                        ),
                         Text(
-                          '${chapter.selectedTopicCount} / ${chapter.topics.length} Topics',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                          topic.name,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
                         ),
-                        const SizedBox(width: 4),
-                        Icon(
-                          chapter.isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                          color: const Color(0xFF94A3B8),
-                          size: 20,
+                        const SizedBox(height: 2),
+                        Text(
+                          topic.chapterName,
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF7C3AED), fontWeight: FontWeight.w500),
                         ),
                       ],
                     ),
                   ),
-                ),
-
-                // Expanded Topics List
-                if (chapter.isExpanded) ...[
-                  const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 8),
-                    child: Column(
-                      children: chapter.topics.map((topic) {
-                        return InkWell(
-                          onTap: () {
-                            setState(() => topic.isSelected = !topic.isSelected);
-                          },
-                          borderRadius: BorderRadius.circular(8),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: Checkbox(
-                                    value: topic.isSelected,
-                                    activeColor: const Color(0xFF7C3AED),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                                    onChanged: (val) {
-                                      setState(() => topic.isSelected = val ?? false);
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    topic.name,
-                                    style: const TextStyle(fontSize: 13, color: Color(0xFF334155), fontWeight: FontWeight.w500),
-                                  ),
-                                ),
-                                const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFFCBD5E1)),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
                 ],
-              ],
+              ),
             ),
-          );
-        }).toList(),
-
-        const SizedBox(height: 20),
-      ],
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -1417,100 +1898,207 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
   Widget _buildStickyBottomBarStep2() {
     final isNeet = _selectedExam.contains('NEET');
     final pcbPcmLabel = isNeet ? 'PCB' : 'PCM';
+    final hasSelection = _totalSelectedChaptersCount > 0 || _totalSelectedTopicsCount > 0;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 12 : 20,
+        vertical: isMobile ? 10 : 14,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
         boxShadow: [
-          BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, -4)),
+          BoxShadow(color: Color(0x0F000000), blurRadius: 10, offset: Offset(0, -4)),
         ],
       ),
       child: SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                // Cumulative Selected Counter Pill Card
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F3FF),
-                    borderRadius: BorderRadius.circular(12),
+            if (isMobile) ...[
+              // Mobile Responsive Layout: Row 1 = Summary Badge & Config Status
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F3FF),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFDDD6FE)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF7C3AED), size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Selected ($pcbPcmLabel): ',
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                        ),
+                        Text(
+                          '$_totalSelectedChaptersCount Chap • $_totalSelectedTopicsCount Top',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.label_outlined, color: Color(0xFF7C3AED), size: 18),
-                      const SizedBox(width: 6),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Selected ($pcbPcmLabel)', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
-                          Text(
-                            '$_totalSelectedChaptersCount Chap • $_totalSelectedTopicsCount Top',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                  Text(
+                    '$_questionCount Qs • $_difficulty',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              // Mobile Responsive Layout: Row 2 = Side-by-Side Action Buttons with Single-line Text & FittedBox
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: OutlinedButton(
+                        onPressed: (!hasSelection || _isStarting) ? null : () => _startPYQSession(false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF7C3AED),
+                          side: BorderSide(
+                            color: hasSelection ? const Color(0xFF7C3AED) : const Color(0xFFCBD5E1),
+                            width: 1.5,
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                // Button 1: Start Practice (Outlined Purple)
-                Expanded(
-                  child: SizedBox(
-                    height: 46,
-                    child: OutlinedButton.icon(
-                      onPressed: (_totalSelectedTopicsCount == 0 || _isStarting) ? null : () => _startPYQSession(false),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF7C3AED),
-                        side: const BorderSide(color: Color(0xFF7C3AED), width: 1.5),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      icon: const Icon(Icons.play_arrow_rounded, color: Color(0xFF7C3AED), size: 18),
-                      label: const Text(
-                        'Start Practice',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.play_arrow_rounded, size: 20),
+                            SizedBox(width: 4),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Start Practice',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-
-                // Button 2: Start Test (Solid Purple)
-                Expanded(
-                  child: SizedBox(
-                    height: 46,
-                    child: ElevatedButton.icon(
-                      onPressed: (_totalSelectedTopicsCount == 0 || _isStarting) ? null : () => _startPYQSession(true),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF7C3AED),
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      icon: const Icon(Icons.assignment_turned_in_rounded, color: Colors.white, size: 16),
-                      label: const Text(
-                        'Start Test',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: (!hasSelection || _isStarting) ? null : () => _startPYQSession(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF7C3AED),
+                          disabledBackgroundColor: const Color(0xFFCBD5E1),
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.assignment_turned_in_rounded, color: Colors.white, size: 18),
+                            SizedBox(width: 4),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                'Start Test',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Bottom Note
+                ],
+              ),
+            ] else ...[
+              // Desktop/Tablet Layout: Single Row with Card + Buttons
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F3FF),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.label_outlined, color: Color(0xFF7C3AED), size: 20),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Selected ($pcbPcmLabel)', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                            Text(
+                              '$_totalSelectedChaptersCount Chap • $_totalSelectedTopicsCount Top',
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        onPressed: (!hasSelection || _isStarting) ? null : () => _startPYQSession(false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF7C3AED),
+                          side: BorderSide(
+                            color: hasSelection ? const Color(0xFF7C3AED) : const Color(0xFFCBD5E1),
+                            width: 1.5,
+                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.play_arrow_rounded, color: Color(0xFF7C3AED), size: 20),
+                        label: const Text(
+                          'Start Practice',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: (!hasSelection || _isStarting) ? null : () => _startPYQSession(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF7C3AED),
+                          disabledBackgroundColor: const Color(0xFFCBD5E1),
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.assignment_turned_in_rounded, color: Colors.white, size: 18),
+                        label: const Text(
+                          'Start Test',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 6),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: const [
                 Icon(Icons.info_outline_rounded, size: 12, color: Color(0xFF94A3B8)),
                 SizedBox(width: 4),
                 Text(
-                  'You can review and change your selection in the next step.',
+                  'You can review and change your selection before starting practice.',
                   style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
                 ),
               ],

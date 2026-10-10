@@ -1365,6 +1365,22 @@ class SupabaseService {
         }).toList());
 
         if (dbChapters.isNotEmpty) {
+          final seeds = _getSeedChaptersForSubject(exam, subject);
+          for (var c in dbChapters) {
+            final tList = c['topicsList'] as List?;
+            if (tList == null || tList.isEmpty) {
+              final cName = (c['name'] ?? '').toString().trim().toLowerCase();
+              final seedMatch = seeds.firstWhere(
+                (s) => (s['name'] ?? '').toString().trim().toLowerCase() == cName ||
+                       cName.contains((s['name'] ?? '').toString().trim().toLowerCase()),
+                orElse: () => <String, dynamic>{},
+              );
+              if (seedMatch.isNotEmpty && seedMatch['topicsList'] is List && (seedMatch['topicsList'] as List).isNotEmpty) {
+                c['topicsList'] = seedMatch['topicsList'];
+                c['topics'] = (seedMatch['topicsList'] as List).length;
+              }
+            }
+          }
           _dynamicTaxonomyStore[storeKey] = dbChapters;
           await _saveTaxonomyToLocalStorage();
         }
@@ -4697,6 +4713,20 @@ class SupabaseService {
         if (q.difficulty.toLowerCase() != difficulty.toLowerCase()) {
           return false;
         }
+      }
+
+      // 4. Chapter & Topic filtering
+      final hasChapterFilter = chapterIds != null && chapterIds.isNotEmpty;
+      final hasTopicFilter = topicIds != null && topicIds.isNotEmpty;
+
+      if (hasTopicFilter && hasChapterFilter) {
+        final matchesTopic = q.topicId != null && topicIds!.contains(q.topicId);
+        final matchesChapter = chapterIds!.contains(q.chapterId);
+        if (!matchesTopic && !matchesChapter) return false;
+      } else if (hasTopicFilter) {
+        if (q.topicId != null && !topicIds!.contains(q.topicId)) return false;
+      } else if (hasChapterFilter) {
+        if (!chapterIds!.contains(q.chapterId)) return false;
       }
 
       return true;
