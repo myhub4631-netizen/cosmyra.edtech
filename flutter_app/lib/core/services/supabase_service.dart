@@ -8048,12 +8048,24 @@ class SupabaseService {
           }
 
           // Grouping for NEET 2026 Paper 1 / NEET 2026 Phase 1
-          if (pId == 'neet_2026_phase_1' || pTitle.contains('NEET 2026')) {
+          if (pId == 'neet_2026_phase_1' || pId == '49bfe774-1e41-495e-a029-49bf1e41595e' || pTitle.contains('NEET 2026')) {
             final p1Count = countsByPaperStr['NEET 2026 Paper 1'] ?? 0;
             final phase1Count = countsByPaperStr['NEET 2026 Phase 1'] ?? 0;
             if (p1Count > 0 || phase1Count > 0) {
               actualCount = p1Count + phase1Count; // 178 + 2 = 180!
             }
+            p['exam'] ??= 'NEET';
+            p['target_exam'] ??= 'NEET';
+            p['year'] ??= '2026';
+            p['status'] = 'Published';
+            subjCounts = {'physics': 45, 'chemistry': 45, 'biology': 90};
+          } else if (actualCount >= 180 && (examName.toUpperCase().contains('NEET') || pTitle.toUpperCase().contains('NEET'))) {
+            subjCounts = {'physics': 45, 'chemistry': 45, 'biology': 90};
+          } else if (actualCount > 0 && subjCounts.isEmpty) {
+            final pCount = (actualCount * 0.25).round();
+            final cCount = (actualCount * 0.25).round();
+            final bCount = actualCount - (pCount + cCount);
+            subjCounts = {'physics': pCount, 'chemistry': cCount, 'biology': bCount};
           }
 
           // Derive canonical expected format from ExamPaperFormatConfig
@@ -8075,12 +8087,32 @@ class SupabaseService {
       debugPrint('Notice resolving paper question counts: $e');
     }
 
+    // Deduplicate duplicate titles or IDs
+    final List<Map<String, dynamic>> deduped = [];
+    final Set<String> seenKeys = {};
+    for (var p in papers) {
+      final id = (p['id'] ?? p['paper_id'] ?? '').toString().trim();
+      final title = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().trim();
+      final key = '${id}_$title'.toLowerCase();
+      if (id == '49bfe774-1e41-495e-a029-49bf1e41595e' || id == 'neet_2026_phase_1') {
+        // Prioritize canonical record
+        if (!seenKeys.contains(id)) {
+          seenKeys.add(id);
+          deduped.add(p);
+        }
+      } else if (!seenKeys.contains(key) && !seenKeys.contains(id)) {
+        seenKeys.add(key);
+        if (id.isNotEmpty) seenKeys.add(id);
+        deduped.add(p);
+      }
+    }
+
     if (exam != null && exam.trim().isNotEmpty && exam.trim() != 'All') {
       final String targetExamUpper = exam.trim().toUpperCase();
       final bool isJee = targetExamUpper.contains('JEE');
       final bool isNeet = targetExamUpper.contains('NEET');
 
-      return papers.where((p) {
+      return deduped.where((p) {
         final String pExam = (p['exam'] ?? p['exam_name'] ?? p['target_exam'] ?? p['exam_id'] ?? '').toString().toUpperCase();
         final String pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toUpperCase();
 
@@ -8100,7 +8132,7 @@ class SupabaseService {
       }).toList();
     }
 
-    return papers;
+    return deduped;
   }
 
   /// Fetch QuestionModels for Test Series / Paper directly from Supabase DB & cache
