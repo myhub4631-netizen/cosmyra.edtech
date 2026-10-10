@@ -21,6 +21,40 @@ void main() {
       await SupabaseService.initialize();
     });
 
+    tearDownAll(() async {
+      try {
+        final sysRes = await SupabaseService.client
+            .from('system_config')
+            .select('value')
+            .eq('key', 'admin_custom_papers')
+            .maybeSingle();
+
+        if (sysRes != null && sysRes['value'] is List) {
+          final List<Map<String, dynamic>> list = (sysRes['value'] as List)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+
+          final countBefore = list.length;
+          list.removeWhere((p) {
+            final name = (p['paper_name'] ?? p['title'] ?? '').toString();
+            final id = (p['id'] ?? p['paper_id'] ?? '').toString();
+            return name.contains('Paper Recreated') ||
+                name.contains('Disposable Test') ||
+                id.startsWith('paper_recreate_') ||
+                id.startsWith('paper_test_delete_');
+          });
+
+          if (list.length < countBefore) {
+            await SupabaseService.client.from('system_config').upsert({
+              'key': 'admin_custom_papers',
+              'value': list,
+              'updated_at': DateTime.now().toIso8601String(),
+            }, onConflict: 'key');
+          }
+        }
+      } catch (_) {}
+    });
+
     test('1. Delete Custom Paper Persistence Test', () async {
       final String customPaperId = 'paper_test_delete_${DateTime.now().millisecondsSinceEpoch}';
 
