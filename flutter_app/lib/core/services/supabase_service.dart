@@ -5126,14 +5126,24 @@ class SupabaseService {
 
   /// Delete paper record from database, system_config and local storage safely
   static Future<bool> deletePaperRecord(String paperId) async {
-    // 1. Delete from Supabase 'papers' table (raising exception if FK constraint fails)
+    // 1. Delete from Supabase 'papers' and 'tests' tables (raising exception if FK constraint fails)
     try {
-      await client.from('papers').delete().eq('id', paperId);
+      await client.from('papers').delete().eq('id', paperId).select();
     } catch (e) {
       debugPrint('Supabase paper delete notice: $e');
       final errStr = e.toString();
       if (errStr.contains('foreign key') || errStr.contains('violates foreign key constraint') || errStr.contains('42501')) {
         throw Exception('Cannot delete paper record because it has historical student attempts or dependent references. Please use Archive instead.');
+      }
+    }
+
+    try {
+      await client.from('tests').delete().eq('id', paperId).select();
+    } catch (e) {
+      debugPrint('Supabase test delete notice: $e');
+      final errStr = e.toString();
+      if (errStr.contains('foreign key') || errStr.contains('violates foreign key constraint') || errStr.contains('42501')) {
+        throw Exception('Cannot delete test record because it has historical student attempts or dependent references. Please use Archive instead.');
       }
     }
 
@@ -5147,7 +5157,7 @@ class SupabaseService {
         if (sysRes != null && sysRes['value'] is List) {
           final List<Map<String, dynamic>> list = (sysRes['value'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
           final countBefore = list.length;
-          list.removeWhere((p) => p['id'] == paperId || p['paper_id'] == paperId);
+          list.removeWhere((p) => (p['id'] ?? p['paper_id'] ?? '').toString() == paperId);
           if (list.length < countBefore) {
             await client.from('system_config').upsert({
               'key': key,
@@ -5161,12 +5171,19 @@ class SupabaseService {
       debugPrint('Notice deleting paper from system_config: $e');
     }
 
-    // 4. Remove from system_config 'admin_custom_test_series'
+    // 4. Remove from system_config 'admin_custom_test_series' (top-level and embedded)
     try {
       final sysRes = await client.from('system_config').select('value').eq('key', 'admin_custom_test_series').maybeSingle();
       if (sysRes != null && sysRes['value'] is List) {
         final List<Map<String, dynamic>> list = (sysRes['value'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
         bool changed = false;
+
+        final countBeforeOuter = list.length;
+        list.removeWhere((s) => (s['id'] ?? s['paper_id'] ?? '').toString() == paperId);
+        if (list.length < countBeforeOuter) {
+          changed = true;
+        }
+
         for (var series in list) {
           if (series['tests'] is List) {
             final tests = (series['tests'] as List).whereType<Map>().map((t) => Map<String, dynamic>.from(t)).toList();
@@ -5208,6 +5225,9 @@ class SupabaseService {
     }
 
     _cachedDbPapers = null;
+    _cachedTestSeries = null;
+    _cachedQuestionModels.clear();
+    _cachedPaperQuestions.clear();
     return true;
   }
 
