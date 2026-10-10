@@ -1246,6 +1246,7 @@ class _AdminQuestionsBankDashboardState extends State<AdminQuestionsBankDashboar
                 _buildSidebarItem(Icons.grid_view_rounded, 'Topics', false, onTap: () => context.go('/admin/topics')),
                 _buildSidebarItem(Icons.help_outline_rounded, 'Questions', true, onTap: () => context.go('/admin/questions')),
                 _buildSidebarItem(Icons.description_outlined, 'NTA Mock Papers', false, onTap: () => context.go('/admin/mock-papers')),
+                _buildSidebarItem(Icons.insert_drive_file_outlined, 'PYQ Paper Manager', false, onTap: () => context.go('/admin/pyq-papers')),
 
                 const SizedBox(height: 14),
                 if (!_isSidebarCollapsed)

@@ -5005,6 +5005,61 @@ class SupabaseService {
     return fullData;
   }
 
+  /// Delete paper record from database and local storage safely
+  static Future<bool> deletePaperRecord(String paperId) async {
+    try {
+      await client.from('papers').delete().eq('id', paperId);
+    } catch (e) {
+      debugPrint('Supabase paper delete notice: $e');
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString('cosmyra_saved_papers');
+      if (str != null && str.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(str);
+        list.removeWhere((item) {
+          final id = (item['id'] ?? item['paper_id'] ?? '').toString();
+          return id == paperId;
+        });
+        await prefs.setString('cosmyra_saved_papers', jsonEncode(list));
+      }
+    } catch (e) {
+      debugPrint('Notice deleting local paper record: $e');
+    }
+    _cachedDbPapers = null;
+    return true;
+  }
+
+  /// Archive or restore paper record
+  static Future<bool> archivePaperRecord(String paperId, {required bool isArchived}) async {
+    final statusStr = isArchived ? 'Archived' : 'Published';
+    try {
+      await client.from('papers').update({'status': statusStr, 'updated_at': DateTime.now().toIso8601String()}).eq('id', paperId);
+    } catch (e) {
+      debugPrint('Supabase paper archive update notice: $e');
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString('cosmyra_saved_papers');
+      if (str != null && str.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(str);
+        final idx = list.indexWhere((item) {
+          final id = (item['id'] ?? item['paper_id'] ?? '').toString();
+          return id == paperId;
+        });
+        if (idx != -1) {
+          list[idx]['status'] = statusStr;
+          list[idx]['updated_at'] = DateTime.now().toIso8601String();
+          await prefs.setString('cosmyra_saved_papers', jsonEncode(list));
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice updating local paper status: $e');
+    }
+    _cachedDbPapers = null;
+    return true;
+  }
+
   // ================= PAYMENT GATEWAYS & SETTINGS =================
   static bool parseBool(dynamic value, {bool defaultValue = true}) {
     if (value == null) return defaultValue;

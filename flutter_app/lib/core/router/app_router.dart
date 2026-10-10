@@ -39,6 +39,7 @@ import '../../features/admin/admin_dashboard_screen.dart';
 import '../../features/admin/admin_user_management_screen.dart';
 import '../../features/admin/admin_chapters_topics_screen.dart';
 import '../../features/admin/admin_questions_bank_dashboard.dart';
+import '../../features/admin/admin_pyq_paper_manager_screen.dart';
 import '../../features/admin/admin_bulk_upload_step1_screen.dart';
 import '../../features/admin/admin_bulk_upload_step2_screen.dart';
 import '../../features/admin/admin_pricing_screen.dart';
@@ -1282,7 +1283,13 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/admin/papers',
-      builder: (context, state) => AdminQuestionsBankDashboard(
+      builder: (context, state) => AdminPyqPaperManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/pyq-papers',
+      builder: (context, state) => AdminPyqPaperManagerScreen(
         userProfile: SupabaseService.getMockProfile(role: 'admin'),
       ),
     ),
