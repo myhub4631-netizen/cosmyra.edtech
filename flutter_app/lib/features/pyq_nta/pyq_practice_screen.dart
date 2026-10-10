@@ -71,20 +71,18 @@ class PYQPracticeScreen extends StatefulWidget {
 }
 
 class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
-  int _currentStep = 1; // 1 = Select Subject & Options, 2 = Select Chapters & Topics
+  int _currentStep = 1; // 1 = Practice Mode, 2 = Select Subjects, 3 = Chapters/Topics or Paper Selection
 
   late String _selectedExam;
   late Set<String> _selectedSubjects;
   PYQPracticeMode _selectedMode = PYQPracticeMode.chapterWise;
-
-  bool _allYears = true;
-  Set<int> _selectedYears = {2025};
 
   int _questionCount = 20;
   String _difficulty = 'Medium';
 
   bool _isLoadingStats = true;
   bool _isLoadingTaxonomy = true;
+  bool _isLoadingPapers = false;
   bool _isStarting = false;
 
   int _availableQuestionsCount = 1248;
@@ -93,16 +91,18 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
   int _timeSpentSeconds = 101700;
   Map<String, int> _subjectPYQCounts = {};
 
-  final List<int> _availableYearsList = List<int>.generate(2029 - 1988 + 1, (i) => 2029 - i);
-
   String _searchQuery = '';
   int _activeViewTab = 0; // 0 = Chapters, 1 = Topics
 
   // Multi-Subject Chapters Map (PCB for NEET, PCM for JEE)
   Map<String, List<ChapterItem>> _subjectChaptersMap = {};
-  String _activeStep2Subject = 'Physics';
+  String _activeStep3Subject = 'Physics';
 
   List<Map<String, dynamic>> _savedPresets = [];
+
+  // Paper-wise Mode State
+  List<Map<String, dynamic>> _availablePaperRecords = [];
+  Map<String, dynamic>? _selectedPaperRecord;
 
   @override
   void initState() {
@@ -111,9 +111,10 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     _selectedSubjects = _selectedExam.contains('NEET')
         ? {'Physics', 'Chemistry', 'Biology'}
         : {'Physics', 'Chemistry', 'Mathematics'};
-    _activeStep2Subject = 'Physics';
+    _activeStep3Subject = 'Physics';
     _loadStats();
     _initChapters();
+    _loadAvailablePapers();
     _loadSavedPresets();
   }
 
@@ -143,6 +144,140 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     }
   }
 
+  Future<void> _loadAvailablePapers() async {
+    setState(() => _isLoadingPapers = true);
+    final papers = await SupabaseService.fetchAllPapersAndTestSeries(
+      exam: _selectedExam,
+      forceRefresh: true,
+    );
+
+    final isNeet = _selectedExam.contains('NEET');
+    final List<Map<String, dynamic>> canonicalList = isNeet
+        ? [
+            {
+              'id': 'neet_2026_phase_1',
+              'name': 'NEET 2026 Phase 1',
+              'title': 'NEET 2026 Phase 1',
+              'year': 2026,
+              'exam': 'NEET 2026',
+              'questionsCount': 180,
+              'subjects': ['Physics', 'Chemistry', 'Biology'],
+            },
+            {
+              'id': 'neet_2026_reneet',
+              'name': 'NEET 2026 Re-NEET',
+              'title': 'NEET 2026 Re-NEET',
+              'year': 2026,
+              'exam': 'NEET 2026',
+              'questionsCount': 180,
+              'subjects': ['Physics', 'Chemistry', 'Biology'],
+            },
+            {
+              'id': 'neet_2025_paper_1',
+              'name': 'NEET 2025 (Official PYQ)',
+              'title': 'NEET 2025 (Official PYQ)',
+              'year': 2025,
+              'exam': 'NEET 2025',
+              'questionsCount': 200,
+              'subjects': ['Physics', 'Chemistry', 'Biology'],
+            },
+            {
+              'id': 'neet_2024_paper_1',
+              'name': 'NEET 2024 (Official PYQ)',
+              'title': 'NEET 2024 (Official PYQ)',
+              'year': 2024,
+              'exam': 'NEET 2024',
+              'questionsCount': 200,
+              'subjects': ['Physics', 'Chemistry', 'Biology'],
+            },
+            {
+              'id': 'neet_2023_paper_1',
+              'name': 'NEET 2023 (Official PYQ)',
+              'title': 'NEET 2023 (Official PYQ)',
+              'year': 2023,
+              'exam': 'NEET 2023',
+              'questionsCount': 200,
+              'subjects': ['Physics', 'Chemistry', 'Biology'],
+            },
+            {
+              'id': 'neet_2022_paper_1',
+              'name': 'NEET 2022 (Official PYQ)',
+              'title': 'NEET 2022 (Official PYQ)',
+              'year': 2022,
+              'exam': 'NEET 2022',
+              'questionsCount': 200,
+              'subjects': ['Physics', 'Chemistry', 'Biology'],
+            },
+            {
+              'id': 'neet_2021_paper_1',
+              'name': 'NEET 2021 (Official PYQ)',
+              'title': 'NEET 2021 (Official PYQ)',
+              'year': 2021,
+              'exam': 'NEET 2021',
+              'questionsCount': 200,
+              'subjects': ['Physics', 'Chemistry', 'Biology'],
+            },
+          ]
+        : [
+            {
+              'id': 'jee_main_2026_s1',
+              'name': 'JEE Main 2026 Shift 1',
+              'title': 'JEE Main 2026 Shift 1',
+              'year': 2026,
+              'exam': 'JEE Main 2026',
+              'questionsCount': 75,
+              'subjects': ['Physics', 'Chemistry', 'Mathematics'],
+            },
+            {
+              'id': 'jee_main_2025_s1',
+              'name': 'JEE Main 2025 Shift 1',
+              'title': 'JEE Main 2025 Shift 1',
+              'year': 2025,
+              'exam': 'JEE Main 2025',
+              'questionsCount': 75,
+              'subjects': ['Physics', 'Chemistry', 'Mathematics'],
+            },
+            {
+              'id': 'jee_main_2024_s1',
+              'name': 'JEE Main 2024 Shift 1',
+              'title': 'JEE Main 2024 Shift 1',
+              'year': 2024,
+              'exam': 'JEE Main 2024',
+              'questionsCount': 75,
+              'subjects': ['Physics', 'Chemistry', 'Mathematics'],
+            },
+          ];
+
+    final Set<String> ids = {};
+    final List<Map<String, dynamic>> combined = [];
+
+    for (var p in papers) {
+      final name = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? p['name'] ?? '').toString();
+      if (name.isNotEmpty && !ids.contains(name.toLowerCase())) {
+        ids.add(name.toLowerCase());
+        combined.add(p);
+      }
+    }
+
+    for (var c in canonicalList) {
+      final name = (c['name'] ?? '').toString();
+      if (!ids.contains(name.toLowerCase())) {
+        ids.add(name.toLowerCase());
+        combined.add(c);
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _availablePaperRecords = combined;
+        if (_availablePaperRecords.isNotEmpty) {
+          _selectedPaperRecord = _availablePaperRecords.first;
+        }
+        _isLoadingPapers = false;
+      });
+    }
+  }
+
   Future<void> _initChapters() async {
     setState(() => _isLoadingTaxonomy = true);
     final isNeet = _selectedExam.contains('NEET');
@@ -159,7 +294,6 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         includeInactive: false,
       );
 
-      // Preserve existing selections if already present
       final existingChapters = _subjectChaptersMap[sub] ?? [];
       final Set<String> selChapterIds = { for (var c in existingChapters.where((c) => c.isSelected)) c.id };
       final Set<String> selTopicIds = {};
@@ -206,8 +340,8 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     if (mounted) {
       setState(() {
         _subjectChaptersMap = newMap;
-        if (!_subjectChaptersMap.containsKey(_activeStep2Subject) && _subjectChaptersMap.isNotEmpty) {
-          _activeStep2Subject = _subjectChaptersMap.keys.first;
+        if (!_subjectChaptersMap.containsKey(_activeStep3Subject) && _subjectChaptersMap.isNotEmpty) {
+          _activeStep3Subject = _subjectChaptersMap.keys.first;
         }
         _isLoadingTaxonomy = false;
       });
@@ -235,13 +369,15 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
       _selectedExam = newExam;
       if (newExam.contains('NEET')) {
         _selectedSubjects = {'Physics', 'Chemistry', 'Biology'};
-        _activeStep2Subject = 'Physics';
+        _activeStep3Subject = 'Physics';
       } else {
         _selectedSubjects = {'Physics', 'Chemistry', 'Mathematics'};
-        _activeStep2Subject = 'Physics';
+        _activeStep3Subject = 'Physics';
       }
       _subjectChaptersMap.clear();
+      _selectedPaperRecord = null;
       _initChapters();
+      _loadAvailablePapers();
     });
     _loadStats();
   }
@@ -260,7 +396,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     });
   }
 
-  List<ChapterItem> get _activeChapters => _subjectChaptersMap[_activeStep2Subject] ?? [];
+  List<ChapterItem> get _activeChapters => _subjectChaptersMap[_activeStep3Subject] ?? [];
 
   int get _totalSelectedChaptersCount {
     int total = 0;
@@ -342,7 +478,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     return '${mins}m';
   }
 
-  Future<void> _startPYQSession(bool isTestMode) async {
+  Future<void> _startChapterPracticeSession(bool isTestMode) async {
     final hasSelection = _totalSelectedChaptersCount > 0 || _totalSelectedTopicsCount > 0;
     if (!hasSelection) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -383,7 +519,6 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
       subjects: activeSubjects.isEmpty ? _selectedSubjects.toList() : activeSubjects,
       chapterIds: selectedChapterIds,
       topicIds: selectedTopicIds,
-      years: _allYears ? null : _selectedYears.toList(),
       difficulty: _difficulty,
       limit: _questionCount,
     );
@@ -413,31 +548,68 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     }
   }
 
-  void _showSavePresetDialog() {
-    final List<String> selChapIds = [];
-    final List<String> selTopIds = [];
-    _subjectChaptersMap.forEach((sub, chapters) {
-      for (var c in chapters) {
-        if (c.isSelected || c.isFullySelected || c.isPartiallySelected) {
-          selChapIds.add(c.id);
-          for (var t in c.topics) {
-            if (t.isSelected) selTopIds.add(t.id);
-          }
-        }
-      }
-    });
-
-    if (selChapIds.isEmpty && selTopIds.isEmpty) {
+  Future<void> _startPaperPracticeSession(bool isTestMode) async {
+    if (_selectedPaperRecord == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select chapters or topics before saving a preset.'),
+          content: Text('Please select a PYQ paper to continue.'),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
 
-    final defaultName = '$_selectedExam Custom (${selChapIds.length} Chaps)';
+    setState(() => _isStarting = true);
+
+    final paperId = (_selectedPaperRecord!['id'] ?? _selectedPaperRecord!['paper_id'] ?? '').toString();
+    final paperName = (_selectedPaperRecord!['name'] ?? _selectedPaperRecord!['title'] ?? _selectedPaperRecord!['paper_name'] ?? 'Official Paper').toString();
+
+    final rawQuestions = await SupabaseService.fetchTestSeriesQuestions(
+      paperId: paperId.isNotEmpty ? paperId : paperName,
+      exam: _selectedExam,
+      limit: 200,
+      forceRefresh: true,
+    );
+
+    final activeSubs = _selectedSubjects.toList();
+    final filtered = rawQuestions.where((q) {
+      final subName = NeetSubjectHelper.getSubjectNameFromId(q.subjectId);
+      if (activeSubs.isNotEmpty) {
+        return activeSubs.any((s) => s.toLowerCase() == subName.toLowerCase() || q.subjectId.toLowerCase().contains(s.toLowerCase()));
+      }
+      return true;
+    }).toList();
+
+    final questions = NeetSubjectHelper.sortQuestionsForNEET(filtered.isEmpty ? rawQuestions : filtered);
+
+    setState(() => _isStarting = false);
+
+    if (!mounted) return;
+
+    if (questions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No questions uploaded yet in database for "$paperName".'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final timerMins = isTestMode ? (questions.length * 1.5).ceil() : 0;
+
+    if (widget.onStartPYQSession != null) {
+      widget.onStartPYQSession!(questions, timerMins, isTestMode);
+    } else if (widget.onStartPractice != null) {
+      widget.onStartPractice!(questions, timerMins);
+    }
+  }
+
+  void _showSavePresetDialog() {
+    final bool isChapterMode = _selectedMode == PYQPracticeMode.chapterWise;
+    final defaultName = isChapterMode
+        ? '$_selectedExam Custom (${_totalSelectedChaptersCount} Chaps)'
+        : '$_selectedExam (${_selectedPaperRecord?['name'] ?? 'Paper'})';
     final controller = TextEditingController(text: defaultName);
 
     showDialog(
@@ -450,7 +622,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Save your current exam, subjects, chapter & topic selections for quick 1-tap practice later.',
+              'Save your practice mode, exam, subjects, and paper/chapter configuration for quick 1-tap launch later.',
               style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
             ),
             const SizedBox(height: 14),
@@ -472,17 +644,31 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
           ElevatedButton(
             onPressed: () {
               final name = controller.text.trim().isEmpty ? defaultName : controller.text.trim();
+              final List<String> selChapIds = [];
+              final List<String> selTopIds = [];
+              _subjectChaptersMap.forEach((sub, chapters) {
+                for (var c in chapters) {
+                  if (c.isSelected || c.isFullySelected || c.isPartiallySelected) {
+                    selChapIds.add(c.id);
+                    for (var t in c.topics) {
+                      if (t.isSelected) selTopIds.add(t.id);
+                    }
+                  }
+                }
+              });
+
               final preset = {
                 'id': 'preset_${DateTime.now().millisecondsSinceEpoch}',
                 'name': name,
                 'exam': _selectedExam,
+                'mode': isChapterMode ? 'chapterWise' : 'yearWise',
                 'subjects': _selectedSubjects.toList(),
+                'paperId': _selectedPaperRecord?['id'],
+                'paperName': _selectedPaperRecord?['name'] ?? _selectedPaperRecord?['title'],
                 'chapterIds': selChapIds,
                 'topicIds': selTopIds,
                 'questionCount': _questionCount,
                 'difficulty': _difficulty,
-                'years': _selectedYears.toList(),
-                'allYears': _allYears,
                 'createdAt': DateTime.now().toIso8601String(),
               };
               setState(() {
@@ -520,7 +706,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
               ? const Padding(
                   padding: EdgeInsets.symmetric(vertical: 20),
                   child: Text(
-                    'No saved presets yet.\nMake a chapter/topic selection and tap "Save Preset".',
+                    'No saved presets yet.\nConfigure your mode/subjects and tap "Save Preset".',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
                   ),
@@ -530,8 +716,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                   itemCount: _savedPresets.length,
                   itemBuilder: (context, index) {
                     final p = _savedPresets[index];
-                    final chapCount = (p['chapterIds'] as List?)?.length ?? 0;
-                    final topCount = (p['topicIds'] as List?)?.length ?? 0;
+                    final mode = p['mode'] == 'yearWise' ? 'Year-wise Paper' : 'Chapter-wise';
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -546,7 +731,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                         ),
                         subtitle: Text(
-                          '${p['exam']} • $chapCount Chapters • $topCount Topics',
+                          '${p['exam']} • $mode',
                           style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                         ),
                         trailing: Row(
@@ -594,30 +779,39 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
 
   void _loadPreset(Map<String, dynamic> preset) {
     final String exam = preset['exam'] ?? _selectedExam;
+    final String modeStr = preset['mode'] ?? 'chapterWise';
+    final List subs = preset['subjects'] ?? [];
     final List chapIds = preset['chapterIds'] ?? [];
     final List topIds = preset['topicIds'] ?? [];
 
     setState(() {
       _selectedExam = exam;
+      _selectedMode = modeStr == 'yearWise' ? PYQPracticeMode.yearWise : PYQPracticeMode.chapterWise;
+      if (subs.isNotEmpty) {
+        _selectedSubjects = Set<String>.from(subs.map((s) => s.toString()));
+      }
       if (preset['questionCount'] != null) _questionCount = preset['questionCount'];
       if (preset['difficulty'] != null) _difficulty = preset['difficulty'];
-      if (preset['years'] != null) {
-        _selectedYears = Set<int>.from(preset['years']);
-      }
-      if (preset['allYears'] != null) {
-        _allYears = preset['allYears'];
-      }
 
-      _subjectChaptersMap.forEach((sub, chapters) {
-        for (var c in chapters) {
-          final matchChap = chapIds.contains(c.id);
-          c.isSelected = matchChap;
-          for (var t in c.topics) {
-            t.isSelected = topIds.contains(t.id) || matchChap;
+      if (_selectedMode == PYQPracticeMode.yearWise && preset['paperId'] != null) {
+        final pId = preset['paperId'].toString();
+        final match = _availablePaperRecords.firstWhere(
+          (p) => (p['id'] ?? p['paper_id'] ?? '').toString() == pId,
+          orElse: () => _availablePaperRecords.isNotEmpty ? _availablePaperRecords.first : {},
+        );
+        if (match.isNotEmpty) _selectedPaperRecord = match;
+      } else {
+        _subjectChaptersMap.forEach((sub, chapters) {
+          for (var c in chapters) {
+            final matchChap = chapIds.contains(c.id);
+            c.isSelected = matchChap;
+            for (var t in c.topics) {
+              t.isSelected = topIds.contains(t.id) || matchChap;
+            }
           }
-        }
-      });
-      _currentStep = 2;
+        });
+      }
+      _currentStep = 3;
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -671,8 +865,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 992;
+    final isDesktop = MediaQuery.of(context).size.width >= 992;
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
 
     return Scaffold(
@@ -696,10 +889,10 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                   Expanded(
                     child: Column(
                       children: [
-                        // Subtitle & 2-Step Progress Indicator Header
+                        // Subtitle & Dynamic Progress Indicator Header
                         Container(
                           color: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           child: Column(
                             children: [
                               Row(
@@ -707,8 +900,8 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                                   IconButton(
                                     icon: const Icon(Icons.arrow_back, color: Color(0xFF7C3AED)),
                                     onPressed: () {
-                                      if (_currentStep == 2) {
-                                        setState(() => _currentStep = 1);
+                                      if (_currentStep > 1) {
+                                        setState(() => _currentStep--);
                                       } else {
                                         if (widget.onBack != null) {
                                           widget.onBack!();
@@ -718,7 +911,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                                       }
                                     },
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 4),
                                   const Text(
                                     'PYQ Practice Engine',
                                     style: TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.bold, fontSize: 16),
@@ -727,10 +920,10 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                                   if (_savedPresets.isNotEmpty) ...[
                                     TextButton.icon(
                                       onPressed: _showSavedPresetsDialog,
-                                      icon: const Icon(Icons.bookmarks_outlined, size: 16, color: Color(0xFF7C3AED)),
+                                      icon: const Icon(Icons.bookmarks_outlined, size: 14, color: Color(0xFF7C3AED)),
                                       label: Text(
                                         'Presets (${_savedPresets.length})',
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
                                       ),
                                     ),
                                     const SizedBox(width: 4),
@@ -740,39 +933,31 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: const Color(0xFF7C3AED),
                                       side: const BorderSide(color: Color(0xFF7C3AED), width: 1.2),
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                     ),
                                     icon: const Icon(Icons.bookmark_border_rounded, size: 14, color: Color(0xFF7C3AED)),
-                                    label: const Text('Save Preset', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                    label: const Text('Save Preset', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                _currentStep == 1
-                                    ? 'Practice previous year questions chapter-wise and year-wise to ace NEET / JEE'
-                                    : 'Practice previous year questions chapter-wise and topic-wise',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.3),
-                              ),
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 8),
                               _buildProgressIndicator(),
                             ],
                           ),
                         ),
                         const Divider(height: 1, color: Color(0xFFE2E8F0)),
 
-                        // Scrollable Body (Step 1 or Step 2)
+                        // Body (Step 1, Step 2, or Step 3)
                         Expanded(
                           child: SingleChildScrollView(
-                            padding: const EdgeInsets.all(18),
-                            child: _currentStep == 1 ? _buildStep1View() : _buildStep2View(),
+                            padding: const EdgeInsets.all(16),
+                            child: _buildCurrentStepView(),
                           ),
                         ),
 
-                        // Sticky Bottom Action Bar (Only on Step 2)
-                        if (_currentStep == 2) _buildStickyBottomBarStep2(),
+                        // Sticky Bottom Action Bar (Only on Step 3)
+                        if (_currentStep == 3) _buildStickyBottomBarStep3(),
                       ],
                     ),
                   ),
@@ -785,103 +970,195 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     );
   }
 
-  // ================= 2-STEP PROGRESS INDICATOR =================
+  // ================= DYNAMIC 3-STEP PROGRESS INDICATOR =================
 
   Widget _buildProgressIndicator() {
+    final step3Label = _selectedMode == PYQPracticeMode.chapterWise ? 'Select Chapters' : 'Select Paper';
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Step 1 Circle
+        // Step 1: Mode
+        _buildStepBadge(1, 'Practice Mode', _currentStep == 1, _currentStep > 1),
+        _buildStepConnector(_currentStep > 1),
+
+        // Step 2: Subjects
+        _buildStepBadge(2, 'Subjects', _currentStep == 2, _currentStep > 2),
+        _buildStepConnector(_currentStep > 2),
+
+        // Step 3: Selection
+        _buildStepBadge(3, step3Label, _currentStep == 3, false),
+      ],
+    );
+  }
+
+  Widget _buildStepBadge(int stepNum, String label, bool isActive, bool isDone) {
+    Color bg = const Color(0xFFF1F5F9);
+    Color border = const Color(0xFFCBD5E1);
+    Color textColor = const Color(0xFF64748B);
+
+    if (isDone) {
+      bg = const Color(0xFFDCFCE7);
+      border = const Color(0xFF16A34A);
+      textColor = const Color(0xFF16A34A);
+    } else if (isActive) {
+      bg = const Color(0xFF7C3AED);
+      border = const Color(0xFF7C3AED);
+      textColor = const Color(0xFF7C3AED);
+    }
+
+    return Row(
+      children: [
         Container(
-          width: 28,
-          height: 28,
+          width: 24,
+          height: 24,
           decoration: BoxDecoration(
-            color: _currentStep > 1 ? const Color(0xFFDCFCE7) : Colors.white,
+            color: bg,
             shape: BoxShape.circle,
-            border: Border.all(
-              color: _currentStep > 1 ? const Color(0xFF16A34A) : const Color(0xFF7C3AED),
-              width: 2,
-            ),
+            border: Border.all(color: border, width: 2),
           ),
           child: Center(
-            child: _currentStep > 1
-                ? const Icon(Icons.check, size: 16, color: Color(0xFF16A34A))
-                : const Text('1', style: TextStyle(color: Color(0xFF7C3AED), fontWeight: FontWeight.bold, fontSize: 13)),
+            child: isDone
+                ? const Icon(Icons.check, size: 14, color: Color(0xFF16A34A))
+                : Text(
+                    '$stepNum',
+                    style: TextStyle(
+                      color: isActive ? Colors.white : const Color(0xFF64748B),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
           ),
         ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Step 1', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-            Text(
-              'Subject',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: _currentStep > 1 ? const Color(0xFF16A34A) : const Color(0xFF7C3AED),
-              ),
-            ),
-          ],
-        ),
-
-        // Connecting Line
-        Container(
-          width: 60,
-          height: 2,
-          margin: const EdgeInsets.symmetric(horizontal: 14),
-          color: _currentStep > 1 ? const Color(0xFF7C3AED) : const Color(0xFFCBD5E1),
-        ),
-
-        // Step 2 Circle
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: _currentStep == 2 ? const Color(0xFF7C3AED) : const Color(0xFFF1F5F9),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: _currentStep == 2 ? const Color(0xFF7C3AED) : const Color(0xFFCBD5E1),
-              width: 2,
-            ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isActive || isDone ? FontWeight.bold : FontWeight.w500,
+            color: textColor,
           ),
-          child: Center(
-            child: Text(
-              '2',
-              style: TextStyle(
-                color: _currentStep == 2 ? Colors.white : const Color(0xFF64748B),
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Step 2', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-            Text(
-              'Select Chapters & Topics',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: _currentStep == 2 ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
-              ),
-            ),
-          ],
         ),
       ],
     );
   }
 
-  // ================= STEP 1 VIEW =================
+  Widget _buildStepConnector(bool isDone) {
+    return Container(
+      width: 24,
+      height: 2,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      color: isDone ? const Color(0xFF7C3AED) : const Color(0xFFCBD5E1),
+    );
+  }
 
-  Widget _buildStep1View() {
-    final isNeet = _selectedExam.contains('NEET');
-    final availableSubjects = isNeet ? ['Physics', 'Chemistry', 'Biology'] : ['Physics', 'Chemistry', 'Mathematics'];
-    final allSelected = _selectedSubjects.length == availableSubjects.length;
+  Widget _buildCurrentStepView() {
+    switch (_currentStep) {
+      case 1:
+        return _buildStep1ModeView();
+      case 2:
+        return _buildStep2SubjectView();
+      case 3:
+      default:
+        return _selectedMode == PYQPracticeMode.chapterWise
+            ? _buildStep3ChapterWiseView()
+            : _buildStep3YearWiseView();
+    }
+  }
 
+  // ================= 1. COMPACT STATISTICS ROW =================
+
+  Widget _buildCompactStatsRow() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x05000000), blurRadius: 4, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildCompactStatItem(
+            icon: Icons.track_changes_rounded,
+            iconColor: const Color(0xFF16A34A),
+            value: '$_availableQuestionsCount',
+            label: 'Questions',
+          ),
+          _buildVerticalDivider(),
+          _buildCompactStatItem(
+            icon: Icons.assignment_outlined,
+            iconColor: const Color(0xFF2563EB),
+            value: '$_availablePapersCount',
+            label: 'Papers',
+          ),
+          _buildVerticalDivider(),
+          _buildCompactStatItem(
+            icon: Icons.trending_up_rounded,
+            iconColor: const Color(0xFF9333EA),
+            value: '$_userAccuracy%',
+            label: 'Accuracy',
+          ),
+          _buildVerticalDivider(),
+          _buildCompactStatItem(
+            icon: Icons.access_time_rounded,
+            iconColor: const Color(0xFFEA580C),
+            value: _formatTimeSpent(_timeSpentSeconds),
+            label: 'Time',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVerticalDivider() {
+    return Container(
+      height: 26,
+      width: 1,
+      color: const Color(0xFFE2E8F0),
+    );
+  }
+
+  Widget _buildCompactStatItem({
+    required IconData icon,
+    required Color iconColor,
+    required String value,
+    required String label,
+  }) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: iconColor, size: 14),
+              const SizedBox(width: 4),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  value,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ================= STEP 1 VIEW — CHOOSE PRACTICE MODE =================
+
+  Widget _buildStep1ModeView() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -921,62 +1198,90 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
 
-        // 4 Real-time Stat Cards
+        // Compact Horizontal Stats Row
         _isLoadingStats
-            ? const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
-            : LayoutBuilder(
-                builder: (context, constraints) {
-                  final cardWidth = (constraints.maxWidth - 12) / 2;
-                  return Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      _buildStatCard(
-                        width: cardWidth,
-                        icon: Icons.track_changes_rounded,
-                        iconBg: const Color(0xFFDCFCE7),
-                        iconColor: const Color(0xFF16A34A),
-                        value: '$_availableQuestionsCount',
-                        label: 'Questions\nAvailable',
-                      ),
-                      _buildStatCard(
-                        width: cardWidth,
-                        icon: Icons.assignment_outlined,
-                        iconBg: const Color(0xFFDBEAFE),
-                        iconColor: const Color(0xFF2563EB),
-                        value: '$_availablePapersCount',
-                        label: 'PYQ Papers\nAvailable',
-                      ),
-                      _buildStatCard(
-                        width: cardWidth,
-                        icon: Icons.trending_up_rounded,
-                        iconBg: const Color(0xFFF3E8FF),
-                        iconColor: const Color(0xFF9333EA),
-                        value: '$_userAccuracy%',
-                        label: 'Avg. Accuracy\n(Your)',
-                      ),
-                      _buildStatCard(
-                        width: cardWidth,
-                        icon: Icons.access_time_rounded,
-                        iconBg: const Color(0xFFFFEDD5),
-                        iconColor: const Color(0xFFEA580C),
-                        value: _formatTimeSpent(_timeSpentSeconds),
-                        label: 'Time Spent\nPracticing',
-                      ),
-                    ],
-                  );
-                },
-              ),
-        const SizedBox(height: 24),
+            ? const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
+            : _buildCompactStatsRow(),
+        const SizedBox(height: 22),
 
-        // Section 1: Select Subjects
+        // Section Title
+        const Text(
+          '1. Choose Practice Mode',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        ),
+        const SizedBox(height: 12),
+
+        // Mode Cards Side-by-Side
+        Row(
+          children: [
+            Expanded(
+              child: _buildModeCard(
+                mode: PYQPracticeMode.chapterWise,
+                icon: Icons.calendar_today_outlined,
+                title: 'Chapter-wise',
+                subtitle: 'Practice PYQs by specific chapters and topics',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildModeCard(
+                mode: PYQPracticeMode.yearWise,
+                icon: Icons.edit_calendar_outlined,
+                title: 'Year-wise',
+                subtitle: 'Practice questions from a specific previous-year paper',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 28),
+
+        // Next Step Button
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton(
+            onPressed: () {
+              setState(() => _currentStep = 2);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4F46E5),
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Next: Select Subjects',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                SizedBox(width: 6),
+                Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ================= STEP 2 VIEW — SELECT SUBJECTS =================
+
+  Widget _buildStep2SubjectView() {
+    final isNeet = _selectedExam.contains('NEET');
+    final availableSubjects = isNeet ? ['Physics', 'Chemistry', 'Biology'] : ['Physics', 'Chemistry', 'Mathematics'];
+    final allSelected = _selectedSubjects.length == availableSubjects.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              '1. Select Subjects',
+              '2. Select Subjects',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
             ),
             GestureDetector(
@@ -988,7 +1293,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         Row(
           children: availableSubjects.map((subName) {
             final isSelected = _selectedSubjects.contains(subName);
@@ -1080,213 +1385,12 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
             );
           }).toList(),
         ),
-        const SizedBox(height: 24),
-
-        // Section 2: Choose Practice Mode
-        const Text(
-          '2. Choose Practice Mode',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildModeCard(
-                mode: PYQPracticeMode.chapterWise,
-                icon: Icons.calendar_today_outlined,
-                title: 'Chapter-wise',
-                subtitle: 'Practice PYQs by specific chapters and topics',
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildModeCard(
-                mode: PYQPracticeMode.yearWise,
-                icon: Icons.edit_calendar_outlined,
-                title: 'Year-wise',
-                subtitle: 'Practice PYQs from specific years',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-
-        // Section 3: Select Year Range (Optional)
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              '3. Select Year Range (Optional)',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-            ),
-            Row(
-              children: [
-                const Text('All Years', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                const SizedBox(width: 4),
-                Switch(
-                  value: _allYears,
-                  activeThumbColor: const Color(0xFF7C3AED),
-                  onChanged: (val) {
-                    setState(() {
-                      _allYears = val;
-                      if (val) _selectedYears = Set.from(_availableYearsList);
-                    });
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: _availableYearsList.map((y) {
-              final isSel = _allYears || _selectedYears.contains(y);
-              return Padding(
-                padding: const EdgeInsets.only(right: 8.0),
-                child: FilterChip(
-                  selected: isSel,
-                  showCheckmark: true,
-                  avatar: isSel ? const Icon(Icons.check_box, size: 16, color: Colors.white) : const Icon(Icons.check_box_outline_blank, size: 16, color: Color(0xFF94A3B8)),
-                  label: Text('$y${y == 2025 ? '\n(Latest)' : ''}'),
-                  selectedColor: const Color(0xFF7C3AED),
-                  checkmarkColor: Colors.white,
-                  backgroundColor: Colors.white,
-                  side: BorderSide(color: isSel ? const Color(0xFF7C3AED) : const Color(0xFFE2E8F0)),
-                  labelStyle: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
-                    color: isSel ? Colors.white : const Color(0xFF1E293B),
-                  ),
-                  onSelected: (selected) {
-                    setState(() {
-                      _allYears = false;
-                      if (selected) {
-                        _selectedYears.add(y);
-                      } else {
-                        if (_selectedYears.length > 1) {
-                          _selectedYears.remove(y);
-                        }
-                      }
-                    });
-                  },
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // Section 4: Number of Questions & Difficulty
-        const Text(
-          '4. Number of Questions & Difficulty',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Number of Questions', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFCBD5E1)),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<int>(
-                        value: [10, 20, 30, 45, 90].contains(_questionCount) ? _questionCount : -1,
-                        isExpanded: true,
-                        items: [
-                          ...[10, 20, 30, 45, 90].map((c) {
-                            return DropdownMenuItem<int>(
-                              value: c,
-                              child: Text('$c Questions', style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B))),
-                            );
-                          }),
-                          DropdownMenuItem<int>(
-                            value: -1,
-                            child: Text(
-                              [10, 20, 30, 45, 90].contains(_questionCount) ? 'Custom' : 'Custom ($_questionCount)',
-                              style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
-                            ),
-                          ),
-                        ],
-                        onChanged: (val) {
-                          if (val == -1) {
-                            _showCustomQuestionCountDialog();
-                          } else if (val != null) {
-                            setState(() => _questionCount = val);
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Difficulty Level', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFCBD5E1)),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _difficulty,
-                        isExpanded: true,
-                        items: ['Mixed', 'Easy', 'Medium', 'Hard'].map((d) {
-                          return DropdownMenuItem<String>(
-                            value: d,
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: d == 'Easy'
-                                        ? Colors.green
-                                        : (d == 'Medium' ? Colors.orange : (d == 'Hard' ? Colors.red : Colors.purple)),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(d, style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B))),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) setState(() => _difficulty = val);
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
         const SizedBox(height: 28),
 
-        // Action Button to proceed to Step 2 (Select Chapters & Topics)
+        // Proceed to Step 3 Button
         SizedBox(
           width: double.infinity,
-          height: 52,
+          height: 50,
           child: ElevatedButton(
             onPressed: () {
               if (_selectedSubjects.isEmpty) {
@@ -1295,36 +1399,38 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                 );
                 return;
               }
-              setState(() => _currentStep = 2);
+              setState(() => _currentStep = 3);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF4F46E5),
               elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  '🎯 Select Chapters & Topics',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  _selectedMode == PYQPracticeMode.chapterWise
+                      ? 'Next: Select Chapters & Topics'
+                      : 'Next: Select PYQ Paper',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
+                const SizedBox(width: 6),
+                const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 20),
       ],
     );
   }
 
-  // ================= STEP 2 VIEW (DYNAMIC PCB / PCM SELECTION) =================
+  // ================= STEP 3 VIEW — CHAPTER-WISE MODE =================
 
-  Widget _buildStep2View() {
+  Widget _buildStep3ChapterWiseView() {
     final isNeet = _selectedExam.contains('NEET');
     final availableSubjects = isNeet ? ['Physics', 'Chemistry', 'Biology'] : ['Physics', 'Chemistry', 'Mathematics'];
-    final activeSubject = _activeStep2Subject;
-
+    final activeSubject = _activeStep3Subject;
     final currentChapters = _activeChapters;
 
     final filteredChapters = _searchQuery.isEmpty
@@ -1337,7 +1443,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Subject Selector Tab Bar (PCB for NEET, PCM for JEE)
+        // Subject Selector Tab Bar
         Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
@@ -1347,7 +1453,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
           ),
           child: Row(
             children: availableSubjects.map((sub) {
-              final isSel = _activeStep2Subject == sub;
+              final isSel = _activeStep3Subject == sub;
               final subChapters = _subjectChaptersMap[sub] ?? [];
 
               IconData iconData = Icons.science_outlined;
@@ -1366,7 +1472,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
 
               return Expanded(
                 child: GestureDetector(
-                  onTap: () => setState(() => _activeStep2Subject = sub),
+                  onTap: () => setState(() => _activeStep3Subject = sub),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
@@ -1401,7 +1507,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
 
         // Subject Summary Card
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -1410,83 +1516,50 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
               BoxShadow(color: Color(0x05000000), blurRadius: 6, offset: Offset(0, 2)),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFF3E8FF),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      activeSubject == 'Chemistry'
-                          ? Icons.science_rounded
-                          : (activeSubject == 'Biology'
-                              ? Icons.coronavirus_outlined
-                              : (activeSubject == 'Mathematics' ? Icons.calculate_outlined : Icons.science_outlined)),
-                      color: const Color(0xFF7C3AED),
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          activeSubject,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _selectedExam,
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3E8FF),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${currentChapters.length} Chapters',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${currentChapters.fold(0, (s, c) => s + c.topics.length)} Topics',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
-                    ),
-                  ),
-                ],
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF3E8FF),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  activeSubject == 'Chemistry'
+                      ? Icons.science_rounded
+                      : (activeSubject == 'Biology'
+                          ? Icons.coronavirus_outlined
+                          : (activeSubject == 'Mathematics' ? Icons.calculate_outlined : Icons.science_outlined)),
+                  color: const Color(0xFF7C3AED),
+                  size: 22,
+                ),
               ),
-              const SizedBox(height: 12),
-              Text(
-                'Choose the chapters and topics of $activeSubject to practice PYQs from.',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      activeSubject,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${currentChapters.length} Chapters • ${currentChapters.fold(0, (s, c) => s + c.topics.length)} Topics',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
         // View Mode Switch Tabs (Chapters vs Topics)
         Container(
-          height: 44,
+          height: 42,
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
             color: const Color(0xFFF1F5F9),
@@ -1553,58 +1626,121 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         ),
         const SizedBox(height: 14),
 
-        // Search Input & Filter Icon Button
+        // Search Input Box
+        Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  decoration: InputDecoration(
+                    hintText: _activeViewTab == 0 ? 'Search $activeSubject chapters...' : 'Search $activeSubject topics...',
+                    hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
+                ),
+              ),
+              if (_searchQuery.isNotEmpty)
+                GestureDetector(
+                  onTap: () => setState(() => _searchQuery = ''),
+                  child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Number of Questions & Difficulty Controls
         Row(
           children: [
             Expanded(
-              child: Container(
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.search, size: 18, color: Color(0xFF94A3B8)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        onChanged: (v) => setState(() => _searchQuery = v),
-                        decoration: InputDecoration(
-                          hintText: _activeViewTab == 0 ? 'Search $activeSubject chapters...' : 'Search $activeSubject topics...',
-                          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                          border: InputBorder.none,
-                          isDense: true,
-                        ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Number of Questions', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        value: [10, 20, 30, 45, 90].contains(_questionCount) ? _questionCount : -1,
+                        isExpanded: true,
+                        isDense: true,
+                        items: [
+                          ...[10, 20, 30, 45, 90].map((c) {
+                            return DropdownMenuItem<int>(
+                              value: c,
+                              child: Text('$c Qs', style: const TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
+                            );
+                          }),
+                          DropdownMenuItem<int>(
+                            value: -1,
+                            child: Text(
+                              [10, 20, 30, 45, 90].contains(_questionCount) ? 'Custom' : 'Custom ($_questionCount)',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF1E293B)),
+                            ),
+                          ),
+                        ],
+                        onChanged: (val) {
+                          if (val == -1) {
+                            _showCustomQuestionCountDialog();
+                          } else if (val != null) {
+                            setState(() => _questionCount = val);
+                          }
+                        },
                       ),
                     ),
-                    if (_searchQuery.isNotEmpty)
-                      GestureDetector(
-                        onTap: () => setState(() => _searchQuery = ''),
-                        child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
-                      ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 8),
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.tune_rounded, size: 18, color: Color(0xFF64748B)),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Filter parameters active.')),
-                  );
-                },
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Difficulty Level', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _difficulty,
+                        isExpanded: true,
+                        isDense: true,
+                        items: ['Mixed', 'Easy', 'Medium', 'Hard'].map((d) {
+                          return DropdownMenuItem<String>(
+                            value: d,
+                            child: Text(d, style: const TextStyle(fontSize: 12, color: Color(0xFF1E293B))),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _difficulty = val);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1618,8 +1754,8 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
             Row(
               children: [
                 SizedBox(
-                  width: 24,
-                  height: 24,
+                  width: 22,
+                  height: 22,
                   child: Checkbox(
                     value: _areAllActiveSubjectChaptersSelected,
                     activeColor: const Color(0xFF7C3AED),
@@ -1630,31 +1766,182 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                 const SizedBox(width: 8),
                 Text(
                   'Select All $activeSubject Chapters',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                 ),
               ],
             ),
-            Row(
-              children: [
-                Text(
-                  '${currentChapters.where((c) => c.isFullySelected || c.isPartiallySelected).length} selected',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.keyboard_arrow_up_rounded, color: Color(0xFF7C3AED), size: 18),
-              ],
+            Text(
+              '${currentChapters.where((c) => c.isFullySelected || c.isPartiallySelected).length} selected',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
 
         if (_isLoadingTaxonomy)
-          const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+          const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()))
         else if (_activeViewTab == 0)
           _buildChaptersView(filteredChapters)
         else
           _buildTopicsView(currentChapters),
 
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  // ================= STEP 3 VIEW — YEAR-WISE MODE (PAPER SELECTOR) =================
+
+  Widget _buildStep3YearWiseView() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Select PYQ Paper',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Choose an official previous year paper from the verified database catalogue.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 16),
+
+        _isLoadingPapers
+            ? const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+            : Column(
+                children: [
+                  // Paper Dropdown / List
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<Map<String, dynamic>>(
+                        value: _selectedPaperRecord,
+                        isExpanded: true,
+                        hint: const Text('Select a paper'),
+                        items: _availablePaperRecords.map((p) {
+                          final title = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? p['name'] ?? 'Paper').toString();
+                          final qCount = p['questionsCount'] ?? p['questions_count'] ?? p['total_questions'] ?? 180;
+                          return DropdownMenuItem<Map<String, dynamic>>(
+                            value: p,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    title,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF3E8FF),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '$qCount Qs',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _selectedPaperRecord = val);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Selected Paper Info Summary Card
+                  if (_selectedPaperRecord != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF7C3AED), width: 1.5),
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 3)),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFEEF2FF),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.assignment_rounded, color: Color(0xFF7C3AED), size: 22),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      (_selectedPaperRecord!['paper_name'] ?? _selectedPaperRecord!['paperName'] ?? _selectedPaperRecord!['title'] ?? _selectedPaperRecord!['name'] ?? 'Selected Paper').toString(),
+                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Target: $_selectedExam',
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 24, color: Color(0xFFF1F5F9)),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              Column(
+                                children: [
+                                  const Text('Total Paper Size', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${_selectedPaperRecord!['questionsCount'] ?? _selectedPaperRecord!['questions_count'] ?? 180} Questions',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                                  ),
+                                ],
+                              ),
+                              Container(height: 20, width: 1, color: const Color(0xFFE2E8F0)),
+                              Column(
+                                children: [
+                                  const Text('Subjects', style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _selectedSubjects.join(' • '),
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
         const SizedBox(height: 20),
       ],
     );
@@ -1666,7 +1953,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         padding: const EdgeInsets.all(24),
         alignment: Alignment.center,
         child: Text(
-          _searchQuery.isNotEmpty ? 'No chapters match "$_searchQuery"' : 'No chapters available for $_activeStep2Subject.',
+          _searchQuery.isNotEmpty ? 'No chapters match "$_searchQuery"' : 'No chapters available for $_activeStep3Subject.',
           style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
         ),
       );
@@ -1678,10 +1965,10 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         final isPartial = chapter.isPartiallySelected;
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 10),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: isFully ? const Color(0xFF7C3AED) : (isPartial ? const Color(0xFFA78BFA) : const Color(0xFFE2E8F0)),
               width: isFully || isPartial ? 1.5 : 1,
@@ -1694,14 +1981,14 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                 onTap: () {
                   setState(() => chapter.isExpanded = !chapter.isExpanded);
                 },
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Row(
                     children: [
                       SizedBox(
-                        width: 22,
-                        height: 22,
+                        width: 20,
+                        height: 20,
                         child: Checkbox(
                           value: isFully ? true : (isPartial ? null : false),
                           tristate: true,
@@ -1712,22 +1999,9 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              chapter.name,
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                            ),
-                            if (chapter.topics.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.only(top: 2),
-                                child: Text(
-                                  'Chapter level selection',
-                                  style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                                ),
-                              ),
-                          ],
+                        child: Text(
+                          chapter.name,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                         ),
                       ),
                       Text(
@@ -1735,7 +2009,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                             ? '${chapter.selectedTopicCount} / ${chapter.topics.length} Topics'
                             : (chapter.isSelected ? 'Selected' : '0 Topics'),
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
                           color: (chapter.isSelected || isFully || isPartial) ? const Color(0xFF7C3AED) : const Color(0xFF94A3B8),
                         ),
@@ -1744,7 +2018,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                       Icon(
                         chapter.isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
                         color: const Color(0xFF94A3B8),
-                        size: 20,
+                        size: 18,
                       ),
                     ],
                   ),
@@ -1755,19 +2029,19 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
               if (chapter.isExpanded && chapter.topics.isNotEmpty) ...[
                 const Divider(height: 1, color: Color(0xFFF1F5F9)),
                 Padding(
-                  padding: const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 8),
+                  padding: const EdgeInsets.only(left: 10, right: 10, top: 4, bottom: 6),
                   child: Column(
                     children: chapter.topics.map((topic) {
                       return InkWell(
                         onTap: () => _toggleTopicSelection(topic, null),
                         borderRadius: BorderRadius.circular(8),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                           child: Row(
                             children: [
                               SizedBox(
-                                width: 20,
-                                height: 20,
+                                width: 18,
+                                height: 18,
                                 child: Checkbox(
                                   value: topic.isSelected,
                                   activeColor: const Color(0xFF7C3AED),
@@ -1775,14 +2049,13 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                                   onChanged: (val) => _toggleTopicSelection(topic, val),
                                 ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   topic.name,
-                                  style: const TextStyle(fontSize: 13, color: Color(0xFF334155), fontWeight: FontWeight.w500),
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF334155), fontWeight: FontWeight.w500),
                                 ),
                               ),
-                              const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFFCBD5E1)),
                             ],
                           ),
                         ),
@@ -1817,16 +2090,11 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         alignment: Alignment.center,
         child: Column(
           children: [
-            const Icon(Icons.format_list_bulleted_outlined, size: 40, color: Color(0xFF94A3B8)),
-            const SizedBox(height: 12),
+            const Icon(Icons.format_list_bulleted_outlined, size: 36, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 10),
             Text(
-              'No topics listed for $_activeStep2Subject yet.',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'You can select chapters directly to practice questions.',
-              style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+              'No topics listed for $_activeStep3Subject yet.',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
             ),
           ],
         ),
@@ -1857,12 +2125,12 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
             onTap: () => _toggleTopicSelection(topic, null),
             borderRadius: BorderRadius.circular(12),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
                 children: [
                   SizedBox(
-                    width: 22,
-                    height: 22,
+                    width: 20,
+                    height: 20,
                     child: Checkbox(
                       value: topic.isSelected,
                       activeColor: const Color(0xFF7C3AED),
@@ -1870,19 +2138,19 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                       onChanged: (val) => _toggleTopicSelection(topic, val),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           topic.name,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           topic.chapterName,
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF7C3AED), fontWeight: FontWeight.w500),
+                          style: const TextStyle(fontSize: 10, color: Color(0xFF7C3AED), fontWeight: FontWeight.w500),
                         ),
                       ],
                     ),
@@ -1896,14 +2164,18 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     );
   }
 
-  // ================= STICKY BOTTOM ACTION BAR (CUMULATIVE PCB / PCM) =================
+  // ================= STICKY BOTTOM ACTION BAR (STEP 3) =================
 
-  Widget _buildStickyBottomBarStep2() {
+  Widget _buildStickyBottomBarStep3() {
     final isNeet = _selectedExam.contains('NEET');
     final pcbPcmLabel = isNeet ? 'PCB' : 'PCM';
-    final hasSelection = _totalSelectedChaptersCount > 0 || _totalSelectedTopicsCount > 0;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    final isChapterMode = _selectedMode == PYQPracticeMode.chapterWise;
+
+    final hasSelection = isChapterMode
+        ? (_totalSelectedChaptersCount > 0 || _totalSelectedTopicsCount > 0)
+        : (_selectedPaperRecord != null);
+
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Container(
       padding: EdgeInsets.symmetric(
@@ -1922,7 +2194,6 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (isMobile) ...[
-              // Mobile Responsive Layout: Row 1 = Summary Badge & Config Status
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1939,12 +2210,14 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                         const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF7C3AED), size: 16),
                         const SizedBox(width: 6),
                         Text(
-                          'Selected ($pcbPcmLabel): ',
+                          isChapterMode ? 'Selected ($pcbPcmLabel): ' : 'Paper: ',
                           style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                         ),
                         Text(
-                          '$_totalSelectedChaptersCount Chap • $_totalSelectedTopicsCount Top',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                          isChapterMode
+                              ? '$_totalSelectedChaptersCount Chap • $_totalSelectedTopicsCount Top'
+                              : (_selectedPaperRecord?['name'] ?? _selectedPaperRecord?['title'] ?? 'Select Paper').toString(),
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
                         ),
                       ],
                     ),
@@ -1956,14 +2229,15 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                 ],
               ),
               const SizedBox(height: 10),
-              // Mobile Responsive Layout: Row 2 = Side-by-Side Action Buttons with Single-line Text & FittedBox
               Row(
                 children: [
                   Expanded(
                     child: SizedBox(
-                      height: 48,
+                      height: 46,
                       child: OutlinedButton(
-                        onPressed: (!hasSelection || _isStarting) ? null : () => _startPYQSession(false),
+                        onPressed: (!hasSelection || _isStarting)
+                            ? null
+                            : () => isChapterMode ? _startChapterPracticeSession(false) : _startPaperPracticeSession(false),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF7C3AED),
                           side: BorderSide(
@@ -1971,12 +2245,12 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                             width: 1.5,
                           ),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: const [
-                            Icon(Icons.play_arrow_rounded, size: 20),
+                            Icon(Icons.play_arrow_rounded, size: 18),
                             SizedBox(width: 4),
                             FittedBox(
                               fit: BoxFit.scaleDown,
@@ -1993,20 +2267,22 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: SizedBox(
-                      height: 48,
+                      height: 46,
                       child: ElevatedButton(
-                        onPressed: (!hasSelection || _isStarting) ? null : () => _startPYQSession(true),
+                        onPressed: (!hasSelection || _isStarting)
+                            ? null
+                            : () => isChapterMode ? _startChapterPracticeSession(true) : _startPaperPracticeSession(true),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF7C3AED),
                           disabledBackgroundColor: const Color(0xFFCBD5E1),
                           elevation: 2,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: const [
-                            Icon(Icons.assignment_turned_in_rounded, color: Colors.white, size: 18),
+                            Icon(Icons.assignment_turned_in_rounded, color: Colors.white, size: 16),
                             SizedBox(width: 4),
                             FittedBox(
                               fit: BoxFit.scaleDown,
@@ -2023,7 +2299,6 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                 ],
               ),
             ] else ...[
-              // Desktop/Tablet Layout: Single Row with Card + Buttons
               Row(
                 children: [
                   Container(
@@ -2032,29 +2307,27 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                       color: const Color(0xFFF5F3FF),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.label_outlined, color: Color(0xFF7C3AED), size: 20),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Selected ($pcbPcmLabel)', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                            Text(
-                              '$_totalSelectedChaptersCount Chap • $_totalSelectedTopicsCount Top',
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
-                            ),
-                          ],
+                        Text(isChapterMode ? 'Selected ($pcbPcmLabel)' : 'Selected Paper', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                        Text(
+                          isChapterMode
+                              ? '$_totalSelectedChaptersCount Chap • $_totalSelectedTopicsCount Top'
+                              : (_selectedPaperRecord?['name'] ?? _selectedPaperRecord?['title'] ?? 'Select Paper').toString(),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: SizedBox(
                       height: 48,
                       child: OutlinedButton.icon(
-                        onPressed: (!hasSelection || _isStarting) ? null : () => _startPYQSession(false),
+                        onPressed: (!hasSelection || _isStarting)
+                            ? null
+                            : () => isChapterMode ? _startChapterPracticeSession(false) : _startPaperPracticeSession(false),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF7C3AED),
                           side: BorderSide(
@@ -2076,7 +2349,9 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                     child: SizedBox(
                       height: 48,
                       child: ElevatedButton.icon(
-                        onPressed: (!hasSelection || _isStarting) ? null : () => _startPYQSession(true),
+                        onPressed: (!hasSelection || _isStarting)
+                            ? null
+                            : () => isChapterMode ? _startChapterPracticeSession(true) : _startPaperPracticeSession(true),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF7C3AED),
                           disabledBackgroundColor: const Color(0xFFCBD5E1),
@@ -2094,69 +2369,8 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                 ],
               ),
             ],
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.info_outline_rounded, size: 12, color: Color(0xFF94A3B8)),
-                SizedBox(width: 4),
-                Text(
-                  'You can review and change your selection before starting practice.',
-                  style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
-                ),
-              ],
-            ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard({
-    required double width,
-    required IconData icon,
-    required Color iconBg,
-    required Color iconColor,
-    required String value,
-    required String label,
-  }) {
-    return Container(
-      width: width,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF1F5F9)),
-        boxShadow: const [
-          BoxShadow(color: Color(0x05000000), blurRadius: 6, offset: Offset(0, 2)),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  label,
-                  style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), height: 1.1),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
