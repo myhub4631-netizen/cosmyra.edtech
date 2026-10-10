@@ -40,6 +40,43 @@ class SupabaseService {
   static StreamSubscription<Uri>? _subDeepLink;
   static bool _isHandlingDeepLink = false;
 
+  // In-memory performance caches & request deduplication
+  static List<Map<String, dynamic>>? _cachedTestSeries;
+  static DateTime? _testSeriesCacheTime;
+  static List<Map<String, dynamic>>? _cachedDbPapers;
+  static DateTime? _dbPapersCacheTime;
+
+  static final Map<String, List<QuestionModel>> _cachedQuestionModels = {};
+  static final Map<String, DateTime> _questionModelsCacheTime = {};
+
+  static final Map<String, List<Map<String, dynamic>>> _cachedPaperQuestions = {};
+  static final Map<String, DateTime> _paperQuestionsCacheTime = {};
+
+  static Future<List<Map<String, dynamic>>>? _inFlightFetchTestSeries;
+  static Future<List<Map<String, dynamic>>>? _inFlightFetchPapersAndSeries;
+  static final Map<String, Future<List<Map<String, dynamic>>>> _inFlightQuestionsForPaper = {};
+
+  static const Duration _cacheTtl = Duration(minutes: 5);
+
+  static void invalidateCaches() {
+    _cachedTestSeries = null;
+    _testSeriesCacheTime = null;
+    _cachedDbPapers = null;
+    _dbPapersCacheTime = null;
+    _cachedQuestionModels.clear();
+    _questionModelsCacheTime.clear();
+    _cachedPaperQuestions.clear();
+    _paperQuestionsCacheTime.clear();
+  }
+
+  static bool get hasCachedTestSeries =>
+      _cachedTestSeries != null &&
+      _testSeriesCacheTime != null &&
+      DateTime.now().difference(_testSeriesCacheTime!) < _cacheTtl;
+
+  static List<Map<String, dynamic>> get cachedTestSeries => _cachedTestSeries ?? [];
+  static List<Map<String, dynamic>> get cachedDbPapers => _cachedDbPapers ?? [];
+
   static Future<void> initialize() async {
     if (_isInitialized) return;
     try {
@@ -5412,6 +5449,7 @@ class SupabaseService {
 
   /// Persist a Test Series (in Supabase test_series/tests table and SharedPreferences cache)
   static Future<Map<String, dynamic>> saveTestSeries(Map<String, dynamic> seriesData) async {
+    invalidateCaches();
     final String seriesId = seriesData['id'] ?? toValidUuid('ts_${DateTime.now().millisecondsSinceEpoch}');
     final String title = (seriesData['title'] ?? seriesData['name'] ?? 'NEET Test Series').toString().trim();
     final String slug = (seriesData['slug']?.toString().trim().isNotEmpty == true)
@@ -5753,7 +5791,7 @@ class SupabaseService {
   static List<Map<String, dynamic>> get defaultCuratedTestSeries => const [];
 
   /// Fetch all created Test Series from Supabase, local cache, and fallback baseline
-  static Future<List<Map<String, dynamic>>> fetchAllTestSeries({String? exam}) async {
+  static Future<List<Map<String, dynamic>>> fetchAllTestSeries({String? exam, bool forceRefresh = false}) async {
     final List<Map<String, dynamic>> list = [];
     final Set<String> seenIds = {};
     Set<String> deletedIds = {};
@@ -7249,7 +7287,6 @@ class SupabaseService {
     return false;
   }
 
-  /// Fetch saved questions for a given paper ID
   /// Fetch saved questions for a given paper ID or paper name
   static Future<List<Map<String, dynamic>>> fetchQuestionsForPaper(String paperId, {String? paperName}) async {
     final List<Map<String, dynamic>> results = [];
@@ -7340,7 +7377,7 @@ class SupabaseService {
       // Query by paper column in questions table
       if (targetName.isNotEmpty && targetName != paperId) {
         try {
-          final res = await client.from('questions').select().eq('paper', targetName).order('created_at', ascending: true).limit(500);
+          final res = await client.from('questions').select().eq('paper', targetName).order('created_at', ascending: true).limit(300);
           if (res != null && (res as List).isNotEmpty) {
             dbQuestions.addAll((res as List).map((row) => Map<String, dynamic>.from(row as Map)));
           }
@@ -7349,58 +7386,69 @@ class SupabaseService {
       
       if (dbQuestions.isEmpty && paperId.isNotEmpty) {
         try {
-          final res = await client.from('questions').select().eq('paper', paperId).order('created_at', ascending: true).limit(500);
+          final res = await client.from('questions').select().eq('paper', paperId).order('created_at', ascending: true).limit(300);
           if (res != null && (res as List).isNotEmpty) {
             dbQuestions.addAll((res as List).map((row) => Map<String, dynamic>.from(row as Map)));
           }
         } catch (_) {}
       }
 
-      // Fallback query if dbQuestions is still empty
-      if (dbQuestions.isEmpty) {
+      if (dbQuestions.isEmpty && paperId.isNotEmpty) {
         try {
-          final res = await client.from('questions').select().limit(500);
+          final res = await client
+              .from('questions')
+              .select()
+              .or('paper_id.eq.$paperId,test_series_id.eq.$paperId,paper_id.eq.$paperUuid')
+              .order('created_at', ascending: true)
+              .limit(300);
           if (res != null && (res as List).isNotEmpty) {
             dbQuestions.addAll((res as List).map((row) => Map<String, dynamic>.from(row as Map)));
           }
         } catch (_) {}
       }
 
+      // Collect question IDs that need option fetching
+      final List<String> unparsedQIds = [];
       for (var dbQ in dbQuestions) {
         dbQ = processEnumerateInQuestionMap(dbQ);
-        final pId = dbQ['paper_id']?.toString() ?? dbQ['paperId']?.toString() ?? dbQ['test_series_id']?.toString() ?? '';
-        final pName = dbQ['paper']?.toString() ?? dbQ['paper_name']?.toString() ?? '';
-        final bool isPaperMatch = pId == paperId ||
-            pId == paperUuid ||
-            pId == toValidUuid(paperId) ||
-            (pName.isNotEmpty && (pName.toLowerCase().trim() == paperId.toLowerCase().trim() || pName.toLowerCase().trim() == targetName.toLowerCase().trim())) ||
-            (targetName.contains('Leader Test Series') && (dbQ['year'] == 2027 || dbQ['created_at']?.toString().startsWith('2026-10-01') == true)) ||
-            (paperId == '6237b088-76ac-4eaf-a03e-623776ac5eaf' && (dbQ['year'] == 2027 || dbQ['created_at']?.toString().startsWith('2026-10-01') == true)) ||
-            (dbQ['id']?.toString().startsWith('q_${paperId}_') == true) ||
-            (dbQ['id']?.toString() == toValidUuid('q_${paperId}_${dbQ['question_number'] ?? dbQ['questionNumber']}'));
-
-        if (isPaperMatch) {
+        List<String> parsedOpts = parseOptionsFromQuestionMap(dbQ);
+        if (parsedOpts.isNotEmpty) {
+          dbQ['options'] = parsedOpts;
+        } else {
           final qUuid = dbQ['id']?.toString() ?? '';
-          final rawNum = dbQ['question_number'] ?? dbQ['questionNumber'];
-          final int qNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum?.toString() ?? '0') ?? 0;
+          if (qUuid.isNotEmpty) unparsedQIds.add(qUuid);
+        }
+      }
 
-          List<String> parsedOpts = parseOptionsFromQuestionMap(dbQ);
-          if (parsedOpts.isNotEmpty) {
-            dbQ['options'] = parsedOpts;
-          } else {
-            try {
-              final optRes = await client
-                  .from('question_options')
-                  .select()
-                  .eq('question_id', qUuid)
-                  .order('option_index', ascending: true);
-              if (optRes != null && (optRes as List).isNotEmpty) {
+      // Single batch fetch for all options if needed
+      if (unparsedQIds.isNotEmpty) {
+        try {
+          final optRes = await client
+              .from('question_options')
+              .select()
+              .inFilter('question_id', unparsedQIds)
+              .order('option_index', ascending: true);
+
+          if (optRes != null && (optRes as List).isNotEmpty) {
+            final Map<String, List<Map<String, dynamic>>> optsByQ = {};
+            for (var row in (optRes as List)) {
+              final map = Map<String, dynamic>.from(row as Map);
+              final qId = map['question_id']?.toString() ?? '';
+              if (qId.isNotEmpty) {
+                optsByQ.putIfAbsent(qId, () => []).add(map);
+              }
+            }
+
+            for (var dbQ in dbQuestions) {
+              final qUuid = dbQ['id']?.toString() ?? '';
+              if (optsByQ.containsKey(qUuid)) {
+                final optRows = optsByQ[qUuid]!;
                 final List<String> optTexts = [];
                 final List<String?> optImgs = [];
                 String? corrAns;
                 int corrIdx = 0;
 
-                for (var optRow in optRes) {
+                for (var optRow in optRows) {
                   final String txt = optRow['option_text']?.toString() ?? '';
                   final String? img = optRow['option_image']?.toString();
                   final bool isCorr = optRow['is_correct'] == true;
@@ -7420,10 +7468,28 @@ class SupabaseService {
                 dbQ['correct_option_index'] = corrIdx;
                 dbQ['correct_answer'] = corrAns ?? 'Option ${String.fromCharCode(65 + corrIdx)}';
               }
-            } catch (e) {
-              debugPrint('Notice fetching question_options for $qUuid: $e');
             }
           }
+        } catch (e) {
+          debugPrint('Notice batch loading question_options: $e');
+        }
+      }
+
+      for (var dbQ in dbQuestions) {
+        final pId = dbQ['paper_id']?.toString() ?? dbQ['paperId']?.toString() ?? dbQ['test_series_id']?.toString() ?? '';
+        final pName = dbQ['paper']?.toString() ?? dbQ['paper_name']?.toString() ?? '';
+        final bool isPaperMatch = pId == paperId ||
+            pId == paperUuid ||
+            pId == toValidUuid(paperId) ||
+            (pName.isNotEmpty && (pName.toLowerCase().trim() == paperId.toLowerCase().trim() || pName.toLowerCase().trim() == targetName.toLowerCase().trim())) ||
+            (targetName.contains('Leader Test Series') && (dbQ['year'] == 2027 || dbQ['created_at']?.toString().startsWith('2026-10-01') == true)) ||
+            (paperId == '6237b088-76ac-4eaf-a03e-623776ac5eaf' && (dbQ['year'] == 2027 || dbQ['created_at']?.toString().startsWith('2026-10-01') == true)) ||
+            (dbQ['id']?.toString().startsWith('q_${paperId}_') == true) ||
+            (dbQ['id']?.toString() == toValidUuid('q_${paperId}_${dbQ['question_number'] ?? dbQ['questionNumber']}'));
+
+        if (isPaperMatch) {
+          final rawNum = dbQ['question_number'] ?? dbQ['questionNumber'];
+          final int qNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum?.toString() ?? '0') ?? 0;
 
           final idx = results.indexWhere((r) {
             final rNum = r['question_number'] ?? r['questionNumber'];
@@ -7441,30 +7507,6 @@ class SupabaseService {
       debugPrint('Notice querying Supabase questions for paper: $e');
     }
 
-    // 3. Fallback: Query all questions from DB and filter by paper_id or test_series_id matching paperId/paperUuid
-    if (results.isEmpty) {
-      try {
-        final res = await client.from('questions').select().limit(500);
-        if (res != null && (res as List).isNotEmpty) {
-          final allDb = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
-          for (var dbQ in allDb) {
-            final pId = dbQ['paper_id']?.toString() ?? dbQ['paperId']?.toString() ?? dbQ['test_series_id']?.toString() ?? '';
-            if (pId == paperId || pId == paperUuid) {
-              final qNum = (dbQ['question_number'] ?? dbQ['questionNumber'] ?? 0) as int;
-              final idx = results.indexWhere((r) => (r['question_number'] ?? r['questionNumber']) == qNum || r['id'] == dbQ['id']);
-              if (idx != -1) {
-                results[idx] = dbQ;
-              } else {
-                results.add(dbQ);
-              }
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('Notice in fallback question fetch for paper: $e');
-      }
-    }
-
     // Sort by question_number ascending
     results.sort((a, b) {
       final numA = (a['question_number'] ?? a['questionNumber'] ?? 999) as int;
@@ -7475,8 +7517,57 @@ class SupabaseService {
     return results;
   }
 
+  static QuestionModel mapSupabaseToQuestionModel(Map<String, dynamic> map) {
+    final optsRaw = map['options'] is List ? List<String>.from(map['options']) : <String>[];
+    final optImgsRaw = map['optionImages'] is List
+        ? List<String?>.from(map['optionImages'])
+        : (map['option_images'] is List ? List<String?>.from(map['option_images']) : <String?>[]);
+
+    final opts = optsRaw.asMap().entries.map((e) {
+      final idx = e.key;
+      final text = e.value;
+      final img = idx < optImgsRaw.length ? optImgsRaw[idx] : null;
+      final optKey = 'opt_${map['id']}_$idx';
+      final isCorr = checkOptionIsCorrect(
+        optionIndex: idx,
+        optionText: text,
+        optionKey: optKey,
+        correctAnswerRaw: map['correctAnswer'] ?? map['correct_answer'],
+        correctOptionIndexRaw: map['correctOptionIndex'] ?? map['correct_option_index'],
+      );
+      return QuestionOptionModel(
+        id: optKey,
+        questionId: map['id']?.toString() ?? '',
+        optionIndex: idx,
+        optionText: text,
+        isCorrect: isCorr,
+        optionImage: img,
+      );
+    }).toList();
+
+    return QuestionModel(
+      id: map['id']?.toString() ?? '',
+      examId: map['exam']?.toString() ?? map['exam_id']?.toString() ?? 'NEET',
+      subjectId: map['subject']?.toString() ?? map['subject_id']?.toString() ?? 'Physics',
+      chapterId: map['chapter']?.toString() ?? map['chapter_id']?.toString() ?? 'General',
+      topicId: map['topic']?.toString() ?? map['topic_id']?.toString() ?? 'General',
+      questionText: map['questionText']?.toString() ?? map['question_text']?.toString() ?? '',
+      questionImage: map['questionImage']?.toString() ?? map['question_image']?.toString(),
+      qType: map['qType']?.toString() ?? map['question_type']?.toString() ?? 'single_correct',
+      difficulty: (map['difficulty']?.toString() ?? 'medium').toLowerCase(),
+      source: (map['sourceType'] ?? map['source_type'] ?? map['source'] ?? map['category'] ?? 'pyq').toString().toLowerCase(),
+      sourceName: map['paperName']?.toString() ?? map['paper_name']?.toString() ?? map['sourceType']?.toString() ?? 'Test Series Question',
+      year: (map['year'] is num) ? (map['year'] as num).toInt() : int.tryParse(map['year']?.toString() ?? '2026'),
+      marks: (map['marks'] is num) ? (map['marks'] as num).toDouble() : double.tryParse(map['marks']?.toString() ?? '4') ?? 4.0,
+      negativeMarks: (map['negativeMarks'] is num) ? (map['negativeMarks'] as num).toDouble() : double.tryParse(map['negativeMarks']?.toString() ?? '1') ?? 1.0,
+      explanation: map['explanation']?.toString() ?? '',
+      solution: map['explanation']?.toString() ?? '',
+      options: opts,
+    );
+  }
+
   /// Fetch all saved papers/test series records from DB and local cache
-  static Future<List<Map<String, dynamic>>> fetchAllPapersAndTestSeries({String? exam}) async {
+  static Future<List<Map<String, dynamic>>> fetchAllPapersAndTestSeries({String? exam, bool forceRefresh = false}) async {
     final List<Map<String, dynamic>> papers = [];
     final Set<String> seenIds = {};
 
@@ -7622,95 +7713,50 @@ class SupabaseService {
     String? category,
     String? exam,
     int limit = 200,
+    bool forceRefresh = false,
   }) async {
+    final cacheKey = paperId;
+    if (!forceRefresh &&
+        _cachedQuestionModels.containsKey(cacheKey) &&
+        _questionModelsCacheTime.containsKey(cacheKey) &&
+        DateTime.now().difference(_questionModelsCacheTime[cacheKey]!) < _cacheTtl) {
+      return _cachedQuestionModels[cacheKey]!;
+    }
+
     final List<Map<String, dynamic>> rawMaps = [];
 
-    // 1. Fetch by paperId from fetchQuestionsForPaper
     if (paperId.isNotEmpty && paperId != 'all') {
       final paperQuestions = await fetchQuestionsForPaper(paperId);
       rawMaps.addAll(paperQuestions);
-    }
 
-    // 2. Check global saved questions for matching paper_id or test_series_id
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final globalStr = prefs.getString('cosmyra_saved_custom_questions');
-      if (globalStr != null && globalStr.isNotEmpty) {
-        final List<dynamic> list = jsonDecode(globalStr);
-        for (var item in list) {
-          final Map<String, dynamic> map = Map<String, dynamic>.from(item as Map);
-          final pId = map['paper_id'] ?? map['paperId'];
-          if (pId == paperId || map['test_series_id'] == paperId) {
-            final idx = rawMaps.indexWhere((m) => m['id'] == map['id'] || (m['paper_id'] == map['paper_id'] && m['question_number'] == map['question_number']));
-            if (idx != -1) {
-              rawMaps[idx] = map;
-            } else {
-              rawMaps.add(map);
-            }
-          }
-        }
+      // If specific paperId is requested and has 0 questions, return [] to preserve empty paper state
+      if (rawMaps.isEmpty) {
+        _cachedQuestionModels[cacheKey] = [];
+        _questionModelsCacheTime[cacheKey] = DateTime.now();
+        return [];
       }
-    } catch (e) {
-      debugPrint('Notice checking global saved questions: $e');
-    }
-
-    // 3. Query Supabase DB questions table for matching paper_id or test_series_id
-    try {
-      var req = client.from('questions').select('*');
-      if (paperId.isNotEmpty && paperId != 'all') {
-        req = req.or('paper_id.eq.$paperId,test_series_id.eq.$paperId');
-      }
-      final res = await req.order('question_number', ascending: true).limit(limit);
-      if (res != null && (res as List).isNotEmpty) {
-        final dbList = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
-        for (var dbQ in dbList) {
-          final idx = rawMaps.indexWhere((m) => m['id'] == dbQ['id'] || (m['paper_id'] == dbQ['paper_id'] && m['question_number'] == dbQ['question_number']));
-          if (idx != -1) {
-            rawMaps[idx] = dbQ;
-          } else {
-            rawMaps.add(dbQ);
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Notice querying Supabase questions table: $e');
-    }
-
-    // 4. If still empty, query all active questions from Supabase for test_series / mock_test or category
-    if (rawMaps.isEmpty) {
+    } else {
+      // General question query for category/exam when no specific paperId is passed
       try {
         final catFilter = (category != null && category.isNotEmpty) ? category : 'mock_test';
         final res = await client
             .from('questions')
             .select('*')
-            .or('category.eq.$catFilter,category.eq.mock_test,category.eq.pyq_practice,category.eq.custom_practice,status.eq.Active')
+            .or('category.eq.$catFilter,category.eq.mock_test,status.eq.Active')
             .order('created_at', ascending: false)
             .limit(limit);
         if (res != null && (res as List).isNotEmpty) {
           rawMaps.addAll((res as List).map((row) => Map<String, dynamic>.from(row as Map)));
         }
       } catch (e) {
-        debugPrint('Notice querying fallback questions from Supabase: $e');
+        debugPrint('Notice querying general questions from Supabase: $e');
       }
     }
 
-    // 5. Fallback to all saved custom questions if still empty
     if (rawMaps.isEmpty) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final globalStr = prefs.getString('cosmyra_saved_custom_questions');
-        if (globalStr != null && globalStr.isNotEmpty) {
-          final List<dynamic> list = jsonDecode(globalStr);
-          rawMaps.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
-        }
-      } catch (e) {
-        debugPrint('Notice loading all saved questions fallback: $e');
-      }
-    }
-
-    // 6. Final fallback: sample questions if no questions exist anywhere
-    if (rawMaps.isEmpty) {
-      return getSampleQuestions(20);
+      _cachedQuestionModels[cacheKey] = [];
+      _questionModelsCacheTime[cacheKey] = DateTime.now();
+      return [];
     }
 
     // Sort by question_number if available
@@ -7720,54 +7766,21 @@ class SupabaseService {
       return numA.compareTo(numB);
     });
 
-    return rawMaps.map((map) {
-      final optsRaw = map['options'] is List ? List<String>.from(map['options']) : <String>[];
-      final optImgsRaw = map['optionImages'] is List
-          ? List<String?>.from(map['optionImages'])
-          : (map['option_images'] is List ? List<String?>.from(map['option_images']) : <String?>[]);
+    final List<QuestionModel> models = [];
+    for (int i = 0; i < rawMaps.length && i < limit; i++) {
+      try {
+        final qMap = rawMaps[i];
+        qMap['question_number'] ??= i + 1;
+        final model = mapSupabaseToQuestionModel(qMap);
+        models.add(model);
+      } catch (e) {
+        debugPrint('Notice mapping question to QuestionModel: $e');
+      }
+    }
 
-      final opts = optsRaw.asMap().entries.map((e) {
-        final idx = e.key;
-        final text = e.value;
-        final img = idx < optImgsRaw.length ? optImgsRaw[idx] : null;
-        final optKey = 'opt_${map['id']}_$idx';
-        final isCorr = checkOptionIsCorrect(
-          optionIndex: idx,
-          optionText: text,
-          optionKey: optKey,
-          correctAnswerRaw: map['correctAnswer'] ?? map['correct_answer'],
-          correctOptionIndexRaw: map['correctOptionIndex'] ?? map['correct_option_index'],
-        );
-        return QuestionOptionModel(
-          id: optKey,
-          questionId: map['id']?.toString() ?? '',
-          optionIndex: idx,
-          optionText: text,
-          isCorrect: isCorr,
-          optionImage: img,
-        );
-      }).toList();
-
-      return QuestionModel(
-        id: map['id']?.toString() ?? '',
-        examId: map['exam']?.toString() ?? map['exam_id']?.toString() ?? 'NEET',
-        subjectId: map['subject']?.toString() ?? map['subject_id']?.toString() ?? 'Physics',
-        chapterId: map['chapter']?.toString() ?? map['chapter_id']?.toString() ?? 'General',
-        topicId: map['topic']?.toString() ?? map['topic_id']?.toString() ?? 'General',
-        questionText: map['questionText']?.toString() ?? map['question_text']?.toString() ?? '',
-        questionImage: map['questionImage']?.toString() ?? map['question_image']?.toString(),
-        qType: map['qType']?.toString() ?? map['question_type']?.toString() ?? 'single_correct',
-        difficulty: (map['difficulty']?.toString() ?? 'medium').toLowerCase(),
-        source: (map['sourceType'] ?? map['source_type'] ?? map['source'] ?? map['category'] ?? 'pyq').toString().toLowerCase(),
-        sourceName: map['paperName']?.toString() ?? map['paper_name']?.toString() ?? map['sourceType']?.toString() ?? 'Test Series Question',
-        year: (map['year'] is num) ? (map['year'] as num).toInt() : int.tryParse(map['year']?.toString() ?? '2026'),
-        marks: (map['marks'] is num) ? (map['marks'] as num).toDouble() : double.tryParse(map['marks']?.toString() ?? '4') ?? 4.0,
-        negativeMarks: (map['negativeMarks'] is num) ? (map['negativeMarks'] as num).toDouble() : double.tryParse(map['negativeMarks']?.toString() ?? '1') ?? 1.0,
-        explanation: map['explanation']?.toString() ?? '',
-        solution: map['explanation']?.toString() ?? '',
-        options: opts,
-      );
-    }).toList();
+    _cachedQuestionModels[cacheKey] = models;
+    _questionModelsCacheTime[cacheKey] = DateTime.now();
+    return models;
   }
 
   // =========================================================================

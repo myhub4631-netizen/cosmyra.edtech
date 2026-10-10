@@ -367,14 +367,39 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   }
 
   Future<void> _loadPapers() async {
+    if (SupabaseService.hasCachedTestSeries) {
+      setState(() {
+        _dbPapers = SupabaseService.cachedDbPapers;
+        _customSeriesList = SupabaseService.cachedTestSeries;
+        _isLoading = false;
+      });
+      _refreshPapersSilently();
+      return;
+    }
+
     setState(() => _isLoading = true);
-    final papers = await SupabaseService.fetchAllPapersAndTestSeries();
-    final customSeries = await SupabaseService.fetchAllTestSeries();
+    final results = await Future.wait([
+      SupabaseService.fetchAllPapersAndTestSeries(),
+      SupabaseService.fetchAllTestSeries(),
+    ]);
     if (mounted) {
       setState(() {
-        _dbPapers = papers;
-        _customSeriesList = customSeries;
+        _dbPapers = List<Map<String, dynamic>>.from(results[0]);
+        _customSeriesList = List<Map<String, dynamic>>.from(results[1]);
         _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _refreshPapersSilently() async {
+    final results = await Future.wait([
+      SupabaseService.fetchAllPapersAndTestSeries(forceRefresh: true),
+      SupabaseService.fetchAllTestSeries(forceRefresh: true),
+    ]);
+    if (mounted) {
+      setState(() {
+        _dbPapers = List<Map<String, dynamic>>.from(results[0]);
+        _customSeriesList = List<Map<String, dynamic>>.from(results[1]);
       });
     }
   }
@@ -439,7 +464,8 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       if (!mounted) return;
 
       if (questions.isEmpty) {
-        questions.addAll(SupabaseService.getSampleQuestions(20));
+        context.push('/test/$paperId', extra: {'title': title, 'duration': durationMins});
+        return;
       }
 
       if (widget.onStartTestSeriesSession != null) {
