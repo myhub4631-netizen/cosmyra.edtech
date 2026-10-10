@@ -135,18 +135,22 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
   }
 
   int _getActualQuestionCount(Map<String, dynamic> p) {
-    if (p['questions'] is List) return (p['questions'] as List).length;
+    if (p['actual_questions_count'] is num) return (p['actual_questions_count'] as num).toInt();
     if (p['saved_questions_count'] is num) return (p['saved_questions_count'] as num).toInt();
-    if (p['question_count'] is num && p['questions'] is List) return (p['questions'] as List).length;
-    return int.tryParse((p['saved_questions_count'] ?? p['actual_questions_count'] ?? '0').toString()) ?? 0;
+    if (p['questions'] is List) return (p['questions'] as List).length;
+    return int.tryParse((p['actual_questions_count'] ?? p['saved_questions_count'] ?? '0').toString()) ?? 0;
   }
 
   int _getExpectedQuestionCount(Map<String, dynamic> p) {
-    if (p['expected_question_count'] is num) return (p['expected_question_count'] as num).toInt();
-    if (p['question_count'] is num) return (p['question_count'] as num).toInt();
-    final exam = (p['exam'] ?? '').toString().toUpperCase();
-    if (exam.contains('JEE')) return 75;
-    return 180;
+    if (p['expected_question_count'] is num && (p['expected_question_count'] as num) > 0) {
+      return (p['expected_question_count'] as num).toInt();
+    }
+    final format = ExamPaperFormatConfig.getPaperFormat(
+      exam: (p['exam'] ?? p['exam_name'] ?? 'NEET').toString(),
+      year: (p['year'] ?? '').toString(),
+      paperName: (p['paper_name'] ?? p['title'] ?? '').toString(),
+    );
+    return format['totalQuestions'] as int? ?? 180;
   }
 
   int get _totalPapersCount => _allPapers.length;
@@ -822,21 +826,23 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
   }
 
   Widget _buildSubjectBreakdownBadge(Map<String, dynamic> p, String exam) {
+    final act = _getActualQuestionCount(p);
+    if (act == 0) {
+      return const Text('P: 0 | C: 0 | B: 0', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)));
+    }
     if (exam.contains('NEET')) {
-      final act = _getActualQuestionCount(p);
-      final pCount = act > 0 ? (act * 0.25).toInt() : 0;
-      final cCount = act > 0 ? (act * 0.25).toInt() : 0;
-      final bCount = act > 0 ? (act * 0.50).toInt() : 0;
+      final pCount = act >= 180 ? 45 : (act * 0.25).toInt();
+      final cCount = act >= 180 ? 45 : (act * 0.25).toInt();
+      final bCount = act >= 180 ? 90 : (act * 0.50).toInt();
       return Text(
         'P: $pCount | C: $cCount | B: $bCount',
-        style: const TextStyle(fontSize: 11, color: Color(0xFF475569)),
+        style: const TextStyle(fontSize: 11, color: Color(0xFF475569), fontWeight: FontWeight.w600),
       );
     } else {
-      final act = _getActualQuestionCount(p);
-      final pCount = act > 0 ? (act ~/ 3) : 0;
+      final pCount = act ~/ 3;
       return Text(
         'P: $pCount | C: $pCount | M: $pCount',
-        style: const TextStyle(fontSize: 11, color: Color(0xFF475569)),
+        style: const TextStyle(fontSize: 11, color: Color(0xFF475569), fontWeight: FontWeight.w600),
       );
     }
   }

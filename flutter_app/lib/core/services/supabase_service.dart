@@ -7928,6 +7928,153 @@ class SupabaseService {
       debugPrint('Notice reading Supabase papers table: $e');
     }
 
+    // 5. Ensure Canonical Official PYQ Papers are present
+    final List<Map<String, dynamic>> canonicalOfficialPapers = [
+      {
+        'id': 'neet_2026_phase_1',
+        'paper_name': 'NEET 2026 Phase 1',
+        'title': 'NEET 2026 Phase 1',
+        'exam': 'NEET',
+        'year': '2026',
+        'phase_session': 'Phase 1',
+        'source_category': 'PYQ',
+        'status': 'Published',
+      },
+      {
+        'id': 'neet_2026_reneet',
+        'paper_name': 'NEET 2026 Re-NEET',
+        'title': 'NEET 2026 Re-NEET',
+        'exam': 'NEET',
+        'year': '2026',
+        'phase_session': 'Re-NEET',
+        'source_category': 'PYQ',
+        'status': 'Published',
+      },
+      {
+        'id': 'neet_2025_paper_1',
+        'paper_name': 'NEET 2025 (Official PYQ)',
+        'title': 'NEET 2025 (Official PYQ)',
+        'exam': 'NEET',
+        'year': '2025',
+        'phase_session': 'Phase 1',
+        'source_category': 'PYQ',
+        'status': 'Published',
+      },
+      {
+        'id': 'neet_2024_paper_1',
+        'paper_name': 'NEET 2024 (Official PYQ)',
+        'title': 'NEET 2024 (Official PYQ)',
+        'exam': 'NEET',
+        'year': '2024',
+        'phase_session': 'Phase 1',
+        'source_category': 'PYQ',
+        'status': 'Published',
+      },
+      {
+        'id': 'neet_2023_paper_1',
+        'paper_name': 'NEET 2023 (Official PYQ)',
+        'title': 'NEET 2023 (Official PYQ)',
+        'exam': 'NEET',
+        'year': '2023',
+        'phase_session': 'Phase 1',
+        'source_category': 'PYQ',
+        'status': 'Published',
+      },
+      {
+        'id': 'neet_2022_paper_1',
+        'paper_name': 'NEET 2022 (Official PYQ)',
+        'title': 'NEET 2022 (Official PYQ)',
+        'exam': 'NEET',
+        'year': '2022',
+        'phase_session': 'Phase 1',
+        'source_category': 'PYQ',
+        'status': 'Published',
+      },
+      {
+        'id': 'neet_2021_paper_1',
+        'paper_name': 'NEET 2021 (Official PYQ)',
+        'title': 'NEET 2021 (Official PYQ)',
+        'exam': 'NEET',
+        'year': '2021',
+        'phase_session': 'Phase 1',
+        'source_category': 'PYQ',
+        'status': 'Published',
+      },
+    ];
+
+    for (var cop in canonicalOfficialPapers) {
+      final String copId = cop['id'].toString();
+      final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '') == copId);
+      if (idx == -1) {
+        papers.insert(0, cop);
+      }
+    }
+
+    // 6. Dynamically query actual question counts and subject breakdowns from `questions` table
+    try {
+      final qRes = await client.from('questions').select('paper, year, subject_id');
+      if (qRes != null && (qRes as List).isNotEmpty) {
+        final Map<String, int> countsByPaperStr = {};
+        final Map<String, Map<String, int>> subjectsByPaperStr = {};
+
+        for (var row in (qRes as List)) {
+          final String pStr = (row['paper'] ?? '').toString().trim();
+          final String sId = (row['subject_id'] ?? '').toString().trim();
+          if (pStr.isNotEmpty) {
+            countsByPaperStr[pStr] = (countsByPaperStr[pStr] ?? 0) + 1;
+            subjectsByPaperStr.putIfAbsent(pStr, () => {});
+            if (sId.isNotEmpty) {
+              subjectsByPaperStr[pStr]![sId] = (subjectsByPaperStr[pStr]![sId] ?? 0) + 1;
+            }
+          }
+        }
+
+        for (var p in papers) {
+          final String pId = (p['id'] ?? p['paper_id'] ?? '').toString().trim();
+          final String pTitle = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().trim();
+          final String examName = (p['exam'] ?? p['exam_name'] ?? 'NEET').toString();
+          final String yearStr = (p['year'] ?? '').toString();
+
+          int actualCount = 0;
+          Map<String, int> subjCounts = {};
+
+          if (countsByPaperStr.containsKey(pTitle)) {
+            actualCount += countsByPaperStr[pTitle]!;
+            subjCounts.addAll(subjectsByPaperStr[pTitle] ?? {});
+          }
+          if (countsByPaperStr.containsKey(pId)) {
+            actualCount += countsByPaperStr[pId]!;
+            subjCounts.addAll(subjectsByPaperStr[pId] ?? {});
+          }
+
+          // Grouping for NEET 2026 Paper 1 / NEET 2026 Phase 1
+          if (pId == 'neet_2026_phase_1' || pTitle.contains('NEET 2026')) {
+            final p1Count = countsByPaperStr['NEET 2026 Paper 1'] ?? 0;
+            final phase1Count = countsByPaperStr['NEET 2026 Phase 1'] ?? 0;
+            if (p1Count > 0 || phase1Count > 0) {
+              actualCount = p1Count + phase1Count; // 178 + 2 = 180!
+            }
+          }
+
+          // Derive canonical expected format from ExamPaperFormatConfig
+          final format = ExamPaperFormatConfig.getPaperFormat(
+            exam: examName,
+            year: yearStr,
+            paperName: pTitle,
+          );
+          final int expectedCount = format['totalQuestions'] as int? ?? 180;
+
+          p['actual_questions_count'] = actualCount;
+          p['saved_questions_count'] = actualCount;
+          p['expected_question_count'] = expectedCount;
+          p['question_count'] = expectedCount;
+          p['subject_counts'] = subjCounts;
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice resolving paper question counts: $e');
+    }
+
     if (exam != null && exam.trim().isNotEmpty && exam.trim() != 'All') {
       final String targetExamUpper = exam.trim().toUpperCase();
       final bool isJee = targetExamUpper.contains('JEE');
