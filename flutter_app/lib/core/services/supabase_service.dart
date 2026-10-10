@@ -5066,7 +5066,12 @@ class SupabaseService {
     } catch (_) {}
 
     try {
-      final res = await client.from('system_config').select('value').eq('key', 'admin_deleted_paper_ids').maybeSingle();
+      final res = await client
+          .from('system_config')
+          .select('value')
+          .eq('key', 'admin_deleted_paper_ids')
+          .maybeSingle()
+          .timeout(const Duration(seconds: 3));
       if (res != null && res['value'] is List) {
         final cloudList = (res['value'] as List).map((e) => e.toString()).toList();
         deleted.addAll(cloudList);
@@ -5092,7 +5097,7 @@ class SupabaseService {
         'key': 'admin_deleted_paper_ids',
         'value': list,
         'updated_at': DateTime.now().toIso8601String(),
-      }, onConflict: 'key');
+      }, onConflict: 'key').timeout(const Duration(seconds: 3));
     } catch (e) {
       debugPrint('Notice saving deleted paper tombstone: $e');
     }
@@ -5114,17 +5119,14 @@ class SupabaseService {
           'key': 'admin_deleted_paper_ids',
           'value': list,
           'updated_at': DateTime.now().toIso8601String(),
-        }, onConflict: 'key');
+        }, onConflict: 'key').timeout(const Duration(seconds: 3));
       } catch (_) {}
     }
   }
 
   /// Delete paper record from database, system_config and local storage safely
   static Future<bool> deletePaperRecord(String paperId) async {
-    // 1. Mark in persistent tombstone set
-    await markPaperAsDeleted(paperId);
-
-    // 2. Delete from Supabase 'papers' table (raising exception if FK constraint fails)
+    // 1. Delete from Supabase 'papers' table (raising exception if FK constraint fails)
     try {
       await client.from('papers').delete().eq('id', paperId);
     } catch (e) {
@@ -5134,6 +5136,9 @@ class SupabaseService {
         throw Exception('Cannot delete paper record because it has historical student attempts or dependent references. Please use Archive instead.');
       }
     }
+
+    // 2. Mark in persistent tombstone set ONLY after DB delete call succeeds
+    await markPaperAsDeleted(paperId);
 
     // 3. Remove from system_config 'admin_custom_papers' & 'created_test_papers'
     try {

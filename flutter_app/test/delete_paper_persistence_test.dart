@@ -52,6 +52,7 @@ void main() {
 
     test('2. Delete Official PYQ Paper (Resurrection Guard) Test', () async {
       const String officialPaperId = 'neet_2021_paper_1';
+      await SupabaseService.unmarkPaperAsDeleted(officialPaperId);
 
       var fetched = await SupabaseService.fetchPaperById(officialPaperId);
       expect(fetched, isNotNull, reason: 'Official NEET 2021 paper must initially exist in catalogue');
