@@ -394,7 +394,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           final String sqId = sq['id']?.toString() ?? '';
           return (parsedNum != null && parsedNum == qNum) || sqId == 'q_${_paperId}_$qNum' || sqId == expectedUuid;
         },
-        orElse: () => {},
+        orElse: () => (i < savedQList.length ? savedQList[i] : {}),
       );
 
       if (savedMatch.isNotEmpty) {
@@ -491,7 +491,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           chapterTopic: finalChapName,
           chapterId: finalChapId,
           availableIn: availInList,
-          isSaved: savedMatch.isNotEmpty && correctIdx >= 0 && finalChapName.isNotEmpty,
+          isSaved: savedMatch.isNotEmpty && rawQText.trim().isNotEmpty,
         );
       } else {
         if (firstUnsavedIndex == -1) {

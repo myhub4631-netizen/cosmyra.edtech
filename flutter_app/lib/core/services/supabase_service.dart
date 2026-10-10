@@ -7413,6 +7413,8 @@ class SupabaseService {
         paperId,
         paperUuid,
         if (paperId == '6237b088-76ac-4eaf-a03e-623776ac5eaf') 'NEET 2027 Leader Test Series - Paper 1',
+        if (paperId.contains('2026') || targetName.contains('2026') || targetName.contains('Phase 1')) 'NEET 2026 Phase 1',
+        if (paperId.contains('2026') || targetName.contains('2026') || targetName.contains('Phase 1')) 'NEET 2026 Paper 1',
       };
 
       for (final filter in paperFilters) {
@@ -7437,6 +7439,20 @@ class SupabaseService {
               .from('questions')
               .select()
               .or('paper_id.eq.$paperId,test_series_id.eq.$paperId,paper_id.eq.$paperUuid')
+              .order('created_at', ascending: true)
+              .limit(300);
+          if (res != null && (res as List).isNotEmpty) {
+            dbQuestions.addAll((res as List).map((row) => Map<String, dynamic>.from(row as Map)));
+          }
+        } catch (_) {}
+      }
+
+      if (dbQuestions.isEmpty && (paperId.contains('2026') || targetName.contains('2026') || targetName.contains('Phase 1'))) {
+        try {
+          final res = await client
+              .from('questions')
+              .select()
+              .eq('year', 2026)
               .order('created_at', ascending: true)
               .limit(300);
           if (res != null && (res as List).isNotEmpty) {
@@ -7524,6 +7540,7 @@ class SupabaseService {
                 pName.toLowerCase().trim() == targetName.toLowerCase().trim()
             )) ||
             (paperId == '6237b088-76ac-4eaf-a03e-623776ac5eaf' || targetName.contains('Paper 1')) && (dbQ['year'] == 2027 || dbQ['created_at']?.toString().startsWith('2026-10-01') == true) ||
+            ((paperId.contains('2026') || targetName.contains('2026') || targetName.contains('Phase 1')) && dbQ['year'] == 2026) ||
             (dbQ['id']?.toString().startsWith('q_${paperId}_') == true) ||
             (dbQ['id']?.toString() == toValidUuid('q_${paperId}_${dbQ['question_number'] ?? dbQ['questionNumber']}'));
 
