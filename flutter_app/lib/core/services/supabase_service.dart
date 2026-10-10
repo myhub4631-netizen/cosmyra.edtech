@@ -5568,19 +5568,55 @@ class SupabaseService {
 
     // 3. Persist to Supabase system_config table ('admin_custom_test_series') for 100% reliable cloud sync
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString('cosmyra_saved_test_series') ?? '[]';
-      List<dynamic> existingList = [];
+      List<Map<String, dynamic>> cloudList = [];
       try {
-        existingList = jsonDecode(raw);
+        final sysRes = await client.from('system_config').select('value').eq('key', 'admin_custom_test_series').maybeSingle();
+        if (sysRes != null && sysRes['value'] is List) {
+          cloudList = (sysRes['value'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
       } catch (_) {}
-      final List<Map<String, dynamic>> cloudList = existingList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      final idx = cloudList.indexWhere((item) => item['id'] == seriesId || item['title'] == title);
+
+      if (cloudList.isEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        final raw = prefs.getString('cosmyra_saved_test_series') ?? '[]';
+        try {
+          final List<dynamic> localDecoded = jsonDecode(raw);
+          cloudList = localDecoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        } catch (_) {}
+      }
+
+      final idx = cloudList.indexWhere((item) => item['id'] == seriesId || item['title'] == title || item['name'] == title);
       if (idx != -1) {
+        final existingSeries = cloudList[idx];
+        final existingTests = (existingSeries['tests'] is List)
+            ? List<Map<String, dynamic>>.from((existingSeries['tests'] as List).map((t) => Map<String, dynamic>.from(t as Map)))
+            : <Map<String, dynamic>>[];
+        final incomingTests = (fullData['tests'] is List)
+            ? List<Map<String, dynamic>>.from((fullData['tests'] as List).map((t) => Map<String, dynamic>.from(t as Map)))
+            : <Map<String, dynamic>>[];
+
+        if (existingTests.length > incomingTests.length) {
+          for (var incTest in incomingTests) {
+            final tId = (incTest['id'] ?? incTest['paper_id'] ?? '').toString();
+            final tTitle = (incTest['title'] ?? incTest['name'] ?? '').toString().trim().toLowerCase();
+            final tIdx = existingTests.indexWhere((et) =>
+                (et['id'] ?? et['paper_id'] ?? '').toString() == tId ||
+                (et['title'] ?? et['name'] ?? '').toString().trim().toLowerCase() == tTitle);
+            if (tIdx != -1) {
+              existingTests[tIdx] = {...existingTests[tIdx], ...incTest};
+            } else {
+              existingTests.add(incTest);
+            }
+          }
+          fullData['tests'] = existingTests;
+          fullData['test_count'] = existingTests.length;
+        }
+
         cloudList[idx] = fullData;
       } else {
         cloudList.insert(0, fullData);
       }
+
       await client.from('system_config').upsert({
         'key': 'admin_custom_test_series',
         'value': cloudList,

@@ -1332,19 +1332,6 @@ class _TestRunnerLoaderScreenState extends State<TestRunnerLoaderScreen> {
       }
     }
 
-    if (questions.isEmpty) {
-      try {
-        final allRaw = await SupabaseService.fetchAllQuestionsFromSupabase();
-        if (allRaw.isNotEmpty) {
-          questions = allRaw.take(200).map((q) => QuestionModel.fromJson(q)).toList();
-        }
-      } catch (_) {}
-    }
-
-    if (questions.isEmpty) {
-      questions = SupabaseService.getSampleQuestions(20);
-    }
-
     if (mounted) {
       setState(() {
         _questions = questions;
@@ -1396,6 +1383,128 @@ class _TestRunnerLoaderScreenState extends State<TestRunnerLoaderScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      );
+    }
+
+    if (_questions.isEmpty) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          title: Text(
+            widget.testTitle.isNotEmpty ? widget.testTitle : 'Test Paper',
+            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+          ),
+          backgroundColor: Colors.white,
+          elevation: 0.5,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                context.go('/test-series');
+              }
+            },
+          ),
+        ),
+        body: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 520),
+            margin: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(color: Color(0x0F000000), blurRadius: 20, offset: Offset(0, 4)),
+              ],
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEF3C7),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.hourglass_empty_rounded, size: 40, color: Color(0xFFD97706)),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Questions for this test paper will be uploaded soon.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF0F172A),
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'For More Detail Contact Admin',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+                if (widget.testTitle.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.assignment_outlined, size: 16, color: Color(0xFF475569)),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            widget.testTitle,
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4F46E5),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      } else {
+                        context.go('/test-series');
+                      }
+                    },
+                    icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                    label: Text(
+                      'Back to Test Series',
+                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
