@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:file_picker/file_picker.dart';
 
 import '../../core/services/supabase_service.dart';
+import '../../shared/utils/neet_subject_helper.dart';
 import '../../shared/widgets/smart_image.dart';
 import '../../shared/widgets/solution_video_player.dart';
 import '../../shared/widgets/latex_view.dart';
@@ -516,7 +517,13 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
         final String chapIdFromMatch = savedMatch['chapter_id']?.toString() ?? '';
         final String chapNameFromMatch = savedMatch['chapter']?.toString() ?? savedMatch['chapterTopic']?.toString() ?? '';
-        final String qSubject = savedMatch['subject']?.toString() ?? _getDefaultSubjectForSlot(slotNum, exam, totalSlots);
+
+        String resolvedMatchSub = '';
+        if (savedMatch['subject'] != null && savedMatch['subject'].toString().trim().isNotEmpty) {
+          resolvedMatchSub = savedMatch['subject'].toString().trim();
+        } else if (savedMatch['subject_id'] != null && savedMatch['subject_id'].toString().trim().isNotEmpty) {
+          resolvedMatchSub = NeetSubjectHelper.getSubjectNameFromId(savedMatch['subject_id'].toString().trim(), exam: exam);
+        }
 
         String finalChapId = chapIdFromMatch;
         String finalChapName = chapNameFromMatch;
@@ -525,14 +532,22 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           final matchedC = _loadedDbChapters.firstWhere((c) => c['id'].toString() == chapIdFromMatch);
           finalChapId = matchedC['id'].toString();
           finalChapName = matchedC['name'].toString();
+          if (resolvedMatchSub.isEmpty && matchedC['subject_id'] != null) {
+            resolvedMatchSub = NeetSubjectHelper.getSubjectNameFromId(matchedC['subject_id'].toString(), exam: exam);
+          }
         } else if (chapNameFromMatch.isNotEmpty && _loadedDbChapters.any((c) => c['name'].toString().trim().toLowerCase() == chapNameFromMatch.trim().toLowerCase())) {
           final matchedC = _loadedDbChapters.firstWhere((c) => c['name'].toString().trim().toLowerCase() == chapNameFromMatch.trim().toLowerCase());
           finalChapId = matchedC['id'].toString();
           finalChapName = matchedC['name'].toString();
+          if (resolvedMatchSub.isEmpty && matchedC['subject_id'] != null) {
+            resolvedMatchSub = NeetSubjectHelper.getSubjectNameFromId(matchedC['subject_id'].toString(), exam: exam);
+          }
         } else if (chapNameFromMatch.isNotEmpty || chapIdFromMatch.isNotEmpty) {
           finalChapId = chapIdFromMatch;
           finalChapName = chapNameFromMatch.isNotEmpty ? chapNameFromMatch : chapIdFromMatch;
         }
+
+        final String qSubject = resolvedMatchSub.isNotEmpty ? resolvedMatchSub : _getDefaultSubjectForSlot(slotNum, exam, totalSlots);
 
         final dynamic availInRaw = savedMatch['available_in'] ?? savedMatch['availableIn'];
         final List<String> availInList = (availInRaw is List && availInRaw.isNotEmpty)
@@ -654,7 +669,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           positiveMarks: qMap['marks']?.toString() ?? qMap['positiveMarks']?.toString() ?? '4',
           negativeMarks: qMap['negative_marks']?.toString() ?? qMap['negativeMarks']?.toString() ?? '-1',
           questionType: qMap['q_type'] ?? qMap['question_type'] ?? 'MCQ (Single Correct)',
-          subject: qMap['subject'] ?? 'Physics',
+          subject: ((qMap['subject'] != null && qMap['subject'].toString().trim().isNotEmpty)
+              ? qMap['subject'].toString().trim()
+              : (qMap['subject_id'] != null && qMap['subject_id'].toString().trim().isNotEmpty)
+                  ? NeetSubjectHelper.getSubjectNameFromId(qMap['subject_id'].toString().trim(), exam: exam)
+                  : _getDefaultSubjectForSlot(idx + 1, exam, expectedQuestionCount)),
+          subjectId: qMap['subject_id']?.toString() ?? '',
           chapter: qMap['chapter'] ?? '',
           topic: qMap['topic'] ?? '',
           chapterTopic: qMap['chapter'] ?? '',
@@ -1380,6 +1400,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           'negativeMarks': double.tryParse(q.negativeMarks) ?? 1.0,
           'qType': q.questionType,
           'chapter_id': (q.chapterId.isNotEmpty && SupabaseService.isValidUuid(q.chapterId)) ? q.chapterId : null,
+          'subject_id': (q.subjectId.isNotEmpty && SupabaseService.isValidUuid(q.subjectId)) ? q.subjectId : null,
           'subject': q.subject,
           'chapter': q.chapter,
           'topic': q.topic,
@@ -1567,6 +1588,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       'negativeMarks': double.tryParse(q.negativeMarks) ?? 1.0,
       'qType': q.questionType,
       'chapter_id': (q.chapterId.isNotEmpty && SupabaseService.isValidUuid(q.chapterId)) ? q.chapterId : null,
+      'subject_id': (q.subjectId.isNotEmpty && SupabaseService.isValidUuid(q.subjectId)) ? q.subjectId : null,
       'subject': q.subject,
       'chapter': q.chapter,
       'topic': q.topic,

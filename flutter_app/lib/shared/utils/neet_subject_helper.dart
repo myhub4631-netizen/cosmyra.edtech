@@ -1,26 +1,23 @@
-import 'package:flutter/foundation.dart';
-
 /// Helper utility for NEET & JEE Subject-Wise Question Ordering and Test Grid Mapping
 class NeetSubjectHelper {
   /// Map UUIDs, codes, or raw string identifiers to canonical subject names
   static String getSubjectNameFromId(String rawId, {String? exam}) {
     if (rawId.trim().isEmpty) return '';
     final s = rawId.trim().toLowerCase();
-    final bool isJee = (exam != null && exam.toUpperCase().contains('JEE'));
 
-    if (isJee) {
-      if (s.contains('a4444444') || s.contains('a7777777') || s.contains('phys')) return 'Physics';
-      if (s.contains('a5555555') || s.contains('a8888888') || s.contains('chem')) return 'Chemistry';
-      if (s.contains('a6666666') || s.contains('a9999999') || s.contains('math')) return 'Mathematics';
-    }
+    // Canonical UUID Mappings (Strict DB IDs)
+    if (s.contains('a1111111') || s.contains('a4444444') || s.contains('a7777777')) return 'Physics';
+    if (s.contains('a2222222') || s.contains('a5555555') || s.contains('a8888888')) return 'Chemistry';
+    if (s.contains('a3333333')) return 'Biology';
+    if (s.contains('a6666666') || s.contains('a9999999')) return 'Mathematics';
 
-    // Canonical UUID & Code Mappings
-    if (s.contains('a1111111') || s.contains('phys')) return 'Physics';
-    if (s.contains('a2222222') || s.contains('chem')) return 'Chemistry';
-    if (s.contains('a4444444') || s.contains('botan')) return 'Botany';
-    if (s.contains('a5555555') || s.contains('zool')) return 'Zoology';
-    if (s.contains('a3333333') || s.contains('bio')) return 'Biology';
-    if (s.contains('a6666666') || s.contains('math')) return 'Mathematics';
+    // Canonical Name / Textual Mappings
+    if (s.contains('botan')) return 'Botany';
+    if (s.contains('zool')) return 'Zoology';
+    if (s.contains('bio')) return 'Biology';
+    if (s.contains('phys')) return 'Physics';
+    if (s.contains('chem')) return 'Chemistry';
+    if (s.contains('math')) return 'Mathematics';
 
     return rawId;
   }

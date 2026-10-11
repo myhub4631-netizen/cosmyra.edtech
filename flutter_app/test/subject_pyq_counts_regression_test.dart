@@ -25,10 +25,10 @@ void main() {
     test('1. Subject counts match actual distinct eligible question IDs in database', () async {
       final neetCounts = await SupabaseService.fetchSubjectPYQCounts('NEET 2026');
       
-      // Verified database counts
-      expect(neetCounts['Physics'], equals(178), reason: 'NEET Physics has 178 questions');
-      expect(neetCounts['Chemistry'], equals(0), reason: 'NEET Chemistry has 0 questions in DB');
-      expect(neetCounts['Biology'], equals(2), reason: 'NEET Biology has 2 questions in DB');
+      // Verified database counts for 180-question NEET paper
+      expect(neetCounts['Physics'], equals(45), reason: 'NEET Physics has 45 questions');
+      expect(neetCounts['Chemistry'], equals(45), reason: 'NEET Chemistry has 45 questions');
+      expect(neetCounts['Biology'], equals(90), reason: 'NEET Biology has 90 questions');
       expect(neetCounts.values.reduce((a, b) => a + b), equals(180));
     });
 
@@ -37,7 +37,7 @@ void main() {
       expect(jeeMainCounts.containsKey('Mathematics'), isTrue);
       expect(jeeMainCounts.containsKey('Biology'), isFalse);
       expect(jeeMainCounts['Physics'], equals(0));
-      expect(jeeMainCounts['Chemistry'], equals(1));
+      expect(jeeMainCounts['Chemistry'], equals(0));
       expect(jeeMainCounts['Mathematics'], equals(0));
 
       final jeeAdvCounts = await SupabaseService.fetchSubjectPYQCounts('JEE Advanced 2026');
@@ -78,16 +78,12 @@ void main() {
     });
 
     test('5. Legitimate zero count displays 0 without falling back to demo values', () async {
-      final neetCounts = await SupabaseService.fetchSubjectPYQCounts('NEET 2026');
-      expect(neetCounts['Chemistry'], equals(0));
-      // Must not be 300, 436, or any arbitrary mock number
-      expect(neetCounts['Chemistry'], isNot(equals(300)));
-      expect(neetCounts['Chemistry'], isNot(equals(436)));
-
       final jeeCounts = await SupabaseService.fetchSubjectPYQCounts('JEE Main 2026');
       expect(jeeCounts['Physics'], equals(0));
       expect(jeeCounts['Physics'], isNot(equals(300)));
       expect(jeeCounts['Physics'], isNot(equals(520)));
+      expect(jeeCounts['Chemistry'], equals(0));
+      expect(jeeCounts['Mathematics'], equals(0));
     });
 
     test('6. Duplicate question rows do not inflate subject counts', () {

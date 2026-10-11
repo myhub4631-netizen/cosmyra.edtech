@@ -17,6 +17,7 @@ import '../../shared/widgets/latex_view.dart';
 import 'ecommerce_automation_service.dart';
 import 'cloudflare_r2_service.dart';
 import 'platform_time_tracker_service.dart';
+import '../../shared/utils/canonical_taxonomy_data.dart';
 
 class ExamPaperFormatConfig {
   static Map<String, dynamic> getPaperFormat({
@@ -1347,6 +1348,31 @@ class SupabaseService {
           .order('display_order', ascending: true);
 
       if (res != null && (res as List).isNotEmpty) {
+        // Compute distinct question counts per chapter
+        final chapterIds = (res as List).map((e) => e['id']?.toString() ?? '').where((id) => id.isNotEmpty).toList();
+        final Map<String, int> chapterQuestionCounts = {};
+        try {
+          if (chapterIds.isNotEmpty) {
+            final qCountRes = await client
+                .from('questions')
+                .select('id, chapter_id')
+                .inFilter('chapter_id', chapterIds);
+            if (qCountRes != null && (qCountRes as List).isNotEmpty) {
+              final Set<String> countedQuestions = {};
+              for (var qr in (qCountRes as List)) {
+                final qId = qr['id']?.toString() ?? '';
+                final cId = qr['chapter_id']?.toString() ?? '';
+                if (qId.isNotEmpty && cId.isNotEmpty && !countedQuestions.contains('$cId:$qId')) {
+                  countedQuestions.add('$cId:$qId');
+                  chapterQuestionCounts[cId] = (chapterQuestionCounts[cId] ?? 0) + 1;
+                }
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Notice aggregating chapter question counts: $e');
+        }
+
         final List<Map<String, dynamic>> dbChapters = sortTaxonomyChapters((res as List).map<Map<String, dynamic>>((e) {
           final topicsList = (e['topics'] as List?)?.map<Map<String, dynamic>>((t) {
             return {
@@ -1358,13 +1384,16 @@ class SupabaseService {
             };
           }).toList() ?? [];
 
+          final cId = e['id']?.toString() ?? '';
+          final int qCount = chapterQuestionCounts[cId] ?? (e['questions_count'] ?? 0);
+
           return {
-            'id': e['id']?.toString() ?? '',
+            'id': cId,
             'name': e['name'] ?? '',
             'code': e['code'] ?? '',
             'topics': topicsList.length,
             'topicsList': topicsList,
-            'questions': e['questions_count'] ?? 0,
+            'questions': qCount,
             'status': (e['is_active'] ?? true) ? 'Active' : 'Inactive',
           };
         }).toList());
@@ -1375,9 +1404,13 @@ class SupabaseService {
             final tList = c['topicsList'] as List?;
             if (tList == null || tList.isEmpty) {
               final cName = (c['name'] ?? '').toString().trim().toLowerCase();
+              final cleanC = cName.replaceAll(RegExp(r'^\d+\.\s*'), '').trim();
               final seedMatch = seeds.firstWhere(
-                (s) => (s['name'] ?? '').toString().trim().toLowerCase() == cName ||
-                       cName.contains((s['name'] ?? '').toString().trim().toLowerCase()),
+                (s) {
+                  final sName = (s['name'] ?? '').toString().trim().toLowerCase();
+                  final cleanS = sName.replaceAll(RegExp(r'^\d+\.\s*'), '').trim();
+                  return sName == cName || cleanS == cleanC || cleanC.contains(cleanS) || cleanS.contains(cleanC);
+                },
                 orElse: () => <String, dynamic>{},
               );
               if (seedMatch.isNotEmpty && seedMatch['topicsList'] is List && (seedMatch['topicsList'] as List).isNotEmpty) {
@@ -1514,238 +1547,7 @@ class SupabaseService {
   }
 
   static List<Map<String, dynamic>> _getSeedChaptersForSubject(String exam, String subject) {
-    final isNeet = exam.toUpperCase().contains('NEET');
-
-    if (subject.toUpperCase() == 'PHYSICS') {
-      return [
-        {
-          'id': toValidUuid('phys_c1'),
-          'name': '1. Mechanics',
-          'code': 'PHYS_MECH',
-          'topics': 8,
-          'questions': 1248,
-          'status': 'Active',
-          'topicsList': [
-            {'id': toValidUuid('phys_t1_1'), 'name': '1.1 Units and Dimensions', 'questions': 156, 'status': 'Active'},
-            {'id': toValidUuid('phys_t1_2'), 'name': '1.2 Kinematics & Projectile Motion', 'questions': 312, 'status': 'Active'},
-            {'id': toValidUuid('phys_t1_3'), 'name': '1.3 Laws of Motion & Friction', 'questions': 298, 'status': 'Active'},
-            {'id': toValidUuid('phys_t1_4'), 'name': '1.4 Work, Energy and Power', 'questions': 246, 'status': 'Active'},
-            {'id': toValidUuid('phys_t1_5'), 'name': '1.5 Centre of Mass & Collisions', 'questions': 128, 'status': 'Active'},
-            {'id': toValidUuid('phys_t1_6'), 'name': '1.6 Rotational Dynamics & Moment of Inertia', 'questions': 108, 'status': 'Active'},
-          ],
-        },
-        {
-          'id': toValidUuid('phys_c2'),
-          'name': '2. Thermodynamics & Kinetic Theory',
-          'code': 'PHYS_THERMO',
-          'topics': 6,
-          'questions': 896,
-          'status': 'Active',
-          'topicsList': [
-            {'id': toValidUuid('phys_t2_1'), 'name': '2.1 Thermal Properties of Matter', 'questions': 180, 'status': 'Active'},
-            {'id': toValidUuid('phys_t2_2'), 'name': '2.2 First & Second Law of Thermodynamics', 'questions': 240, 'status': 'Active'},
-            {'id': toValidUuid('phys_t2_3'), 'name': '2.3 Heat Engines & Carnot Cycle', 'questions': 190, 'status': 'Active'},
-            {'id': toValidUuid('phys_t2_4'), 'name': '2.4 Kinetic Theory of Gases', 'questions': 286, 'status': 'Active'},
-          ],
-        },
-        {
-          'id': toValidUuid('phys_c3'),
-          'name': '3. Oscillations and Waves',
-          'code': 'PHYS_WAVES',
-          'topics': 5,
-          'questions': 642,
-          'status': 'Active',
-          'topicsList': [
-            {'id': toValidUuid('phys_t3_1'), 'name': '3.1 Simple Harmonic Motion (SHM)', 'questions': 210, 'status': 'Active'},
-            {'id': toValidUuid('phys_t3_2'), 'name': '3.2 Wave Motion & Doppler Effect', 'questions': 220, 'status': 'Active'},
-            {'id': toValidUuid('phys_t3_3'), 'name': '3.3 Sound Waves & Organ Pipes', 'questions': 212, 'status': 'Active'},
-          ],
-        },
-        {
-          'id': toValidUuid('phys_c4'),
-          'name': '4. Electromagnetism & Circuits',
-          'code': 'PHYS_EM',
-          'topics': 12,
-          'questions': 1856,
-          'status': 'Active',
-          'topicsList': [
-            {'id': toValidUuid('phys_t4_1'), 'name': '4.1 Electrostatics & Coulomb\'s Law', 'questions': 340, 'status': 'Active'},
-            {'id': toValidUuid('phys_t4_2'), 'name': '4.2 Capacitors & Dielectrics', 'questions': 280, 'status': 'Active'},
-            {'id': toValidUuid('phys_t4_3'), 'name': '4.3 Current Electricity & Kirchhoff\'s Laws', 'questions': 450, 'status': 'Active'},
-            {'id': toValidUuid('phys_t4_4'), 'name': '4.4 Magnetic Effects of Current & EMI', 'questions': 420, 'status': 'Active'},
-            {'id': toValidUuid('phys_t4_5'), 'name': '4.5 Alternating Current (AC)', 'questions': 366, 'status': 'Active'},
-          ],
-        },
-        {
-          'id': toValidUuid('phys_c5'),
-          'name': '5. Optics & Modern Physics',
-          'code': 'PHYS_OPTICS',
-          'topics': 9,
-          'questions': 1346,
-          'status': 'Active',
-          'topicsList': [
-            {'id': toValidUuid('phys_t5_1'), 'name': '5.1 Ray Optics & Optical Instruments', 'questions': 390, 'status': 'Active'},
-            {'id': toValidUuid('phys_t5_2'), 'name': '5.2 Wave Optics & Interference', 'questions': 280, 'status': 'Active'},
-            {'id': toValidUuid('phys_t5_3'), 'name': '5.3 Dual Nature of Matter & Photoelectric Effect', 'questions': 310, 'status': 'Active'},
-            {'id': toValidUuid('phys_t5_4'), 'name': '5.4 Atoms & Nuclei', 'questions': 366, 'status': 'Active'},
-          ],
-        },
-      ];
-    }
-
-    if (subject.toUpperCase() == 'CHEMISTRY') {
-      return [
-        {
-          'id': toValidUuid('chem_c1'),
-          'name': '1. Physical Chemistry',
-          'code': 'CHEM_PHYS',
-          'topics': 6,
-          'questions': 1120,
-          'status': 'Active',
-          'topicsList': [
-            {'id': toValidUuid('chem_t1_1'), 'name': '1.1 Some Basic Concepts of Chemistry (Mole Concept)', 'questions': 240, 'status': 'Active'},
-            {'id': toValidUuid('chem_t1_2'), 'name': '1.2 Atomic Structure & Quantum Numbers', 'questions': 210, 'status': 'Active'},
-            {'id': toValidUuid('chem_t1_3'), 'name': '1.3 Chemical Bonding & Molecular Structure', 'questions': 310, 'status': 'Active'},
-            {'id': toValidUuid('chem_t1_4'), 'name': '1.4 Chemical & Ionic Equilibrium', 'questions': 210, 'status': 'Active'},
-            {'id': toValidUuid('chem_t1_5'), 'name': '1.5 Electrochemistry & Redox Reactions', 'questions': 150, 'status': 'Active'},
-          ],
-        },
-        {
-          'id': toValidUuid('chem_c2'),
-          'name': '2. Organic Chemistry',
-          'code': 'CHEM_ORG',
-          'topics': 8,
-          'questions': 1480,
-          'status': 'Active',
-          'topicsList': [
-            {'id': toValidUuid('chem_t2_1'), 'name': '2.1 GOC & Isomerism', 'questions': 380, 'status': 'Active'},
-            {'id': toValidUuid('chem_t2_2'), 'name': '2.2 Hydrocarbons (Alkanes, Alkenes, Alkynes)', 'questions': 320, 'status': 'Active'},
-            {'id': toValidUuid('chem_t2_3'), 'name': '2.3 Haloalkanes & Haloarenes', 'questions': 260, 'status': 'Active'},
-            {'id': toValidUuid('chem_t2_4'), 'name': '2.4 Alcohols, Phenols & Ethers', 'questions': 280, 'status': 'Active'},
-            {'id': toValidUuid('chem_t2_5'), 'name': '2.5 Aldehydes, Ketones & Carboxylic Acids', 'questions': 240, 'status': 'Active'},
-          ],
-        },
-        {
-          'id': toValidUuid('chem_c3'),
-          'name': '3. Inorganic Chemistry',
-          'code': 'CHEM_INORG',
-          'topics': 5,
-          'questions': 940,
-          'status': 'Active',
-          'topicsList': [
-            {'id': toValidUuid('chem_t3_1'), 'name': '3.1 Periodic Classification & Periodicity', 'questions': 220, 'status': 'Active'},
-            {'id': toValidUuid('chem_t3_2'), 'name': '3.2 p-Block Elements', 'questions': 240, 'status': 'Active'},
-            {'id': toValidUuid('chem_t3_3'), 'name': '3.3 d & f Block Elements', 'questions': 210, 'status': 'Active'},
-            {'id': toValidUuid('chem_t3_4'), 'name': '3.4 Coordination Compounds', 'questions': 270, 'status': 'Active'},
-          ],
-        },
-      ];
-    }
-
-    if (isNeet && (subject.toUpperCase() == 'BIOLOGY' || subject.toUpperCase().contains('BIOLOGY'))) {
-      return [
-        {
-          'id': toValidUuid('bio_c1'),
-          'name': '1. Diversity in Living World',
-          'code': 'BIO_DIV',
-          'topics': 4,
-          'questions': 650,
-          'status': 'Active',
-          'topicsList': [
-            {'id': toValidUuid('bio_t1_1'), 'name': '1.1 The Living World', 'questions': 120, 'status': 'Active'},
-            {'id': toValidUuid('bio_t1_2'), 'name': '1.2 Biological Classification', 'questions': 180, 'status': 'Active'},
-            {'id': toValidUuid('bio_t1_3'), 'name': '1.3 Plant Kingdom', 'questions': 170, 'status': 'Active'},
-            {'id': toValidUuid('bio_t1_4'), 'name': '1.4 Animal Kingdom', 'questions': 180, 'status': 'Active'},
-          ],
-        },
-        {
-          'id': toValidUuid('bio_c2'),
-          'name': '2. Cell Structure & Functions',
-          'code': 'BIO_CELL',
-          'topics': 3,
-          'questions': 780,
-          'status': 'Active',
-          'topicsList': [
-            {'id': toValidUuid('bio_t2_1'), 'name': '2.1 Cell: The Unit of Life', 'questions': 280, 'status': 'Active'},
-            {'id': toValidUuid('bio_t2_2'), 'name': '2.2 Biomolecules', 'questions': 240, 'status': 'Active'},
-            {'id': toValidUuid('bio_t2_3'), 'name': '2.3 Cell Cycle & Cell Division', 'questions': 260, 'status': 'Active'},
-          ],
-        },
-        {
-          'id': toValidUuid('bio_c3'),
-          'name': '3. Genetics & Evolution',
-          'code': 'BIO_GEN',
-          'topics': 3,
-          'questions': 920,
-          'status': 'Active',
-          'topicsList': [
-            {'id': toValidUuid('bio_t3_1'), 'name': '3.1 Principles of Inheritance & Variation', 'questions': 340, 'status': 'Active'},
-            {'id': toValidUuid('bio_t3_2'), 'name': '3.2 Molecular Basis of Inheritance', 'questions': 320, 'status': 'Active'},
-            {'id': toValidUuid('bio_t3_3'), 'name': '3.3 Evolution', 'questions': 260, 'status': 'Active'},
-          ],
-        },
-        {
-          'id': toValidUuid('bio_c4'),
-          'name': '4. Human Physiology',
-          'code': 'BIO_PHYS',
-          'topics': 5,
-          'questions': 1140,
-          'status': 'Active',
-          'topicsList': [
-            {'id': toValidUuid('bio_t4_1'), 'name': '4.1 Breathing & Exchange of Gases', 'questions': 220, 'status': 'Active'},
-            {'id': toValidUuid('bio_t4_2'), 'name': '4.2 Body Fluids & Circulation', 'questions': 240, 'status': 'Active'},
-            {'id': toValidUuid('bio_t4_3'), 'name': '4.3 Excretory Products & Elimination', 'questions': 210, 'status': 'Active'},
-            {'id': toValidUuid('bio_t4_4'), 'name': '4.4 Locomotion & Movement', 'questions': 210, 'status': 'Active'},
-            {'id': toValidUuid('bio_t4_5'), 'name': '4.5 Neural Control & Chemical Coordination', 'questions': 260, 'status': 'Active'},
-          ],
-        },
-      ];
-    }
-
-    // Default for Mathematics
-    return [
-      {
-        'id': toValidUuid('math_c1'),
-        'name': '1. Sets, Relations & Functions',
-        'code': 'MATH_SETS',
-        'topics': 3,
-        'questions': 540,
-        'status': 'Active',
-        'topicsList': [
-          {'id': toValidUuid('math_t1_1'), 'name': '1.1 Sets & Relations', 'questions': 180, 'status': 'Active'},
-          {'id': toValidUuid('math_t1_2'), 'name': '1.2 Functions & Domain/Range', 'questions': 210, 'status': 'Active'},
-          {'id': toValidUuid('math_t1_3'), 'name': '1.3 Inverse Trigonometric Functions', 'questions': 150, 'status': 'Active'},
-        ],
-      },
-      {
-        'id': 'math_c2',
-        'name': '2. Algebra',
-        'code': 'MATH_ALG',
-        'topics': 5,
-        'questions': 890,
-        'status': 'Active',
-        'topicsList': [
-          {'id': 'math_t2_1', 'name': '2.1 Complex Numbers & Quadratic Equations', 'questions': 220, 'status': 'Active'},
-          {'id': 'math_t2_2', 'name': '2.2 Matrices & Determinants', 'questions': 240, 'status': 'Active'},
-          {'id': 'math_t2_3', 'name': '2.3 Permutations & Combinations', 'questions': 190, 'status': 'Active'},
-          {'id': 'math_t2_4', 'name': '2.4 Binomial Theorem & Sequences/Series', 'questions': 240, 'status': 'Active'},
-        ],
-      },
-      {
-        'id': 'math_c3',
-        'name': '3. Calculus',
-        'code': 'MATH_CALC',
-        'topics': 4,
-        'questions': 1120,
-        'status': 'Active',
-        'topicsList': [
-          {'id': 'math_t3_1', 'name': '3.1 Limits, Continuity & Differentiability', 'questions': 320, 'status': 'Active'},
-          {'id': 'math_t3_2', 'name': '3.2 Applications of Derivatives (AOD)', 'questions': 280, 'status': 'Active'},
-          {'id': 'math_t3_3', 'name': '3.3 Indefinite & Definite Integrals', 'questions': 310, 'status': 'Active'},
-          {'id': 'math_t3_4', 'name': '3.4 Differential Equations & Area', 'questions': 210, 'status': 'Active'},
-        ],
-      },
-    ];
+    return CanonicalTaxonomyData.getSeedChaptersForSubject(exam, subject);
   }
 
   static Future<String> ensureSubjectExists(String examName, String subjectName) async {
@@ -3474,17 +3276,38 @@ class SupabaseService {
       await ensureTaxonomySeeded();
 
       final String finalExamId = await getOrCreateValidExamId(qMap['exam']?.toString() ?? 'NEET');
-      final String finalSubjectId = await getOrCreateValidSubjectId(finalExamId, qMap['subject']?.toString() ?? 'Physics');
+
       String? finalChapterId;
+      String? resolvedSubjectId;
       final String? passedChapId = qMap['chapter_id']?.toString() ?? qMap['chapterId']?.toString();
       if (passedChapId != null && passedChapId.isNotEmpty && isValidUuid(passedChapId)) {
         try {
-          final checkRes = await client.from('chapters').select('id').eq('id', passedChapId).limit(1);
+          final checkRes = await client.from('chapters').select('id, subject_id').eq('id', passedChapId).limit(1);
           if (checkRes != null && (checkRes as List).isNotEmpty) {
             finalChapterId = passedChapId;
+            final chapSubId = checkRes[0]['subject_id']?.toString();
+            if (chapSubId != null && isValidUuid(chapSubId)) {
+              resolvedSubjectId = chapSubId;
+            }
           }
         } catch (_) {}
       }
+
+      final String? passedSubjId = qMap['subject_id']?.toString() ?? qMap['subjectId']?.toString();
+      if (resolvedSubjectId == null && passedSubjId != null && passedSubjId.isNotEmpty && isValidUuid(passedSubjId)) {
+        resolvedSubjectId = passedSubjId;
+      }
+
+      if (resolvedSubjectId == null) {
+        String subName = qMap['subject']?.toString() ?? '';
+        final isNeet = finalExamId == '11111111-1111-1111-1111-111111111111';
+        if (isNeet && (subName.isEmpty || subName.toLowerCase() == 'physics') && qNum >= 1 && qNum <= 200) {
+          subName = NeetSubjectHelper.getSubjectForQuestionIndex(qNum - 1, 180, useBotanyZoology: false);
+        }
+        resolvedSubjectId = await getOrCreateValidSubjectId(finalExamId, subName.isNotEmpty ? subName : 'Physics');
+      }
+
+      final String finalSubjectId = resolvedSubjectId;
 
       if (finalChapterId == null) {
         finalChapterId = await getOrCreateValidChapterId(

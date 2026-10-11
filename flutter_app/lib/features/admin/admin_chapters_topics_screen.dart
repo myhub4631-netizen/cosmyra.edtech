@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/services/supabase_service.dart';
+import '../../shared/utils/canonical_taxonomy_data.dart';
 import '../../shared/widgets/app_avatar.dart';
 
 class AdminChaptersTopicsScreen extends StatefulWidget {
@@ -20,11 +21,54 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
   List<Map<String, dynamic>> _chaptersList = [];
   List<Map<String, dynamic>> _topicsList = [];
   bool _isLoading = true;
+  int _totalChapters = 0;
+  int _totalTopics = 0;
+  int _activeChapters = 0;
+  int _activeTopics = 0;
 
   @override
   void initState() {
     super.initState();
     _loadTaxonomyFromService();
+    _loadGlobalTaxonomyStats();
+  }
+
+  Future<void> _loadGlobalTaxonomyStats() async {
+    try {
+      final chapsRes = await SupabaseService.client
+          .from('chapters')
+          .select('id, is_active');
+      if ((chapsRes as List).isNotEmpty) {
+        final totalC = (chapsRes as List).length;
+        final activeC = (chapsRes as List).where((c) => c['is_active'] != false).length;
+
+        int totalT = 0;
+        int activeT = 0;
+        final seeds = [
+          ...CanonicalTaxonomyData.neetPhysicsChapters,
+          ...CanonicalTaxonomyData.neetChemistryChapters,
+          ...CanonicalTaxonomyData.neetBiologyChapters,
+        ];
+        for (var s in seeds) {
+          final tList = s['topicsList'] as List?;
+          if (tList != null) {
+            totalT += tList.length;
+            activeT += tList.where((t) => t['status'] != 'Inactive').length;
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _totalChapters = totalC;
+            _activeChapters = activeC;
+            _totalTopics = totalT;
+            _activeTopics = activeT;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice loading global taxonomy stats: $e');
+    }
   }
 
   Future<void> _loadTaxonomyFromService({bool forceRefresh = true}) async {
@@ -594,7 +638,7 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                           iconBg: const Color(0xFFEEF2FF),
                           iconColor: const Color(0xFF6366F1),
                           title: 'Total Chapters',
-                          value: '324',
+                          value: _totalChapters > 0 ? '$_totalChapters' : '83',
                           subtitle: 'Across all exams',
                         ),
                         const SizedBox(width: 16),
@@ -603,7 +647,7 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                           iconBg: const Color(0xFFEFF6FF),
                           iconColor: const Color(0xFF3B82F6),
                           title: 'Total Topics',
-                          value: '1,256',
+                          value: _totalTopics > 0 ? '$_totalTopics' : '312',
                           subtitle: 'Across all chapters',
                         ),
                         const SizedBox(width: 16),
@@ -612,8 +656,10 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                           iconBg: const Color(0xFFECFDF5),
                           iconColor: const Color(0xFF10B981),
                           title: 'Active Chapters',
-                          value: '298',
-                          subtitle: '92.0% Active',
+                          value: _activeChapters > 0 ? '$_activeChapters' : '83',
+                          subtitle: _totalChapters > 0
+                              ? '${((_activeChapters / _totalChapters) * 100).toStringAsFixed(1)}% Active'
+                              : '100% Active',
                         ),
                         const SizedBox(width: 16),
                         _buildMetricCard(
@@ -621,8 +667,10 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                           iconBg: const Color(0xFFFFF7ED),
                           iconColor: const Color(0xFFF97316),
                           title: 'Active Topics',
-                          value: '1,142',
-                          subtitle: '90.9% Active',
+                          value: _activeTopics > 0 ? '$_activeTopics' : '312',
+                          subtitle: _totalTopics > 0
+                              ? '${((_activeTopics / _totalTopics) * 100).toStringAsFixed(1)}% Active'
+                              : '100% Active',
                         ),
                       ],
                     ),
@@ -751,6 +799,15 @@ class _AdminChaptersTopicsScreenState extends State<AdminChaptersTopicsScreen> {
                                 ],
                               ),
                               const SizedBox(height: 16),
+                              if (_isLoading)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 4),
+                                  child: LinearProgressIndicator(
+                                    minHeight: 2,
+                                    backgroundColor: Color(0xFFEDE9FE),
+                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF7C3AED)),
+                                  ),
+                                ),
 
                               // Table Header
                               Table(
