@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/services/supabase_service.dart';
 import '../../models/models.dart';
+import '../../shared/utils/neet_subject_helper.dart';
 import 'admin_bulk_upload_step2_screen.dart';
 
 class AdminBulkUploadStep1Screen extends StatefulWidget {
@@ -136,18 +137,944 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   List<Map<String, dynamic>> _step1QBankResults = [];
   List<Map<String, dynamic>> _step1QuestionSetsList = [];
 
+  String _getCanonicalQuestionId(Map<String, dynamic> q) {
+    return q['id']?.toString() ??
+        q['question_id']?.toString() ??
+        q['questionId']?.toString() ??
+        'q_${q['question_text']?.toString().hashCode}';
+  }
+
+  String _resolveQuestionSubject(Map<String, dynamic> q, {String? exam}) {
+    // 1. Direct subject string
+    final rawSub = (q['subject'] ?? q['subject_name'])?.toString().trim() ?? '';
+    if (rawSub.isNotEmpty && !rawSub.toLowerCase().contains('uuid') && rawSub.length < 35) {
+      final mapped = NeetSubjectHelper.getSubjectNameFromId(rawSub, exam: exam);
+      if (mapped.isNotEmpty && mapped != rawSub) {
+        return mapped;
+      }
+      final sLower = rawSub.toLowerCase();
+      if (sLower.contains('phys')) return 'Physics';
+      if (sLower.contains('chem')) return 'Chemistry';
+      if (sLower.contains('botan')) return 'Botany';
+      if (sLower.contains('zool')) return 'Zoology';
+      if (sLower.contains('bio')) return 'Biology';
+      if (sLower.contains('math')) return 'Mathematics';
+    }
+
+    // 2. Check subject_id
+    final rawSubId = (q['subject_id'] ?? q['subjectId'])?.toString().trim() ?? '';
+    if (rawSubId.isNotEmpty) {
+      final mapped = NeetSubjectHelper.getSubjectNameFromId(rawSubId, exam: exam);
+      if (mapped.isNotEmpty && mapped != rawSubId) {
+        return mapped;
+      }
+    }
+
+    // 3. Check section_name / section
+    final rawSection = (q['section_name'] ?? q['section'])?.toString().trim() ?? '';
+    if (rawSection.isNotEmpty) {
+      final sLower = rawSection.toLowerCase();
+      if (sLower.contains('phys')) return 'Physics';
+      if (sLower.contains('chem')) return 'Chemistry';
+      if (sLower.contains('botan')) return 'Botany';
+      if (sLower.contains('zool')) return 'Zoology';
+      if (sLower.contains('bio')) return 'Biology';
+      if (sLower.contains('math')) return 'Mathematics';
+    }
+
+    return 'Unknown';
+  }
+
+  Map<String, dynamic> _getSourceSubjectBreakdown(Map<String, dynamic> src) {
+    final List rawList = (src['rawQuestions'] as List? ?? src['questions'] as List? ?? []);
+    final String exam = (src['exam'] ?? _examName ?? 'NEET').toString();
+    final bool isJee = exam.toUpperCase().contains('JEE');
+
+    int physics = 0;
+    int chemistry = 0;
+    int biology = 0;
+    int botany = 0;
+    int zoology = 0;
+    int mathematics = 0;
+    int unknown = 0;
+
+    for (var q in rawList) {
+      if (q is! Map) continue;
+      final qMap = Map<String, dynamic>.from(q as Map);
+      final String sub = _resolveQuestionSubject(qMap, exam: exam);
+      if (sub == 'Physics') {
+        physics++;
+      } else if (sub == 'Chemistry') {
+        chemistry++;
+      } else if (sub == 'Mathematics') {
+        mathematics++;
+      } else if (sub == 'Botany') {
+        botany++;
+        biology++;
+      } else if (sub == 'Zoology') {
+        zoology++;
+        biology++;
+      } else if (sub == 'Biology') {
+        biology++;
+      } else {
+        unknown++;
+      }
+    }
+
+    return {
+      'total': rawList.length,
+      'physics': physics,
+      'chemistry': chemistry,
+      'biology': biology,
+      'botany': botany,
+      'zoology': zoology,
+      'mathematics': mathematics,
+      'unknown': unknown,
+      'isJee': isJee,
+    };
+  }
+
+  List<Map<String, dynamic>> _filterQuestionsByMode(
+    Map<String, dynamic> src,
+    String mode, {
+    Set<String>? customIds,
+  }) {
+    final List rawList = (src['rawQuestions'] as List? ?? src['questions'] as List? ?? []);
+    final String exam = (src['exam'] ?? _examName ?? 'NEET').toString();
+    final List<Map<String, dynamic>> rawQuestions = rawList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
+    if (mode == 'full') {
+      return rawQuestions;
+    } else if (mode == 'physics') {
+      return rawQuestions.where((q) => _resolveQuestionSubject(q, exam: exam) == 'Physics').toList();
+    } else if (mode == 'chemistry') {
+      return rawQuestions.where((q) => _resolveQuestionSubject(q, exam: exam) == 'Chemistry').toList();
+    } else if (mode == 'biology') {
+      return rawQuestions.where((q) {
+        final s = _resolveQuestionSubject(q, exam: exam);
+        return s == 'Biology' || s == 'Botany' || s == 'Zoology';
+      }).toList();
+    } else if (mode == 'mathematics') {
+      return rawQuestions.where((q) => _resolveQuestionSubject(q, exam: exam) == 'Mathematics').toList();
+    } else if (mode == 'custom') {
+      final Set<String> targetIds = customIds ?? (src['customSelectedIds'] as Set<String>? ?? <String>{});
+      return rawQuestions.where((q) {
+        final id = _getCanonicalQuestionId(q);
+        return targetIds.contains(id);
+      }).toList();
+    }
+    return rawQuestions;
+  }
+
+  String _getModeDisplayName(String mode) {
+    switch (mode) {
+      case 'full':
+        return 'Full Paper';
+      case 'physics':
+        return 'Physics Only';
+      case 'chemistry':
+        return 'Chemistry Only';
+      case 'biology':
+        return 'Biology Only';
+      case 'mathematics':
+        return 'Mathematics Only';
+      case 'custom':
+        return 'Custom Selection';
+      default:
+        return mode;
+    }
+  }
+
+  void _setSourceSelectionMode(int idx, String mode) {
+    if (idx < 0 || idx >= _addedSources.length) return;
+    final src = _addedSources[idx];
+    final currentMode = src['selectionMode']?.toString() ?? 'full';
+    final customIds = (src['customSelectedIds'] as Set<String>?) ?? <String>{};
+
+    if (mode == 'custom') {
+      _openCustomQuestionSelectorModal(idx);
+      return;
+    }
+
+    if (currentMode == 'custom' && customIds.length > 5) {
+      showDialog(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B)),
+              SizedBox(width: 8),
+              Text('Change Selection Mode?'),
+            ],
+          ),
+          content: Text(
+            'You currently have ${customIds.length} custom-selected questions in "${src['name']}".\n\n'
+            'Switching to ${_getModeDisplayName(mode)} will reset your custom selection.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Keep Custom Selection'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                _applyModeToSource(idx, mode);
+              },
+              child: const Text('Switch Mode', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    _applyModeToSource(idx, mode);
+  }
+
+  void _applyModeToSource(int idx, String mode) {
+    final src = _addedSources[idx];
+    final filtered = _filterQuestionsByMode(src, mode);
+    setState(() {
+      src['selectionMode'] = mode;
+      src['questions'] = filtered;
+      src['count'] = filtered.length;
+      _questionCountCtrl.text = _allDeduplicatedQuestions.length.toString();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✓ Selected ${_getModeDisplayName(mode)} (${filtered.length} Qs) from "${src['name']}"'),
+        backgroundColor: const Color(0xFF4F46E5),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Set<int> _parseRangeString(String text) {
+    final Set<int> numbers = {};
+    final parts = text.split(RegExp(r'[,;\s]+'));
+    for (var part in parts) {
+      final clean = part.trim();
+      if (clean.isEmpty) continue;
+      if (clean.contains('-')) {
+        final rangeParts = clean.split('-');
+        if (rangeParts.length == 2) {
+          final start = int.tryParse(rangeParts[0].trim());
+          final end = int.tryParse(rangeParts[1].trim());
+          if (start != null && end != null) {
+            final low = start < end ? start : end;
+            final high = start < end ? end : start;
+            for (int i = low; i <= high; i++) {
+              numbers.add(i);
+            }
+          }
+        }
+      } else {
+        final single = int.tryParse(clean);
+        if (single != null) {
+          numbers.add(single);
+        }
+      }
+    }
+    return numbers;
+  }
+
+  void _openCustomQuestionSelectorModal(int srcIdx) {
+    if (srcIdx < 0 || srcIdx >= _addedSources.length) return;
+    final src = _addedSources[srcIdx];
+    final List rawList = (src['rawQuestions'] as List? ?? src['questions'] as List? ?? []);
+    final List<Map<String, dynamic>> rawQuestions = rawList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final String paperName = src['name']?.toString() ?? 'Selected Paper';
+    final String exam = (src['exam'] ?? _examName ?? 'NEET').toString();
+    final bool isJee = exam.toUpperCase().contains('JEE');
+
+    if (rawQuestions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No questions available in this source paper to select from.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    final existingCustomIds = (src['customSelectedIds'] as Set<String>?);
+    final Set<String> tempSelectedIds = (existingCustomIds != null && existingCustomIds.isNotEmpty)
+        ? Set<String>.from(existingCustomIds)
+        : (src['selectionMode'] == 'custom'
+            ? <String>{}
+            : (src['questions'] as List? ?? [])
+                .map((q) => _getCanonicalQuestionId(Map<String, dynamic>.from(q as Map)))
+                .toSet());
+
+    final breakdown = _getSourceSubjectBreakdown(src);
+
+    final Set<String> availableChapters = {};
+    for (var q in rawQuestions) {
+      final ch = (q['chapter'] ?? q['chapter_name'] ?? q['chapterTopic'])?.toString().trim() ?? '';
+      if (ch.isNotEmpty && ch != 'General') availableChapters.add(ch);
+    }
+    final List<String> chapterList = ['All', ...availableChapters.toList()..sort()];
+
+    final TextEditingController searchCtrl = TextEditingController();
+    final TextEditingController rangeCtrl = TextEditingController();
+
+    String filterSubject = 'All';
+    String filterChapter = 'All';
+    int currentPage = 0;
+    const int pageSize = 25;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final query = searchCtrl.text.trim().toLowerCase();
+            final filteredList = rawQuestions.where((q) {
+              final sub = _resolveQuestionSubject(q, exam: exam);
+              if (filterSubject != 'All') {
+                if (filterSubject == 'Biology') {
+                  if (sub != 'Biology' && sub != 'Botany' && sub != 'Zoology') return false;
+                } else if (sub != filterSubject) {
+                  return false;
+                }
+              }
+
+              if (filterChapter != 'All') {
+                final ch = (q['chapter'] ?? q['chapter_name'] ?? q['chapterTopic'])?.toString().trim() ?? '';
+                if (ch != filterChapter) return false;
+              }
+
+              if (query.isNotEmpty) {
+                final qText = (q['question_text'] ?? q['questionText'] ?? '').toString().toLowerCase();
+                final rawNum = (q['question_number'] ?? '').toString();
+                if (!qText.contains(query) && !rawNum.contains(query)) {
+                  return false;
+                }
+              }
+              return true;
+            }).toList();
+
+            final totalPages = (filteredList.length / pageSize).ceil().clamp(1, 9999);
+            if (currentPage >= totalPages) currentPage = totalPages - 1;
+            final startIndex = currentPage * pageSize;
+            final endIndex = (startIndex + pageSize).clamp(0, filteredList.length);
+            final pageItems = (startIndex < filteredList.length)
+                ? filteredList.sublist(startIndex, endIndex)
+                : <Map<String, dynamic>>[];
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Container(
+                width: 980,
+                height: 720,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [
+                    BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.15), blurRadius: 24, offset: Offset(0, 8)),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEEF2FF),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.checklist_rounded, color: Color(0xFF4F46E5), size: 22),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        'Custom Questions Selector: $paperName',
+                                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEEF2FF),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        exam,
+                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Select exactly which questions to include (${rawQuestions.length} total available in source paper)',
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: tempSelectedIds.isNotEmpty ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: tempSelectedIds.isNotEmpty ? const Color(0xFF86EFAC) : const Color(0xFFCBD5E1),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.check_circle_rounded,
+                                  size: 16,
+                                  color: tempSelectedIds.isNotEmpty ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '${tempSelectedIds.length} Selected',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: tempSelectedIds.isNotEmpty ? const Color(0xFF15803D) : const Color(0xFF475569),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                            onPressed: () => Navigator.pop(dialogCtx),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        border: Border(bottom: BorderSide(color: Color(0xFFF1F5F9))),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 4,
+                                child: SizedBox(
+                                  height: 38,
+                                  child: TextField(
+                                    controller: searchCtrl,
+                                    onChanged: (_) => setModalState(() => currentPage = 0),
+                                    decoration: InputDecoration(
+                                      hintText: 'Search question text or question #...',
+                                      hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                                      prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
+                                      suffixIcon: searchCtrl.text.isNotEmpty
+                                          ? IconButton(
+                                              icon: const Icon(Icons.clear_rounded, size: 16),
+                                              onPressed: () {
+                                                searchCtrl.clear();
+                                                setModalState(() => currentPage = 0);
+                                              },
+                                            )
+                                          : null,
+                                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 3,
+                                child: SizedBox(
+                                  height: 38,
+                                  child: DropdownButtonFormField<String>(
+                                    value: filterSubject,
+                                    isExpanded: true,
+                                    decoration: InputDecoration(
+                                      labelText: 'Subject Filter',
+                                      labelStyle: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                                    ),
+                                    items: [
+                                      DropdownMenuItem(value: 'All', child: Text('All Subjects (${breakdown['total']})', style: const TextStyle(fontSize: 12))),
+                                      DropdownMenuItem(value: 'Physics', child: Text('Physics (${breakdown['physics']})', style: const TextStyle(fontSize: 12))),
+                                      DropdownMenuItem(value: 'Chemistry', child: Text('Chemistry (${breakdown['chemistry']})', style: const TextStyle(fontSize: 12))),
+                                      if (!isJee) ...[
+                                        DropdownMenuItem(value: 'Biology', child: Text('Biology (${breakdown['biology']})', style: const TextStyle(fontSize: 12))),
+                                        if (breakdown['botany'] > 0)
+                                          DropdownMenuItem(value: 'Botany', child: Text('Botany (${breakdown['botany']})', style: const TextStyle(fontSize: 12))),
+                                        if (breakdown['zoology'] > 0)
+                                          DropdownMenuItem(value: 'Zoology', child: Text('Zoology (${breakdown['zoology']})', style: const TextStyle(fontSize: 12))),
+                                      ] else ...[
+                                        DropdownMenuItem(value: 'Mathematics', child: Text('Mathematics (${breakdown['mathematics']})', style: const TextStyle(fontSize: 12))),
+                                      ],
+                                      if (breakdown['unknown'] > 0)
+                                        DropdownMenuItem(value: 'Unknown', child: Text('Unclassified (${breakdown['unknown']})', style: const TextStyle(fontSize: 12, color: Color(0xFFB45309)))),
+                                    ],
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        setModalState(() {
+                                          filterSubject = val;
+                                          currentPage = 0;
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ),
+                              if (chapterList.length > 2) ...[
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 3,
+                                  child: SizedBox(
+                                    height: 38,
+                                    child: DropdownButtonFormField<String>(
+                                      value: filterChapter,
+                                      isExpanded: true,
+                                      decoration: InputDecoration(
+                                        labelText: 'Chapter',
+                                        labelStyle: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                                      ),
+                                      items: chapterList.map((ch) {
+                                        return DropdownMenuItem(value: ch, child: Text(ch, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis));
+                                      }).toList(),
+                                      onChanged: (val) {
+                                        if (val != null) {
+                                          setModalState(() {
+                                            filterChapter = val;
+                                            currentPage = 0;
+                                          });
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              SizedBox(
+                                width: 260,
+                                height: 34,
+                                child: TextField(
+                                  controller: rangeCtrl,
+                                  style: const TextStyle(fontSize: 12),
+                                  decoration: InputDecoration(
+                                    hintText: 'Range (e.g. 1-45, 91-180 or 1,2,5)',
+                                    hintStyle: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: () {
+                                  final numbers = _parseRangeString(rangeCtrl.text);
+                                  if (numbers.isNotEmpty) {
+                                    setModalState(() {
+                                      for (int i = 0; i < rawQuestions.length; i++) {
+                                        final q = rawQuestions[i];
+                                        final rawNum = q['question_number'];
+                                        final int qNum = rawNum is num ? rawNum.toInt() : (int.tryParse(rawNum?.toString() ?? '') ?? (i + 1));
+                                        if (numbers.contains(qNum)) {
+                                          tempSelectedIds.add(_getCanonicalQuestionId(q));
+                                        }
+                                      }
+                                    });
+                                  }
+                                },
+                                child: const Text('+ Select Range', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 6),
+                              OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFFEF4444),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: () {
+                                  final numbers = _parseRangeString(rangeCtrl.text);
+                                  if (numbers.isNotEmpty) {
+                                    setModalState(() {
+                                      for (int i = 0; i < rawQuestions.length; i++) {
+                                        final q = rawQuestions[i];
+                                        final rawNum = q['question_number'];
+                                        final int qNum = rawNum is num ? rawNum.toInt() : (int.tryParse(rawNum?.toString() ?? '') ?? (i + 1));
+                                        if (numbers.contains(qNum)) {
+                                          tempSelectedIds.remove(_getCanonicalQuestionId(q));
+                                        }
+                                      }
+                                    });
+                                  }
+                                },
+                                child: const Text('- Deselect Range', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              ),
+                              const Spacer(),
+                              TextButton.icon(
+                                icon: const Icon(Icons.select_all_rounded, size: 16),
+                                label: Text('Select All (${filteredList.length})', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                onPressed: () {
+                                  setModalState(() {
+                                    for (var q in filteredList) {
+                                      tempSelectedIds.add(_getCanonicalQuestionId(q));
+                                    }
+                                  });
+                                },
+                              ),
+                              const SizedBox(width: 4),
+                              TextButton.icon(
+                                icon: const Icon(Icons.deselect_rounded, size: 16, color: Color(0xFFEF4444)),
+                                label: const Text('Deselect All', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEF4444))),
+                                onPressed: () {
+                                  setModalState(() {
+                                    for (var q in filteredList) {
+                                      tempSelectedIds.remove(_getCanonicalQuestionId(q));
+                                    }
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: filteredList.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.filter_alt_off_rounded, size: 40, color: Color(0xFF94A3B8)),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'No questions match the active filters.',
+                                    style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextButton(
+                                    onPressed: () {
+                                      setModalState(() {
+                                        searchCtrl.clear();
+                                        filterSubject = 'All';
+                                        filterChapter = 'All';
+                                        currentPage = 0;
+                                      });
+                                    },
+                                    child: const Text('Reset Filters'),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              itemCount: pageItems.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 8),
+                              itemBuilder: (context, idx) {
+                                final q = pageItems[idx];
+                                final canonicalId = _getCanonicalQuestionId(q);
+                                final isSelected = tempSelectedIds.contains(canonicalId);
+                                final sub = _resolveQuestionSubject(q, exam: exam);
+                                final rawNum = q['question_number'];
+                                final int qNum = rawNum is num
+                                    ? rawNum.toInt()
+                                    : (int.tryParse(rawNum?.toString() ?? '') ?? (startIndex + idx + 1));
+                                final qText = (q['question_text'] ?? q['questionText'] ?? 'Question #$qNum').toString();
+                                final chapter = (q['chapter'] ?? q['chapter_name'] ?? q['chapterTopic'])?.toString() ?? '';
+
+                                Color subColor;
+                                if (sub == 'Physics') {
+                                  subColor = const Color(0xFF0284C7);
+                                } else if (sub == 'Chemistry') {
+                                  subColor = const Color(0xFFD97706);
+                                } else if (sub == 'Biology' || sub == 'Botany' || sub == 'Zoology') {
+                                  subColor = const Color(0xFF059669);
+                                } else if (sub == 'Mathematics') {
+                                  subColor = const Color(0xFF7C3AED);
+                                } else {
+                                  subColor = const Color(0xFF64748B);
+                                }
+
+                                return InkWell(
+                                  onTap: () {
+                                    setModalState(() {
+                                      if (isSelected) {
+                                        tempSelectedIds.remove(canonicalId);
+                                      } else {
+                                        tempSelectedIds.add(canonicalId);
+                                      }
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? const Color(0xFFF0FDF4) : Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: isSelected ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                                        width: isSelected ? 1.5 : 1.0,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Checkbox(
+                                          value: isSelected,
+                                          activeColor: const Color(0xFF16A34A),
+                                          onChanged: (val) {
+                                            setModalState(() {
+                                              if (val == true) {
+                                                tempSelectedIds.add(canonicalId);
+                                              } else {
+                                                tempSelectedIds.remove(canonicalId);
+                                              }
+                                            });
+                                          },
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF1F5F9),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            '#$qNum',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: subColor.withValues(alpha: 0.12),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            sub,
+                                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: subColor),
+                                          ),
+                                        ),
+                                        if (chapter.isNotEmpty && chapter != 'General') ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            constraints: const BoxConstraints(maxWidth: 160),
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF8FAFC),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                                            ),
+                                            child: Text(
+                                              chapter,
+                                              style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            qText.replaceAll(RegExp(r'\s+'), ' ').trim(),
+                                            style: const TextStyle(fontSize: 12, color: Color(0xFF334155), height: 1.4),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '+${q['marks'] ?? 4} / ${q['negative_marks'] ?? -1}',
+                                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    if (totalPages > 1)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFF8FAFC),
+                          border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Showing ${startIndex + 1}–${endIndex} of ${filteredList.length} questions',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            ),
+                            Row(
+                              children: [
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.chevron_left_rounded, size: 16),
+                                  label: const Text('Previous', style: TextStyle(fontSize: 11)),
+                                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
+                                  onPressed: currentPage > 0
+                                      ? () => setModalState(() => currentPage--)
+                                      : null,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Page ${currentPage + 1} of $totalPages',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                                ),
+                                const SizedBox(width: 8),
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.chevron_right_rounded, size: 16),
+                                  label: const Text('Next', style: TextStyle(fontSize: 11)),
+                                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
+                                  onPressed: currentPage < totalPages - 1
+                                      ? () => setModalState(() => currentPage++)
+                                      : null,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+                        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            tempSelectedIds.isNotEmpty ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                            size: 16,
+                            color: tempSelectedIds.isNotEmpty ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            tempSelectedIds.isNotEmpty
+                                ? '${tempSelectedIds.length} questions will be imported into destination paper'
+                                : 'No questions selected yet',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: tempSelectedIds.isNotEmpty ? const Color(0xFF15803D) : const Color(0xFF64748B),
+                            ),
+                          ),
+                          const Spacer(),
+                          OutlinedButton(
+                            onPressed: () => Navigator.pop(dialogCtx),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.check_rounded, size: 16),
+                            label: Text('Apply Selection (${tempSelectedIds.length} Qs)'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF16A34A),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            ),
+                            onPressed: () {
+                              if (tempSelectedIds.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Please select at least 1 question before applying.'),
+                                    backgroundColor: Color(0xFFF59E0B),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              Navigator.pop(dialogCtx);
+
+                              final filtered = _filterQuestionsByMode(src, 'custom', customIds: tempSelectedIds);
+                              setState(() {
+                                src['customSelectedIds'] = Set<String>.from(tempSelectedIds);
+                                src['selectionMode'] = 'custom';
+                                src['questions'] = filtered;
+                                src['count'] = filtered.length;
+                                _questionCountCtrl.text = _allDeduplicatedQuestions.length.toString();
+                              });
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('✓ Applied ${filtered.length} custom questions from "$paperName"'),
+                                  backgroundColor: const Color(0xFF16A34A),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   List<Map<String, dynamic>> get _allDeduplicatedQuestions {
     final Map<String, Map<String, dynamic>> uniqueMap = {};
     for (var src in _addedSources) {
       final qList = src['questions'];
+      final String exam = (src['exam'] ?? _examName ?? 'NEET').toString();
       if (qList is List) {
         for (var q in qList) {
           if (q is Map) {
             final qMap = Map<String, dynamic>.from(q as Map);
-            final String canonicalId = qMap['id']?.toString() ??
-                qMap['question_id']?.toString() ??
-                qMap['questionId']?.toString() ??
-                'q_${qMap['question_text']?.toString().hashCode}';
+            final String canonicalId = _getCanonicalQuestionId(qMap);
+            final resolvedSub = _resolveQuestionSubject(qMap, exam: exam);
+            if (resolvedSub != 'Unknown') {
+              qMap['subject'] = resolvedSub;
+            }
             if (!uniqueMap.containsKey(canonicalId)) {
               uniqueMap[canonicalId] = qMap;
             }
@@ -275,15 +1202,35 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     );
 
     final questions = await SupabaseService.fetchQuestionsForPaper(paperId, paperName: pName);
+    final rawList = List<Map<String, dynamic>>.from(questions);
+    final paperExam = (paperMap['exam'] ?? _examName ?? 'NEET').toString();
+
+    if (!mounted) return;
+
+    // Prevent duplicate source paper addition
+    final existingIdx = _addedSources.indexWhere((s) => s['id'] == paperId);
+    if (existingIdx != -1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"$pName" is already in selected sources list.'),
+          backgroundColor: const Color(0xFFF59E0B),
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _addedSources.add({
         'type': sourceType,
         'id': paperId,
         'name': pName,
-        'count': questions.length,
+        'exam': paperExam,
+        'count': rawList.length,
         'paperMap': paperMap,
-        'questions': questions,
+        'rawQuestions': rawList,
+        'questions': rawList,
+        'selectionMode': 'full',
+        'customSelectedIds': <String>{},
       });
       _questionCountCtrl.text = _allDeduplicatedQuestions.length.toString();
     });
@@ -304,13 +1251,19 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
 
     if (selectedQuestions.isEmpty) return;
 
+    final rawList = List<Map<String, dynamic>>.from(selectedQuestions);
     setState(() {
       _addedSources.add({
         'type': 'Question Bank',
         'id': 'qbank_${DateTime.now().millisecondsSinceEpoch}',
         'name': 'Question Bank (${_step1QBankSubjectFilter} - ${selectedQuestions.length} Qs)',
-        'count': selectedQuestions.length,
-        'questions': selectedQuestions,
+        'exam': _examName,
+        'paperMap': {'exam': _examName, 'subject': _step1QBankSubjectFilter},
+        'count': rawList.length,
+        'rawQuestions': rawList,
+        'questions': rawList,
+        'selectionMode': 'full',
+        'customSelectedIds': <String>{},
       });
       _selectedQBankIdsInStep1.clear();
       _questionCountCtrl.text = _allDeduplicatedQuestions.length.toString();
@@ -2795,47 +3748,171 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                     Column(
                       children: List.generate(_addedSources.length, (idx) {
                         final src = _addedSources[idx];
+                        final breakdown = _getSourceSubjectBreakdown(src);
+                        final currentMode = src['selectionMode']?.toString() ?? 'full';
+                        final customSelectedIds = (src['customSelectedIds'] as Set<String>?) ?? <String>{};
+                        final bool isJee = breakdown['isJee'] == true;
+                        final int rawTotal = breakdown['total'] as int? ?? 0;
+                        final int selectedCount = src['count'] as int? ?? 0;
+
                         return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                            boxShadow: const [
+                              BoxShadow(color: Color.fromRGBO(0, 0, 0, 0.02), blurRadius: 4, offset: Offset(0, 2)),
+                            ],
                           ),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFEEF2FF),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  src['type'].toString().toUpperCase(),
-                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
-                                ),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEEF2FF),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      src['type'].toString().toUpperCase(),
+                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          src['name'].toString(),
+                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Source contains $rawTotal total questions',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '$selectedCount questions selected',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    tooltip: 'Remove source paper',
+                                    icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 20),
+                                    onPressed: () {
+                                      setState(() {
+                                        _addedSources.removeAt(idx);
+                                        _questionCountCtrl.text = _allDeduplicatedQuestions.length.toString();
+                                      });
+                                    },
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  src['name'].toString(),
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                                ),
+                              const SizedBox(height: 12),
+                              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  const Icon(Icons.tune_rounded, size: 14, color: Color(0xFF64748B)),
+                                  const SizedBox(width: 6),
+                                  const Text(
+                                    'QUESTION SELECTION',
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B), letterSpacing: 0.5),
+                                  ),
+                                  if (breakdown['unknown'] > 0) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(4)),
+                                      child: Text(
+                                        '⚠️ ${breakdown['unknown']} unclassified',
+                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFFB45309)),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
-                              Text(
-                                '${src['count']} questions',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
-                              ),
-                              const SizedBox(width: 12),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
-                                onPressed: () {
-                                  setState(() {
-                                    _addedSources.removeAt(idx);
-                                    _questionCountCtrl.text = _allDeduplicatedQuestions.length.toString();
-                                  });
-                                },
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  _buildSelectionModeChip(
+                                    label: 'Full Paper — $rawTotal Qs',
+                                    isSelected: currentMode == 'full',
+                                    onTap: () => _setSourceSelectionMode(idx, 'full'),
+                                    color: const Color(0xFF4F46E5),
+                                  ),
+                                  if (breakdown['physics'] > 0 || !isJee)
+                                    _buildSelectionModeChip(
+                                      label: 'Physics — ${breakdown['physics']} Qs',
+                                      isSelected: currentMode == 'physics',
+                                      onTap: () => _setSourceSelectionMode(idx, 'physics'),
+                                      color: const Color(0xFF0284C7),
+                                    ),
+                                  if (breakdown['chemistry'] > 0 || !isJee)
+                                    _buildSelectionModeChip(
+                                      label: 'Chemistry — ${breakdown['chemistry']} Qs',
+                                      isSelected: currentMode == 'chemistry',
+                                      onTap: () => _setSourceSelectionMode(idx, 'chemistry'),
+                                      color: const Color(0xFFD97706),
+                                    ),
+                                  if (!isJee)
+                                    _buildSelectionModeChip(
+                                      label: 'Biology — ${breakdown['biology']} Qs',
+                                      tooltip: (breakdown['botany'] > 0 || breakdown['zoology'] > 0)
+                                          ? 'Botany: ${breakdown['botany']} Qs, Zoology: ${breakdown['zoology']} Qs'
+                                          : null,
+                                      isSelected: currentMode == 'biology',
+                                      onTap: () => _setSourceSelectionMode(idx, 'biology'),
+                                      color: const Color(0xFF059669),
+                                    )
+                                  else if (breakdown['mathematics'] > 0 || isJee)
+                                    _buildSelectionModeChip(
+                                      label: 'Mathematics — ${breakdown['mathematics']} Qs',
+                                      isSelected: currentMode == 'mathematics',
+                                      onTap: () => _setSourceSelectionMode(idx, 'mathematics'),
+                                      color: const Color(0xFF7C3AED),
+                                    ),
+                                  _buildSelectionModeChip(
+                                    label: currentMode == 'custom' && customSelectedIds.isNotEmpty
+                                        ? 'Custom (${customSelectedIds.length} Selected)'
+                                        : 'Custom Questions Selector',
+                                    icon: Icons.checklist_rounded,
+                                    isSelected: currentMode == 'custom',
+                                    onTap: () => _setSourceSelectionMode(idx, 'custom'),
+                                    color: const Color(0xFF2563EB),
+                                  ),
+                                  if (currentMode == 'custom')
+                                    OutlinedButton.icon(
+                                      onPressed: () => _openCustomQuestionSelectorModal(idx),
+                                      icon: const Icon(Icons.edit_note_rounded, size: 14),
+                                      label: const Text('Edit Custom Selection', style: TextStyle(fontSize: 11)),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: const Color(0xFF2563EB),
+                                        side: const BorderSide(color: Color(0xFF93C5FD)),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ],
                           ),
@@ -3136,6 +4213,58 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
         ),
       ),
     );
+  }
+
+  Widget _buildSelectionModeChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required Color color,
+    IconData? icon,
+    String? tooltip,
+  }) {
+    final chip = InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.12) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color : const Color(0xFFCBD5E1),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: isSelected ? color : const Color(0xFF64748B)),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? color : const Color(0xFF334155),
+              ),
+            ),
+            if (isSelected) ...[
+              const SizedBox(width: 6),
+              Icon(Icons.check_circle_rounded, size: 14, color: color),
+            ],
+          ],
+        ),
+      ),
+    );
+
+    if (tooltip != null) {
+      return Tooltip(message: tooltip, child: chip);
+    }
+    return chip;
   }
 
   Widget _buildStep1PyqPicker() {
