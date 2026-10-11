@@ -33,6 +33,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   Map<String, dynamic>? _selectedEditPaperRecord;
   List<Map<String, dynamic>> _availableEditPapers = [];
   bool _isLoadingEditPapers = false;
+  String? _editPapersError;
   final TextEditingController _editPaperSearchCtrl = TextEditingController();
   // Years range from 2029 down to 1988
   static final List<String> availableYears = List<String>.generate(
@@ -1316,25 +1317,32 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     }
   }
 
-  Future<void> _loadMatchingEditPapers() async {
+  Future<void> _loadMatchingEditPapers({bool forceRefresh = false}) async {
     if (!mounted) return;
-    setState(() => _isLoadingEditPapers = true);
+    setState(() {
+      _isLoadingEditPapers = true;
+      _editPapersError = null;
+    });
     try {
       List<Map<String, dynamic>> papers = [];
       final query = _editPaperSearchCtrl.text.trim();
+
+      debugPrint('[EditPaperSelector] Fetching papers: sourceCat=$_sourceCategory, exam=$_examName, search="$query", forceRefresh=$forceRefresh');
 
       if (_sourceCategory == 'PYQ') {
         papers = await SupabaseService.fetchExistingPYQPapers(
           exam: _examName,
           search: query,
+          forceRefresh: forceRefresh,
         );
       } else if (_sourceCategory == 'NTA') {
         papers = await SupabaseService.fetchExistingNTAPapers(
           exam: _examName,
           search: query,
+          forceRefresh: forceRefresh,
         );
       } else {
-        final all = await SupabaseService.fetchAllPapersAndTestSeries(exam: _examName);
+        final all = await SupabaseService.fetchAllPapersAndTestSeries(exam: _examName, forceRefresh: forceRefresh);
         papers = all.where((p) {
           final pExam = (p['exam'] ?? p['exam_name'] ?? '').toString().toUpperCase();
           if (!pExam.contains(_examName.toUpperCase())) return false;
@@ -1347,7 +1355,10 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           }
           if (query.isNotEmpty) {
             final name = (p['paper_name'] ?? p['title'] ?? '').toString().toLowerCase();
-            if (!name.contains(query.toLowerCase())) return false;
+            final pYear = (p['year'] ?? '').toString().toLowerCase();
+            final pCode = (p['paper_code'] ?? p['paperCode'] ?? '').toString().toLowerCase();
+            final pId = (p['id'] ?? p['paper_id'] ?? '').toString().toLowerCase();
+            if (!name.contains(query.toLowerCase()) && !pYear.contains(query.toLowerCase()) && !pCode.contains(query.toLowerCase()) && !pId.contains(query.toLowerCase())) return false;
           }
           return true;
         }).toList();
@@ -1362,10 +1373,13 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       }
       final dedupList = dedup.values.toList();
 
+      debugPrint('[EditPaperSelector] Success: Loaded ${dedupList.length} papers: ${dedupList.map((p) => p['id']).toList()}');
+
       if (mounted) {
         setState(() {
           _availableEditPapers = dedupList;
           _isLoadingEditPapers = false;
+          _editPapersError = null;
 
           if (_selectedEditPaperId != null) {
             final found = dedupList.firstWhere(
@@ -1379,7 +1393,13 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoadingEditPapers = false);
+      debugPrint('[EditPaperSelector] Error loading edit papers: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingEditPapers = false;
+          _editPapersError = 'Failed to load papers: $e';
+        });
+      }
     }
   }
 
@@ -2820,7 +2840,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
               IconButton(
                 icon: const Icon(Icons.refresh_rounded, size: 20, color: Color(0xFF4F46E5)),
                 tooltip: 'Refresh paper list',
-                onPressed: _loadMatchingEditPapers,
+                onPressed: () => _loadMatchingEditPapers(forceRefresh: true),
               ),
             ],
           ),
@@ -2863,6 +2883,42 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                   SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF4F46E5))),
                   SizedBox(width: 12),
                   Text('Loading existing papers from Supabase...', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                ],
+              ),
+            )
+          else if (_editPapersError != null)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded, size: 20, color: Color(0xFFDC2626)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _editPapersError!,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF991B1B)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton.icon(
+                    onPressed: () => _loadMatchingEditPapers(forceRefresh: true),
+                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDC2626),
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
                 ],
               ),
             )

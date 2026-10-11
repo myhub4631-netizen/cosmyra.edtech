@@ -8419,17 +8419,45 @@ class SupabaseService {
       if (containerYear.isNotEmpty) {
         etMap['year'] ??= containerYear;
       }
-      // Explicitly classify extracted tests as Test Series
-      etMap['source_category'] = 'Test Series';
-      etMap['is_test_series'] = true;
-      etMap['is_pyq'] = false;
-      etMap['is_nta'] = false;
-
       final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '').toString() == etId);
       if (idx != -1) {
-        papers[idx] = {...etMap, ...papers[idx], 'is_test_series': true, 'source_category': 'Test Series'};
+        // Merge metadata but preserve existing authoritative classification (e.g. PYQ or NTA)
+        final existing = papers[idx];
+        final existingCat = (existing['source_category'] ?? existing['sourceCategory'] ?? existing['category'] ?? '').toString().toUpperCase();
+        final bool preservePyq = existing['is_pyq'] == true || existingCat.contains('PYQ');
+        final bool preserveNta = existing['is_nta'] == true || existingCat.contains('NTA');
+
+        papers[idx] = {
+          ...etMap,
+          ...existing,
+          if (preservePyq) ...{
+            'source_category': 'PYQ',
+            'is_pyq': true,
+          } else if (preserveNta) ...{
+            'source_category': 'NTA',
+            'is_nta': true,
+          } else ...{
+            'is_test_series': true,
+            'source_category': existing['source_category'] ?? 'Test Series',
+          }
+        };
       } else {
         seenIds.add(etId);
+        final title = (etMap['title'] ?? etMap['paper_name'] ?? '').toString().toUpperCase();
+        final rawCat = (etMap['source_category'] ?? etMap['sourceCategory'] ?? etMap['category'] ?? '').toString().toUpperCase();
+        final bool isPyq = etMap['is_pyq'] == true || rawCat.contains('PYQ') || title.contains('OFFICIAL PYQ');
+        final bool isNta = etMap['is_nta'] == true || rawCat.contains('NTA');
+
+        if (isPyq) {
+          etMap['source_category'] = 'PYQ';
+          etMap['is_pyq'] = true;
+        } else if (isNta) {
+          etMap['source_category'] = 'NTA';
+          etMap['is_nta'] = true;
+        } else {
+          etMap['source_category'] = 'Test Series';
+          etMap['is_test_series'] = true;
+        }
         papers.add(etMap);
       }
     }
@@ -8581,12 +8609,13 @@ class SupabaseService {
     final List<Map<String, dynamic>> canonicalOfficialPapers = [
       {
         'id': 'neet_2026_phase_1',
-        'paper_name': 'NEET 2026 Phase 1',
-        'title': 'NEET 2026 Phase 1',
+        'paper_name': 'NEET 2026 Paper 1',
+        'title': 'NEET 2026 Paper 1',
         'exam': 'NEET',
         'year': '2026',
         'phase_session': 'Phase 1',
         'source_category': 'PYQ',
+        'is_pyq': true,
         'status': 'Published',
       },
       {
@@ -8597,6 +8626,7 @@ class SupabaseService {
         'year': '2026',
         'phase_session': 'Re-NEET',
         'source_category': 'PYQ',
+        'is_pyq': true,
         'status': 'Published',
       },
       {
@@ -8607,6 +8637,7 @@ class SupabaseService {
         'year': '2025',
         'phase_session': 'Phase 1',
         'source_category': 'PYQ',
+        'is_pyq': true,
         'status': 'Published',
       },
       {
@@ -8617,6 +8648,7 @@ class SupabaseService {
         'year': '2024',
         'phase_session': 'Phase 1',
         'source_category': 'PYQ',
+        'is_pyq': true,
         'status': 'Published',
       },
       {
@@ -8627,6 +8659,7 @@ class SupabaseService {
         'year': '2023',
         'phase_session': 'Phase 1',
         'source_category': 'PYQ',
+        'is_pyq': true,
         'status': 'Published',
       },
       {
@@ -8637,6 +8670,7 @@ class SupabaseService {
         'year': '2022',
         'phase_session': 'Phase 1',
         'source_category': 'PYQ',
+        'is_pyq': true,
         'status': 'Published',
       },
       {
@@ -8647,6 +8681,7 @@ class SupabaseService {
         'year': '2021',
         'phase_session': 'Phase 1',
         'source_category': 'PYQ',
+        'is_pyq': true,
         'status': 'Published',
       },
     ];
@@ -8657,6 +8692,17 @@ class SupabaseService {
       final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '') == copId);
       if (idx == -1) {
         papers.insert(0, cop);
+      } else {
+        papers[idx] = {
+          ...cop,
+          ...papers[idx],
+          'paper_name': cop['paper_name'],
+          'title': cop['title'],
+          'source_category': 'PYQ',
+          'is_pyq': true,
+          'exam': cop['exam'] ?? papers[idx]['exam'] ?? 'NEET',
+          'year': cop['year'] ?? papers[idx]['year'] ?? '2026',
+        };
       }
     }
 
@@ -8708,6 +8754,8 @@ class SupabaseService {
             p['target_exam'] ??= 'NEET';
             p['year'] ??= '2026';
             p['status'] ??= 'Published';
+            p['source_category'] = 'PYQ';
+            p['is_pyq'] = true;
             subjCounts = {'physics': 45, 'chemistry': 45, 'biology': 90};
           } else if (actualCount >= 180 && (examName.toUpperCase().contains('NEET') || pTitle.toUpperCase().contains('NEET'))) {
             subjCounts = {'physics': 45, 'chemistry': 45, 'biology': 90};
@@ -8748,10 +8796,25 @@ class SupabaseService {
 
       final title = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().trim();
       final key = '${id}_$title'.toLowerCase();
-      if (id == '49bfe774-1e41-495e-a029-49bf1e41595e' || id == 'neet_2026_phase_1') {
-        // Prioritize canonical record
-        if (!seenKeys.contains(id)) {
-          seenKeys.add(id);
+
+      final bool isNeet2026P1 = id == 'neet_2026_phase_1' ||
+          id == '49bfe774-1e41-495e-a029-49bf1e41595e' ||
+          (title.toLowerCase().contains('neet 2026') &&
+              (title.toLowerCase().contains('paper 1') ||
+                  title.toLowerCase().contains('phase 1') ||
+                  title.toLowerCase().trim() == 'neet 2026 paper'));
+
+      if (isNeet2026P1) {
+        if (!seenKeys.contains('neet_2026_paper_1_canonical')) {
+          seenKeys.add('neet_2026_paper_1_canonical');
+          seenKeys.add('neet_2026_phase_1');
+          seenKeys.add('49bfe774-1e41-495e-a029-49bf1e41595e');
+          if (id.isNotEmpty) seenKeys.add(id);
+          p['id'] = 'neet_2026_phase_1';
+          p['paper_name'] = 'NEET 2026 Paper 1';
+          p['title'] = 'NEET 2026 Paper 1';
+          p['source_category'] = 'PYQ';
+          p['is_pyq'] = true;
           deduped.add(p);
         }
       } else if (!seenKeys.contains(key) && !seenKeys.contains(id)) {
@@ -8871,16 +8934,37 @@ class SupabaseService {
     String? year,
     String? subject,
     String? search,
+    bool forceRefresh = false,
   }) async {
-    final List<Map<String, dynamic>> allPapers = await fetchAllPapersAndTestSeries();
-    return allPapers.where((p) {
+    final List<Map<String, dynamic>> allPapers = await fetchAllPapersAndTestSeries(forceRefresh: forceRefresh);
+    final results = allPapers.where((p) {
       final sourceCat = (p['source_category'] ?? p['sourceCategory'] ?? p['category'] ?? p['source'] ?? '').toString().toUpperCase();
-      final isPyq = sourceCat.contains('PYQ') || sourceCat == 'PREVIOUS YEAR';
+      final pTitle = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toUpperCase();
+      final pId = (p['id'] ?? p['paper_id'] ?? '').toString().toLowerCase();
+
+      final bool isPyq = p['is_pyq'] == true ||
+          sourceCat.contains('PYQ') ||
+          sourceCat == 'PREVIOUS YEAR' ||
+          pTitle.contains('OFFICIAL PYQ') ||
+          pId.startsWith('neet_') ||
+          pId.startsWith('jee_') ||
+          (pTitle.contains('NEET 2026') && (pTitle.contains('PAPER 1') || pTitle.contains('PHASE 1')));
+
       if (!isPyq) return false;
 
       if (exam != null && exam.isNotEmpty && exam != 'All') {
-        final pExam = (p['exam'] ?? p['exam_name'] ?? '').toString();
-        if (!pExam.toUpperCase().contains(exam.toUpperCase())) return false;
+        final pExam = (p['exam'] ?? p['exam_name'] ?? p['target_exam'] ?? '').toString().toUpperCase();
+        final targetExam = exam.trim().toUpperCase();
+        final bool isNeet = targetExam.contains('NEET');
+        final bool isJee = targetExam.contains('JEE');
+
+        if (isNeet) {
+          if (!pExam.contains('NEET') && !pTitle.contains('NEET')) return false;
+        } else if (isJee) {
+          if (!pExam.contains('JEE') && !pTitle.contains('JEE')) return false;
+        } else {
+          if (!pExam.contains(targetExam) && !pTitle.contains(targetExam)) return false;
+        }
       }
       if (year != null && year.isNotEmpty && year != 'All' && year != 'All Years') {
         final pYear = (p['year'] ?? '').toString();
@@ -8889,10 +8973,16 @@ class SupabaseService {
       if (search != null && search.trim().isNotEmpty) {
         final term = search.trim().toLowerCase();
         final pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toLowerCase();
-        if (!pName.contains(term)) return false;
+        final pYear = (p['year'] ?? '').toString().toLowerCase();
+        final pCode = (p['paper_code'] ?? p['paperCode'] ?? '').toString().toLowerCase();
+        final pIdStr = (p['id'] ?? p['paper_id'] ?? '').toString().toLowerCase();
+        if (!pName.contains(term) && !pYear.contains(term) && !pCode.contains(term) && !pIdStr.contains(term)) return false;
       }
       return true;
     }).toList();
+
+    debugPrint('[fetchExistingPYQPapers] Loaded ${results.length} papers (exam: $exam, year: $year, search: $search): ${results.map((p) => p['id']).toList()}');
+    return results;
   }
 
   /// Fetch NTA Question Papers available in the database for reuse
@@ -8901,16 +8991,23 @@ class SupabaseService {
     String? year,
     String? session,
     String? search,
+    bool forceRefresh = false,
   }) async {
-    final List<Map<String, dynamic>> allPapers = await fetchAllPapersAndTestSeries();
-    return allPapers.where((p) {
+    final List<Map<String, dynamic>> allPapers = await fetchAllPapersAndTestSeries(forceRefresh: forceRefresh);
+    final results = allPapers.where((p) {
       final sourceCat = (p['source_category'] ?? p['sourceCategory'] ?? p['category'] ?? p['source'] ?? '').toString().toUpperCase();
-      final isNta = sourceCat.contains('NTA') || sourceCat.contains('MOCK') || sourceCat.contains('ABHYAS');
+      final pTitle = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toUpperCase();
+      final isNta = p['is_nta'] == true ||
+          sourceCat.contains('NTA') ||
+          sourceCat.contains('MOCK') ||
+          sourceCat.contains('ABHYAS') ||
+          (pTitle.contains('NTA') && !pTitle.contains('PYQ'));
       if (!isNta) return false;
 
       if (exam != null && exam.isNotEmpty && exam != 'All') {
-        final pExam = (p['exam'] ?? p['exam_name'] ?? '').toString();
-        if (!pExam.toUpperCase().contains(exam.toUpperCase())) return false;
+        final pExam = (p['exam'] ?? p['exam_name'] ?? p['target_exam'] ?? '').toString().toUpperCase();
+        final targetExam = exam.trim().toUpperCase();
+        if (!pExam.contains(targetExam) && !pTitle.contains(targetExam)) return false;
       }
       if (year != null && year.isNotEmpty && year != 'All' && year != 'All Years') {
         final pYear = (p['year'] ?? '').toString();
@@ -8919,10 +9016,16 @@ class SupabaseService {
       if (search != null && search.trim().isNotEmpty) {
         final term = search.trim().toLowerCase();
         final pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toLowerCase();
-        if (!pName.contains(term)) return false;
+        final pYear = (p['year'] ?? '').toString().toLowerCase();
+        final pCode = (p['paper_code'] ?? p['paperCode'] ?? '').toString().toLowerCase();
+        final pIdStr = (p['id'] ?? p['paper_id'] ?? '').toString().toLowerCase();
+        if (!pName.contains(term) && !pYear.contains(term) && !pCode.contains(term) && !pIdStr.contains(term)) return false;
       }
       return true;
     }).toList();
+
+    debugPrint('[fetchExistingNTAPapers] Loaded ${results.length} papers (exam: $exam, year: $year, search: $search): ${results.map((p) => p['id']).toList()}');
+    return results;
   }
 
   /// Search/Query Question Bank with filters & pagination
