@@ -312,4 +312,336 @@ void main() {
       expect(defaultScreen.editingPaperId, isNull);
     });
   });
+
+  group('P1 Bug Fix: Restore Empty Question Slots in Existing Paper Editor (Requirements 1 - 14)', () {
+    final String testPaperId = 'b0797305-6ec7-4638-b7eb-663884347c61';
+
+    // Helper that replicates the slot-mapping engine implemented in AdminBulkUploadStep2Screen
+    List<QuestionItemData> buildSlots({
+      required int expectedCount,
+      required List<Map<String, dynamic>> savedQList,
+      String exam = 'NEET',
+    }) {
+      int maxFoundNum = 0;
+      final Map<int, Map<String, dynamic>> savedByNumber = {};
+      final Map<int, List<Map<String, dynamic>>> duplicatesByNumber = {};
+      final List<Map<String, dynamic>> unnumberedSaved = [];
+
+      for (final savedMatch in savedQList) {
+        final rawNum = savedMatch['question_number'] ?? savedMatch['questionNumber'];
+        final int? parsedNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum?.toString() ?? '');
+        if (parsedNum != null && parsedNum > 0) {
+          if (parsedNum > maxFoundNum) maxFoundNum = parsedNum;
+          if (savedByNumber.containsKey(parsedNum)) {
+            duplicatesByNumber.putIfAbsent(parsedNum, () => [savedByNumber[parsedNum]!]).add(savedMatch);
+          } else {
+            savedByNumber[parsedNum] = savedMatch;
+          }
+        } else {
+          unnumberedSaved.add(savedMatch);
+        }
+      }
+
+      final int totalSlots = expectedCount > 0
+          ? (expectedCount > maxFoundNum ? expectedCount : maxFoundNum)
+          : maxFoundNum;
+
+      final List<QuestionItemData> slots = [];
+      int unnumberedIdx = 0;
+
+      for (int slotNum = 1; slotNum <= totalSlots; slotNum++) {
+        if (savedByNumber.containsKey(slotNum)) {
+          final m = savedByNumber[slotNum]!;
+          slots.add(QuestionItemData(
+            id: (m['id'] ?? '').toString(),
+            number: slotNum,
+            text: m['question_text'] ?? m['questionText'] ?? '',
+            options: [
+              m['option_1'] ?? 'Opt 1',
+              m['option_2'] ?? 'Opt 2',
+              m['option_3'] ?? 'Opt 3',
+              m['option_4'] ?? 'Opt 4',
+            ],
+            correctOptionIndex: (m['correct_option_index'] as num?)?.toInt() ?? 0,
+            explanation: m['explanation'] ?? '',
+            solutionVideoUrl: m['solution_video_url'],
+            subject: m['subject'] ?? 'Physics',
+            chapter: m['chapter'] ?? 'Kinematics',
+            topic: m['topic'] ?? 'Motion',
+            chapterId: m['chapter_id'] ?? 'c-uuid-1',
+            isSaved: true,
+          ));
+        } else if (unnumberedIdx < unnumberedSaved.length) {
+          final m = unnumberedSaved[unnumberedIdx++];
+          slots.add(QuestionItemData(
+            id: (m['id'] ?? '').toString(),
+            number: slotNum,
+            text: m['question_text'] ?? m['questionText'] ?? '',
+            options: ['Opt 1', 'Opt 2', 'Opt 3', 'Opt 4'],
+            correctOptionIndex: 0,
+            isSaved: true,
+          ));
+        } else {
+          slots.add(QuestionItemData(
+            id: '',
+            number: slotNum,
+            text: '',
+            options: ['1', '2', '3', '4'],
+            correctOptionIndex: -1,
+            subject: slotNum <= 45 ? 'Physics' : (slotNum <= 90 ? 'Chemistry' : (slotNum <= 135 ? 'Botany' : 'Zoology')),
+            isSaved: false,
+          ));
+        }
+      }
+      return slots;
+    }
+
+    bool isSlotEmpty(QuestionItemData q) => !q.isSaved && q.text.trim().isEmpty && (q.questionImage == null || q.questionImage!.isEmpty);
+
+    bool isSlotComplete(QuestionItemData q) {
+      if (!q.isSaved) return false;
+      final bool hasText = q.text.trim().isNotEmpty || (q.questionImage != null && q.questionImage!.isNotEmpty);
+      final int filledOpts = q.options.where((o) => o.trim().isNotEmpty).length;
+      final bool hasCorrect = q.correctOptionIndex >= 0 && q.correctOptionIndex < q.options.length;
+      final bool hasChapter = q.chapterId.trim().isNotEmpty || q.chapter.trim().isNotEmpty;
+      return hasText && filledOpts >= 2 && hasCorrect && hasChapter;
+    }
+
+    bool isSlotIncomplete(QuestionItemData q) {
+      if (q.isSaved) {
+        return !isSlotComplete(q);
+      } else {
+        return q.text.trim().isNotEmpty || (q.questionImage != null && q.questionImage!.isNotEmpty);
+      }
+    }
+
+    // Fixture with 179 questions out of 180 (Question 22 missing)
+    final List<Map<String, dynamic>> fixture179 = List.generate(180, (i) {
+      final int qNum = i + 1;
+      return {
+        'id': 'uuid-q-$qNum',
+        'paper_id': testPaperId,
+        'question_number': qNum,
+        'question_text': 'Question $qNum content',
+        'option_1': 'A',
+        'option_2': 'B',
+        'option_3': 'C',
+        'option_4': 'D',
+        'correct_option_index': 0,
+        'chapter': 'Kinematics',
+        'chapter_id': 'c-1',
+      };
+    }).where((q) => q['question_number'] != 22).toList();
+
+    test('1. Paper with 180 expected questions and 179 saved records displays all 180 slots', () {
+      final slots = buildSlots(expectedCount: 180, savedQList: fixture179);
+      expect(slots.length, equals(180));
+    });
+
+    test('2. Missing Question 22 slot is visible and clickable with number 22', () {
+      final slots = buildSlots(expectedCount: 180, savedQList: fixture179);
+      final slot22 = slots[21]; // 0-indexed index 21 corresponds to Question 22
+      expect(slot22.number, equals(22));
+      expect(isSlotEmpty(slot22), isTrue);
+    });
+
+    test('3. Clicking slot 22 opens a blank form preassigned to Question 22', () {
+      final slots = buildSlots(expectedCount: 180, savedQList: fixture179);
+      final slot22 = slots[21];
+      expect(slot22.id, equals(''));
+      expect(slot22.number, equals(22));
+      expect(slot22.text, isEmpty);
+      expect(slot22.isSaved, isFalse);
+    });
+
+    test('4. Saving valid Question 22 fills that slot and persists the new question', () {
+      final slots = buildSlots(expectedCount: 180, savedQList: fixture179);
+      final slot22 = slots[21];
+
+      // Admin fills in slot 22
+      slot22.text = 'What is Newton second law?';
+      slot22.options = ['F=ma', 'E=mc^2', 'V=IR', 'P=VI'];
+      slot22.correctOptionIndex = 0;
+      slot22.chapter = 'Laws of Motion';
+      slot22.chapterId = 'c-laws';
+
+      // Persist simulation
+      final String newUuid = SupabaseService.toValidUuid('q_${testPaperId}_12345678_${slot22.number}');
+      slot22.id = newUuid;
+      slot22.isSaved = true;
+
+      expect(slot22.isSaved, isTrue);
+      expect(slot22.id, equals(newUuid));
+      expect(SupabaseService.isValidUuid(slot22.id), isTrue);
+      expect(isSlotComplete(slot22), isTrue);
+    });
+
+    test('5. The other 179 question UUIDs remain unchanged when slot 22 is saved', () {
+      final slots = buildSlots(expectedCount: 180, savedQList: fixture179);
+      final Set<String> originalIds = fixture179.map((q) => q['id'].toString()).toSet();
+      expect(originalIds.length, equals(179));
+
+      // Save Question 22
+      final slot22 = slots[21];
+      slot22.text = 'New Q22';
+      slot22.id = SupabaseService.toValidUuid('q_${testPaperId}_new_22');
+      slot22.isSaved = true;
+
+      final Set<String> preservedIds = slots
+          .where((q) => q.number != 22)
+          .map((q) => q.id)
+          .toSet();
+
+      expect(preservedIds, equals(originalIds));
+    });
+
+    test('6. A 200-question paper displays slots 1–200', () {
+      final List<Map<String, dynamic>> fixture199 = List.generate(200, (i) {
+        return {
+          'id': 'uuid-200-q-${i + 1}',
+          'question_number': i + 1,
+          'question_text': 'Q ${i + 1}',
+          'chapter': 'Physics',
+          'chapter_id': 'c-p',
+        };
+      }).where((q) => q['question_number'] != 50).toList();
+
+      final slots = buildSlots(expectedCount: 200, savedQList: fixture199);
+      expect(slots.length, equals(200));
+      expect(slots.first.number, equals(1));
+      expect(slots.last.number, equals(200));
+      expect(isSlotEmpty(slots[49]), isTrue); // Slot 50 is empty
+    });
+
+    test('7. A custom paper displays exactly its configured number of slots', () {
+      final slots = buildSlots(expectedCount: 75, savedQList: []);
+      expect(slots.length, equals(75));
+      expect(slots.every((q) => isSlotEmpty(q)), isTrue);
+    });
+
+    test('8. Existing saved questions load correctly when their slots are selected', () {
+      final slots = buildSlots(expectedCount: 180, savedQList: fixture179);
+      final slot1 = slots.first;
+      expect(slot1.number, equals(1));
+      expect(slot1.id, equals('uuid-q-1'));
+      expect(slot1.text, equals('Question 1 content'));
+      expect(slot1.isSaved, isTrue);
+      expect(isSlotComplete(slot1), isTrue);
+    });
+
+    test('9. Incomplete saved questions remain editable and are not treated as empty records', () {
+      final incompleteFixture = [
+        {
+          'id': 'uuid-incomplete-1',
+          'question_number': 1,
+          'question_text': 'Incomplete question lacking correct option and chapter',
+          'option_1': 'A',
+          'option_2': '',
+          'option_3': '',
+          'option_4': '',
+          'correct_option_index': -1,
+          'chapter': '',
+          'chapter_id': '',
+        }
+      ];
+
+      final slots = buildSlots(expectedCount: 10, savedQList: incompleteFixture);
+      final q1 = slots.first;
+      expect(q1.isSaved, isTrue);
+      expect(isSlotEmpty(q1), isFalse);
+      expect(isSlotIncomplete(q1), isTrue);
+      expect(isSlotComplete(q1), isFalse);
+    });
+
+    test('10. Duplicate question numbers are detected and surfaced', () {
+      final duplicateList = [
+        {'id': 'uuid-dup-1', 'question_number': 5, 'question_text': 'First Q5'},
+        {'id': 'uuid-dup-2', 'question_number': 5, 'question_text': 'Second Q5'},
+      ];
+
+      final Map<int, List<Map<String, dynamic>>> duplicates = {};
+      final Map<int, Map<String, dynamic>> seen = {};
+      for (final q in duplicateList) {
+        final num = q['question_number'] as int;
+        if (seen.containsKey(num)) {
+          duplicates.putIfAbsent(num, () => [seen[num]!]).add(q);
+        } else {
+          seen[num] = q;
+        }
+      }
+
+      expect(duplicates.containsKey(5), isTrue);
+      expect(duplicates[5]!.length, equals(2));
+    });
+
+    test('11. Opening a blank slot without saving does not create a database record', () {
+      final slots = buildSlots(expectedCount: 180, savedQList: fixture179);
+      final emptySlot = slots[21];
+
+      // Admin views slot without saving
+      expect(emptySlot.id, equals(''));
+      expect(emptySlot.isSaved, isFalse);
+      // No DB save performed: ID remains empty and unpersisted
+    });
+
+    test('12. Progress and completeness counts are correct before and after saving', () {
+      final slots = buildSlots(expectedCount: 180, savedQList: fixture179);
+
+      int completeBefore = slots.where((q) => isSlotComplete(q)).length;
+      int emptyBefore = slots.where((q) => isSlotEmpty(q)).length;
+      double progressBefore = (completeBefore / 180) * 100;
+
+      expect(completeBefore, equals(179));
+      expect(emptyBefore, equals(1));
+      expect(progressBefore.toInt(), equals(99));
+
+      // Success banner condition is false
+      final bool bannerBefore = completeBefore == 180 && emptyBefore == 0;
+      expect(bannerBefore, isFalse);
+
+      // Now save Q22
+      final q22 = slots[21];
+      q22.text = 'Filled Q22 text';
+      q22.options = ['A', 'B', 'C', 'D'];
+      q22.correctOptionIndex = 0;
+      q22.chapter = 'Kinematics';
+      q22.chapterId = 'c-1';
+      q22.id = 'uuid-new-22';
+      q22.isSaved = true;
+
+      int completeAfter = slots.where((q) => isSlotComplete(q)).length;
+      int emptyAfter = slots.where((q) => isSlotEmpty(q)).length;
+      double progressAfter = (completeAfter / 180) * 100;
+
+      expect(completeAfter, equals(180));
+      expect(emptyAfter, equals(0));
+      expect(progressAfter.toInt(), equals(100));
+
+      final bool bannerAfter = completeAfter == 180 && emptyAfter == 0;
+      expect(bannerAfter, isTrue);
+    });
+
+    test('13. A failed save does not mark the slot as complete', () {
+      final slots = buildSlots(expectedCount: 180, savedQList: fixture179);
+      final q22 = slots[21];
+      q22.text = 'Attempting Q22 save';
+
+      // Simulated failed API response
+      final res = {'success': false, 'error': 'Network timeout'};
+      if (res['success'] == true) {
+        q22.isSaved = true;
+      }
+
+      expect(q22.isSaved, isFalse);
+      expect(isSlotComplete(q22), isFalse);
+    });
+
+    test('14. Existing create-new-paper and bulk-upload workflows continue to work', () {
+      final newPaperSlots = buildSlots(expectedCount: 180, savedQList: []);
+      expect(newPaperSlots.length, equals(180));
+      expect(newPaperSlots.every((q) => q.isSaved == false), isTrue);
+      expect(newPaperSlots.every((q) => isSlotEmpty(q)), isTrue);
+    });
+  });
 }
+

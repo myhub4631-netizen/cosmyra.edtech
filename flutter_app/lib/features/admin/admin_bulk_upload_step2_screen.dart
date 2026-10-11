@@ -247,15 +247,81 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     return format['totalQuestions'] as int;
   }
 
+  int get totalExpectedSlots => math.max(expectedQuestionCount, _questionsList.length);
+
+  bool _isSlotEmpty(QuestionItemData q) {
+    return !q.isSaved && q.text.trim().isEmpty && (q.questionImage == null || q.questionImage!.isEmpty);
+  }
+
+  bool _isSlotComplete(QuestionItemData q) {
+    return q.isSaved && _hasEssentialDetails(q);
+  }
+
+  bool _isSlotIncomplete(QuestionItemData q) {
+    if (q.isSaved) {
+      return !_hasEssentialDetails(q);
+    } else {
+      return q.text.trim().isNotEmpty || (q.questionImage != null && q.questionImage!.isNotEmpty);
+    }
+  }
+
+  int get completeQuestionCount => _questionsList.where((q) => _isSlotComplete(q)).length;
+  int get incompleteQuestionCount => _questionsList.where((q) => _isSlotIncomplete(q)).length;
+  int get emptyQuestionCount => _questionsList.where((q) => _isSlotEmpty(q)).length;
+  int get savedSlotsCount => _questionsList.where((q) => q.isSaved).length;
+
   int get loadedQuestionCount => _questionsList.where((q) => q.text.trim().isNotEmpty || (q.questionImage != null && q.questionImage!.isNotEmpty)).length;
 
-  int get savedQuestionCount => _questionsList.where((q) => q.isSaved && (q.text.trim().isNotEmpty || (q.questionImage != null && q.questionImage!.isNotEmpty))).length;
+  int get savedQuestionCount => savedSlotsCount;
 
-  int get pendingQuestionCount => math.max(0, expectedQuestionCount - savedQuestionCount);
+  int get pendingQuestionCount => math.max(0, expectedQuestionCount - completeQuestionCount);
 
   double get completionPercentage => expectedQuestionCount > 0
-      ? ((savedQuestionCount / expectedQuestionCount) * 100).clamp(0.0, 100.0)
+      ? ((completeQuestionCount / expectedQuestionCount) * 100).clamp(0.0, 100.0)
       : 0.0;
+
+  List<int> get _pendingQuestionNumbers {
+    return _questionsList.where((q) => !_isSlotComplete(q)).map((q) => q.number).toList();
+  }
+
+  List<int> get _emptyQuestionNumbers {
+    return _questionsList.where((q) => _isSlotEmpty(q)).map((q) => q.number).toList();
+  }
+
+  List<int> get _incompleteQuestionNumbers {
+    return _questionsList.where((q) => _isSlotIncomplete(q)).map((q) => q.number).toList();
+  }
+
+  List<int> _duplicateQuestionNumbers = [];
+  String _paletteFilter = 'all'; // 'all', 'empty', 'incomplete', 'complete'
+
+  String _getDefaultSubjectForSlot(int slotNum, String paperExam, int totalCount) {
+    final String paperSub = _paperData?['subject']?.toString().trim() ?? '';
+    if (paperSub.isNotEmpty && paperSub.toLowerCase() != 'all' && paperSub.toLowerCase() != 'full syllabus') {
+      return paperSub;
+    }
+    final examUpper = paperExam.toUpperCase();
+    if (examUpper.contains('NEET')) {
+      if (totalCount == 200) {
+        if (slotNum <= 50) return 'Physics';
+        if (slotNum <= 100) return 'Chemistry';
+        if (slotNum <= 150) return 'Botany';
+        return 'Zoology';
+      } else {
+        final quarter = (totalCount / 4).round();
+        if (slotNum <= quarter) return 'Physics';
+        if (slotNum <= quarter * 2) return 'Chemistry';
+        if (slotNum <= quarter * 3) return 'Botany';
+        return 'Zoology';
+      }
+    } else if (examUpper.contains('JEE')) {
+      final third = (totalCount / 3).round();
+      if (slotNum <= third) return 'Physics';
+      if (slotNum <= third * 2) return 'Chemistry';
+      return 'Mathematics';
+    }
+    return _paperData?['subject'] ?? 'Physics';
+  }
 
   @override
   void initState() {
@@ -354,24 +420,36 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     final String optionPresetKey = widget.paperRecord?['defaultOptionPreset'] ?? widget.paperRecord?['default_option_preset'] ?? _paperData?['defaultOptionPreset'] ?? _paperData?['default_option_preset'] ?? '1_2_3_4';
     final List<String> defaultPresetOpts = _getPresetOptions(optionPresetKey);
 
-    // If Edit Mode and existing questions exist for this paper, load canonical questions directly
-    if (_isEditMode && savedQList.isNotEmpty) {
-      final sortedSaved = List<Map<String, dynamic>>.from(savedQList);
-      sortedSaved.sort((a, b) {
-        final na = a['question_number'] ?? a['questionNumber'];
-        final nb = b['question_number'] ?? b['questionNumber'];
-        final int ia = na is num ? na.toInt() : (int.tryParse(na?.toString() ?? '') ?? 9999);
-        final int ib = nb is num ? nb.toInt() : (int.tryParse(nb?.toString() ?? '') ?? 9999);
-        return ia.compareTo(ib);
-      });
+    // If Edit Mode, build the complete slot-mapping model for all expected slots
+    if (_isEditMode) {
+      final int targetExpected = expectedQuestionCount;
+      int maxFoundNum = 0;
+      final Map<int, Map<String, dynamic>> savedByNumber = {};
+      final Map<int, List<Map<String, dynamic>>> duplicatesByNumber = {};
+      final List<Map<String, dynamic>> unnumberedSaved = [];
+
+      for (final savedMatch in savedQList) {
+        final rawNum = savedMatch['question_number'] ?? savedMatch['questionNumber'];
+        final int? parsedNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum?.toString() ?? '');
+        if (parsedNum != null && parsedNum > 0) {
+          if (parsedNum > maxFoundNum) maxFoundNum = parsedNum;
+          if (savedByNumber.containsKey(parsedNum)) {
+            duplicatesByNumber.putIfAbsent(parsedNum, () => [savedByNumber[parsedNum]!]).add(savedMatch);
+          } else {
+            savedByNumber[parsedNum] = savedMatch;
+          }
+        } else {
+          unnumberedSaved.add(savedMatch);
+        }
+      }
+
+      _duplicateQuestionNumbers = duplicatesByNumber.keys.toList()..sort();
+      final int totalSlots = math.max(targetExpected, math.max(savedQList.length, maxFoundNum));
 
       _originalQuestionIds.clear();
       final List<QuestionItemData> editQuestions = [];
 
-      for (int i = 0; i < sortedSaved.length; i++) {
-        final savedMatch = sortedSaved[i];
-        final rawNum = savedMatch['question_number'] ?? savedMatch['questionNumber'];
-        final int qNum = rawNum is num ? rawNum.toInt() : (int.tryParse(rawNum?.toString() ?? '') ?? (i + 1));
+      QuestionItemData parseSavedQuestion(Map<String, dynamic> savedMatch, int slotNum) {
         final String origId = (savedMatch['id'] ?? '').toString();
         if (origId.isNotEmpty) {
           _originalQuestionIds.add(origId);
@@ -426,7 +504,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
         final String chapIdFromMatch = savedMatch['chapter_id']?.toString() ?? '';
         final String chapNameFromMatch = savedMatch['chapter']?.toString() ?? savedMatch['chapterTopic']?.toString() ?? '';
-        final String qSubject = savedMatch['subject']?.toString() ?? subject;
+        final String qSubject = savedMatch['subject']?.toString() ?? _getDefaultSubjectForSlot(slotNum, exam, totalSlots);
 
         String finalChapId = chapIdFromMatch;
         String finalChapName = chapNameFromMatch;
@@ -449,9 +527,9 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
             ? List<String>.from(availInRaw)
             : List<String>.from(defaultAvailableIn);
 
-        editQuestions.add(QuestionItemData(
+        return QuestionItemData(
           id: origId,
-          number: qNum,
+          number: slotNum,
           text: rawQText,
           questionImage: savedMatch['question_image'] ?? savedMatch['questionImage'],
           options: opts,
@@ -470,12 +548,44 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           chapterId: finalChapId,
           availableIn: availInList,
           isSaved: true,
-        ));
+        );
+      }
+
+      int unnumberedIdx = 0;
+      for (int slotNum = 1; slotNum <= totalSlots; slotNum++) {
+        if (savedByNumber.containsKey(slotNum)) {
+          editQuestions.add(parseSavedQuestion(savedByNumber[slotNum]!, slotNum));
+        } else if (unnumberedIdx < unnumberedSaved.length) {
+          editQuestions.add(parseSavedQuestion(unnumberedSaved[unnumberedIdx++], slotNum));
+        } else {
+          // Empty slot requiring admin entry
+          editQuestions.add(QuestionItemData(
+            id: '', // Blank id ensures not yet persisted in database
+            number: slotNum,
+            text: '',
+            questionImage: null,
+            options: List<String>.from(defaultPresetOpts),
+            optionImages: <String?>[null, null, null, null],
+            correctOptionIndex: -1,
+            explanation: '',
+            solutionVideoUrl: null,
+            difficulty: 'Medium',
+            positiveMarks: '4',
+            negativeMarks: '-1',
+            questionType: 'MCQ (Single Correct)',
+            subject: _getDefaultSubjectForSlot(slotNum, exam, totalSlots),
+            chapter: '',
+            topic: '',
+            chapterTopic: '',
+            chapterId: '',
+            availableIn: List<String>.from(defaultAvailableIn),
+            isSaved: false,
+          ));
+        }
       }
 
       _questionsList = editQuestions;
-      _reindexQuestions();
-      _addedCount = _questionsList.length;
+      _addedCount = _questionsList.where((q) => q.isSaved).length;
       _currentPageIndex = 1;
       setState(() => _isLoading = false);
       return;
@@ -1295,50 +1405,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       });
 
       // Update canonical paper record with actual question count and subject breakdown
-      try {
-        final updatedPaper = Map<String, dynamic>.from(_paperData ?? {});
-        updatedPaper['id'] = _paperId;
-        updatedPaper['question_count'] = _addedCount;
-        updatedPaper['saved_questions_count'] = _addedCount;
-        if (updatedPaper['status'] == null || updatedPaper['status'].toString().isEmpty) {
-          updatedPaper['status'] = 'Published';
-        }
-
-        final Map<String, int> subjectCounts = {};
-        for (final q in _questionsList.where((q) => q.isSaved)) {
-          final sub = q.subject.trim().toLowerCase();
-          subjectCounts[sub] = (subjectCounts[sub] ?? 0) + 1;
-        }
-        updatedPaper['subject_distribution'] = subjectCounts;
-        if (subjectCounts.containsKey('physics')) updatedPaper['physics_count'] = subjectCounts['physics'];
-        if (subjectCounts.containsKey('chemistry')) updatedPaper['chemistry_count'] = subjectCounts['chemistry'];
-        if (subjectCounts.containsKey('botany')) updatedPaper['botany_count'] = subjectCounts['botany'];
-        if (subjectCounts.containsKey('zoology')) updatedPaper['zoology_count'] = subjectCounts['zoology'];
-        if (subjectCounts.containsKey('biology')) updatedPaper['biology_count'] = subjectCounts['biology'];
-        if (subjectCounts.containsKey('mathematics')) updatedPaper['maths_count'] = subjectCounts['mathematics'];
-
-        await SupabaseService.savePaperRecord(updatedPaper);
-        SupabaseService.invalidatePaperQuestionsCache(_paperId);
-
-        final tsTitle = (updatedPaper['test_series_title'] ?? updatedPaper['new_test_series_name'] ?? updatedPaper['existing_test_series'] ?? '').toString().trim();
-        if (tsTitle.isNotEmpty || updatedPaper['source_category'] == 'Test Series') {
-          await SupabaseService.saveTestSeries({
-            'id': SupabaseService.toValidUuid('ts_${updatedPaper['exam']}_${updatedPaper['year']}_$tsTitle'),
-            'title': tsTitle.isNotEmpty ? tsTitle : (updatedPaper['paper_name'] ?? 'NEET Test Series'),
-            'exam': updatedPaper['exam'] ?? 'NEET',
-            'year': updatedPaper['year']?.toString() ?? '2026',
-            'category': 'Full Syllabus',
-            'paper_id': _paperId,
-            'paper_name': widget.paperName,
-            'question_count': _addedCount,
-            'duration_minutes': int.tryParse(updatedPaper['duration_minutes']?.toString() ?? '180') ?? 180,
-            'difficulty': 'High',
-            'status': 'Published',
-          });
-        }
-      } catch (paperErr) {
-        debugPrint('Notice updating paper/test series record status: $paperErr');
-      }
+      await _updatePaperRecordCounts();
 
       if (showToast && mounted) {
         final String toastMsg = _isEditMode
@@ -1365,6 +1432,55 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     }
 
     if (mounted) setState(() => _isSavingBatch = false);
+  }
+
+  Future<void> _updatePaperRecordCounts() async {
+    try {
+      final int actualSaved = _questionsList.where((q) => q.isSaved).length;
+      final updatedPaper = Map<String, dynamic>.from(_paperData ?? {});
+      updatedPaper['id'] = _paperId;
+      updatedPaper['question_count'] = actualSaved;
+      updatedPaper['saved_questions_count'] = actualSaved;
+      if (updatedPaper['status'] == null || updatedPaper['status'].toString().isEmpty) {
+        updatedPaper['status'] = 'Published';
+      }
+
+      final Map<String, int> subjectCounts = {};
+      for (final q in _questionsList.where((q) => q.isSaved)) {
+        final sub = q.subject.trim().toLowerCase();
+        subjectCounts[sub] = (subjectCounts[sub] ?? 0) + 1;
+      }
+      updatedPaper['subject_distribution'] = subjectCounts;
+      if (subjectCounts.containsKey('physics')) updatedPaper['physics_count'] = subjectCounts['physics'];
+      if (subjectCounts.containsKey('chemistry')) updatedPaper['chemistry_count'] = subjectCounts['chemistry'];
+      if (subjectCounts.containsKey('botany')) updatedPaper['botany_count'] = subjectCounts['botany'];
+      if (subjectCounts.containsKey('zoology')) updatedPaper['zoology_count'] = subjectCounts['zoology'];
+      if (subjectCounts.containsKey('biology')) updatedPaper['biology_count'] = subjectCounts['biology'];
+      if (subjectCounts.containsKey('mathematics')) updatedPaper['maths_count'] = subjectCounts['mathematics'];
+
+      await SupabaseService.savePaperRecord(updatedPaper);
+      SupabaseService.invalidatePaperQuestionsCache(_paperId);
+
+      final tsTitle = (updatedPaper['test_series_title'] ?? updatedPaper['new_test_series_name'] ?? updatedPaper['existing_test_series'] ?? '').toString().trim();
+      if (tsTitle.isNotEmpty || updatedPaper['source_category'] == 'Test Series') {
+        await SupabaseService.saveTestSeries({
+          'id': SupabaseService.toValidUuid('ts_${updatedPaper['exam']}_${updatedPaper['year']}_$tsTitle'),
+          'title': tsTitle.isNotEmpty ? tsTitle : (updatedPaper['paper_name'] ?? 'NEET Test Series'),
+          'exam': updatedPaper['exam'] ?? 'NEET',
+          'year': updatedPaper['year']?.toString() ?? '2026',
+          'category': 'Full Syllabus',
+          'paper_id': _paperId,
+          'paper_name': widget.paperName,
+          'question_count': actualSaved,
+          'duration_minutes': int.tryParse(updatedPaper['duration_minutes']?.toString() ?? '180') ?? 180,
+          'difficulty': 'High',
+          'status': 'Published',
+        });
+      }
+      _paperData = updatedPaper;
+    } catch (paperErr) {
+      debugPrint('Notice updating paper/test series record status: $paperErr');
+    }
   }
 
   Future<void> _saveSingleQuestion(QuestionItemData q, {bool showToast = true}) async {
@@ -1441,6 +1557,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       });
 
       SupabaseService.invalidatePaperQuestionsCache(_paperId);
+      await _updatePaperRecordCounts();
 
       if (mounted && showToast) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2122,7 +2239,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                             _buildKPISummaryCard(remainingCount, progressPercent),
                             const SizedBox(height: 20),
 
-                            // 5. Filter / Jump Toolbar Bar
+                            // 5. Question Navigator & Slot Palette
+                            _buildQuestionPaletteNavBar(),
+                            const SizedBox(height: 20),
+
+                            // 6. Filter / Jump Toolbar Bar
                             _buildFilterToolbarBar(),
                             const SizedBox(height: 20),
 
@@ -3331,10 +3452,6 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     );
   }
 
-  List<int> get _pendingQuestionNumbers {
-    return _questionsList.where((q) => !q.isSaved).map((q) => q.number).toList();
-  }
-
   void _jumpToQuestion(int qNum) {
     if (qNum < 1 || qNum > _questionsList.length) return;
     final targetPage = ((qNum - 1) ~/ _itemsPerPage) + 1;
@@ -3355,8 +3472,6 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   // 5. KPI SUMMARY METRIC CARD
   // ===========================================================================
   Widget _buildKPISummaryCard(int remainingCount, double progressPercent) {
-    final pendingNums = _pendingQuestionNumbers;
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -3379,38 +3494,54 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                   children: [
                     Text('Total Questions', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
                     const SizedBox(height: 4),
-                    Text('$expectedQuestionCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
+                    Text('$totalExpectedSlots', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
                   ],
                 ),
               ),
               Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
 
-              // Added
+              // Added / Saved Slots
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(left: 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Added', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                      Text('Added (Saved)', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
                       const SizedBox(height: 4),
-                      Text('$savedQuestionCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
+                      Text('$savedSlotsCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
                     ],
                   ),
                 ),
               ),
               Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
 
-              // Remaining
+              // Empty / Remaining Slots
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(left: 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Remaining', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                      Text('Empty Slots', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
                       const SizedBox(height: 4),
-                      Text('$remainingCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: remainingCount > 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A))),
+                      Text('$emptyQuestionCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: emptyQuestionCount > 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A))),
+                    ],
+                  ),
+                ),
+              ),
+              Container(width: 1, height: 40, color: const Color(0xFFF1F5F9)),
+
+              // Incomplete Slots
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Incomplete', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                      const SizedBox(height: 4),
+                      Text('$incompleteQuestionCount', style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: incompleteQuestionCount > 0 ? const Color(0xFFD97706) : const Color(0xFF64748B))),
                     ],
                   ),
                 ),
@@ -3425,9 +3556,9 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Progress', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                      Text('Complete Progress', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
                       const SizedBox(height: 4),
-                      Text('${(progressPercent * 100).toInt()}%', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                      Text('${(progressPercent * 100).toInt()}% ($completeQuestionCount / $totalExpectedSlots complete)', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
                       const SizedBox(height: 6),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
@@ -3435,7 +3566,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                           value: progressPercent,
                           minHeight: 6,
                           backgroundColor: const Color(0xFFF1F5F9),
-                          valueColor: AlwaysStoppedAnimation<Color>(remainingCount == 0 ? const Color(0xFF10B981) : const Color(0xFF4F46E5)),
+                          valueColor: AlwaysStoppedAnimation<Color>(remainingCount == 0 && emptyQuestionCount == 0 && incompleteQuestionCount == 0 ? const Color(0xFF10B981) : const Color(0xFF4F46E5)),
                         ),
                       ),
                     ],
@@ -3445,8 +3576,33 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
             ],
           ),
 
-          // Pending Question Numbers Section
-          if (pendingNums.isNotEmpty) ...[
+          // Duplicate Question Numbers Section
+          if (_duplicateQuestionNumbers.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Duplicate Question Numbers Detected: Questions ${_duplicateQuestionNumbers.join(", ")} appear multiple times in the database. Please review each to avoid overwriting.',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF991B1B)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Empty Question Slots Section
+          if (_emptyQuestionNumbers.isNotEmpty) ...[
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(14),
@@ -3463,12 +3619,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 18),
                       const SizedBox(width: 8),
                       Text(
-                        'Questions Still Pending Upload (${pendingNums.length}):',
+                        'Empty Question Slots Requiring Upload (${_emptyQuestionNumbers.length}):',
                         style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF991B1B)),
                       ),
                       const Spacer(),
                       Text(
-                        'Click any question number to jump directly to it ➔',
+                        'Click any question number to open and fill ➔',
                         style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFB91C1C)),
                       ),
                     ],
@@ -3478,7 +3634,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      ...pendingNums.take(30).map((qNum) {
+                      ..._emptyQuestionNumbers.take(30).map((qNum) {
                         return InkWell(
                           onTap: () => _jumpToQuestion(qNum),
                           borderRadius: BorderRadius.circular(6),
@@ -3506,11 +3662,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                           ),
                         );
                       }),
-                      if (pendingNums.length > 30)
+                      if (_emptyQuestionNumbers.length > 30)
                         Padding(
                           padding: const EdgeInsets.only(left: 6, top: 4),
                           child: Text(
-                            '+${pendingNums.length - 30} more pending...',
+                            '+${_emptyQuestionNumbers.length - 30} more empty slots...',
                             style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF991B1B)),
                           ),
                         ),
@@ -3519,7 +3675,86 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                 ],
               ),
             ),
-          ] else ...[
+          ],
+
+          // Incomplete Questions Section
+          if (_incompleteQuestionNumbers.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.edit_note_rounded, color: Color(0xFFD97706), size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Saved Questions Missing Required Fields (${_incompleteQuestionNumbers.length}):',
+                        style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF92400E)),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Click to complete missing fields ➔',
+                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFB45309)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      ..._incompleteQuestionNumbers.take(30).map((qNum) {
+                        return InkWell(
+                          onTap: () => _jumpToQuestion(qNum),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFF59E0B)),
+                              boxShadow: const [
+                                BoxShadow(color: Color(0x1AF59E0B), blurRadius: 4, offset: Offset(0, 1)),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Q$qNum',
+                                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFFB45309)),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.arrow_forward_rounded, size: 12, color: Color(0xFFB45309)),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                      if (_incompleteQuestionNumbers.length > 30)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6, top: 4),
+                          child: Text(
+                            '+${_incompleteQuestionNumbers.length - 30} more incomplete...',
+                            style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF92400E)),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // All complete and saved banner: only when really all are filled and complete!
+          if (_emptyQuestionNumbers.isEmpty && _incompleteQuestionNumbers.isEmpty && savedSlotsCount >= totalExpectedSlots && totalExpectedSlots > 0) ...[
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -3533,7 +3768,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                   const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    '✓ Great job! All ${widget.totalQuestionsCount} questions have been successfully filled and saved!',
+                    '✓ Great job! All $totalExpectedSlots questions have been successfully filled, validated, and saved!',
                     style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.bold, color: const Color(0xFF065F46)),
                   ),
                 ],
@@ -3546,10 +3781,201 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   }
 
   // ===========================================================================
+  // 5B. QUESTION NAVIGATION PALETTE BAR
+  // ===========================================================================
+  Widget _buildQuestionPaletteNavBar() {
+    final totalSlots = totalExpectedSlots;
+    if (totalSlots == 0) return const SizedBox.shrink();
+
+    final filteredList = _questionsList.where((q) {
+      if (_paletteFilter == 'empty') return _isSlotEmpty(q);
+      if (_paletteFilter == 'incomplete') return _isSlotIncomplete(q);
+      if (_paletteFilter == 'complete') return _isSlotComplete(q);
+      return true;
+    }).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with Title, Slot Count, and Filter Pills
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.grid_view_rounded, size: 20, color: Color(0xFF4F46E5)),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Question Navigator & Slot Palette',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Showing slots 1 to $totalSlots. Click any slot to jump directly into its editor.',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              // Filter Tabs
+              Wrap(
+                spacing: 6,
+                children: [
+                  _buildPaletteFilterChip('all', 'All ($totalSlots)', const Color(0xFF475569), const Color(0xFFF1F5F9)),
+                  _buildPaletteFilterChip('empty', 'Empty ($emptyQuestionCount)', const Color(0xFFDC2626), const Color(0xFFFEE2E2)),
+                  _buildPaletteFilterChip('incomplete', 'Incomplete ($incompleteQuestionCount)', const Color(0xFFD97706), const Color(0xFFFEF3C7)),
+                  _buildPaletteFilterChip('complete', 'Complete ($completeQuestionCount)', const Color(0xFF16A34A), const Color(0xFFDCFCE7)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 14),
+
+          // Palette Chips Container (Scrollable if many slots)
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 200),
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: filteredList.map((q) {
+                  final bool isSelected = q.number == _jumpToQuestionNumber;
+                  final bool isComplete = _isSlotComplete(q);
+                  final bool isIncomplete = _isSlotIncomplete(q);
+
+                  Color bgColor;
+                  Color borderColor;
+                  Color textColor;
+                  String statusDesc;
+
+                  if (isComplete) {
+                    bgColor = const Color(0xFFECFDF5);
+                    borderColor = const Color(0xFFA7F3D0);
+                    textColor = const Color(0xFF065F46);
+                    statusDesc = 'Saved & Complete';
+                  } else if (isIncomplete) {
+                    bgColor = const Color(0xFFFFFBEB);
+                    borderColor = const Color(0xFFFDE68A);
+                    textColor = const Color(0xFF92400E);
+                    statusDesc = 'Incomplete';
+                  } else {
+                    bgColor = const Color(0xFFFEF2F2);
+                    borderColor = const Color(0xFFFCA5A5);
+                    textColor = const Color(0xFF991B1B);
+                    statusDesc = 'Empty Slot';
+                  }
+
+                  if (isSelected) {
+                    borderColor = const Color(0xFF4F46E5);
+                  }
+
+                  return Tooltip(
+                    message: 'Question ${q.number}: $statusDesc (Click to edit)',
+                    child: InkWell(
+                      onTap: () => _jumpToQuestion(q.number),
+                      borderRadius: BorderRadius.circular(8),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        width: 40,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFFEEF2FF) : bgColor,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: borderColor,
+                            width: isSelected ? 2.2 : 1.0,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${q.number}',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: isSelected ? FontWeight.w900 : FontWeight.bold,
+                              color: isSelected ? const Color(0xFF4338CA) : textColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaletteFilterChip(String filterKey, String label, Color textColor, Color bgColor) {
+    final bool isSelected = _paletteFilter == filterKey;
+    return InkWell(
+      onTap: () => setState(() => _paletteFilter = filterKey),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? textColor : bgColor,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11.5,
+            fontWeight: FontWeight.bold,
+            color: isSelected ? Colors.white : textColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
   // 6. FILTER / JUMP TOOLBAR BAR
   // ===========================================================================
   Widget _buildFilterToolbarBar() {
-    final pendingNums = _pendingQuestionNumbers;
+    final int safeJumpValue = _jumpToQuestionNumber.clamp(1, math.max(1, _questionsList.length));
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -3576,7 +4002,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<int>(
-                    value: _jumpToQuestionNumber,
+                    value: safeJumpValue,
                     items: List.generate(
                       _questionsList.length,
                       (index) => DropdownMenuItem<int>(
@@ -3602,17 +4028,33 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                 ),
                 child: Text('Go to', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
               ),
-              if (pendingNums.isNotEmpty) ...[
+              if (_emptyQuestionNumbers.isNotEmpty) ...[
                 const SizedBox(width: 10),
                 ElevatedButton.icon(
-                  onPressed: () => _jumpToQuestion(pendingNums.first),
+                  onPressed: () => _jumpToQuestion(_emptyQuestionNumbers.first),
                   icon: const Icon(Icons.bolt_rounded, size: 14, color: Colors.white),
                   label: Text(
-                    '⚡ Next Pending: Q${pendingNums.first}',
+                    '⚡ Next Empty: Q${_emptyQuestionNumbers.first}',
                     style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFDC2626),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ] else if (_incompleteQuestionNumbers.isNotEmpty) ...[
+                const SizedBox(width: 10),
+                ElevatedButton.icon(
+                  onPressed: () => _jumpToQuestion(_incompleteQuestionNumbers.first),
+                  icon: const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.white),
+                  label: Text(
+                    '⚠ Next Incomplete: Q${_incompleteQuestionNumbers.first}',
+                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD97706),
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -3777,14 +4219,25 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   }
 
   Widget _buildQuestionCard(QuestionItemData q, int index, bool isDesktop) {
+    final bool isSelected = _jumpToQuestionNumber == q.number;
+
     return Container(
       key: ValueKey('q_card_${q.number}_${q.uniqueId}'),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
+          width: isSelected ? 2.0 : 1.0,
+        ),
         boxShadow: [
-          BoxShadow(color: const Color(0xFF0F172A).withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3)),
+          BoxShadow(
+            color: isSelected
+                ? const Color(0xFF4F46E5).withValues(alpha: 0.12)
+                : const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: Column(
@@ -3807,8 +4260,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       'Question ${q.number}',
                       style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF4F46E5)),
                     ),
-                    if (q.isSaved) ...[
-                      const SizedBox(width: 10),
+                    const SizedBox(width: 10),
+                    if (_isSlotComplete(q)) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
@@ -3822,8 +4275,48 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                             const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF10B981)),
                             const SizedBox(width: 4),
                             Text(
-                              'Saved to Question Bank',
+                              'Complete & Saved',
                               style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF065F46)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else if (_isSlotIncomplete(q)) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, size: 12, color: Color(0xFFD97706)),
+                            const SizedBox(width: 4),
+                            Text(
+                              q.isSaved ? 'Incomplete (Missing Required Fields)' : 'In Progress (Unsaved)',
+                              style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF92400E)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFCA5A5)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.error_outline_rounded, size: 12, color: Color(0xFFDC2626)),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Empty Slot — Enter Question Details',
+                              style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF991B1B)),
                             ),
                           ],
                         ),
