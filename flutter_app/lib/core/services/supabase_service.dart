@@ -8096,6 +8096,88 @@ class SupabaseService {
     );
   }
 
+  /// Returns true if the object is a top-level Test Series container, rather than an individual paper.
+  static bool isTestSeriesContainer(Map<String, dynamic> item) {
+    if (item.isEmpty) return false;
+    if (item['is_series_container'] == true || item['type'] == 'series_container') {
+      return true;
+    }
+    // A series container holds an embedded tests collection
+    if (item['tests'] is List) {
+      return true;
+    }
+    // Schema markers that characterize a test series bundle / container
+    final bool hasSeriesFields = item.containsKey('test_count') &&
+        (item.containsKey('features') ||
+            item.containsKey('checkout_url') ||
+            item.containsKey('product_url') ||
+            item.containsKey('syllabus_url') ||
+            item.containsKey('top_scores'));
+    if (hasSeriesFields) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Defensive invariant: Validates whether an object qualifies as an individual paper record.
+  static bool isValidIndividualPaper(Map<String, dynamic> item) {
+    if (item.isEmpty) return false;
+
+    // Must have a non-empty identity (id or paper_id)
+    final id = (item['id'] ?? item['paper_id'] ?? '').toString().trim();
+    if (id.isEmpty) return false;
+
+    // Series containers must NEVER be emitted as individual papers
+    if (isTestSeriesContainer(item)) {
+      debugPrint('[Defensive Invariant] Dropped test series container "$id" from individual paper list');
+      return false;
+    }
+
+    return true;
+  }
+
+  /// Extracts embedded tests from a series container into the paper catalogue
+  static void _extractEmbeddedTestsFromContainer(
+    Map<String, dynamic> containerMap,
+    List<Map<String, dynamic>> papers,
+    Set<String> seenIds,
+    Set<String> deletedPaperIds,
+  ) {
+    if (containerMap['tests'] is! List) return;
+    final containerId = (containerMap['id'] ?? containerMap['paper_id'] ?? '').toString().trim();
+    final containerTitle = (containerMap['title'] ?? containerMap['name'] ?? '').toString().trim();
+    final containerExam = (containerMap['exam'] ?? '').toString().trim();
+    final containerYear = (containerMap['year'] ?? '').toString().trim();
+
+    final embeddedTests = (containerMap['tests'] as List).whereType<Map>().toList();
+    for (var et in embeddedTests) {
+      final etMap = Map<String, dynamic>.from(et);
+      final etId = (etMap['id'] ?? etMap['paper_id'] ?? '').toString().trim();
+      if (etId.isEmpty || deletedPaperIds.contains(etId)) continue;
+
+      etMap['test_series_id'] = containerId;
+      etMap['test_series_title'] = containerTitle;
+      etMap['target_exam'] ??= containerExam.isNotEmpty ? containerExam : 'NEET';
+      etMap['exam'] ??= containerExam.isNotEmpty ? containerExam : 'NEET';
+      if (containerYear.isNotEmpty) {
+        etMap['year'] ??= containerYear;
+      }
+      // Explicitly classify extracted tests as Test Series
+      etMap['source_category'] = 'Test Series';
+      etMap['is_test_series'] = true;
+      etMap['is_pyq'] = false;
+      etMap['is_nta'] = false;
+
+      final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '').toString() == etId);
+      if (idx != -1) {
+        papers[idx] = {...etMap, ...papers[idx], 'is_test_series': true, 'source_category': 'Test Series'};
+      } else {
+        seenIds.add(etId);
+        papers.add(etMap);
+      }
+    }
+  }
+
   /// Fetch all saved papers/test series records from DB and local cache
   static Future<List<Map<String, dynamic>>> fetchAllPapersAndTestSeries({String? exam, bool forceRefresh = false}) async {
     final List<Map<String, dynamic>> papers = [];
@@ -8108,13 +8190,25 @@ class SupabaseService {
       final str = prefs.getString('cosmyra_saved_papers');
       if (str != null && str.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(str);
+        bool dirtyCache = false;
+        final List<Map<String, dynamic>> sanitizedCache = [];
         for (var e in decoded) {
-          final map = Map<String, dynamic>.from(e as Map);
-          final id = (map['id'] ?? map['paper_id'] ?? '').toString();
-          if (id.isNotEmpty && !seenIds.contains(id)) {
+          if (e is! Map) continue;
+          final map = Map<String, dynamic>.from(e);
+          if (isTestSeriesContainer(map)) {
+            dirtyCache = true;
+            _extractEmbeddedTestsFromContainer(map, papers, seenIds, deletedPaperIds);
+            continue;
+          }
+          final id = (map['id'] ?? map['paper_id'] ?? '').toString().trim();
+          if (id.isNotEmpty && !deletedPaperIds.contains(id) && !seenIds.contains(id)) {
             seenIds.add(id);
             papers.add(map);
+            sanitizedCache.add(map);
           }
+        }
+        if (dirtyCache) {
+          await prefs.setString('cosmyra_saved_papers', jsonEncode(sanitizedCache));
         }
       }
     } catch (e) {
@@ -8154,41 +8248,20 @@ class SupabaseService {
             if (item is Map) {
               final map = Map<String, dynamic>.from(item);
 
-              // Extract embedded tests list if test series contains embedded created tests
-              if (map['tests'] is List) {
-                final embeddedTests = (map['tests'] as List).whereType<Map>().toList();
-                for (var et in embeddedTests) {
-                  final etMap = Map<String, dynamic>.from(et);
-                  etMap['test_series_id'] ??= map['id'];
-                  etMap['test_series_title'] ??= map['title'] ?? map['name'];
-                  etMap['target_exam'] ??= map['exam'];
-                  etMap['is_test_series'] = true; // Mark as Test Series paper so catalogue router puts it under Test Series!
-                  final etId = (etMap['id'] ?? etMap['paper_id'] ?? '').toString();
-                  if (etId.isNotEmpty) {
-                    final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '').toString() == etId);
-                    if (idx != -1) {
-                      papers[idx] = {...etMap, ...papers[idx]};
-                    } else {
-                      seenIds.add(etId);
-                      papers.add(etMap);
-                    }
-                  } else {
-                    papers.add(etMap);
-                  }
-                }
+              // If it's a test series container, extract its embedded tests and NEVER add the container itself!
+              if (row['key'] == 'admin_custom_test_series' || isTestSeriesContainer(map)) {
+                _extractEmbeddedTestsFromContainer(map, papers, seenIds, deletedPaperIds);
+                continue;
               }
 
-              // Do NOT add the Test Series Container object itself as a paper!
-              if (row['key'] != 'admin_custom_test_series') {
-                final id = (map['id'] ?? map['paper_id'] ?? '').toString();
-                if (id.isNotEmpty) {
-                  final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '').toString() == id);
-                  if (idx != -1) {
-                    papers[idx] = {...papers[idx], ...map};
-                  } else {
-                    seenIds.add(id);
-                    papers.add(map);
-                  }
+              final id = (map['id'] ?? map['paper_id'] ?? '').toString().trim();
+              if (id.isNotEmpty && !deletedPaperIds.contains(id)) {
+                final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '').toString() == id);
+                if (idx != -1) {
+                  papers[idx] = {...papers[idx], ...map};
+                } else if (!seenIds.contains(id)) {
+                  seenIds.add(id);
+                  papers.add(map);
                 }
               }
             }
@@ -8205,8 +8278,12 @@ class SupabaseService {
       if (res != null && (res as List).isNotEmpty) {
         for (var row in res) {
           final map = Map<String, dynamic>.from(row as Map);
-          final id = (map['id'] ?? map['paper_id'] ?? '').toString();
-          if (id.isNotEmpty && !seenIds.contains(id)) {
+          if (isTestSeriesContainer(map)) {
+            _extractEmbeddedTestsFromContainer(map, papers, seenIds, deletedPaperIds);
+            continue;
+          }
+          final id = (map['id'] ?? map['paper_id'] ?? '').toString().trim();
+          if (id.isNotEmpty && !deletedPaperIds.contains(id) && !seenIds.contains(id)) {
             seenIds.add(id);
             papers.add(map);
           }
@@ -8222,13 +8299,20 @@ class SupabaseService {
       if (res != null && (res as List).isNotEmpty) {
         final dbPapers = (res as List).map((row) => Map<String, dynamic>.from(row as Map)).toList();
         for (var dbP in dbPapers) {
-          final id = (dbP['id'] ?? dbP['paper_id'] ?? '').toString();
-          final idx = papers.indexWhere((p) => p['id'] == id);
+          if (isTestSeriesContainer(dbP)) {
+            _extractEmbeddedTestsFromContainer(dbP, papers, seenIds, deletedPaperIds);
+            continue;
+          }
+          final id = (dbP['id'] ?? dbP['paper_id'] ?? '').toString().trim();
+          if (deletedPaperIds.contains(id)) continue;
+          final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '') == id);
           if (idx != -1) {
-            papers[idx] = dbP;
+            papers[idx] = {...papers[idx], ...dbP};
           } else {
-            if (id.isNotEmpty) seenIds.add(id);
-            papers.add(dbP);
+            if (id.isNotEmpty && !seenIds.contains(id)) {
+              seenIds.add(id);
+              papers.add(dbP);
+            }
           }
         }
       }
@@ -8396,12 +8480,15 @@ class SupabaseService {
       debugPrint('Notice resolving paper question counts: $e');
     }
 
-    // Deduplicate duplicate titles or IDs
+    // Deduplicate duplicate titles or IDs & validate against defensive invariant
     final List<Map<String, dynamic>> deduped = [];
     final Set<String> seenKeys = {};
     for (var p in papers) {
       final id = (p['id'] ?? p['paper_id'] ?? '').toString().trim();
       if (deletedPaperIds.contains(id)) continue;
+      // Defensive invariant: series containers must never be emitted as individual papers
+      if (!isValidIndividualPaper(p)) continue;
+
       final title = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().trim();
       final key = '${id}_$title'.toLowerCase();
       if (id == '49bfe774-1e41-495e-a029-49bf1e41595e' || id == 'neet_2026_phase_1') {

@@ -51,28 +51,80 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
   }
 
   String _getPaperCatalogue(Map<String, dynamic> p) {
+    // 0. Defensive invariant: Test series containers must NEVER be classified as papers
+    if (SupabaseService.isTestSeriesContainer(p)) {
+      debugPrint('[Catalogue Filter] Series container "${p['id']}" rejected from paper catalogues');
+      return 'InvalidContainer';
+    }
+
     final cat = (p['source_category'] ?? p['sourceCategory'] ?? p['category'] ?? p['paper_type'] ?? '').toString().toUpperCase();
-    final title = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toLowerCase();
-    final id = (p['id'] ?? p['paper_id'] ?? '').toString().toLowerCase();
+    
+    // Safely resolve title handling empty strings
+    final title = ((p['paper_name']?.toString().trim().isNotEmpty == true)
+            ? p['paper_name'].toString().trim()
+            : ((p['paperName']?.toString().trim().isNotEmpty == true)
+                ? p['paperName'].toString().trim()
+                : ((p['title']?.toString().trim().isNotEmpty == true)
+                    ? p['title'].toString().trim()
+                    : ((p['name']?.toString().trim().isNotEmpty == true) ? p['name'].toString().trim() : ''))))
+        .toLowerCase();
+
+    final id = (p['id'] ?? p['paper_id'] ?? '').toString().toLowerCase().trim();
     final isPyq = p['is_pyq'] == true;
     final isNta = p['is_nta'] == true;
     final isTestSeries = p['is_test_series'] == true;
+    final hasSeriesParent = (p['test_series_id'] != null && p['test_series_id'].toString().trim().isNotEmpty);
 
-    if (isTestSeries || cat == 'TEST_SERIES' || cat == 'TEST SERIES' || title.contains('test series') || title.contains('mock test') || title.contains('fst')) {
+    // 1. Test Series papers classification
+    if (isTestSeries ||
+        hasSeriesParent ||
+        cat == 'TEST_SERIES' ||
+        cat == 'TEST SERIES' ||
+        cat == 'TEST_SERIES_PAPERS' ||
+        title.contains('test series') ||
+        title.contains('mock test') ||
+        title.contains('fst') ||
+        title.contains('leader test series') ||
+        title.contains('beginner test series') ||
+        title.contains('full syllabus test series') ||
+        p.containsKey('series_name')) {
       return 'Test Series';
     }
+
+    // 2. NTA papers classification
     if (isNta || cat == 'NTA' || (title.contains('nta') && !title.contains('pyq') && !isPyq)) {
       return 'NTA';
     }
-    if (isPyq || cat == 'PYQ' || id.startsWith('neet_') || id.startsWith('jee_') || title.contains('official pyq') || title.contains('phase 1') || title.contains('re-neet') || title.contains('paper 1') || title.contains('pyq')) {
+
+    // 3. PYQ papers classification
+    if (isPyq ||
+        cat == 'PYQ' ||
+        id.startsWith('neet_') ||
+        id.startsWith('jee_') ||
+        title.contains('official pyq') ||
+        title.contains('phase 1') ||
+        title.contains('phase 2') ||
+        title.contains('re-neet') ||
+        title.contains('paper 1') ||
+        title.contains('pyq')) {
       return 'PYQ';
     }
-    if (title.contains('test') || title.contains('series')) return 'Test Series';
-    return 'PYQ';
+
+    // 4. Secondary checks based on title contents
+    if (title.contains('test') || title.contains('series') || title.contains('mock')) {
+      return 'Test Series';
+    }
+
+    // 5. Defensive invariant: Ambiguous records must be logged and flagged, NOT silently classified as PYQ!
+    debugPrint('[Catalogue Invariant] Ambiguous paper record "$id" (title: "$title") could not be classified; flagged as Ambiguous');
+    return 'Ambiguous';
   }
 
   List<Map<String, dynamic>> get _cataloguePapers {
-    return _allPapers.where((p) => _getPaperCatalogue(p) == _activeCatalogue).toList();
+    return _allPapers.where((p) {
+      if (SupabaseService.isTestSeriesContainer(p)) return false;
+      return _getPaperCatalogue(p) == _activeCatalogue;
+    }).toList();
   }
 
   Future<void> _loadPapers() async {
@@ -764,7 +816,15 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
               final isSelected = _selectedPaperIds.contains(paperId);
               final exam = (p['exam'] ?? p['exam_name'] ?? 'NEET').toString();
               final year = (p['year'] ?? '').toString();
-              final title = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? 'PYQ Paper').toString();
+              final title = ((p['paper_name']?.toString().trim().isNotEmpty == true)
+                  ? p['paper_name'].toString().trim()
+                  : ((p['paperName']?.toString().trim().isNotEmpty == true)
+                      ? p['paperName'].toString().trim()
+                      : ((p['title']?.toString().trim().isNotEmpty == true)
+                          ? p['title'].toString().trim()
+                          : ((p['name']?.toString().trim().isNotEmpty == true)
+                              ? p['name'].toString().trim()
+                              : 'PYQ Paper'))));
               final phase = (p['phase_session'] ?? p['phaseSession'] ?? p['session'] ?? '').toString();
               final status = (p['status'] ?? 'Published').toString();
 
