@@ -89,6 +89,11 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   List<String> _availablePapersForSelectedSeries = [];
   List<Map<String, dynamic>> _loadedPapersList = [];
 
+  // Dedicated Source Paper State (Distinct from Destination Test Name)
+  String _selectedSourcePaperId = '';
+  String _selectedSourcePaperName = '';
+  String _selectedSourcePaperMode = 'biology';
+
   // Checkboxes for subjects
   bool _subjectPhysics = true;
   bool _subjectChemistry = true;
@@ -1185,25 +1190,32 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     }
   }
 
-  Future<void> _addPaperSourceToStep1(Map<String, dynamic> paperMap, String sourceType) async {
+  Future<void> _addPaperSourceToStep1(Map<String, dynamic> paperMap, String sourceType, {String? targetMode}) async {
     final String paperId = paperMap['id']?.toString() ?? '';
     final String pName = paperMap['paper_name'] ?? paperMap['paperName'] ?? 'Selected Paper';
 
-    // Auto-fill Step 1 Paper Details from selected paper metadata!
+    // Store source paper reference separately from destination test name!
     setState(() {
-      _paperNameCtrl.text = pName;
-      if (paperMap['paper_code'] != null || paperMap['code'] != null) {
-        _paperCodeCtrl.text = (paperMap['paper_code'] ?? paperMap['code']).toString();
+      _selectedSourcePaperId = paperId;
+      _selectedSourcePaperName = pName;
+
+      // DO NOT overwrite destination test / paper name if in Test Series category or already named!
+      if (_paperNameCtrl.text.trim().isEmpty && _sourceCategory != 'Test Series') {
+        _paperNameCtrl.text = pName;
       }
-      if (paperMap['exam'] != null) _examName = paperMap['exam'].toString();
-      if (paperMap['year'] != null) _year = paperMap['year'].toString();
-      if (paperMap['phase_session'] != null) _phaseSession = paperMap['phase_session'].toString();
-      if (paperMap['paper_type'] != null) _paperType = paperMap['paper_type'].toString();
-      if (paperMap['conducting_body'] != null) _conductingBody = paperMap['conducting_body'].toString();
-      if (paperMap['total_marks'] != null) _totalMarksCtrl.text = paperMap['total_marks'].toString();
-      if (paperMap['question_count'] != null) _questionCountCtrl.text = paperMap['question_count'].toString();
-      if (paperMap['duration_minutes'] != null) _durationCtrl.text = paperMap['duration_minutes'].toString();
-      if (paperMap['instructions'] != null) _instructionsCtrl.text = paperMap['instructions'].toString();
+      if (paperMap['paper_code'] != null || paperMap['code'] != null) {
+        if (_paperCodeCtrl.text.trim().isEmpty) {
+          _paperCodeCtrl.text = (paperMap['paper_code'] ?? paperMap['code']).toString();
+        }
+      }
+      if (paperMap['exam'] != null && _examName.isEmpty) _examName = paperMap['exam'].toString();
+      if (paperMap['year'] != null && _year.isEmpty) _year = paperMap['year'].toString();
+      if (paperMap['phase_session'] != null && _phaseSession.isEmpty) _phaseSession = paperMap['phase_session'].toString();
+      if (paperMap['paper_type'] != null && _paperType.isEmpty) _paperType = paperMap['paper_type'].toString();
+      if (paperMap['conducting_body'] != null && _conductingBody.isEmpty) _conductingBody = paperMap['conducting_body'].toString();
+      if (paperMap['instructions'] != null && _instructionsCtrl.text.trim().isEmpty) {
+        _instructionsCtrl.text = paperMap['instructions'].toString();
+      }
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1231,26 +1243,61 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       return;
     }
 
+    // Determine initial selection mode:
+    // If targetMode is provided, use it.
+    // If destination test or test series title contains "Biology" or "Bio", default to 'biology' (90 Qs).
+    // If it contains "Physics", default to 'physics' (45 Qs).
+    // If it contains "Chemistry", default to 'chemistry' (45 Qs).
+    // Otherwise 'full'.
+    String initialMode = targetMode ?? 'full';
+    if (targetMode == null) {
+      final contextText = ('$_existingTestSeries ${_newTestSeriesCtrl.text} ${_paperNameCtrl.text}').toLowerCase();
+      if (contextText.contains('biology') || contextText.contains('bio')) {
+        initialMode = 'biology';
+      } else if (contextText.contains('physics') || contextText.contains('phy')) {
+        initialMode = 'physics';
+      } else if (contextText.contains('chemistry') || contextText.contains('chem')) {
+        initialMode = 'chemistry';
+      }
+    }
+    _selectedSourcePaperMode = initialMode;
+
+    final Map<String, dynamic> dummySource = {
+      'rawQuestions': rawList,
+      'exam': paperExam,
+    };
+    final filtered = _filterQuestionsByMode(dummySource, initialMode);
+
     setState(() {
       _addedSources.add({
         'type': sourceType,
         'id': paperId,
+        'source_paper_id': paperId,
+        'source_paper_name': pName,
         'name': pName,
         'exam': paperExam,
-        'count': rawList.length,
+        'count': filtered.length,
         'paperMap': paperMap,
         'rawQuestions': rawList,
-        'questions': rawList,
-        'selectionMode': 'full',
+        'questions': filtered,
+        'selectionMode': initialMode,
         'customSelectedIds': <String>{},
       });
       _questionCountCtrl.text = _allDeduplicatedQuestions.length.toString();
+      _totalMarksCtrl.text = (_allDeduplicatedQuestions.length * 4).toString();
+      if (initialMode == 'biology') {
+        _durationCtrl.text = '90';
+      } else if (initialMode == 'physics' || initialMode == 'chemistry') {
+        _durationCtrl.text = '45';
+      }
     });
 
+    final String destName = _paperNameCtrl.text.trim().isNotEmpty ? _paperNameCtrl.text.trim() : 'Test';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('✓ Added "$pName" (${questions.length} questions) to paper content!'),
+        content: Text('✓ Selected ${_getModeDisplayName(initialMode)} (${filtered.length} questions) from "$pName" for destination test "$destName"!'),
         backgroundColor: const Color(0xFF16A34A),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -1759,7 +1806,9 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
         _paperOption = 'new';
         _existingPaper = '';
         final int nextPaperNum = titles.length + 1;
-        _paperNameCtrl.text = seriesTitle.isNotEmpty ? '$seriesTitle - Test #$nextPaperNum' : 'NEET 2026 Phase 1';
+        if (_paperNameCtrl.text.trim().isEmpty) {
+          _paperNameCtrl.text = seriesTitle.isNotEmpty ? '$seriesTitle - Test #$nextPaperNum' : 'NEET 2026 Phase 1';
+        }
         _paperCodeCtrl.text = 'P$nextPaperNum';
       }
     });
@@ -1854,7 +1903,11 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       }
 
       if (foundPaper.isNotEmpty) {
-        _paperNameCtrl.text = foundPaper['paper_name'] ?? foundPaper['paperName'] ?? paperTitle;
+        if (_paperNameCtrl.text.trim().isEmpty || _sourceCategory != 'Test Series') {
+          _paperNameCtrl.text = foundPaper['paper_name'] ?? foundPaper['paperName'] ?? paperTitle;
+        }
+        _selectedSourcePaperId = foundPaper['id']?.toString() ?? '';
+        _selectedSourcePaperName = foundPaper['paper_name'] ?? foundPaper['paperName'] ?? paperTitle;
         _paperCodeCtrl.text = foundPaper['paper_code'] ?? foundPaper['paperCode'] ?? 'P1';
 
         if (foundPaper['exam'] != null && foundPaper['exam'].toString().isNotEmpty) {
@@ -1916,6 +1969,21 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
         _checkPaperPendingQuestions(paperId, totalQ, paperName: paperTitle);
       }
     });
+
+    if (_sourceCategory == 'Test Series' && paperTitle.isNotEmpty) {
+      final Map<String, dynamic> paperToLoad = (customPaperMapList != null && customPaperMapList.isNotEmpty)
+          ? customPaperMapList.firstWhere(
+              (p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim().toLowerCase() == paperTitle.trim().toLowerCase(),
+              orElse: () => {},
+            )
+          : _loadedPapersList.firstWhere(
+              (p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim().toLowerCase() == paperTitle.trim().toLowerCase(),
+              orElse: () => {},
+            );
+      if (paperToLoad.isNotEmpty) {
+        _addPaperSourceToStep1(paperToLoad, 'Selected Paper');
+      }
+    }
   }
 
   void _onNewPaperOptionSelected() {
@@ -1925,7 +1993,9 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       final prefix = _testSeriesOption == 'new'
           ? (_newTestSeriesCtrl.text.isNotEmpty ? _newTestSeriesCtrl.text.trim() : 'Test Series')
           : _existingTestSeries;
-      _paperNameCtrl.text = '$prefix - Paper $nextNum';
+      if (_paperNameCtrl.text.trim().isEmpty) {
+        _paperNameCtrl.text = '$prefix - Paper $nextNum';
+      }
       _paperCodeCtrl.text = 'P$nextNum';
       _applyExamDefaults(_examName);
     });
@@ -1975,10 +2045,18 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       return;
     }
 
-    final String pName = _paperNameCtrl.text.trim().isNotEmpty ? _paperNameCtrl.text.trim() : 'NEET 2026 Phase 1';
+    final String pName = _paperNameCtrl.text.trim().isNotEmpty ? _paperNameCtrl.text.trim() : 'Bio Fst Test 1';
+    final String effectiveTestSeriesTitle = _sourceCategory == 'Test Series'
+        ? (_testSeriesOption == 'new' && _newTestSeriesCtrl.text.trim().isNotEmpty
+            ? _newTestSeriesCtrl.text.trim()
+            : _existingTestSeries)
+        : '';
     
-    // If existing paper was selected, reuse its exact ID so Step 2 loads its existing questions
-    String paperId = SupabaseService.toValidUuid('paper_${_examName}_${_year}_${_phaseSession}_$pName');
+    // Maintain separate destination test ID
+    String paperId = _sourceCategory == 'Test Series'
+        ? SupabaseService.toValidUuid('test_ts_${effectiveTestSeriesTitle}_$pName')
+        : SupabaseService.toValidUuid('paper_${_examName}_${_year}_${_phaseSession}_$pName');
+
     if (_workflowMode == 'edit') {
       if (_selectedEditPaperId == null || _selectedEditPaperId!.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1991,13 +2069,11 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       }
       paperId = _selectedEditPaperId!;
     } else if (_sourceCategory == 'Test Series' && _paperOption == 'existing' && _existingPaper.isNotEmpty) {
-      Map<String, dynamic> foundExisting = _loadedPapersList.firstWhere(
-        (p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim().toLowerCase() == _existingPaper.trim().toLowerCase(),
-        orElse: () => {},
-      );
-      if (foundExisting.isEmpty && _existingTestSeries.isNotEmpty) {
+      // Find the existing test strictly within the test series container
+      Map<String, dynamic> foundTestInSeries = {};
+      if (effectiveTestSeriesTitle.isNotEmpty) {
         final seriesObj = _loadedSeriesObjects.firstWhere(
-          (s) => (s['title'] ?? s['name'] ?? '').toString().trim().toLowerCase() == _existingTestSeries.trim().toLowerCase(),
+          (s) => (s['title'] ?? s['name'] ?? '').toString().trim().toLowerCase() == effectiveTestSeriesTitle.trim().toLowerCase(),
           orElse: () => {},
         );
         if (seriesObj['tests'] is List) {
@@ -2006,29 +2082,30 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
               final tMap = Map<String, dynamic>.from(t);
               final tTitle = (tMap['title'] ?? tMap['name'] ?? '').toString().trim();
               if (tTitle.toLowerCase() == _existingPaper.trim().toLowerCase()) {
-                foundExisting = tMap;
+                foundTestInSeries = tMap;
                 break;
               }
             }
           }
         }
       }
-      if (foundExisting.isNotEmpty && foundExisting['id'] != null && foundExisting['id'].toString().isNotEmpty) {
-        paperId = SupabaseService.toValidUuid(foundExisting['id'].toString());
+      if (foundTestInSeries.isNotEmpty && foundTestInSeries['id'] != null && foundTestInSeries['id'].toString().isNotEmpty) {
+        paperId = SupabaseService.toValidUuid(foundTestInSeries['id'].toString());
       }
     }
-
-    final String effectiveTestSeriesTitle = _sourceCategory == 'Test Series'
-        ? (_testSeriesOption == 'new' && _newTestSeriesCtrl.text.trim().isNotEmpty
-            ? _newTestSeriesCtrl.text.trim()
-            : _existingTestSeries)
-        : '';
 
     final now = DateTime.now();
     final defaultDateTime = DateTime(now.year, now.month, now.day, 14, 0);
     final String formattedIsoDateTime = _selectedTestDateTime != null
         ? _selectedTestDateTime!.toIso8601String()
         : defaultDateTime.toIso8601String();
+
+    final int qCountCalculated = _allDeduplicatedQuestions.isNotEmpty
+        ? _allDeduplicatedQuestions.length
+        : (int.tryParse(_questionCountCtrl.text) ?? 90);
+    final double marksCalculated = _allDeduplicatedQuestions.isNotEmpty
+        ? (_allDeduplicatedQuestions.length * 4.0)
+        : (double.tryParse(_totalMarksCtrl.text) ?? 360.0);
 
     final Map<String, dynamic> paperDetails = {
       'id': paperId,
@@ -2048,16 +2125,23 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       'paper_type': _paperType,
       'paperName': pName,
       'paper_name': pName,
+      'destination_test_name': pName,
+      'destinationTestName': pName,
+      'source_paper_id': _selectedSourcePaperId,
+      'source_paper_name': _selectedSourcePaperName,
+      'source_paper': _selectedSourcePaperName,
+      'selection_mode': _selectedSourcePaperMode,
       'paperCode': _paperCodeCtrl.text.trim(),
       'paper_code': _paperCodeCtrl.text.trim(),
       'language': _language,
       'conductingBody': _conductingBody,
       'conducting_body': _conductingBody,
-      'questionCount': int.tryParse(_questionCountCtrl.text) ?? 180,
-      'totalMarks': int.tryParse(_totalMarksCtrl.text) ?? 720,
-      'total_marks': double.tryParse(_totalMarksCtrl.text) ?? 720.0,
-      'durationMinutes': int.tryParse(_durationCtrl.text) ?? 180,
-      'duration': int.tryParse(_durationCtrl.text) ?? 180,
+      'questionCount': qCountCalculated,
+      'question_count': qCountCalculated,
+      'totalMarks': marksCalculated.toInt(),
+      'total_marks': marksCalculated,
+      'durationMinutes': int.tryParse(_durationCtrl.text) ?? 90,
+      'duration': int.tryParse(_durationCtrl.text) ?? 90,
       'test_date_time': formattedIsoDateTime,
       'test_date': formattedIsoDateTime,
       'scheduled_at': formattedIsoDateTime,
@@ -2102,19 +2186,51 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       'added_sources': _addedSources,
     };
 
-    if (_allDeduplicatedQuestions.isNotEmpty) {
-      paperDetails['questionCount'] = _allDeduplicatedQuestions.length;
-    }
-
-    // Immediately persist created Test Series so it shows up in Test Series section
+    // Immediately persist created Test Series without wiping other tests in container
     if (_sourceCategory == 'Test Series' && effectiveTestSeriesTitle.isNotEmpty) {
       try {
+        final seriesObj = _loadedSeriesObjects.firstWhere(
+          (s) => (s['title'] ?? s['name'] ?? '').toString().trim().toLowerCase() == effectiveTestSeriesTitle.trim().toLowerCase(),
+          orElse: () => {},
+        );
+        final List<dynamic> existingTests = (seriesObj['tests'] is List)
+            ? List<dynamic>.from(seriesObj['tests'])
+            : <dynamic>[];
+
+        final newTestEntry = {
+          'id': paperId,
+          'paper_id': paperId,
+          'title': pName,
+          'name': pName,
+          'source_paper_id': _selectedSourcePaperId,
+          'source_paper_name': _selectedSourcePaperName,
+          'selection_mode': _selectedSourcePaperMode,
+          'questions': qCountCalculated,
+          'marks': marksCalculated,
+          'duration': int.tryParse(_durationCtrl.text) ?? 90,
+          'type': 'Full Syllabus',
+          'status': 'Published',
+          'test_date_time': formattedIsoDateTime,
+          'scheduled_at': formattedIsoDateTime,
+        };
+
+        final existingIdx = existingTests.indexWhere((t) =>
+          (t is Map && t['id'] != null && t['id'].toString() == paperId) ||
+          (t is Map && (t['title'] ?? t['name'] ?? '').toString().trim().toLowerCase() == pName.toLowerCase())
+        );
+
+        if (existingIdx != -1) {
+          existingTests[existingIdx] = newTestEntry;
+        } else {
+          existingTests.add(newTestEntry);
+        }
+
         await SupabaseService.saveTestSeries({
-          'id': SupabaseService.toValidUuid('ts_${_examName}_${_year}_$effectiveTestSeriesTitle'),
+          'id': seriesObj['id'] ?? SupabaseService.toValidUuid('ts_${_examName}_${_year}_$effectiveTestSeriesTitle'),
           'title': effectiveTestSeriesTitle,
           'name': effectiveTestSeriesTitle,
-          'description': _testSeriesDescCtrl.text.trim(),
-          'banner_image_url': _testSeriesBannerCtrl.text.trim(),
+          'description': _testSeriesDescCtrl.text.trim().isNotEmpty ? _testSeriesDescCtrl.text.trim() : (seriesObj['description'] ?? 'Curated test series'),
+          'banner_image_url': _testSeriesBannerCtrl.text.trim().isNotEmpty ? _testSeriesBannerCtrl.text.trim() : (seriesObj['banner_image_url'] ?? ''),
           'exam': _examName,
           'year': _year,
           'category': 'Full Syllabus',
@@ -2126,32 +2242,42 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
           'purchase_link': _testSeriesPurchaseLinkCtrl.text.trim(),
           'purchase_button_text': _testSeriesButtonTextCtrl.text.trim(),
           'show_purchase_button': _testSeriesShowButton,
-          'question_count': int.tryParse(_questionCountCtrl.text) ?? 180,
-          'total_marks': double.tryParse(_totalMarksCtrl.text) ?? (_examName.contains('JEE') ? 300.0 : 720.0),
+          'question_count': qCountCalculated,
+          'total_marks': marksCalculated,
           'conducting_body': _conductingBody,
-          'duration_minutes': int.tryParse(_durationCtrl.text) ?? 180,
+          'duration_minutes': int.tryParse(_durationCtrl.text) ?? 90,
           'difficulty': 'High',
           'status': 'Published',
           'test_date_time': formattedIsoDateTime,
           'scheduled_at': formattedIsoDateTime,
-          'tests': [
-            {
-              'id': paperId,
-              'paper_id': paperId,
-              'title': pName,
-              'questions': int.tryParse(_questionCountCtrl.text) ?? 180,
-              'marks': double.tryParse(_totalMarksCtrl.text) ?? (_examName.contains('JEE') ? 300.0 : 720.0),
-              'duration': int.tryParse(_durationCtrl.text) ?? 180,
-              'type': 'Full',
-              'status': 'Published',
-              'test_date_time': formattedIsoDateTime,
-              'scheduled_at': formattedIsoDateTime,
-            }
-          ],
-          'test_count': 1,
+          'tests': existingTests,
+          'test_count': existingTests.length,
         });
       } catch (e) {
         debugPrint('Notice persisting test series in step 1: $e');
+      }
+    }
+
+    if (_allDeduplicatedQuestions.isNotEmpty) {
+      try {
+        final seriesObj = effectiveTestSeriesTitle.isNotEmpty
+            ? _loadedSeriesObjects.firstWhere(
+                (s) => (s['title'] ?? s['name'] ?? '').toString().trim().toLowerCase() == effectiveTestSeriesTitle.trim().toLowerCase(),
+                orElse: () => {},
+              )
+            : <String, dynamic>{};
+        await SupabaseService.createTestSeriesPaperFromExistingQuestions(
+          paperDetails: paperDetails,
+          selectedQuestionItems: _allDeduplicatedQuestions,
+          testSeriesDetails: {
+            'id': seriesObj['id'],
+            'title': effectiveTestSeriesTitle,
+            'description': _testSeriesDescCtrl.text.trim().isNotEmpty ? _testSeriesDescCtrl.text.trim() : (seriesObj['description'] ?? 'Curated test series'),
+            'banner_image_url': _testSeriesBannerCtrl.text.trim().isNotEmpty ? _testSeriesBannerCtrl.text.trim() : (seriesObj['banner_image_url'] ?? ''),
+          },
+        );
+      } catch (e) {
+        debugPrint('Notice persisting test series paper from existing questions: $e');
       }
     }
 
@@ -3775,24 +3901,149 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                           ],
                         ),
                       ),
-                  ] else ...[
-                    _buildTextField(
-                      label: 'New Paper Name *',
-                      controller: _paperNameCtrl,
+                  ],
+                  const SizedBox(height: 14),
+                  _buildTextField(
+                    label: _sourceCategory == 'Test Series' ? 'Destination Test Name in Series *' : 'Paper Name *',
+                    controller: _paperNameCtrl,
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(6)),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.auto_awesome_rounded, color: Color(0xFF2563EB), size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '✓ Pre-filled standard defaults for $_examName: Total Marks (${_totalMarksCtrl.text}), Total Questions (${_questionCountCtrl.text}), Conducting Body ($_conductingBody). Destination test name is kept distinct from source papers.',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF1D4ED8), fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 6),
+                  ),
+                  if (_selectedSourcePaperName.isNotEmpty) ...[
+                    const SizedBox(height: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(6)),
-                      child: Row(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFF86EFAC)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.auto_awesome_rounded, color: Color(0xFF2563EB), size: 16),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '✓ Pre-filled standard defaults for $_examName: Total Marks (${_totalMarksCtrl.text}), Total Questions (${_questionCountCtrl.text}), Conducting Body ($_conductingBody). You can customize them in the grid below.',
-                              style: const TextStyle(fontSize: 11, color: Color(0xFF1D4ED8), fontWeight: FontWeight.bold),
-                            ),
+                          Row(
+                            children: [
+                              const Icon(Icons.link_rounded, color: Color(0xFF16A34A), size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Destination Test: ${_paperNameCtrl.text.trim().isNotEmpty ? _paperNameCtrl.text.trim() : "Bio Fst Test 1"}',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF14532D)),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Source Paper: $_selectedSourcePaperName  (canonical source preserved)',
+                                      style: const TextStyle(fontSize: 11.5, color: Color(0xFF15803D), fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Select Question Subset Mode:',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF166534)),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              ChoiceChip(
+                                label: const Text('Biology Only (90 Qs)'),
+                                selected: _selectedSourcePaperMode == 'biology',
+                                selectedColor: const Color(0xFFBBF7D0),
+                                onSelected: (sel) {
+                                  if (sel) {
+                                    if (_addedSources.isNotEmpty) {
+                                      _applyModeToSource(0, 'biology');
+                                    } else {
+                                      setState(() => _selectedSourcePaperMode = 'biology');
+                                    }
+                                  }
+                                },
+                              ),
+                              ChoiceChip(
+                                label: const Text('Physics Only (45 Qs)'),
+                                selected: _selectedSourcePaperMode == 'physics',
+                                selectedColor: const Color(0xFFBAE6FD),
+                                onSelected: (sel) {
+                                  if (sel) {
+                                    if (_addedSources.isNotEmpty) {
+                                      _applyModeToSource(0, 'physics');
+                                    } else {
+                                      setState(() => _selectedSourcePaperMode = 'physics');
+                                    }
+                                  }
+                                },
+                              ),
+                              ChoiceChip(
+                                label: const Text('Chemistry Only (45 Qs)'),
+                                selected: _selectedSourcePaperMode == 'chemistry',
+                                selectedColor: const Color(0xFFFED7AA),
+                                onSelected: (sel) {
+                                  if (sel) {
+                                    if (_addedSources.isNotEmpty) {
+                                      _applyModeToSource(0, 'chemistry');
+                                    } else {
+                                      setState(() => _selectedSourcePaperMode = 'chemistry');
+                                    }
+                                  }
+                                },
+                              ),
+                              ChoiceChip(
+                                label: const Text('Full Paper (180 Qs)'),
+                                selected: _selectedSourcePaperMode == 'full',
+                                selectedColor: const Color(0xFFDDD6FE),
+                                onSelected: (sel) {
+                                  if (sel) {
+                                    if (_addedSources.isNotEmpty) {
+                                      _applyModeToSource(0, 'full');
+                                    } else {
+                                      setState(() => _selectedSourcePaperMode = 'full');
+                                    }
+                                  }
+                                },
+                              ),
+                              ChoiceChip(
+                                label: const Text('Custom Selection'),
+                                selected: _selectedSourcePaperMode == 'custom',
+                                selectedColor: const Color(0xFFFDE68A),
+                                onSelected: (sel) {
+                                  if (sel) {
+                                    if (_addedSources.isNotEmpty) {
+                                      _openCustomQuestionSelectorModal(0);
+                                    } else {
+                                      setState(() => _selectedSourcePaperMode = 'custom');
+                                    }
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '✓ Current Selection: ${_getModeDisplayName(_selectedSourcePaperMode)} • ${_allDeduplicatedQuestions.length} Questions (${_allDeduplicatedQuestions.length * 4} Marks)',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
                           ),
                         ],
                       ),

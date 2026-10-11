@@ -1462,6 +1462,29 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (t['source_paper_name'] != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF86EFAC)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.source_rounded, color: Color(0xFF16A34A), size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Source Paper: ${t['source_paper_name']} • Selection: ${(t['selection_mode'] ?? 'biology').toString().toUpperCase()}',
+                              style: const TextStyle(fontSize: 11.5, color: Color(0xFF15803D), fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   TextFormField(
                     controller: titleCtrl,
                     decoration: const InputDecoration(
@@ -1573,9 +1596,12 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                   _tests[index] = {
                     ...t,
                     'title': titleCtrl.text.trim(),
-                    'questions': int.tryParse(qCtrl.text.trim()) ?? 200,
-                    'marks': int.tryParse(marksCtrl.text.trim()) ?? 720,
-                    'duration': int.tryParse(durCtrl.text.trim()) ?? 180,
+                    'source_paper_id': t['source_paper_id'],
+                    'source_paper_name': t['source_paper_name'],
+                    'selection_mode': t['selection_mode'],
+                    'questions': int.tryParse(qCtrl.text.trim()) ?? (t['questions'] ?? 90),
+                    'marks': int.tryParse(marksCtrl.text.trim()) ?? (t['marks'] ?? 360),
+                    'duration': int.tryParse(durCtrl.text.trim()) ?? (t['duration'] ?? 90),
                     'type': type,
                     'status': status,
                     'test_date_time': editTestDateTime.toIso8601String(),
@@ -1701,90 +1727,270 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     }
 
     Map<String, dynamic> selectedPaper = widget.availablePapers.first;
+    final isBioSeries = _titleCtrl.text.toLowerCase().contains('bio') ||
+        _category.toLowerCase().contains('bio') ||
+        _testType.toLowerCase().contains('bio');
+
+    String selectedMode = isBioSeries ? 'biology' : 'full';
+    final initialSrcName = (selectedPaper['paper_name'] ?? selectedPaper['paperName'] ?? selectedPaper['title'] ?? 'Test Paper').toString();
+    final testNameCtrl = TextEditingController(
+      text: isBioSeries ? 'Bio Fst Test ${_tests.length + 1}' : initialSrcName,
+    );
+
+    int getQuestionsForMode(String mode, Map<String, dynamic> p) {
+      if (mode == 'biology') return 90;
+      if (mode == 'physics' || mode == 'chemistry') return 45;
+      return (p['question_count'] ?? p['saved_questions_count'] ?? (_exam.contains('JEE') ? 90 : 180)) as int;
+    }
+
+    int getMarksForMode(String mode, Map<String, dynamic> p) {
+      if (mode == 'biology') return 360;
+      if (mode == 'physics' || mode == 'chemistry') return 180;
+      return (p['total_marks'] ?? (_exam.contains('JEE') ? 300 : 720)) as int;
+    }
+
+    int getDurationForMode(String mode, Map<String, dynamic> p) {
+      if (mode == 'biology') return 90;
+      if (mode == 'physics' || mode == 'chemistry') return 60;
+      return (p['duration_minutes'] ?? 180) as int;
+    }
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlgState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          title: const Row(
-            children: [
-              Icon(Icons.link_rounded, color: Color(0xFF10B981), size: 20),
-              SizedBox(width: 8),
-              Text('Link Published Paper', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: SizedBox(
-            width: 460,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+        builder: (ctx, setDlgState) {
+          final srcPaperName = (selectedPaper['paper_name'] ?? selectedPaper['paperName'] ?? selectedPaper['title'] ?? 'Untitled Paper').toString();
+          final qCount = getQuestionsForMode(selectedMode, selectedPaper);
+          final marks = getMarksForMode(selectedMode, selectedPaper);
+          final duration = getDurationForMode(selectedMode, selectedPaper);
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            title: const Row(
               children: [
-                const Text(
-                  'Select an existing published test paper from question uploads to link directly into this test series:',
-                  style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
-                ),
-                const SizedBox(height: 14),
-                DropdownButtonFormField<Map<String, dynamic>>(
-                  value: selectedPaper,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Choose Paper *'),
-                  items: widget.availablePapers.map((p) {
-                    final name = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? 'Untitled Paper').toString();
-                    final qCount = p['question_count'] ?? p['saved_questions_count'] ?? 200;
-                    return DropdownMenuItem(
-                      value: p,
-                      child: Text('$name ($qCount Qs)', overflow: TextOverflow.ellipsis),
-                    );
-                  }).toList(),
-                  onChanged: (v) => setDlgState(() => selectedPaper = v!),
-                ),
+                Icon(Icons.link_rounded, color: Color(0xFF10B981), size: 22),
+                SizedBox(width: 8),
+                Text('Link Published Paper', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ],
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
-              onPressed: () {
-                final name = (selectedPaper['paper_name'] ?? selectedPaper['paperName'] ?? selectedPaper['title'] ?? 'Test Paper').toString();
-                final pId = selectedPaper['id']?.toString() ?? 'p_${DateTime.now().millisecondsSinceEpoch}';
+            content: SizedBox(
+              width: 480,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Select an existing published paper as source, customize the destination test name, and choose the question subset:',
+                      style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 16),
+                    // Source Paper Dropdown
+                    DropdownButtonFormField<Map<String, dynamic>>(
+                      value: selectedPaper,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Source Paper *',
+                        prefixIcon: Icon(Icons.source_rounded, size: 18),
+                      ),
+                      items: widget.availablePapers.map((p) {
+                        final name = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? 'Untitled Paper').toString();
+                        final count = p['question_count'] ?? p['saved_questions_count'] ?? 180;
+                        return DropdownMenuItem(
+                          value: p,
+                          child: Text('$name ($count Qs)', overflow: TextOverflow.ellipsis),
+                        );
+                      }).toList(),
+                      onChanged: (v) {
+                        if (v == null) return;
+                        setDlgState(() {
+                          selectedPaper = v;
+                          if (testNameCtrl.text.isEmpty) {
+                            final newName = (v['paper_name'] ?? v['paperName'] ?? v['title'] ?? 'Test Paper').toString();
+                            testNameCtrl.text = isBioSeries ? 'Bio Fst Test ${_tests.length + 1}' : newName;
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    // Destination Test Name Input
+                    TextField(
+                      controller: testNameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Destination Test Name in Series *',
+                        hintText: 'e.g. Bio Fst Test 1',
+                        prefixIcon: Icon(Icons.title_rounded, size: 18),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    // Subject Selection Mode Dropdown
+                    DropdownButtonFormField<String>(
+                      value: selectedMode,
+                      decoration: const InputDecoration(
+                        labelText: 'Question Selection Mode *',
+                        prefixIcon: Icon(Icons.filter_list_rounded, size: 18),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'biology',
+                          child: Text('🟢 Biology Only (90 Questions • 360 Marks • 90 Mins)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'physics',
+                          child: Text('🔵 Physics Only (45 Questions • 180 Marks • 60 Mins)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'chemistry',
+                          child: Text('🟣 Chemistry Only (45 Questions • 180 Marks • 60 Mins)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'full',
+                          child: Text('🟡 Full Paper (All Questions • 720 Marks • 180 Mins)'),
+                        ),
+                      ],
+                      onChanged: (mode) {
+                        if (mode != null) setDlgState(() => selectedMode = mode);
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    // Summary Preview Card
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFF4F46E5)),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Will import $qCount Qs • $marks Marks • $duration Mins',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Source: $srcPaperName (will remain intact with 180 Qs)',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
+                icon: const Icon(Icons.link_rounded, size: 16),
+                onPressed: () {
+                  final destTestName = testNameCtrl.text.trim().isNotEmpty
+                      ? testNameCtrl.text.trim()
+                      : srcPaperName;
+                  final pId = selectedPaper['id']?.toString() ?? 'p_${DateTime.now().millisecondsSinceEpoch}';
 
-                final alreadyLinked = _tests.any((t) => (t['id'] ?? t['paper_id'] ?? '').toString().toLowerCase() == pId.toLowerCase());
-                if (alreadyLinked) {
+                  final alreadyLinked = _tests.any((t) =>
+                      (t['title'] ?? '').toString().trim().toLowerCase() == destTestName.toLowerCase());
+                  if (alreadyLinked) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('A test named "$destTestName" already exists in this series.'),
+                        backgroundColor: const Color(0xFFEF4444),
+                      ),
+                    );
+                    return;
+                  }
+
+                  final destTestId = SupabaseService.toValidUuid('test_ts_${DateTime.now().millisecondsSinceEpoch}_${_tests.length + 1}');
+
+                  setState(() {
+                    _tests.add({
+                      'id': destTestId,
+                      'paper_id': destTestId,
+                      'source_paper_id': pId,
+                      'source_paper_name': srcPaperName,
+                      'selection_mode': selectedMode,
+                      'title': destTestName,
+                      'questions': qCount,
+                      'marks': marks,
+                      'duration': duration,
+                      'type': _testType,
+                      'status': 'Not Attempted',
+                    });
+                    _testCountCtrl.text = _tests.length.toString();
+                  });
+
+                  // Persist question relationships for linked test
+                  SupabaseService.fetchQuestionsForPaper(pId, paperName: srcPaperName).then((srcQuestions) {
+                    final filtered = srcQuestions.where((q) {
+                      final sId = (q['subject_id'] ?? '').toString().trim();
+                      final qNum = int.tryParse((q['question_number'] ?? '0').toString()) ?? 0;
+                      if (selectedMode == 'biology') {
+                        if (sId == 'a3333333-3333-3333-3333-333333333333') return true;
+                        final sName = (q['subject'] ?? '').toString().toLowerCase();
+                        if (sName.contains('bio') || sName.contains('botan') || sName.contains('zool')) return true;
+                        if (sId.isEmpty && qNum > 90) return true;
+                        return false;
+                      } else if (selectedMode == 'physics') {
+                        if (sId == 'a1111111-1111-1111-1111-111111111111') return true;
+                        final sName = (q['subject'] ?? '').toString().toLowerCase();
+                        if (sName.contains('phys')) return true;
+                        if (sId.isEmpty && qNum >= 1 && qNum <= 45) return true;
+                        return false;
+                      } else if (selectedMode == 'chemistry') {
+                        if (sId == 'a2222222-2222-2222-2222-222222222222') return true;
+                        final sName = (q['subject'] ?? '').toString().toLowerCase();
+                        if (sName.contains('chem')) return true;
+                        if (sId.isEmpty && qNum >= 46 && qNum <= 90) return true;
+                        return false;
+                      }
+                      return true;
+                    }).toList();
+
+                    if (filtered.isNotEmpty) {
+                      SupabaseService.createTestSeriesPaperFromExistingQuestions(
+                        paperDetails: {
+                          'id': destTestId,
+                          'paper_name': destTestName,
+                          'destination_test_name': destTestName,
+                          'source_paper_id': pId,
+                          'source_paper_name': srcPaperName,
+                          'selection_mode': selectedMode,
+                          'exam': _exam,
+                          'year': int.tryParse(_year) ?? 2026,
+                          'total_marks': marks,
+                          'duration_minutes': duration,
+                        },
+                        selectedQuestionItems: filtered,
+                        testSeriesDetails: {
+                          'id': _seriesId.isNotEmpty ? _seriesId : SupabaseService.toValidUuid('ts_${_titleCtrl.text}'),
+                          'title': _titleCtrl.text,
+                        },
+                      );
+                    }
+                  });
+
+                  Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Paper "$name" is already linked to this series.'),
-                      backgroundColor: const Color(0xFFEF4444),
+                      content: Text('✓ Linked "$destTestName" ($qCount Qs) from $srcPaperName!'),
+                      backgroundColor: const Color(0xFF10B981),
                     ),
                   );
-                  Navigator.pop(ctx);
-                  return;
-                }
-
-                final qCount = selectedPaper['question_count'] ?? selectedPaper['saved_questions_count'] ?? (_exam.contains('JEE') ? 90 : 200);
-                final marks = selectedPaper['total_marks'] ?? (_exam.contains('JEE') ? 300 : 720);
-                final duration = selectedPaper['duration_minutes'] ?? 180;
-
-                setState(() {
-                  _tests.add({
-                    'id': pId,
-                    'paper_id': pId,
-                    'title': name,
-                    'questions': qCount,
-                    'marks': marks,
-                    'duration': duration,
-                    'type': _testType,
-                    'status': 'Not Attempted',
-                  });
-                  _testCountCtrl.text = _tests.length.toString();
-                });
-                Navigator.pop(ctx);
-              },
-              child: const Text('Link Paper'),
-            ),
-          ],
-        ),
+                },
+                label: const Text('Link Paper'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -2930,6 +3136,10 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                                     _buildMiniBadge('$qCount Qs'),
                                     _buildMiniBadge('$marks Marks'),
                                     _buildMiniBadge('$duration Mins'),
+                                    if (t['source_paper_name'] != null && t['source_paper_name'].toString().isNotEmpty)
+                                      _buildMiniBadge('Source: ${t['source_paper_name']}', color: const Color(0xFF0F766E)),
+                                    if (t['selection_mode'] != null && t['selection_mode'].toString().isNotEmpty && t['selection_mode'] != 'full')
+                                      _buildMiniBadge('${t['selection_mode'].toString().toUpperCase()}', color: const Color(0xFF7C3AED)),
                                     if (formattedDt.isNotEmpty)
                                       _buildMiniBadge('📅 $formattedDt', color: const Color(0xFF2563EB)),
                                     // Interactive Test Type Dropdown Chip
@@ -2975,8 +3185,8 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                             onPressed: () {
                               Navigator.of(context).pop();
                               final String paperTitle = (t['title'] ?? t['name'] ?? _titleCtrl.text).toString();
-                              final String paperId = (t['paper_id'] ?? t['id'] ?? '').toString();
-                              final int qCount = (t['questions'] is num && (t['questions'] as num) > 0) ? (t['questions'] as num).toInt() : 180;
+                              final String destTestId = (t['id'] ?? t['paper_id'] ?? '').toString();
+                              final int qCount = (t['questions'] is num && (t['questions'] as num) > 0) ? (t['questions'] as num).toInt() : 90;
                               Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (_) => AdminBulkUploadStep2Screen(
@@ -2984,13 +3194,20 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                                     paperName: paperTitle,
                                     totalQuestionsCount: qCount,
                                     paperRecord: {
-                                      'id': paperId,
+                                      'id': destTestId,
+                                      'paper_id': destTestId,
                                       'paper_name': paperTitle,
                                       'paperName': paperTitle,
+                                      'destination_test_name': paperTitle,
+                                      'destinationTestName': paperTitle,
+                                      'source_paper_id': t['source_paper_id'],
+                                      'source_paper_name': t['source_paper_name'],
+                                      'selection_mode': t['selection_mode'],
                                       'exam': _exam,
                                       'sourceCategory': 'Test Series',
                                       'source_category': 'Test Series',
                                       'testSeriesTitle': _titleCtrl.text,
+                                      'test_series_title': _titleCtrl.text,
                                       'existingTestSeries': _titleCtrl.text,
                                       'existingPaper': paperTitle,
                                       'questionCount': qCount,

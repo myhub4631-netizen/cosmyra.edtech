@@ -618,26 +618,17 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       return;
     }
 
-    final int targetTotal = expectedQuestionCount;
-    final int qCount = math.max(targetTotal, savedQList.length);
-
-    if (_questionsList.length != qCount) {
-      _questionsList = List.generate(
-        qCount,
-        (index) => QuestionItemData(
-          id: 'q_${_paperId}_${index + 1}',
-          number: index + 1,
-          options: List<String>.from(defaultPresetOpts),
-          availableIn: List<String>.from(defaultAvailableIn),
-          positiveMarks: '4',
-          negativeMarks: '-1',
-        ),
-      );
-    }
-
     final dynamic preselectedRaw = _paperData?['preselectedQuestions'] ?? _paperData?['preselected_questions'];
+    final List<QuestionItemData> preselectedItems = [];
+
     if (preselectedRaw is List && preselectedRaw.isNotEmpty) {
-      final List<QuestionItemData> preselectedItems = [];
+      _testSeriesSelectedQuestions.clear();
+      for (final rawQ in preselectedRaw) {
+        if (rawQ is Map) {
+          _testSeriesSelectedQuestions.add(Map<String, dynamic>.from(rawQ));
+        }
+      }
+
       for (int idx = 0; idx < preselectedRaw.length; idx++) {
         final qMap = Map<String, dynamic>.from(preselectedRaw[idx] as Map);
         final opts = SupabaseService.parseOptionsFromQuestionMap(qMap);
@@ -683,145 +674,169 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           availableIn: defaultAvailableIn,
         ));
       }
+
       if (preselectedItems.isNotEmpty) {
         _questionsList = preselectedItems;
         _activeStep2Tab = 'manual';
+        _addedCount = preselectedItems.length;
+        _currentPageIndex = 1;
       }
-    }
+    } else {
+      final int targetTotal = expectedQuestionCount;
+      final int qCount = savedQList.isNotEmpty ? savedQList.length : targetTotal;
 
+      if (_questionsList.length != qCount) {
+        _questionsList = List.generate(
+          qCount,
+          (index) => QuestionItemData(
+            id: 'q_${_paperId}_${index + 1}',
+            number: index + 1,
+            options: List<String>.from(defaultPresetOpts),
+            availableIn: List<String>.from(defaultAvailableIn),
+            positiveMarks: '4',
+            negativeMarks: '-1',
+          ),
+        );
+      }
 
+      if (_testSeriesSelectedQuestions.isEmpty && savedQList.isNotEmpty) {
+        for (final sq in savedQList) {
+          _testSeriesSelectedQuestions.add(Map<String, dynamic>.from(sq));
+        }
+      }
 
-    int savedCounter = 0;
-    int firstUnsavedIndex = -1;
+      int savedCounter = 0;
+      int firstUnsavedIndex = -1;
 
-    for (int i = 0; i < _questionsList.length; i++) {
-      final qNum = i + 1;
-      final String expectedUuid = SupabaseService.toValidUuid('q_${_paperId}_$qNum');
-      final savedMatch = savedQList.firstWhere(
-        (sq) {
-          final rawNum = sq['question_number'] ?? sq['questionNumber'];
-          final int? parsedNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum?.toString() ?? '');
-          final String sqId = sq['id']?.toString() ?? '';
-          return (parsedNum != null && parsedNum == qNum) || sqId == 'q_${_paperId}_$qNum' || sqId == expectedUuid;
-        },
-        orElse: () => (i < savedQList.length ? savedQList[i] : {}),
-      );
+      for (int i = 0; i < _questionsList.length; i++) {
+        final qNum = i + 1;
+        final String expectedUuid = SupabaseService.toValidUuid('q_${_paperId}_$qNum');
+        final savedMatch = savedQList.firstWhere(
+          (sq) {
+            final rawNum = sq['question_number'] ?? sq['questionNumber'];
+            final int? parsedNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum?.toString() ?? '');
+            final String sqId = sq['id']?.toString() ?? '';
+            return (parsedNum != null && parsedNum == qNum) || sqId == 'q_${_paperId}_$qNum' || sqId == expectedUuid;
+          },
+          orElse: () => (i < savedQList.length ? savedQList[i] : <String, dynamic>{}),
+        );
 
-      if (savedMatch.isNotEmpty) {
-        savedCounter++;
-        String rawQText = savedMatch['question_text'] ?? savedMatch['questionText'] ?? '';
-        List<String> opts = SupabaseService.parseOptionsFromQuestionMap(savedMatch);
+        if (savedMatch.isNotEmpty) {
+          savedCounter++;
+          String rawQText = savedMatch['question_text'] ?? savedMatch['questionText'] ?? '';
+          List<String> opts = SupabaseService.parseOptionsFromQuestionMap(savedMatch);
 
-        final parsed = _parseOptionsFromQuestionText(rawQText, opts);
-        rawQText = parsed['text'] as String;
-        opts = List<String>.from(parsed['options'] as List);
-        while (opts.length < 4) opts.add('');
+          final parsed = _parseOptionsFromQuestionText(rawQText, opts);
+          rawQText = parsed['text'] as String;
+          opts = List<String>.from(parsed['options'] as List);
+          while (opts.length < 4) opts.add('');
 
-        int correctIdx = -1;
-        if (savedMatch['correct_option_index'] != null) {
-          correctIdx = (savedMatch['correct_option_index'] as num).toInt();
-        } else if (savedMatch['correctOptionIndex'] != null) {
-          correctIdx = (savedMatch['correctOptionIndex'] as num).toInt();
-        } else {
-          String correctOptText = (savedMatch['correct_answer'] ?? savedMatch['correctAnswer'] ?? '').toString().trim();
-          if (correctOptText.startsWith('Option ')) {
-            int optNum = int.tryParse(correctOptText.replaceAll('Option ', '')) ?? -1;
-            if (optNum > 0) {
-              correctIdx = (optNum - 1).clamp(0, opts.length > 0 ? opts.length - 1 : 0);
-            }
-          } else if (correctOptText.isNotEmpty) {
-            int foundIdx = opts.indexOf(correctOptText);
-            if (foundIdx != -1) {
-              correctIdx = foundIdx;
-            } else if (correctOptText.toLowerCase() == 'option a' || correctOptText.toLowerCase() == 'a') {
-              correctIdx = 0;
-            } else if (correctOptText.toLowerCase() == 'option b' || correctOptText.toLowerCase() == 'b') {
-              correctIdx = 1;
-            } else if (correctOptText.toLowerCase() == 'option c' || correctOptText.toLowerCase() == 'c') {
-              correctIdx = 2;
-            } else if (correctOptText.toLowerCase() == 'option d' || correctOptText.toLowerCase() == 'd') {
-              correctIdx = 3;
+          int correctIdx = -1;
+          if (savedMatch['correct_option_index'] != null) {
+            correctIdx = (savedMatch['correct_option_index'] as num).toInt();
+          } else if (savedMatch['correctOptionIndex'] != null) {
+            correctIdx = (savedMatch['correctOptionIndex'] as num).toInt();
+          } else {
+            String correctOptText = (savedMatch['correct_answer'] ?? savedMatch['correctAnswer'] ?? '').toString().trim();
+            if (correctOptText.startsWith('Option ')) {
+              int optNum = int.tryParse(correctOptText.replaceAll('Option ', '')) ?? -1;
+              if (optNum > 0) {
+                correctIdx = (optNum - 1).clamp(0, opts.length > 0 ? opts.length - 1 : 0);
+              }
+            } else if (correctOptText.isNotEmpty) {
+              int foundIdx = opts.indexOf(correctOptText);
+              if (foundIdx != -1) {
+                correctIdx = foundIdx;
+              } else if (correctOptText.toLowerCase() == 'option a' || correctOptText.toLowerCase() == 'a') {
+                correctIdx = 0;
+              } else if (correctOptText.toLowerCase() == 'option b' || correctOptText.toLowerCase() == 'b') {
+                correctIdx = 1;
+              } else if (correctOptText.toLowerCase() == 'option c' || correctOptText.toLowerCase() == 'c') {
+                correctIdx = 2;
+              } else if (correctOptText.toLowerCase() == 'option d' || correctOptText.toLowerCase() == 'd') {
+                correctIdx = 3;
+              }
             }
           }
+
+          String normDiff = (savedMatch['difficulty'] ?? 'Medium').toString().toLowerCase();
+          if (normDiff == 'easy') normDiff = 'Easy';
+          else if (normDiff == 'hard') normDiff = 'Hard';
+          else normDiff = 'Medium';
+
+          final optImgsRaw = savedMatch['option_images'] ?? savedMatch['optionImages'];
+          final List<String?> optImgs = optImgsRaw is List
+              ? List<String?>.from(optImgsRaw)
+              : <String?>[null, null, null, null];
+          while (optImgs.length < opts.length) optImgs.add(null);
+
+          final String chapIdFromMatch = savedMatch['chapter_id']?.toString() ?? '';
+          final String chapNameFromMatch = savedMatch['chapter']?.toString() ?? savedMatch['chapterTopic']?.toString() ?? '';
+          final String qSubject = savedMatch['subject']?.toString() ?? subject;
+
+          String finalChapId = chapIdFromMatch;
+          String finalChapName = chapNameFromMatch;
+
+          if (chapIdFromMatch.isNotEmpty && _loadedDbChapters.any((c) => c['id'].toString() == chapIdFromMatch)) {
+            final matchedC = _loadedDbChapters.firstWhere((c) => c['id'].toString() == chapIdFromMatch);
+            finalChapId = matchedC['id'].toString();
+            finalChapName = matchedC['name'].toString();
+          } else if (chapNameFromMatch.isNotEmpty && _loadedDbChapters.any((c) => c['name'].toString().trim().toLowerCase() == chapNameFromMatch.trim().toLowerCase())) {
+            final matchedC = _loadedDbChapters.firstWhere((c) => c['name'].toString().trim().toLowerCase() == chapNameFromMatch.trim().toLowerCase());
+            finalChapId = matchedC['id'].toString();
+            finalChapName = matchedC['name'].toString();
+          } else if (chapNameFromMatch.isNotEmpty || chapIdFromMatch.isNotEmpty) {
+            finalChapId = chapIdFromMatch;
+            finalChapName = chapNameFromMatch.isNotEmpty ? chapNameFromMatch : chapIdFromMatch;
+          }
+
+          final dynamic availInRaw = savedMatch['available_in'] ?? savedMatch['availableIn'];
+          final List<String> availInList = (availInRaw is List && availInRaw.isNotEmpty)
+              ? List<String>.from(availInRaw)
+              : List<String>.from(defaultAvailableIn);
+
+          _questionsList[i] = QuestionItemData(
+            id: savedMatch['id'] ?? 'q_${_paperId}_$qNum',
+            number: qNum,
+            text: rawQText,
+            questionImage: savedMatch['question_image'] ?? savedMatch['questionImage'],
+            options: opts,
+            optionImages: optImgs,
+            correctOptionIndex: correctIdx,
+            explanation: savedMatch['explanation'] ?? savedMatch['solution'] ?? '',
+            solutionVideoUrl: savedMatch['solution_video_url'] ?? savedMatch['solutionVideoUrl'] ?? savedMatch['video_url'],
+            difficulty: normDiff,
+            positiveMarks: savedMatch['marks']?.toString() ?? savedMatch['positiveMarks']?.toString() ?? '4',
+            negativeMarks: savedMatch['negative_marks']?.toString() ?? savedMatch['negativeMarks']?.toString() ?? '-1',
+            questionType: savedMatch['q_type'] ?? savedMatch['question_type'] ?? savedMatch['qType'] ?? 'MCQ (Single Correct)',
+            subject: qSubject,
+            chapter: finalChapName,
+            topic: savedMatch['topic'] ?? finalChapName,
+            chapterTopic: finalChapName,
+            chapterId: finalChapId,
+            availableIn: availInList,
+            isSaved: savedMatch.isNotEmpty && rawQText.trim().isNotEmpty,
+          );
+        } else {
+          if (firstUnsavedIndex == -1) {
+            firstUnsavedIndex = i;
+          }
+          _questionsList[i] = QuestionItemData(
+            id: 'q_${_paperId}_$qNum',
+            number: qNum,
+            options: List<String>.from(defaultPresetOpts),
+            availableIn: List<String>.from(defaultAvailableIn),
+            positiveMarks: '4',
+            negativeMarks: '-1',
+          );
         }
-
-        String normDiff = (savedMatch['difficulty'] ?? 'Medium').toString().toLowerCase();
-        if (normDiff == 'easy') normDiff = 'Easy';
-        else if (normDiff == 'hard') normDiff = 'Hard';
-        else normDiff = 'Medium';
-
-        final optImgsRaw = savedMatch['option_images'] ?? savedMatch['optionImages'];
-        final List<String?> optImgs = optImgsRaw is List
-            ? List<String?>.from(optImgsRaw)
-            : <String?>[null, null, null, null];
-        while (optImgs.length < opts.length) optImgs.add(null);
-
-        final String chapIdFromMatch = savedMatch['chapter_id']?.toString() ?? '';
-        final String chapNameFromMatch = savedMatch['chapter']?.toString() ?? savedMatch['chapterTopic']?.toString() ?? '';
-        final String qSubject = savedMatch['subject']?.toString() ?? subject;
-
-        String finalChapId = chapIdFromMatch;
-        String finalChapName = chapNameFromMatch;
-
-        if (chapIdFromMatch.isNotEmpty && _loadedDbChapters.any((c) => c['id'].toString() == chapIdFromMatch)) {
-          final matchedC = _loadedDbChapters.firstWhere((c) => c['id'].toString() == chapIdFromMatch);
-          finalChapId = matchedC['id'].toString();
-          finalChapName = matchedC['name'].toString();
-        } else if (chapNameFromMatch.isNotEmpty && _loadedDbChapters.any((c) => c['name'].toString().trim().toLowerCase() == chapNameFromMatch.trim().toLowerCase())) {
-          final matchedC = _loadedDbChapters.firstWhere((c) => c['name'].toString().trim().toLowerCase() == chapNameFromMatch.trim().toLowerCase());
-          finalChapId = matchedC['id'].toString();
-          finalChapName = matchedC['name'].toString();
-        } else if (chapNameFromMatch.isNotEmpty || chapIdFromMatch.isNotEmpty) {
-          finalChapId = chapIdFromMatch;
-          finalChapName = chapNameFromMatch.isNotEmpty ? chapNameFromMatch : chapIdFromMatch;
-        }
-
-        final dynamic availInRaw = savedMatch['available_in'] ?? savedMatch['availableIn'];
-        final List<String> availInList = (availInRaw is List && availInRaw.isNotEmpty)
-            ? List<String>.from(availInRaw)
-            : List<String>.from(defaultAvailableIn);
-
-        _questionsList[i] = QuestionItemData(
-          id: savedMatch['id'] ?? 'q_${_paperId}_$qNum',
-          number: qNum,
-          text: rawQText,
-          questionImage: savedMatch['question_image'] ?? savedMatch['questionImage'],
-          options: opts,
-          optionImages: optImgs,
-          correctOptionIndex: correctIdx,
-          explanation: savedMatch['explanation'] ?? savedMatch['solution'] ?? '',
-          solutionVideoUrl: savedMatch['solution_video_url'] ?? savedMatch['solutionVideoUrl'] ?? savedMatch['video_url'],
-          difficulty: normDiff,
-          positiveMarks: savedMatch['marks']?.toString() ?? savedMatch['positiveMarks']?.toString() ?? '4',
-          negativeMarks: savedMatch['negative_marks']?.toString() ?? savedMatch['negativeMarks']?.toString() ?? '-1',
-          questionType: savedMatch['q_type'] ?? savedMatch['question_type'] ?? savedMatch['qType'] ?? 'MCQ (Single Correct)',
-          subject: qSubject,
-          chapter: finalChapName,
-          topic: savedMatch['topic'] ?? finalChapName,
-          chapterTopic: finalChapName,
-          chapterId: finalChapId,
-          availableIn: availInList,
-          isSaved: savedMatch.isNotEmpty && rawQText.trim().isNotEmpty,
-        );
-      } else {
-        if (firstUnsavedIndex == -1) {
-          firstUnsavedIndex = i;
-        }
-        _questionsList[i] = QuestionItemData(
-          id: 'q_${_paperId}_$qNum',
-          number: qNum,
-          options: List<String>.from(defaultPresetOpts),
-          availableIn: List<String>.from(defaultAvailableIn),
-          positiveMarks: '4',
-          negativeMarks: '-1',
-        );
       }
-    }
 
-    _addedCount = savedCounter;
+      _addedCount = savedCounter;
 
-    if (firstUnsavedIndex != -1) {
-      _currentPageIndex = (firstUnsavedIndex ~/ _itemsPerPage) + 1;
+      if (firstUnsavedIndex != -1) {
+        _currentPageIndex = (firstUnsavedIndex ~/ _itemsPerPage) + 1;
+      }
     }
 
     setState(() => _isLoading = false);
@@ -898,7 +913,108 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     }
   }
 
-  Future<void> _attachPaperQuestionsToTestSeries(Map<String, dynamic> paper, String sourceTag) async {
+  String _resolveQuestionSubjectForTestSeries(Map<String, dynamic> q, {String? exam}) {
+    final rawSubId = (q['subject_id'] ?? q['subjectId'])?.toString().trim() ?? '';
+    if (rawSubId.isNotEmpty) {
+      final mapped = NeetSubjectHelper.getSubjectNameFromId(rawSubId, exam: exam);
+      if (mapped.isNotEmpty && mapped != rawSubId) return mapped;
+    }
+    final rawSub = (q['subject'] ?? q['subject_name'])?.toString().trim() ?? '';
+    if (rawSub.isNotEmpty && !rawSub.toLowerCase().contains('uuid') && rawSub.length < 35) {
+      final mapped = NeetSubjectHelper.getSubjectNameFromId(rawSub, exam: exam);
+      if (mapped.isNotEmpty && mapped != rawSub) return mapped;
+      final sLower = rawSub.toLowerCase();
+      if (sLower.contains('phys')) return 'Physics';
+      if (sLower.contains('chem')) return 'Chemistry';
+      if (sLower.contains('botan')) return 'Botany';
+      if (sLower.contains('zool')) return 'Zoology';
+      if (sLower.contains('bio')) return 'Biology';
+      if (sLower.contains('math')) return 'Mathematics';
+    }
+    final rawSection = (q['section_name'] ?? q['section'])?.toString().trim() ?? '';
+    if (rawSection.isNotEmpty) {
+      final sLower = rawSection.toLowerCase();
+      if (sLower.contains('phys')) return 'Physics';
+      if (sLower.contains('chem')) return 'Chemistry';
+      if (sLower.contains('botan')) return 'Botany';
+      if (sLower.contains('zool')) return 'Zoology';
+      if (sLower.contains('bio')) return 'Biology';
+      if (sLower.contains('math')) return 'Mathematics';
+    }
+    final rawQNum = q['question_number'] ?? q['sequence_order'];
+    final int? qNum = rawQNum is num ? rawQNum.toInt() : int.tryParse(rawQNum?.toString() ?? '');
+    if (qNum != null && qNum > 0) {
+      return NeetSubjectHelper.getSubjectForQuestionIndex(
+        qNum - 1,
+        180,
+        isNeet: !(exam?.toUpperCase().contains('JEE') ?? false),
+        useBotanyZoology: false,
+      );
+    }
+    return 'Biology';
+  }
+
+  Widget _buildAttachModeOption({
+    required String title,
+    required String subtitle,
+    required Color color,
+    required bool isRecommended,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isRecommended ? color.withOpacity(0.08) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: isRecommended ? color : const Color(0xFFCBD5E1), width: isRecommended ? 1.5 : 1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.check_circle_outline_rounded, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(title, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: color)),
+                      if (isRecommended) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('RECOMMENDED', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white)),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _attachPaperQuestionsToTestSeries(Map<String, dynamic> paper, String sourceTag, {String? targetMode}) async {
     final String pId = (paper['id'] ?? paper['paper_id'] ?? '').toString();
     final String pName = (paper['paper_name'] ?? paper['paperName'] ?? paper['title'] ?? 'Paper').toString();
     if (pId.isEmpty) return;
@@ -926,6 +1042,168 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       return;
     }
 
+    final String paperExam = (paper['exam'] ?? widget.paperRecord?['exam'] ?? 'NEET').toString();
+    final bool isJee = paperExam.toUpperCase().contains('JEE');
+
+    final List<Map<String, dynamic>> physList = [];
+    final List<Map<String, dynamic>> chemList = [];
+    final List<Map<String, dynamic>> bioList = [];
+    final List<Map<String, dynamic>> mathList = [];
+
+    for (var q in questions) {
+      final qMap = Map<String, dynamic>.from(q);
+      final sub = _resolveQuestionSubjectForTestSeries(qMap, exam: paperExam);
+      if (sub == 'Physics') {
+        physList.add(qMap);
+      } else if (sub == 'Chemistry') {
+        chemList.add(qMap);
+      } else if (sub == 'Biology' || sub == 'Botany' || sub == 'Zoology') {
+        bioList.add(qMap);
+      } else if (sub == 'Mathematics') {
+        mathList.add(qMap);
+      } else {
+        bioList.add(qMap);
+      }
+    }
+
+    String? selectedMode = targetMode;
+    if (selectedMode == null) {
+      selectedMode = await showDialog<String>(
+        context: context,
+        builder: (ctx) {
+          final isBioTarget = widget.paperName.toLowerCase().contains('bio') ||
+              (_paperData?['test_series_title']?.toString().toLowerCase().contains('bio') ?? false);
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            title: Row(
+              children: [
+                const Icon(Icons.playlist_add_check_circle_rounded, color: Color(0xFF10B981), size: 24),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Select Question Mode', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Destination Test: ${widget.paperName}',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 480,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.source_rounded, color: Color(0xFF4F46E5), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Source: $pName (${questions.length} Total Questions)',
+                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('Choose how many questions to import into this test:', style: TextStyle(fontSize: 12.5, color: Color(0xFF475569))),
+                  const SizedBox(height: 12),
+                  if (!isJee) ...[
+                    _buildAttachModeOption(
+                      title: 'Biology Only (${bioList.length} Questions)',
+                      subtitle: 'Imports exclusively the 90 verified Biology questions. No Physics or Chemistry.',
+                      color: const Color(0xFF059669),
+                      isRecommended: isBioTarget,
+                      onTap: () => Navigator.pop(ctx, 'biology'),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  _buildAttachModeOption(
+                    title: 'Physics Only (${physList.length} Questions)',
+                    subtitle: 'Imports only the 45 Physics questions from the source paper.',
+                    color: const Color(0xFF0284C7),
+                    isRecommended: widget.paperName.toLowerCase().contains('phy'),
+                    onTap: () => Navigator.pop(ctx, 'physics'),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildAttachModeOption(
+                    title: 'Chemistry Only (${chemList.length} Questions)',
+                    subtitle: 'Imports only the 45 Chemistry questions from the source paper.',
+                    color: const Color(0xFFD97706),
+                    isRecommended: widget.paperName.toLowerCase().contains('chem'),
+                    onTap: () => Navigator.pop(ctx, 'chemistry'),
+                  ),
+                  if (isJee) ...[
+                    const SizedBox(height: 8),
+                    _buildAttachModeOption(
+                      title: 'Mathematics Only (${mathList.length} Questions)',
+                      subtitle: 'Imports only the Mathematics questions from the source paper.',
+                      color: const Color(0xFF7C3AED),
+                      isRecommended: widget.paperName.toLowerCase().contains('math'),
+                      onTap: () => Navigator.pop(ctx, 'mathematics'),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  _buildAttachModeOption(
+                    title: 'Full Paper (${questions.length} Questions)',
+                    subtitle: 'Imports all 180 questions across all subjects.',
+                    color: const Color(0xFF4F46E5),
+                    isRecommended: false,
+                    onTap: () => Navigator.pop(ctx, 'full'),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ],
+          );
+        },
+      );
+    }
+
+    if (selectedMode == null) return;
+
+    List<Map<String, dynamic>> targetQuestions = [];
+    if (selectedMode == 'biology') {
+      targetQuestions = bioList;
+    } else if (selectedMode == 'physics') {
+      targetQuestions = physList;
+    } else if (selectedMode == 'chemistry') {
+      targetQuestions = chemList;
+    } else if (selectedMode == 'mathematics') {
+      targetQuestions = mathList;
+    } else {
+      targetQuestions = questions.map((q) => Map<String, dynamic>.from(q)).toList();
+    }
+
+    if (targetQuestions.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No $selectedMode questions found in "$pName". Selection cannot be empty.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     int dupCount = 0;
     int addedCount = 0;
     final Set<String> existingIds = _testSeriesSelectedQuestions
@@ -933,12 +1211,14 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         .where((id) => id.isNotEmpty)
         .toSet();
 
-    for (var q in questions) {
+    for (var q in targetQuestions) {
       final qMap = Map<String, dynamic>.from(q);
       final qId = (qMap['id'] ?? qMap['question_id'] ?? '').toString();
 
-      qMap['source_badge'] = sourceTag;
+      qMap['source_badge'] = '$sourceTag (${selectedMode.toUpperCase()})';
       qMap['original_paper'] = pName;
+      qMap['source_paper_id'] = pId;
+      qMap['source_paper_name'] = pName;
 
       if (qId.isNotEmpty && existingIds.contains(qId)) {
         dupCount++;
@@ -956,9 +1236,9 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('✓ Attached $addedCount questions from "$pName".' + (dupCount > 0 ? ' ($dupCount duplicate questions removed.)' : '')),
+          content: Text('✓ Attached $addedCount questions (${selectedMode.toUpperCase()}) from "$pName" to destination test "${widget.paperName}".' + (dupCount > 0 ? ' ($dupCount duplicate questions removed.)' : '')),
           backgroundColor: const Color(0xFF10B981),
-          duration: const Duration(seconds: 3),
+          duration: const Duration(seconds: 4),
         ),
       );
     }
@@ -1066,8 +1346,14 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     final int botanyCount = _testSeriesSelectedQuestions.where((q) => ['botany', 'biology'].contains((q['subject'] ?? '').toString().toLowerCase())).length;
     final int zoologyCount = _testSeriesSelectedQuestions.where((q) => (q['subject'] ?? '').toString().toLowerCase() == 'zoology').length;
     final int totalSelected = _testSeriesSelectedQuestions.length;
+    final bool isSubjectTest = widget.paperName.toLowerCase().contains('bio') ||
+        widget.paperName.toLowerCase().contains('phy') ||
+        widget.paperName.toLowerCase().contains('chem') ||
+        (_paperData?['test_series_title']?.toString().toLowerCase().contains('bio') ?? false) ||
+        totalSelected == 90 ||
+        totalSelected == 45;
 
-    if (!_allowIncompletePaper && totalSelected < 180 && (_paperData?['exam'] ?? '').toString().contains('NEET')) {
+    if (!_allowIncompletePaper && totalSelected < 180 && !isSubjectTest && (_paperData?['exam'] ?? '').toString().contains('NEET')) {
       final bool? proceed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -1100,16 +1386,25 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     setState(() => _isSavingBatch = true);
 
     final res = await SupabaseService.createTestSeriesPaperFromExistingQuestions(
-      paperDetails: _paperData ?? {
+      paperDetails: {
+        ...(_paperData ?? {}),
+        'id': _paperId,
         'paper_name': widget.paperName,
-        'exam': 'NEET',
-        'year': 2026,
+        'paperName': widget.paperName,
+        'destination_test_name': widget.paperName,
+        'destinationTestName': widget.paperName,
+        'exam': _paperData?['exam'] ?? 'NEET',
+        'year': _paperData?['year'] ?? 2026,
         'questionCount': _testSeriesSelectedQuestions.length,
+        'question_count': _testSeriesSelectedQuestions.length,
+        'total_marks': _testSeriesSelectedQuestions.length * 4.0,
+        'duration_minutes': _testSeriesSelectedQuestions.length == 90 ? 90 : (_paperData?['duration_minutes'] ?? 180),
       },
       selectedQuestionItems: _testSeriesSelectedQuestions,
       testSeriesDetails: {
-        'title': _paperData?['test_series_title'] ?? widget.paperName,
-        'description': _paperData?['test_series_desc'] ?? 'Full length test series paper',
+        'id': _paperData?['test_series_id'] ?? _paperData?['testSeriesId'],
+        'title': _paperData?['test_series_title'] ?? _paperData?['testSeriesTitle'] ?? widget.paperName,
+        'description': _paperData?['test_series_desc'] ?? _paperData?['description'] ?? 'Curated test series',
       },
     );
 
