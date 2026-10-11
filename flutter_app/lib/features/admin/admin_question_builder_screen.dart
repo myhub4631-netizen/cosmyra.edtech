@@ -171,15 +171,28 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
   }
 
   void _removeOption(int index) {
-    if (_optionsList.length <= 2) return;
+    if (_optionsList.length <= 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A multiple-choice question must have at least 2 options.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     setState(() {
       final removed = _optionsList.removeAt(index);
       (removed['controller'] as TextEditingController).dispose();
       for (int i = 0; i < _optionsList.length; i++) {
         _optionsList[i]['label'] = String.fromCharCode(65 + i);
       }
-      if (_correctAnswerOption.codeUnitAt(0) - 65 >= _optionsList.length) {
-        _correctAnswerOption = 'A';
+      final int currentCorrectIdx = _correctAnswerOption.isNotEmpty
+          ? _correctAnswerOption.codeUnitAt(0) - 65
+          : -1;
+      if (currentCorrectIdx == index) {
+        _correctAnswerOption = ''; // cleared: admin must pick a new one
+      } else if (currentCorrectIdx > index) {
+        _correctAnswerOption = String.fromCharCode(65 + currentCorrectIdx - 1);
       }
     });
   }
@@ -203,6 +216,19 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
       return;
     }
 
+    final int correctIndex = _correctAnswerOption.isNotEmpty
+        ? _correctAnswerOption.codeUnitAt(0) - 65
+        : -1;
+    if (_correctAnswerOption.isEmpty || correctIndex < 0 || correctIndex >= _optionsList.length) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a valid Correct Answer option before submitting.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final usedIn = <String>[];
     if (_showInCustomPractice) usedIn.add('Custom Practice');
     if (_showInCustomTest) usedIn.add('Custom Test');
@@ -211,7 +237,6 @@ class _AdminQuestionBuilderScreenState extends State<AdminQuestionBuilderScreen>
     if (_showInTestSeries) usedIn.add('Test Series');
 
     final optionTexts = _optionsList.map((opt) => (opt['controller'] as TextEditingController).text).toList();
-    final correctIndex = _correctAnswerOption.codeUnitAt(0) - 65;
     final correctVal = (correctIndex >= 0 && correctIndex < optionTexts.length)
         ? optionTexts[correctIndex]
         : (optionTexts.isNotEmpty ? optionTexts[0] : '');

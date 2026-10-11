@@ -63,8 +63,16 @@ class QuestionItemData {
   String? solutionVideoUrl;
   bool isUploadingSolutionVideo;
   List<String> availableIn;
+  int optionsVersion;
+  List<String> optionKeys;
 
   String get uniqueId => id.isNotEmpty ? id : 'temp_q_$number';
+
+  void ensureOptionKeys() {
+    while (optionKeys.length < options.length) {
+      optionKeys.add('opt_key_${number}_${DateTime.now().microsecondsSinceEpoch}_${optionKeys.length}');
+    }
+  }
 
   QuestionItemData({
     this.id = '',
@@ -96,10 +104,14 @@ class QuestionItemData {
     this.solutionVideoUrl,
     this.isUploadingSolutionVideo = false,
     List<String>? availableIn,
+    int? optionsVersion,
+    List<String>? optionKeys,
   })  : options = options != null ? List<String>.from(options) : ['', '', '', ''],
         optionImages = optionImages != null ? List<String?>.from(optionImages) : [null, null, null, null],
         isUploadingOptionImage = isUploadingOptionImage != null ? List<bool>.from(isUploadingOptionImage) : [false, false, false, false],
-        availableIn = availableIn != null ? List<String>.from(availableIn) : [];
+        availableIn = availableIn != null ? List<String>.from(availableIn) : [],
+        optionsVersion = optionsVersion ?? 0,
+        optionKeys = optionKeys != null ? List<String>.from(optionKeys) : List.generate(options?.length ?? 4, (i) => 'opt_key_${number}_$i');
 }
 
 class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen> {
@@ -1485,6 +1497,28 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
   Future<void> _saveSingleQuestion(QuestionItemData q, {bool showToast = true}) async {
     if (_isLoading) return;
+    if (q.options.length < 2) {
+      if (mounted && showToast) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Question ${q.number} must have at least 2 options.'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+      return;
+    }
+    if (q.correctOptionIndex < 0 || q.correctOptionIndex >= q.options.length) {
+      if (mounted && showToast) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Please select a valid Correct Answer for Question ${q.number} before saving.'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+      return;
+    }
     if (!_hasEssentialDetails(q)) {
       if (mounted && showToast) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1497,8 +1531,8 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       return;
     }
 
-    int correctIdx = (q.correctOptionIndex >= 0 && q.correctOptionIndex < q.options.length) ? q.correctOptionIndex : 0;
-    String correctLetter = String.fromCharCode(65 + correctIdx);
+    int correctIdx = q.correctOptionIndex;
+    String correctLetter = _getOptionLetter(correctIdx);
     String correctAnsText = q.options[correctIdx].isNotEmpty
         ? q.options[correctIdx]
         : 'Option $correctLetter';
@@ -1681,11 +1715,204 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     }
   }
 
+  String _getOptionLetter(int index) {
+    if (index >= 0 && index < 26) {
+      return String.fromCharCode(65 + index);
+    }
+    return 'Opt ${index + 1}';
+  }
+
   void _addOptionToQuestion(QuestionItemData q) {
-    if (q.options.length < 6) {
+    if (q.options.length < 8) {
       setState(() {
         q.options.add('');
+        while (q.optionImages.length < q.options.length) q.optionImages.add(null);
+        while (q.isUploadingOptionImage.length < q.options.length) q.isUploadingOptionImage.add(false);
+        q.ensureOptionKeys();
+        q.optionsVersion++;
       });
+      _scheduleAutoSave(q);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Maximum 8 options allowed per question.'),
+          backgroundColor: Color(0xFFF59E0B),
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteOptionFromQuestion(QuestionItemData q, int optIdx) async {
+    if (optIdx < 0 || optIdx >= q.options.length) return;
+
+    if (q.options.length <= 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A multiple-choice question must have at least 2 options. Cannot delete further options.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    final String letter = _getOptionLetter(optIdx);
+    final bool isCorrect = (q.correctOptionIndex == optIdx);
+    final bool hasContent = q.options[optIdx].trim().isNotEmpty ||
+        (optIdx < q.optionImages.length && q.optionImages[optIdx] != null && q.optionImages[optIdx]!.isNotEmpty);
+    final bool shouldConfirm = q.isSaved || isCorrect || hasContent;
+
+    if (shouldConfirm) {
+      final bool? confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Row(
+            children: [
+              const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 24),
+              const SizedBox(width: 8),
+              Text('Delete Option $letter?', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Are you sure you want to delete Option $letter? The remaining options will be reindexed (A, B, C...).',
+                style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF334155)),
+              ),
+              if (isCorrect) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Option $letter is currently marked as the Correct Answer. Deleting it will clear the correct answer key. You must select a new correct answer before saving.',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF991B1B)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (q.questionType == 'Match the Following') ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'For "Match the Following", please verify that the remaining option codes match the question statement.',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: const Color(0xFF92400E)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text('Delete Option', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true) return;
+    }
+
+    final bool wasSaved = q.isSaved;
+
+    setState(() {
+      q.options.removeAt(optIdx);
+      if (optIdx < q.optionImages.length) {
+        q.optionImages.removeAt(optIdx);
+      }
+      if (optIdx < q.isUploadingOptionImage.length) {
+        q.isUploadingOptionImage.removeAt(optIdx);
+      }
+      if (optIdx < q.optionKeys.length) {
+        q.optionKeys.removeAt(optIdx);
+      }
+      q.optionsVersion++;
+
+      if (isCorrect) {
+        q.correctOptionIndex = -1; // Invalidate answer key - admin must pick a new one
+        if (wasSaved) {
+          // Marked as pending / unsaved because answer key was cleared
+          q.isSaved = false;
+        }
+      } else if (q.correctOptionIndex > optIdx) {
+        // Shift answer index down to maintain reference to the exact same choice
+        q.correctOptionIndex -= 1;
+      }
+      // if correctOptionIndex < optIdx: unchanged
+    });
+
+    if (wasSaved && !isCorrect && _hasEssentialDetails(q)) {
+      // Saved question with remaining valid answer key: persist updated option set
+      try {
+        await _saveSingleQuestion(q, showToast: false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✓ Option $letter deleted and Question ${q.number} updated.'),
+              backgroundColor: const Color(0xFF10B981),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (err) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update question: $err. Changes preserved locally.'),
+              backgroundColor: const Color(0xFFEF4444),
+            ),
+          );
+        }
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isCorrect
+                ? 'Option $letter deleted. Please select a new Correct Answer for Question ${q.number}.'
+                : 'Option $letter removed from Question ${q.number}.'),
+            backgroundColor: isCorrect ? const Color(0xFFF59E0B) : const Color(0xFF334155),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -1848,6 +2075,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
               q.options[i] = presetOpts[i];
             }
           }
+          q.optionsVersion++;
         });
         _scheduleAutoSave(q);
       },
@@ -2056,7 +2284,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         const SizedBox(height: 8),
 
         ...List.generate(q.options.length, (optIdx) {
-          final letter = optionLetters[optIdx];
+          final letter = _getOptionLetter(optIdx);
           final isCorrect = (q.correctOptionIndex == optIdx);
           final optText = q.options[optIdx];
           final optImg = (optIdx < q.optionImages.length) ? q.optionImages[optIdx] : null;
@@ -4710,7 +4938,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   // 2. OPTIONS LIST SECTION (LEFT COLUMN)
   // ===========================================================================
   Widget _buildOptionsListSection(QuestionItemData q) {
-    final optionLetters = ['A', 'B', 'C', 'D', 'E', 'F'];
+    q.ensureOptionKeys();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -4732,7 +4960,14 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                 _buildQuickOptionPresetPill(q, ['(A)', '(B)', '(C)', '(D)'], '(A),(B),(C),(D)'),
               ],
             ),
-            Text('Is Correct?', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              children: [
+                Text('Is Correct?', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+                Text('Delete', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF64748B))),
+              ],
+            ),
           ],
         ),
         const SizedBox(height: 10),
@@ -4741,7 +4976,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           while (q.optionImages.length < q.options.length) q.optionImages.add(null);
           while (q.isUploadingOptionImage.length < q.options.length) q.isUploadingOptionImage.add(false);
 
-          final letter = optionLetters[optIdx];
+          final letter = _getOptionLetter(optIdx);
           final isSelected = (q.correctOptionIndex == optIdx);
           final optImg = q.optionImages[optIdx];
           final isUploadingOpt = q.isUploadingOptionImage[optIdx];
@@ -4778,7 +5013,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                           border: Border.all(color: const Color(0xFFCBD5E1)),
                         ),
                         child: TextFormField(
-                          key: ValueKey('q_opt_${q.number}_${q.uniqueId}_$optIdx'),
+                          key: ValueKey('q_opt_${q.number}_${q.uniqueId}_${(optIdx < q.optionKeys.length) ? q.optionKeys[optIdx] : optIdx}_${q.optionsVersion}'),
                           initialValue: q.options[optIdx],
                           onChanged: (val) {
                             q.options[optIdx] = val;
@@ -4809,7 +5044,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                       onPressed: () => _pickAndUploadOptionImage(q, optIdx),
                       tooltip: 'Add / Replace Image for Option $letter',
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 4),
 
                     // Is Correct Radio Button
                     Radio<int>(
@@ -4820,6 +5055,22 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
                         setState(() => q.correctOptionIndex = val ?? -1);
                         _scheduleAutoSave(q);
                       },
+                    ),
+                    const SizedBox(width: 4),
+
+                    // Delete Option Control
+                    Tooltip(
+                      message: q.options.length <= 2
+                          ? 'A question must have at least 2 options'
+                          : 'Delete Option $letter',
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.delete_outline_rounded,
+                          color: q.options.length <= 2 ? const Color(0xFFCBD5E1) : const Color(0xFFEF4444),
+                          size: 20,
+                        ),
+                        onPressed: () => _deleteOptionFromQuestion(q, optIdx),
+                      ),
                     ),
                   ],
                 ),
@@ -4910,18 +5161,23 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFCBD5E1)),
+            border: Border.all(
+              color: (q.correctOptionIndex < 0 || q.correctOptionIndex >= q.options.length)
+                  ? const Color(0xFFFCA5A5)
+                  : const Color(0xFFCBD5E1),
+              width: (q.correctOptionIndex < 0 || q.correctOptionIndex >= q.options.length) ? 1.5 : 1.0,
+            ),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<int>(
-              value: q.correctOptionIndex == -1 ? null : q.correctOptionIndex,
+              value: (q.correctOptionIndex >= 0 && q.correctOptionIndex < q.options.length) ? q.correctOptionIndex : null,
               hint: Text('Select Correct Option', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
               isExpanded: true,
               items: List.generate(
                 q.options.length,
                 (idx) => DropdownMenuItem<int>(
                   value: idx,
-                  child: Text('Option ${['A', 'B', 'C', 'D', 'E', 'F'][idx]}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                  child: Text('Option ${_getOptionLetter(idx)}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
                 ),
               ),
               onChanged: (val) {

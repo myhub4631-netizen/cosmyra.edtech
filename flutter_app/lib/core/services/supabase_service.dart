@@ -3440,13 +3440,13 @@ class SupabaseService {
           final String uStr = str.toUpperCase();
           if (uStr.startsWith('OPTION ')) {
             final sub = uStr.substring(7).trim();
-            if (sub.length == 1 && RegExp(r'[A-D]').hasMatch(sub)) {
+            if (sub.length == 1 && RegExp(r'[A-Z]').hasMatch(sub)) {
               cIdx = sub.codeUnitAt(0) - 65;
             } else {
               int numVal = int.tryParse(sub) ?? -1;
-              if (numVal != -1) cIdx = (numVal - 1).clamp(0, 3);
+              if (numVal != -1) cIdx = (numVal - 1).clamp(0, optionsList.isNotEmpty ? optionsList.length - 1 : 3);
             }
-          } else if (uStr.length == 1 && RegExp(r'[A-D]').hasMatch(uStr)) {
+          } else if (uStr.length == 1 && RegExp(r'[A-Z]').hasMatch(uStr)) {
             cIdx = uStr.codeUnitAt(0) - 65;
           } else if (optionsList.isNotEmpty) {
             int foundInList = optionsList.indexOf(str);
