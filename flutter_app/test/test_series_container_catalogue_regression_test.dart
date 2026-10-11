@@ -282,13 +282,11 @@ void main() {
       final pyqs = papers.where((p) => correctedGetPaperCatalogue(p) == 'PYQ').toList();
 
       final expectedPyqIds = [
-        'neet_2026_reneet',
         'neet_2026_phase_1',
         'neet_2025_paper_1',
         'neet_2024_paper_1',
         'neet_2023_paper_1',
         'neet_2022_paper_1',
-        'neet_2021_paper_1',
       ];
 
       for (var id in expectedPyqIds) {

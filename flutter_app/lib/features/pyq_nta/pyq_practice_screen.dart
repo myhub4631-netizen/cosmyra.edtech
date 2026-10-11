@@ -85,11 +85,17 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
   bool _isLoadingPapers = false;
   bool _isStarting = false;
 
-  int _availableQuestionsCount = 1248;
-  int _availablePapersCount = 98;
-  double _userAccuracy = 72.4;
-  int _timeSpentSeconds = 101700;
+  int _availableQuestionsCount = 0;
+  int _availablePapersCount = 0;
+  double? _userAccuracy;
+  int _timeSpentSeconds = 0;
   Map<String, int> _subjectPYQCounts = {};
+  String? _statsErrorMessage;
+  int _statsRequestId = 0;
+  String? _taxonomyErrorMessage;
+  int _taxonomyRequestId = 0;
+  String? _papersErrorMessage;
+  int _papersRequestId = 0;
 
   String _searchQuery = '';
   int _activeViewTab = 0; // 0 = Chapters, 1 = Topics
@@ -145,222 +151,202 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
   }
 
   Future<void> _loadAvailablePapers() async {
-    setState(() => _isLoadingPapers = true);
-    final papers = await SupabaseService.fetchAllPapersAndTestSeries(
-      exam: _selectedExam,
-      forceRefresh: true,
-    );
+    final currentReqId = ++_papersRequestId;
+    setState(() {
+      _isLoadingPapers = true;
+      _papersErrorMessage = null;
+    });
 
-    final isNeet = _selectedExam.contains('NEET');
-    final List<Map<String, dynamic>> canonicalList = isNeet
-        ? [
-            {
-              'id': 'neet_2026_phase_1',
-              'name': 'NEET 2026 Phase 1',
-              'title': 'NEET 2026 Phase 1',
-              'year': 2026,
-              'exam': 'NEET 2026',
-              'questionsCount': 180,
-              'subjects': ['Physics', 'Chemistry', 'Biology'],
-            },
-            {
-              'id': 'neet_2026_reneet',
-              'name': 'NEET 2026 Re-NEET',
-              'title': 'NEET 2026 Re-NEET',
-              'year': 2026,
-              'exam': 'NEET 2026',
-              'questionsCount': 180,
-              'subjects': ['Physics', 'Chemistry', 'Biology'],
-            },
-            {
-              'id': 'neet_2025_paper_1',
-              'name': 'NEET 2025 (Official PYQ)',
-              'title': 'NEET 2025 (Official PYQ)',
-              'year': 2025,
-              'exam': 'NEET 2025',
-              'questionsCount': 200,
-              'subjects': ['Physics', 'Chemistry', 'Biology'],
-            },
-            {
-              'id': 'neet_2024_paper_1',
-              'name': 'NEET 2024 (Official PYQ)',
-              'title': 'NEET 2024 (Official PYQ)',
-              'year': 2024,
-              'exam': 'NEET 2024',
-              'questionsCount': 200,
-              'subjects': ['Physics', 'Chemistry', 'Biology'],
-            },
-            {
-              'id': 'neet_2023_paper_1',
-              'name': 'NEET 2023 (Official PYQ)',
-              'title': 'NEET 2023 (Official PYQ)',
-              'year': 2023,
-              'exam': 'NEET 2023',
-              'questionsCount': 200,
-              'subjects': ['Physics', 'Chemistry', 'Biology'],
-            },
-            {
-              'id': 'neet_2022_paper_1',
-              'name': 'NEET 2022 (Official PYQ)',
-              'title': 'NEET 2022 (Official PYQ)',
-              'year': 2022,
-              'exam': 'NEET 2022',
-              'questionsCount': 200,
-              'subjects': ['Physics', 'Chemistry', 'Biology'],
-            },
-            {
-              'id': 'neet_2021_paper_1',
-              'name': 'NEET 2021 (Official PYQ)',
-              'title': 'NEET 2021 (Official PYQ)',
-              'year': 2021,
-              'exam': 'NEET 2021',
-              'questionsCount': 200,
-              'subjects': ['Physics', 'Chemistry', 'Biology'],
-            },
-          ]
-        : [
-            {
-              'id': 'jee_main_2026_s1',
-              'name': 'JEE Main 2026 Shift 1',
-              'title': 'JEE Main 2026 Shift 1',
-              'year': 2026,
-              'exam': 'JEE Main 2026',
-              'questionsCount': 75,
-              'subjects': ['Physics', 'Chemistry', 'Mathematics'],
-            },
-            {
-              'id': 'jee_main_2025_s1',
-              'name': 'JEE Main 2025 Shift 1',
-              'title': 'JEE Main 2025 Shift 1',
-              'year': 2025,
-              'exam': 'JEE Main 2025',
-              'questionsCount': 75,
-              'subjects': ['Physics', 'Chemistry', 'Mathematics'],
-            },
-            {
-              'id': 'jee_main_2024_s1',
-              'name': 'JEE Main 2024 Shift 1',
-              'title': 'JEE Main 2024 Shift 1',
-              'year': 2024,
-              'exam': 'JEE Main 2024',
-              'questionsCount': 75,
-              'subjects': ['Physics', 'Chemistry', 'Mathematics'],
-            },
-          ];
+    try {
+      final papers = await SupabaseService.fetchAllPapersAndTestSeries(
+        exam: _selectedExam,
+        forceRefresh: true,
+      ).timeout(const Duration(seconds: 10));
 
-    final Set<String> ids = {};
-    final List<Map<String, dynamic>> combined = [];
+      final targetExamUpper = _selectedExam.trim().toUpperCase();
+      final bool isNeet = targetExamUpper.contains('NEET');
+      final bool isJeeAdv = targetExamUpper.contains('ADV');
+      final bool isJeeMain = targetExamUpper.contains('JEE') && !isJeeAdv;
 
-    for (var p in papers) {
-      final name = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? p['name'] ?? '').toString();
-      if (name.isNotEmpty && !ids.contains(name.toLowerCase())) {
-        ids.add(name.toLowerCase());
-        combined.add(p);
-      }
-    }
+      final pyqPapers = papers.where((p) {
+        final cat = (p['source_category'] ?? '').toString().trim().toUpperCase();
+        final isTestSeries = p['is_test_series'] == true || cat == 'TEST_SERIES' || cat == 'CUSTOM_PRACTICE';
+        final isNta = p['is_nta'] == true || cat == 'NTA' || cat == 'NTA_ABHYAS';
+        if (isTestSeries || isNta) return false;
 
-    for (var c in canonicalList) {
-      final name = (c['name'] ?? '').toString();
-      if (!ids.contains(name.toLowerCase())) {
-        ids.add(name.toLowerCase());
-        combined.add(c);
-      }
-    }
+        final pId = (p['id'] ?? p['paper_id'] ?? '').toString();
+        final pTitle = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toUpperCase();
+        final pExam = (p['exam'] ?? p['target_exam'] ?? p['exam_name'] ?? '').toString().toUpperCase();
 
-    if (mounted) {
-      setState(() {
-        _availablePaperRecords = combined;
-        if (_availablePaperRecords.isNotEmpty) {
-          _selectedPaperRecord = _availablePaperRecords.first;
+        final isPyq = cat == 'PYQ' || cat == 'OFFICIAL_PYQ' || p['is_pyq'] == true || pTitle.contains('PYQ') || pId.startsWith('neet_') || pId.startsWith('jee_');
+        if (!isPyq) return false;
+
+        if (isNeet) {
+          return pExam.contains('NEET') || (pTitle.contains('NEET') && !pTitle.contains('JEE'));
+        } else if (isJeeAdv) {
+          return pExam.contains('ADV') || pTitle.contains('ADVANCED');
+        } else if (isJeeMain) {
+          return (pExam.contains('JEE') && !pExam.contains('ADV')) || (pTitle.contains('JEE') && !pTitle.contains('ADV') && !pTitle.contains('NEET'));
         }
-        _isLoadingPapers = false;
-      });
+        return false;
+      }).toList();
+
+      if (mounted && currentReqId == _papersRequestId) {
+        setState(() {
+          _availablePaperRecords = pyqPapers;
+          if (_availablePaperRecords.isNotEmpty) {
+            _selectedPaperRecord = _availablePaperRecords.first;
+          } else {
+            _selectedPaperRecord = null;
+          }
+          _papersErrorMessage = null;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading available papers: $e');
+      if (mounted && currentReqId == _papersRequestId) {
+        setState(() {
+          _papersErrorMessage = 'Unable to load official PYQ papers. Check network connection.';
+        });
+      }
+    } finally {
+      if (mounted && currentReqId == _papersRequestId) {
+        setState(() {
+          _isLoadingPapers = false;
+        });
+      }
     }
   }
 
   Future<void> _initChapters() async {
-    setState(() => _isLoadingTaxonomy = true);
+    final currentReqId = ++_taxonomyRequestId;
+    setState(() {
+      _isLoadingTaxonomy = true;
+      _taxonomyErrorMessage = null;
+    });
     final isNeet = _selectedExam.contains('NEET');
     final examCode = isNeet ? 'NEET' : 'JEE Main';
     final subjects = isNeet ? ['Physics', 'Chemistry', 'Biology'] : ['Physics', 'Chemistry', 'Mathematics'];
 
     final Map<String, List<ChapterItem>> newMap = {};
 
-    for (var sub in subjects) {
-      final rawChapters = await SupabaseService.fetchTaxonomyForSubject(
-        exam: examCode,
-        subject: sub,
-        forceRefresh: true,
-        includeInactive: false,
-      );
+    try {
+      for (var sub in subjects) {
+        final rawChapters = await SupabaseService.fetchTaxonomyForSubject(
+          exam: examCode,
+          subject: sub,
+          forceRefresh: true,
+          includeInactive: false,
+        ).timeout(const Duration(seconds: 10));
 
-      final existingChapters = _subjectChaptersMap[sub] ?? [];
-      final Set<String> selChapterIds = { for (var c in existingChapters.where((c) => c.isSelected)) c.id };
-      final Set<String> selTopicIds = {};
-      for (var c in existingChapters) {
-        for (var t in c.topics.where((t) => t.isSelected)) {
-          selTopicIds.add(t.id);
+        final existingChapters = _subjectChaptersMap[sub] ?? [];
+        final Set<String> selChapterIds = { for (var c in existingChapters.where((c) => c.isSelected)) c.id };
+        final Set<String> selTopicIds = {};
+        for (var c in existingChapters) {
+          for (var t in c.topics.where((t) => t.isSelected)) {
+            selTopicIds.add(t.id);
+          }
         }
-      }
 
-      final List<ChapterItem> chapterItems = rawChapters.map((cMap) {
-        final cId = (cMap['id'] ?? '').toString();
-        final cName = (cMap['name'] ?? '').toString();
+        final List<ChapterItem> chapterItems = rawChapters.map((cMap) {
+          final cId = (cMap['id'] ?? '').toString();
+          final cName = (cMap['name'] ?? '').toString();
 
-        final rawTopics = (cMap['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
-        final topicItems = rawTopics.map((tMap) {
-          final tId = (tMap['id'] ?? '').toString();
-          return TopicItem(
-            id: tId,
-            name: (tMap['name'] ?? '').toString(),
-            chapterId: cId,
-            chapterName: cName,
-            isSelected: selTopicIds.contains(tId),
+          final rawTopics = (cMap['topicsList'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+          final topicItems = rawTopics.map((tMap) {
+            final tId = (tMap['id'] ?? '').toString();
+            return TopicItem(
+              id: tId,
+              name: (tMap['name'] ?? '').toString(),
+              chapterId: cId,
+              chapterName: cName,
+              isSelected: selTopicIds.contains(tId),
+            );
+          }).toList();
+
+          final isChapSel = selChapterIds.contains(cId) || (topicItems.isNotEmpty && topicItems.every((t) => t.isSelected));
+
+          return ChapterItem(
+            id: cId,
+            name: cName,
+            isExpanded: false,
+            isSelected: isChapSel,
+            topics: topicItems,
           );
         }).toList();
 
-        final isChapSel = selChapterIds.contains(cId) || (topicItems.isNotEmpty && topicItems.every((t) => t.isSelected));
+        if (chapterItems.isNotEmpty) {
+          chapterItems.first.isExpanded = true;
+        }
 
-        return ChapterItem(
-          id: cId,
-          name: cName,
-          isExpanded: false,
-          isSelected: isChapSel,
-          topics: topicItems,
-        );
-      }).toList();
-
-      if (chapterItems.isNotEmpty) {
-        chapterItems.first.isExpanded = true;
+        newMap[sub] = chapterItems;
       }
 
-      newMap[sub] = chapterItems;
-    }
-
-    if (mounted) {
-      setState(() {
-        _subjectChaptersMap = newMap;
-        if (!_subjectChaptersMap.containsKey(_activeStep3Subject) && _subjectChaptersMap.isNotEmpty) {
-          _activeStep3Subject = _subjectChaptersMap.keys.first;
-        }
-        _isLoadingTaxonomy = false;
-      });
+      if (mounted && currentReqId == _taxonomyRequestId) {
+        setState(() {
+          _subjectChaptersMap = newMap;
+          if (!_subjectChaptersMap.containsKey(_activeStep3Subject) && _subjectChaptersMap.isNotEmpty) {
+            _activeStep3Subject = _subjectChaptersMap.keys.first;
+          }
+          _taxonomyErrorMessage = null;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading taxonomy: $e');
+      if (mounted && currentReqId == _taxonomyRequestId) {
+        setState(() {
+          _taxonomyErrorMessage = 'Unable to load syllabus chapters. Check network connection.';
+        });
+      }
+    } finally {
+      if (mounted && currentReqId == _taxonomyRequestId) {
+        setState(() {
+          _isLoadingTaxonomy = false;
+        });
+      }
     }
   }
 
   Future<void> _loadStats() async {
-    setState(() => _isLoadingStats = true);
-    final stats = await SupabaseService.fetchPYQStats(_selectedExam);
-    final counts = await SupabaseService.fetchSubjectPYQCounts(_selectedExam);
-    if (mounted) {
-      setState(() {
-        _availableQuestionsCount = stats['availableQuestions'] ?? 1248;
-        _availablePapersCount = stats['availablePapers'] ?? 98;
-        _userAccuracy = stats['avgAccuracy'] ?? 72.4;
-        _timeSpentSeconds = stats['timeSpentSeconds'] ?? 101700;
-        _subjectPYQCounts = counts;
-        _isLoadingStats = false;
-      });
+    final currentReqId = ++_statsRequestId;
+    setState(() {
+      _isLoadingStats = true;
+      _statsErrorMessage = null;
+    });
+
+    try {
+      final user = SupabaseService.client.auth.currentUser;
+      final results = await Future.wait([
+        SupabaseService.fetchPYQStats(_selectedExam, userId: user?.id),
+        SupabaseService.fetchSubjectPYQCounts(_selectedExam),
+      ]).timeout(const Duration(seconds: 10));
+
+      final stats = results[0] as Map<String, dynamic>;
+      final counts = results[1] as Map<String, int>;
+
+      if (mounted && currentReqId == _statsRequestId) {
+        setState(() {
+          _availableQuestionsCount = (stats['availableQuestions'] as num?)?.toInt() ?? 0;
+          _availablePapersCount = (stats['availablePapers'] as num?)?.toInt() ?? 0;
+          _userAccuracy = stats['avgAccuracy'] != null ? (stats['avgAccuracy'] as num).toDouble() : null;
+          _timeSpentSeconds = (stats['timeSpentSeconds'] as num?)?.toInt() ?? 0;
+          _subjectPYQCounts = counts;
+          _statsErrorMessage = null;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading PYQ stats: $e');
+      if (mounted && currentReqId == _statsRequestId) {
+        setState(() {
+          _statsErrorMessage = 'Unable to load PYQ statistics.';
+        });
+      }
+    } finally {
+      if (mounted && currentReqId == _statsRequestId) {
+        setState(() {
+          _isLoadingStats = false;
+        });
+      }
     }
   }
 
@@ -376,10 +362,12 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
       }
       _subjectChaptersMap.clear();
       _selectedPaperRecord = null;
+      _availableQuestionsCount = 0;
+      _availablePapersCount = 0;
       _initChapters();
       _loadAvailablePapers();
+      _loadStats();
     });
-    _loadStats();
   }
 
   void _toggleSelectAllSubjects() {
@@ -469,7 +457,13 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     }
   }
 
-  String _formatTimeSpent(int seconds) {
+  String _formatTimeSpent(int? seconds) {
+    if (seconds == null || seconds <= 0) {
+      return '—';
+    }
+    if (seconds < 60) {
+      return '< 1m';
+    }
     final hours = seconds ~/ 3600;
     final mins = (seconds % 3600) ~/ 60;
     if (hours > 0) {
@@ -1087,6 +1081,9 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
             iconColor: const Color(0xFF16A34A),
             value: '$_availableQuestionsCount',
             label: 'Questions',
+            tooltip: _availableQuestionsCount > 0
+                ? '$_availableQuestionsCount verified PYQ questions'
+                : 'No published PYQ questions yet for this exam',
           ),
           _buildVerticalDivider(),
           _buildCompactStatItem(
@@ -1094,13 +1091,17 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
             iconColor: const Color(0xFF2563EB),
             value: '$_availablePapersCount',
             label: 'Papers',
+            tooltip: '$_availablePapersCount official PYQ papers',
           ),
           _buildVerticalDivider(),
           _buildCompactStatItem(
             icon: Icons.trending_up_rounded,
             iconColor: const Color(0xFF9333EA),
-            value: '$_userAccuracy%',
+            value: _userAccuracy != null ? '${_userAccuracy!.toStringAsFixed(1)}%' : '—',
             label: 'Accuracy',
+            tooltip: _userAccuracy != null
+                ? 'Your practice accuracy: ${_userAccuracy!.toStringAsFixed(1)}%'
+                : 'Complete some questions to see your accuracy',
           ),
           _buildVerticalDivider(),
           _buildCompactStatItem(
@@ -1108,6 +1109,115 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
             iconColor: const Color(0xFFEA580C),
             value: _formatTimeSpent(_timeSpentSeconds),
             label: 'Time',
+            tooltip: _timeSpentSeconds > 0
+                ? 'Total platform study time'
+                : 'Active time will be recorded as you practice',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatsLoadingSkeleton() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x05000000), blurRadius: 4, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildCompactStatItem(
+            icon: Icons.track_changes_rounded,
+            iconColor: const Color(0xFF94A3B8),
+            value: '...',
+            label: 'Questions',
+          ),
+          _buildVerticalDivider(),
+          _buildCompactStatItem(
+            icon: Icons.assignment_outlined,
+            iconColor: const Color(0xFF94A3B8),
+            value: '...',
+            label: 'Papers',
+          ),
+          _buildVerticalDivider(),
+          _buildCompactStatItem(
+            icon: Icons.trending_up_rounded,
+            iconColor: const Color(0xFF94A3B8),
+            value: '...',
+            label: 'Accuracy',
+          ),
+          _buildVerticalDivider(),
+          _buildCompactStatItem(
+            icon: Icons.access_time_rounded,
+            iconColor: const Color(0xFF94A3B8),
+            value: '...',
+            label: 'Time',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorRetryWidget(String message, VoidCallback onRetry) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_rounded, size: 36, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Retry'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF7C3AED),
+                side: const BorderSide(color: Color(0xFFDDD6FE)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyPapersWidget() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.assignment_outlined, size: 36, color: Color(0xFF94A3B8)),
+          const SizedBox(height: 8),
+          Text(
+            'No official PYQ papers found for $_selectedExam.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Switch to Chapter-wise mode or select another exam to start practicing.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
           ),
         ],
       ),
@@ -1127,33 +1237,38 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     required Color iconColor,
     required String value,
     required String label,
+    String? tooltip,
   }) {
-    return Expanded(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: iconColor, size: 14),
-              const SizedBox(width: 4),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  value,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                ),
+    Widget item = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: iconColor, size: 14),
+            const SizedBox(width: 4),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
               ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+        ),
+      ],
     );
+
+    if (tooltip != null) {
+      item = Tooltip(message: tooltip, child: item);
+    }
+
+    return Expanded(child: item);
   }
 
   // ================= STEP 1 VIEW — CHOOSE PRACTICE MODE =================
@@ -1200,9 +1315,41 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         ),
         const SizedBox(height: 16),
 
+        if (_statsErrorMessage != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFECACA)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, size: 16, color: Color(0xFFDC2626)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _statsErrorMessage!,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF991B1B)),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _loadStats,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('Retry', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFDC2626))),
+                ),
+              ],
+            ),
+          ),
+
         // Compact Horizontal Stats Row
         _isLoadingStats
-            ? const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
+            ? _buildStatsLoadingSkeleton()
             : _buildCompactStatsRow(),
         const SizedBox(height: 22),
 
@@ -1297,7 +1444,7 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         Row(
           children: availableSubjects.map((subName) {
             final isSelected = _selectedSubjects.contains(subName);
-            final count = _subjectPYQCounts[subName] ?? (subName == 'Physics' ? 520 : (subName == 'Chemistry' ? 436 : (isNeet ? 292 : 480)));
+            final count = _subjectPYQCounts[subName] ?? 0;
 
             IconData iconData = Icons.science_outlined;
             Color themeColor = const Color(0xFF7C3AED);
@@ -1780,6 +1927,8 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
 
         if (_isLoadingTaxonomy)
           const Center(child: Padding(padding: EdgeInsets.all(28), child: CircularProgressIndicator()))
+        else if (_taxonomyErrorMessage != null)
+          _buildErrorRetryWidget(_taxonomyErrorMessage!, _initChapters)
         else if (_activeViewTab == 0)
           _buildChaptersView(filteredChapters)
         else
@@ -1807,11 +1956,16 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
         ),
         const SizedBox(height: 16),
 
-        _isLoadingPapers
-            ? const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
-            : Column(
-                children: [
-                  // Paper Dropdown / List
+        if (_isLoadingPapers)
+          const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+        else if (_papersErrorMessage != null)
+          _buildErrorRetryWidget(_papersErrorMessage!, _loadAvailablePapers)
+        else if (_availablePaperRecords.isEmpty)
+          _buildEmptyPapersWidget()
+        else
+          Column(
+            children: [
+              // Paper Dropdown / List
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                     decoration: BoxDecoration(

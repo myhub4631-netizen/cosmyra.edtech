@@ -16,6 +16,7 @@ import '../../shared/utils/neet_subject_helper.dart';
 import '../../shared/widgets/latex_view.dart';
 import 'ecommerce_automation_service.dart';
 import 'cloudflare_r2_service.dart';
+import 'platform_time_tracker_service.dart';
 
 class ExamPaperFormatConfig {
   static Map<String, dynamic> getPaperFormat({
@@ -134,6 +135,7 @@ class SupabaseService {
   static final ValueNotifier<UserProfileModel?> authNotifier = ValueNotifier<UserProfileModel?>(null);
 
   static SupabaseClient get client => Supabase.instance.client;
+  static bool isAdminPreview = false;
 
   static final AppLinks _appLinks = AppLinks();
   static StreamSubscription<Uri>? _subDeepLink;
@@ -1235,6 +1237,8 @@ class SupabaseService {
       debugPrint('Notice loading taxonomy cloud config: $e');
     }
   }
+
+  static String getExamId(String exam) => _getExamId(exam);
 
   static String _getExamId(String exam) {
     final e = exam.toUpperCase();
@@ -4593,55 +4597,141 @@ class SupabaseService {
   // ================= PYQ PRACTICE MODULE HELPERS =================
 
   /// Returns real-time database stats for selected exam: total available PYQs, paper count, avg accuracy, time spent
-  static Future<Map<String, dynamic>> fetchPYQStats(String exam) async {
+  static Future<Map<String, dynamic>> fetchPYQStats(String exam, {String? userId}) async {
     int totalQuestions = 0;
-    int availablePapers = 18;
-    double avgAccuracy = 72.4;
-    int timeSpentSeconds = 101700; // 28h 15m default
+    int availablePapers = 0;
+    double? avgAccuracy;
+    int timeSpentSeconds = 0;
 
+    final targetExamUpper = exam.trim().toUpperCase();
+    final bool isNeet = targetExamUpper.contains('NEET');
+    final bool isJeeAdv = targetExamUpper.contains('ADV');
+    final bool isJeeMain = targetExamUpper.contains('JEE') && !isJeeAdv;
+
+    // 1. Metric 1: Total distinct published PYQ questions available for the selected exam
     try {
-      final questions = await fetchPYQQuestions(
-        exam: exam,
-        subjects: exam.contains('NEET') ? ['Physics', 'Chemistry', 'Biology'] : ['Physics', 'Chemistry', 'Mathematics'],
-        limit: 500,
-      );
-      totalQuestions = questions.length;
-      if (totalQuestions > 0) {
-        availablePapers = (totalQuestions / 15).ceil().clamp(10, 120);
-      }
+      final examId = getExamId(exam);
+      final qCount = await client
+          .from('questions')
+          .count(CountOption.exact)
+          .eq('source', 'pyq')
+          .eq('status', 'published')
+          .eq('exam_id', examId);
+      totalQuestions = qCount;
     } catch (e) {
-      debugPrint('Error fetching PYQ stats: $e');
+      debugPrint('Error fetching PYQ question count: $e');
     }
 
-    // Try loading actual accuracy & time spent from local PYQ history
+    // 2. Metric 2: Total distinct canonical PYQ papers eligible for the selected exam
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final historyStr = prefs.getString('cosmyra_pyq_practice_history');
-      if (historyStr != null && historyStr.isNotEmpty) {
-        final List<dynamic> history = jsonDecode(historyStr);
-        if (history.isNotEmpty) {
-          double accSum = 0;
-          int timeSum = 0;
-          int count = 0;
-          for (var item in history) {
-            if (item['exam'] == exam || exam.isEmpty) {
-              accSum += (item['accuracy'] as num?)?.toDouble() ?? 0.0;
-              timeSum += (item['timeSpentSeconds'] as num?)?.toInt() ?? 0;
-              count++;
-            }
-          }
-          if (count > 0) {
-            avgAccuracy = double.parse((accSum / count).toStringAsFixed(1));
-            timeSpentSeconds = timeSum;
+      final allPapers = await fetchAllPapersAndTestSeries();
+      final pyqPapers = allPapers.where((p) {
+        final cat = (p['source_category'] ?? '').toString().trim().toUpperCase();
+        final isTestSeries = p['is_test_series'] == true || cat == 'TEST_SERIES' || cat == 'CUSTOM_PRACTICE';
+        final isNta = p['is_nta'] == true || cat == 'NTA' || cat == 'NTA_ABHYAS';
+        if (isTestSeries || isNta) return false;
+
+        final pId = (p['id'] ?? p['paper_id'] ?? '').toString();
+        final pTitle = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toUpperCase();
+        final pExam = (p['exam'] ?? p['target_exam'] ?? p['exam_name'] ?? '').toString().toUpperCase();
+
+        final isPyq = cat == 'PYQ' || cat == 'OFFICIAL_PYQ' || p['is_pyq'] == true || pTitle.contains('PYQ') || pId.startsWith('neet_') || pId.startsWith('jee_');
+        if (!isPyq) return false;
+
+        if (isNeet) {
+          return pExam.contains('NEET') || (pTitle.contains('NEET') && !pTitle.contains('JEE'));
+        } else if (isJeeAdv) {
+          return pExam.contains('ADV') || pTitle.contains('ADVANCED');
+        } else if (isJeeMain) {
+          return (pExam.contains('JEE') && !pExam.contains('ADV')) || (pTitle.contains('JEE') && !pTitle.contains('ADV') && !pTitle.contains('NEET'));
+        }
+        return false;
+      }).toList();
+      availablePapers = pyqPapers.length;
+    } catch (e) {
+      debugPrint('Error fetching canonical PYQ papers count: $e');
+    }
+
+    // 3. Metric 3: Genuine student accuracy from authenticated attempts
+    int totalCorrect = 0;
+    int totalGraded = 0;
+    final Set<String> processedAttemptIds = {};
+    final authUser = client.auth.currentUser;
+    final targetUid = userId ?? authUser?.id;
+
+    if (targetUid != null && targetUid.isNotEmpty && !isAdminPreview) {
+      try {
+        final attempts = await client
+            .from('test_attempts')
+            .select('id, correct_count, incorrect_count, status, student_id')
+            .eq('student_id', targetUid)
+            .eq('status', 'submitted');
+
+        for (var a in (attempts as List)) {
+          final aId = (a['id'] ?? '').toString();
+          if (aId.isEmpty || processedAttemptIds.contains(aId)) continue;
+          processedAttemptIds.add(aId);
+          final c = (a['correct_count'] as num?)?.toInt() ?? 0;
+          final inc = (a['incorrect_count'] as num?)?.toInt() ?? 0;
+          final graded = c + inc;
+          if (graded > 0) {
+            totalCorrect += c;
+            totalGraded += graded;
           }
         }
+      } catch (e) {
+        debugPrint('Notice querying user test_attempts: $e');
       }
+    }
+
+    // Local PYQ practice history
+    if (!isAdminPreview) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final historyStr = prefs.getString('cosmyra_pyq_practice_history');
+        if (historyStr != null && historyStr.isNotEmpty) {
+          final List<dynamic> history = jsonDecode(historyStr);
+          for (var item in history) {
+            if (item is! Map) continue;
+            final id = (item['id'] ?? '').toString();
+            if (id.isNotEmpty && processedAttemptIds.contains(id)) continue;
+            processedAttemptIds.add(id);
+
+            final itemExam = (item['exam'] ?? '').toString().toUpperCase();
+            if (exam.isNotEmpty && itemExam.isNotEmpty) {
+              final isMatch = (isNeet && itemExam.contains('NEET')) ||
+                              (isJeeAdv && itemExam.contains('ADV')) ||
+                              (isJeeMain && itemExam.contains('JEE') && !itemExam.contains('ADV'));
+              if (!isMatch) continue;
+            }
+
+            final c = (item['correctCount'] as num?)?.toInt() ?? 0;
+            final inc = (item['incorrectCount'] as num?)?.toInt() ?? 0;
+            final graded = c + inc;
+            if (graded > 0) {
+              totalCorrect += c;
+              totalGraded += graded;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Notice loading local PYQ stats: $e');
+      }
+    }
+
+    if (totalGraded > 0) {
+      avgAccuracy = double.parse(((totalCorrect / totalGraded) * 100).toStringAsFixed(1));
+    }
+
+    // 4. Metric 4: Platform time spent by authenticated student
+    try {
+      timeSpentSeconds = await PlatformTimeTrackerService.getAccumulatedPlatformSeconds(userId: targetUid);
     } catch (e) {
-      debugPrint('Error loading local PYQ stats: $e');
+      debugPrint('Notice getting platform active seconds: $e');
     }
 
     return {
-      'availableQuestions': totalQuestions > 0 ? totalQuestions : (exam.contains('NEET') ? 1248 : 1480),
+      'availableQuestions': totalQuestions,
       'availablePapers': availablePapers,
       'avgAccuracy': avgAccuracy,
       'timeSpentSeconds': timeSpentSeconds,
@@ -4653,10 +4743,32 @@ class SupabaseService {
     final Map<String, int> counts = {};
     final isNeet = exam.contains('NEET');
     final subjects = isNeet ? ['Physics', 'Chemistry', 'Biology'] : ['Physics', 'Chemistry', 'Mathematics'];
+    for (var s in subjects) counts[s] = 0;
 
-    for (var sub in subjects) {
-      final qList = await fetchPYQQuestions(exam: exam, subjects: [sub], limit: 300);
-      counts[sub] = qList.length > 0 ? qList.length : (sub == 'Physics' ? 520 : (sub == 'Chemistry' ? 436 : (isNeet ? 292 : 480)));
+    try {
+      final examId = getExamId(exam);
+      final res = await client
+          .from('questions')
+          .select('subject_id')
+          .eq('source', 'pyq')
+          .eq('status', 'published')
+          .eq('exam_id', examId);
+
+      if (res != null && (res as List).isNotEmpty) {
+        for (var r in (res as List)) {
+          final sId = (r['subject_id'] ?? '').toString();
+          final sName = NeetSubjectHelper.getSubjectNameFromId(sId, exam: exam);
+          if (counts.containsKey(sName)) {
+            counts[sName] = counts[sName]! + 1;
+          } else if (sName == 'Botany' || sName == 'Zoology') {
+            if (counts.containsKey('Biology')) {
+              counts['Biology'] = counts['Biology']! + 1;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching subject PYQ counts: $e');
     }
     return counts;
   }

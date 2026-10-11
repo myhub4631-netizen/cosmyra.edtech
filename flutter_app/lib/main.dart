@@ -11,6 +11,7 @@ import 'core/router/app_back_button_handler.dart';
 import 'core/services/seo_tracking_service.dart';
 
 import 'core/services/feature_config_service.dart';
+import 'core/services/platform_time_tracker_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +23,7 @@ void main() async {
   );
 
   await SupabaseService.initialize();
+  await PlatformTimeTrackerService.initialize();
   await FeatureConfigService.init();
   await SeoTrackingService.initialize();
   AppBackButtonHandler.initialize();

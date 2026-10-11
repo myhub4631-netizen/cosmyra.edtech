@@ -3,9 +3,16 @@ import 'package:flutter/foundation.dart';
 /// Helper utility for NEET & JEE Subject-Wise Question Ordering and Test Grid Mapping
 class NeetSubjectHelper {
   /// Map UUIDs, codes, or raw string identifiers to canonical subject names
-  static String getSubjectNameFromId(String rawId) {
+  static String getSubjectNameFromId(String rawId, {String? exam}) {
     if (rawId.trim().isEmpty) return '';
     final s = rawId.trim().toLowerCase();
+    final bool isJee = (exam != null && exam.toUpperCase().contains('JEE'));
+
+    if (isJee) {
+      if (s.contains('a4444444') || s.contains('a7777777') || s.contains('phys')) return 'Physics';
+      if (s.contains('a5555555') || s.contains('a8888888') || s.contains('chem')) return 'Chemistry';
+      if (s.contains('a6666666') || s.contains('a9999999') || s.contains('math')) return 'Mathematics';
+    }
 
     // Canonical UUID & Code Mappings
     if (s.contains('a1111111') || s.contains('phys')) return 'Physics';
