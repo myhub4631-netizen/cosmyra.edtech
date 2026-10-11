@@ -158,44 +158,21 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
     });
 
     try {
-      final papers = await SupabaseService.fetchAllPapersAndTestSeries(
-        exam: _selectedExam,
+      final pyqPapers = await SupabaseService.fetchAvailablePYQPapers(
+        _selectedExam,
         forceRefresh: true,
       ).timeout(const Duration(seconds: 10));
-
-      final targetExamUpper = _selectedExam.trim().toUpperCase();
-      final bool isNeet = targetExamUpper.contains('NEET');
-      final bool isJeeAdv = targetExamUpper.contains('ADV');
-      final bool isJeeMain = targetExamUpper.contains('JEE') && !isJeeAdv;
-
-      final pyqPapers = papers.where((p) {
-        final cat = (p['source_category'] ?? '').toString().trim().toUpperCase();
-        final isTestSeries = p['is_test_series'] == true || cat == 'TEST_SERIES' || cat == 'CUSTOM_PRACTICE';
-        final isNta = p['is_nta'] == true || cat == 'NTA' || cat == 'NTA_ABHYAS';
-        if (isTestSeries || isNta) return false;
-
-        final pId = (p['id'] ?? p['paper_id'] ?? '').toString();
-        final pTitle = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toUpperCase();
-        final pExam = (p['exam'] ?? p['target_exam'] ?? p['exam_name'] ?? '').toString().toUpperCase();
-
-        final isPyq = cat == 'PYQ' || cat == 'OFFICIAL_PYQ' || p['is_pyq'] == true || pTitle.contains('PYQ') || pId.startsWith('neet_') || pId.startsWith('jee_');
-        if (!isPyq) return false;
-
-        if (isNeet) {
-          return pExam.contains('NEET') || (pTitle.contains('NEET') && !pTitle.contains('JEE'));
-        } else if (isJeeAdv) {
-          return pExam.contains('ADV') || pTitle.contains('ADVANCED');
-        } else if (isJeeMain) {
-          return (pExam.contains('JEE') && !pExam.contains('ADV')) || (pTitle.contains('JEE') && !pTitle.contains('ADV') && !pTitle.contains('NEET'));
-        }
-        return false;
-      }).toList();
 
       if (mounted && currentReqId == _papersRequestId) {
         setState(() {
           _availablePaperRecords = pyqPapers;
           if (_availablePaperRecords.isNotEmpty) {
-            _selectedPaperRecord = _availablePaperRecords.first;
+            // Pick target year paper first if available (e.g. for NEET 2026, prefer 2026 paper, else first reverse-chronological)
+            final targetYearMatch = _availablePaperRecords.firstWhere(
+              (p) => (p['year']?.toString() ?? '').contains('2026') || (p['title']?.toString() ?? '').contains('2026') || (p['paper_name']?.toString() ?? '').contains('2026'),
+              orElse: () => _availablePaperRecords.first,
+            );
+            _selectedPaperRecord = targetYearMatch;
           } else {
             _selectedPaperRecord = null;
           }
@@ -558,10 +535,23 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
       return;
     }
 
-    setState(() => _isStarting = true);
-
     final paperId = (_selectedPaperRecord!['id'] ?? _selectedPaperRecord!['paper_id'] ?? '').toString();
     final paperName = (_selectedPaperRecord!['name'] ?? _selectedPaperRecord!['title'] ?? _selectedPaperRecord!['paper_name'] ?? 'Official Paper').toString();
+
+    // Revalidate eligibility against canonical catalogue classification
+    final isEligible = SupabaseService.getPaperCatalogue(_selectedPaperRecord!) == 'PYQ' &&
+        _availablePaperRecords.any((p) => (p['id'] ?? p['paper_id'] ?? '').toString() == paperId);
+    if (!isEligible) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Selected paper "$paperName" is not an eligible PYQ paper for $_selectedExam.'),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isStarting = true);
 
     final rawQuestions = await SupabaseService.fetchTestSeriesQuestions(
       paperId: paperId.isNotEmpty ? paperId : paperName,
@@ -2147,10 +2137,36 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                                       (_selectedPaperRecord!['paper_name'] ?? _selectedPaperRecord!['paperName'] ?? _selectedPaperRecord!['title'] ?? _selectedPaperRecord!['name'] ?? 'Selected Paper').toString(),
                                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Target: $_selectedExam',
-                                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                    const SizedBox(height: 4),
+                                    Wrap(
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      spacing: 8,
+                                      runSpacing: 4,
+                                      children: [
+                                        if ((_selectedPaperRecord!['year']?.toString() ?? '').isNotEmpty)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFEDE9FE),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              'Exam Year: ${_selectedPaperRecord!['year']}',
+                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF6D28D9)),
+                                            ),
+                                          ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF1F5F9),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            'Target Exam: $_selectedExam',
+                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),

@@ -4624,30 +4624,8 @@ class SupabaseService {
 
     // 2. Metric 2: Total distinct canonical PYQ papers eligible for the selected exam
     try {
-      final allPapers = await fetchAllPapersAndTestSeries();
-      final pyqPapers = allPapers.where((p) {
-        final cat = (p['source_category'] ?? '').toString().trim().toUpperCase();
-        final isTestSeries = p['is_test_series'] == true || cat == 'TEST_SERIES' || cat == 'CUSTOM_PRACTICE';
-        final isNta = p['is_nta'] == true || cat == 'NTA' || cat == 'NTA_ABHYAS';
-        if (isTestSeries || isNta) return false;
-
-        final pId = (p['id'] ?? p['paper_id'] ?? '').toString();
-        final pTitle = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toUpperCase();
-        final pExam = (p['exam'] ?? p['target_exam'] ?? p['exam_name'] ?? '').toString().toUpperCase();
-
-        final isPyq = cat == 'PYQ' || cat == 'OFFICIAL_PYQ' || p['is_pyq'] == true || pTitle.contains('PYQ') || pId.startsWith('neet_') || pId.startsWith('jee_');
-        if (!isPyq) return false;
-
-        if (isNeet) {
-          return pExam.contains('NEET') || (pTitle.contains('NEET') && !pTitle.contains('JEE'));
-        } else if (isJeeAdv) {
-          return pExam.contains('ADV') || pTitle.contains('ADVANCED');
-        } else if (isJeeMain) {
-          return (pExam.contains('JEE') && !pExam.contains('ADV')) || (pTitle.contains('JEE') && !pTitle.contains('ADV') && !pTitle.contains('NEET'));
-        }
-        return false;
-      }).toList();
-      availablePapers = pyqPapers.length;
+      final eligiblePyqPapers = await fetchAvailablePYQPapers(exam);
+      availablePapers = eligiblePyqPapers.length;
     } catch (e) {
       debugPrint('Error fetching canonical PYQ papers count: $e');
     }
@@ -4777,6 +4755,133 @@ class SupabaseService {
       rethrow;
     }
     return counts;
+  }
+
+  /// Authoritative single source of truth for catalogue classification: 'PYQ', 'NTA', 'Test Series', or 'Other'
+  static String getPaperCatalogue(Map<String, dynamic> p) {
+    if (isTestSeriesContainer(p)) {
+      return 'InvalidContainer';
+    }
+
+    final cat = (p['source_category'] ?? p['sourceCategory'] ?? p['category'] ?? p['paper_type'] ?? '').toString().toUpperCase().trim();
+    final title = ((p['paper_name']?.toString().trim().isNotEmpty == true)
+            ? p['paper_name'].toString().trim()
+            : ((p['paperName']?.toString().trim().isNotEmpty == true)
+                ? p['paperName'].toString().trim()
+                : ((p['title']?.toString().trim().isNotEmpty == true)
+                    ? p['title'].toString().trim()
+                    : ((p['name']?.toString().trim().isNotEmpty == true) ? p['name'].toString().trim() : ''))))
+        .toLowerCase();
+
+    final id = (p['id'] ?? p['paper_id'] ?? '').toString().toLowerCase().trim();
+    final isPyq = p['is_pyq'] == true;
+    final isNta = p['is_nta'] == true;
+    final isTestSeries = p['is_test_series'] == true;
+    final hasSeriesParent = (p['test_series_id'] != null && p['test_series_id'].toString().trim().isNotEmpty);
+
+    // 1. Test Series papers
+    if (isTestSeries ||
+        hasSeriesParent ||
+        cat == 'TEST_SERIES' ||
+        cat == 'TEST SERIES' ||
+        cat == 'CUSTOM_PRACTICE' ||
+        cat == 'TEST_SERIES_PAPERS' ||
+        title.contains('test series') ||
+        title.contains('mock test') ||
+        title.contains('fst') ||
+        title.contains('leader test series') ||
+        title.contains('beginner test series') ||
+        title.contains('full syllabus test series') ||
+        p.containsKey('series_name')) {
+      return 'Test Series';
+    }
+
+    // 2. NTA papers
+    if (isNta || cat == 'NTA' || cat == 'NTA_ABHYAS' || (title.contains('nta') && !title.contains('pyq') && !isPyq)) {
+      return 'NTA';
+    }
+
+    // 3. PYQ papers
+    if (isPyq ||
+        cat == 'PYQ' ||
+        cat == 'OFFICIAL_PYQ' ||
+        id.startsWith('neet_') ||
+        id.startsWith('jee_') ||
+        title.contains('official pyq') ||
+        title.contains('phase 1') ||
+        title.contains('phase 2') ||
+        title.contains('re-neet') ||
+        title.contains('paper 1') ||
+        (title.contains('pyq') && !title.contains('mock') && !title.contains('series'))) {
+      return 'PYQ';
+    }
+
+    return 'Other';
+  }
+
+  /// Dedicated canonical method to retrieve genuine, eligible PYQ papers for a given exam
+  static Future<List<Map<String, dynamic>>> fetchAvailablePYQPapers(
+    String exam, {
+    bool forceRefresh = false,
+  }) async {
+    final targetExamUpper = exam.trim().toUpperCase();
+    final bool isNeet = targetExamUpper.contains('NEET');
+    final bool isJeeAdv = targetExamUpper.contains('ADV');
+    final bool isJeeMain = targetExamUpper.contains('JEE') && !isJeeAdv;
+
+    final allPapers = await fetchAllPapersAndTestSeries(
+      exam: exam,
+      forceRefresh: forceRefresh,
+    );
+    final deletedPaperIds = await getDeletedPaperIds();
+
+    final eligible = allPapers.where((p) {
+      final pId = (p['id'] ?? p['paper_id'] ?? '').toString().trim();
+      if (pId.isEmpty) return false;
+      if (deletedPaperIds.contains(pId)) return false;
+
+      final status = (p['status'] ?? '').toString().toLowerCase().trim();
+      if (status == 'archived' || status == 'deleted') return false;
+
+      if (isTestSeriesContainer(p)) return false;
+      if (getPaperCatalogue(p) != 'PYQ') return false;
+
+      final pExam = (p['exam'] ?? p['target_exam'] ?? p['exam_name'] ?? '').toString().toUpperCase();
+      final pTitle = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toUpperCase();
+
+      if (isNeet) {
+        return pExam.contains('NEET') || (pTitle.contains('NEET') && !pTitle.contains('JEE'));
+      } else if (isJeeAdv) {
+        return pExam.contains('ADV') || pTitle.contains('ADVANCED');
+      } else if (isJeeMain) {
+        return (pExam.contains('JEE') && !pExam.contains('ADV')) || (pTitle.contains('JEE') && !pTitle.contains('ADV') && !pTitle.contains('NEET'));
+      }
+      return false;
+    }).toList();
+
+    int extractYear(Map<String, dynamic> p) {
+      final y = p['year'];
+      if (y is num) return y.toInt();
+      if (y != null) {
+        final parsed = int.tryParse(y.toString());
+        if (parsed != null && parsed > 1990) return parsed;
+      }
+      final combined = '${p['id']}_${p['title']}_${p['paper_name']}';
+      final match = RegExp(r'20\d\d').firstMatch(combined);
+      if (match != null) return int.tryParse(match.group(0)!) ?? 0;
+      return 0;
+    }
+
+    eligible.sort((a, b) {
+      final yA = extractYear(a);
+      final yB = extractYear(b);
+      if (yA != yB) return yB.compareTo(yA);
+      final tA = (a['paper_name'] ?? a['title'] ?? '').toString();
+      final tB = (b['paper_name'] ?? b['title'] ?? '').toString();
+      return tA.compareTo(tB);
+    });
+
+    return eligible;
   }
 
   /// Returns available PYQ years for selected exam and subjects
