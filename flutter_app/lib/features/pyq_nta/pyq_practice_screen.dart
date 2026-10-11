@@ -353,6 +353,13 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
   void _onExamChanged(String newExam) {
     setState(() {
       _selectedExam = newExam;
+      _subjectPYQCounts.clear();
+      _isLoadingStats = true;
+      _statsErrorMessage = null;
+      _availableQuestionsCount = 0;
+      _availablePapersCount = 0;
+      _userAccuracy = null;
+      _timeSpentSeconds = 0;
       if (newExam.contains('NEET')) {
         _selectedSubjects = {'Physics', 'Chemistry', 'Biology'};
         _activeStep3Subject = 'Physics';
@@ -362,8 +369,6 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
       }
       _subjectChaptersMap.clear();
       _selectedPaperRecord = null;
-      _availableQuestionsCount = 0;
-      _availablePapersCount = 0;
       _initChapters();
       _loadAvailablePapers();
       _loadStats();
@@ -1441,10 +1446,44 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
           ],
         ),
         const SizedBox(height: 14),
+
+        if (_statsErrorMessage != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFECACA)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, size: 16, color: Color(0xFFDC2626)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _statsErrorMessage!,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF991B1B)),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _loadStats,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('Retry', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFDC2626))),
+                ),
+              ],
+            ),
+          ),
+
         Row(
           children: availableSubjects.map((subName) {
             final isSelected = _selectedSubjects.contains(subName);
             final count = _subjectPYQCounts[subName] ?? 0;
+            final bool hasZeroQuestions = !_isLoadingStats && _statsErrorMessage == null && count == 0;
 
             IconData iconData = Icons.science_outlined;
             Color themeColor = const Color(0xFF7C3AED);
@@ -1506,11 +1545,48 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                               subName,
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '$count PYQs',
-                              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                            ),
+                            const SizedBox(height: 4),
+                            if (_isLoadingStats)
+                              Container(
+                                width: 46,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE2E8F0),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              )
+                            else if (_statsErrorMessage != null)
+                              const Text(
+                                'Error',
+                                style: TextStyle(fontSize: 10, color: Color(0xFFDC2626), fontWeight: FontWeight.w500),
+                              )
+                            else if (hasZeroQuestions)
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text(
+                                    '0 PYQs',
+                                    style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontWeight: FontWeight.w600),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'None available',
+                                      style: TextStyle(fontSize: 8.5, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else
+                              Text(
+                                '$count PYQs',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                              ),
                           ],
                         ),
                         if (isSelected)
@@ -1545,6 +1621,24 @@ class _PYQPracticeScreenState extends State<PYQPracticeScreen> {
                   const SnackBar(content: Text('Please select at least one subject to continue.')),
                 );
                 return;
+              }
+              // Prevent proceeding if all selected subjects have 0 available questions
+              if (!_isLoadingStats && _statsErrorMessage == null && _subjectPYQCounts.isNotEmpty) {
+                final totalSelectedQ = _selectedSubjects.fold<int>(
+                  0,
+                  (sum, sub) => sum + (_subjectPYQCounts[sub] ?? 0),
+                );
+                if (totalSelectedQ == 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'The selected subject(s) currently have 0 PYQs available in the database for $_selectedExam.',
+                      ),
+                      backgroundColor: const Color(0xFFDC2626),
+                    ),
+                  );
+                  return;
+                }
               }
               setState(() => _currentStep = 3);
             },

@@ -4738,7 +4738,7 @@ class SupabaseService {
     };
   }
 
-  /// Returns total PYQ count per subject for the given exam
+  /// Returns total distinct PYQ count per subject for the given exam
   static Future<Map<String, int>> fetchSubjectPYQCounts(String exam) async {
     final Map<String, int> counts = {};
     final isNeet = exam.contains('NEET');
@@ -4749,13 +4749,18 @@ class SupabaseService {
       final examId = getExamId(exam);
       final res = await client
           .from('questions')
-          .select('subject_id')
+          .select('id, subject_id')
           .eq('source', 'pyq')
           .eq('status', 'published')
           .eq('exam_id', examId);
 
       if (res != null && (res as List).isNotEmpty) {
+        final Set<String> seenIds = {};
         for (var r in (res as List)) {
+          final qId = (r['id'] ?? '').toString();
+          if (qId.isEmpty || seenIds.contains(qId)) continue;
+          seenIds.add(qId);
+
           final sId = (r['subject_id'] ?? '').toString();
           final sName = NeetSubjectHelper.getSubjectNameFromId(sId, exam: exam);
           if (counts.containsKey(sName)) {
@@ -4769,6 +4774,7 @@ class SupabaseService {
       }
     } catch (e) {
       debugPrint('Error fetching subject PYQ counts: $e');
+      rethrow;
     }
     return counts;
   }
