@@ -16,6 +16,8 @@ class AdminBulkUploadStep2Screen extends StatefulWidget {
   final String paperName;
   final int totalQuestionsCount;
   final Map<String, dynamic>? paperRecord;
+  final bool isEditMode;
+  final String? editingPaperId;
 
   const AdminBulkUploadStep2Screen({
     Key? key,
@@ -23,6 +25,8 @@ class AdminBulkUploadStep2Screen extends StatefulWidget {
     this.paperName = 'NEET 2026 Phase 1',
     this.totalQuestionsCount = 200,
     this.paperRecord,
+    this.isEditMode = false,
+    this.editingPaperId,
   }) : super(key: key);
 
   @override
@@ -104,6 +108,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   int _jumpToQuestionNumber = 1;
   int _addedCount = 0;
   Timer? _autoSaveTimer;
+
+  bool _isEditMode = false;
+  String _editingPaperId = '';
+  final Set<String> _originalQuestionIds = {};
+  final Set<String> _deletedQuestionIds = {};
 
   late List<QuestionItemData> _questionsList;
   Map<String, dynamic>? _paperData;
@@ -251,6 +260,12 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   @override
   void initState() {
     super.initState();
+    _isEditMode = widget.isEditMode || (widget.paperRecord?['isEditMode'] == true);
+    final String candidateId = widget.editingPaperId ??
+        widget.paperRecord?['editingPaperId']?.toString() ??
+        widget.paperRecord?['id']?.toString() ??
+        '';
+    _editingPaperId = candidateId.trim();
     final int initialCount = expectedQuestionCount;
     _questionsList = List.generate(
       initialCount,
@@ -296,7 +311,14 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     setState(() => _isLoading = true);
 
     _paperData = widget.paperRecord ?? await SupabaseService.loadActiveUploadPaperSession();
-    _paperId = _paperData?['id'] ?? 'paper_${DateTime.now().millisecondsSinceEpoch}';
+    _isEditMode = widget.isEditMode || (_paperData?['isEditMode'] == true);
+    final String candidateId = widget.editingPaperId ??
+        _paperData?['editingPaperId']?.toString() ??
+        _paperData?['id']?.toString() ??
+        widget.paperRecord?['id']?.toString() ??
+        '';
+    _editingPaperId = candidateId.trim();
+    _paperId = (_editingPaperId.isNotEmpty ? _editingPaperId : (_paperData?['id']?.toString() ?? 'paper_${DateTime.now().millisecondsSinceEpoch}')).trim();
 
     final String buildMethod = (_paperData?['buildPaperMethod'] ?? _paperData?['build_paper_method'] ?? '').toString();
     final String sourceCat = (_paperData?['source_category'] ?? _paperData?['sourceCategory'] ?? '').toString();
@@ -323,9 +345,6 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     final String paperNameParam = _paperData?['paperName'] ?? _paperData?['paper_name'] ?? widget.paperName;
     final savedQList = await SupabaseService.fetchQuestionsForPaper(_paperId, paperName: paperNameParam);
 
-    final int targetTotal = expectedQuestionCount;
-    final int qCount = math.max(targetTotal, savedQList.length);
-
     final dynamic paperAvailRaw = widget.paperRecord?['available_in'] ?? widget.paperRecord?['availableIn'] ?? _paperData?['available_in'] ?? _paperData?['availableIn'];
     final List<String> defaultAvailableIn = (paperAvailRaw is List && paperAvailRaw.isNotEmpty)
         ? List<String>.from(paperAvailRaw)
@@ -334,6 +353,136 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
 
     final String optionPresetKey = widget.paperRecord?['defaultOptionPreset'] ?? widget.paperRecord?['default_option_preset'] ?? _paperData?['defaultOptionPreset'] ?? _paperData?['default_option_preset'] ?? '1_2_3_4';
     final List<String> defaultPresetOpts = _getPresetOptions(optionPresetKey);
+
+    // If Edit Mode and existing questions exist for this paper, load canonical questions directly
+    if (_isEditMode && savedQList.isNotEmpty) {
+      final sortedSaved = List<Map<String, dynamic>>.from(savedQList);
+      sortedSaved.sort((a, b) {
+        final na = a['question_number'] ?? a['questionNumber'];
+        final nb = b['question_number'] ?? b['questionNumber'];
+        final int ia = na is num ? na.toInt() : (int.tryParse(na?.toString() ?? '') ?? 9999);
+        final int ib = nb is num ? nb.toInt() : (int.tryParse(nb?.toString() ?? '') ?? 9999);
+        return ia.compareTo(ib);
+      });
+
+      _originalQuestionIds.clear();
+      final List<QuestionItemData> editQuestions = [];
+
+      for (int i = 0; i < sortedSaved.length; i++) {
+        final savedMatch = sortedSaved[i];
+        final rawNum = savedMatch['question_number'] ?? savedMatch['questionNumber'];
+        final int qNum = rawNum is num ? rawNum.toInt() : (int.tryParse(rawNum?.toString() ?? '') ?? (i + 1));
+        final String origId = (savedMatch['id'] ?? '').toString();
+        if (origId.isNotEmpty) {
+          _originalQuestionIds.add(origId);
+        }
+
+        String rawQText = savedMatch['question_text'] ?? savedMatch['questionText'] ?? '';
+        List<String> opts = SupabaseService.parseOptionsFromQuestionMap(savedMatch);
+
+        final parsed = _parseOptionsFromQuestionText(rawQText, opts);
+        rawQText = parsed['text'] as String;
+        opts = List<String>.from(parsed['options'] as List);
+        while (opts.length < 4) opts.add('');
+
+        int correctIdx = -1;
+        if (savedMatch['correct_option_index'] != null) {
+          correctIdx = (savedMatch['correct_option_index'] as num).toInt();
+        } else if (savedMatch['correctOptionIndex'] != null) {
+          correctIdx = (savedMatch['correctOptionIndex'] as num).toInt();
+        } else {
+          String correctOptText = (savedMatch['correct_answer'] ?? savedMatch['correctAnswer'] ?? '').toString().trim();
+          if (correctOptText.startsWith('Option ')) {
+            int optNum = int.tryParse(correctOptText.replaceAll('Option ', '')) ?? -1;
+            if (optNum > 0) {
+              correctIdx = (optNum - 1).clamp(0, opts.length > 0 ? opts.length - 1 : 0);
+            }
+          } else if (correctOptText.isNotEmpty) {
+            int foundIdx = opts.indexOf(correctOptText);
+            if (foundIdx != -1) {
+              correctIdx = foundIdx;
+            } else if (correctOptText.toLowerCase() == 'option a' || correctOptText.toLowerCase() == 'a') {
+              correctIdx = 0;
+            } else if (correctOptText.toLowerCase() == 'option b' || correctOptText.toLowerCase() == 'b') {
+              correctIdx = 1;
+            } else if (correctOptText.toLowerCase() == 'option c' || correctOptText.toLowerCase() == 'c') {
+              correctIdx = 2;
+            } else if (correctOptText.toLowerCase() == 'option d' || correctOptText.toLowerCase() == 'd') {
+              correctIdx = 3;
+            }
+          }
+        }
+
+        String normDiff = (savedMatch['difficulty'] ?? 'Medium').toString().toLowerCase();
+        if (normDiff == 'easy') normDiff = 'Easy';
+        else if (normDiff == 'hard') normDiff = 'Hard';
+        else normDiff = 'Medium';
+
+        final optImgsRaw = savedMatch['option_images'] ?? savedMatch['optionImages'];
+        final List<String?> optImgs = optImgsRaw is List
+            ? List<String?>.from(optImgsRaw)
+            : <String?>[null, null, null, null];
+        while (optImgs.length < opts.length) optImgs.add(null);
+
+        final String chapIdFromMatch = savedMatch['chapter_id']?.toString() ?? '';
+        final String chapNameFromMatch = savedMatch['chapter']?.toString() ?? savedMatch['chapterTopic']?.toString() ?? '';
+        final String qSubject = savedMatch['subject']?.toString() ?? subject;
+
+        String finalChapId = chapIdFromMatch;
+        String finalChapName = chapNameFromMatch;
+
+        if (chapIdFromMatch.isNotEmpty && _loadedDbChapters.any((c) => c['id'].toString() == chapIdFromMatch)) {
+          final matchedC = _loadedDbChapters.firstWhere((c) => c['id'].toString() == chapIdFromMatch);
+          finalChapId = matchedC['id'].toString();
+          finalChapName = matchedC['name'].toString();
+        } else if (chapNameFromMatch.isNotEmpty && _loadedDbChapters.any((c) => c['name'].toString().trim().toLowerCase() == chapNameFromMatch.trim().toLowerCase())) {
+          final matchedC = _loadedDbChapters.firstWhere((c) => c['name'].toString().trim().toLowerCase() == chapNameFromMatch.trim().toLowerCase());
+          finalChapId = matchedC['id'].toString();
+          finalChapName = matchedC['name'].toString();
+        } else if (chapNameFromMatch.isNotEmpty || chapIdFromMatch.isNotEmpty) {
+          finalChapId = chapIdFromMatch;
+          finalChapName = chapNameFromMatch.isNotEmpty ? chapNameFromMatch : chapIdFromMatch;
+        }
+
+        final dynamic availInRaw = savedMatch['available_in'] ?? savedMatch['availableIn'];
+        final List<String> availInList = (availInRaw is List && availInRaw.isNotEmpty)
+            ? List<String>.from(availInRaw)
+            : List<String>.from(defaultAvailableIn);
+
+        editQuestions.add(QuestionItemData(
+          id: origId,
+          number: qNum,
+          text: rawQText,
+          questionImage: savedMatch['question_image'] ?? savedMatch['questionImage'],
+          options: opts,
+          optionImages: optImgs,
+          correctOptionIndex: correctIdx,
+          explanation: savedMatch['explanation'] ?? savedMatch['solution'] ?? '',
+          solutionVideoUrl: savedMatch['solution_video_url'] ?? savedMatch['solutionVideoUrl'] ?? savedMatch['video_url'],
+          difficulty: normDiff,
+          positiveMarks: savedMatch['marks']?.toString() ?? savedMatch['positiveMarks']?.toString() ?? '4',
+          negativeMarks: savedMatch['negative_marks']?.toString() ?? savedMatch['negativeMarks']?.toString() ?? '-1',
+          questionType: savedMatch['q_type'] ?? savedMatch['question_type'] ?? savedMatch['qType'] ?? 'MCQ (Single Correct)',
+          subject: qSubject,
+          chapter: finalChapName,
+          topic: savedMatch['topic'] ?? finalChapName,
+          chapterTopic: finalChapName,
+          chapterId: finalChapId,
+          availableIn: availInList,
+          isSaved: true,
+        ));
+      }
+
+      _questionsList = editQuestions;
+      _reindexQuestions();
+      _addedCount = _questionsList.length;
+      _currentPageIndex = 1;
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    final int targetTotal = expectedQuestionCount;
+    final int qCount = math.max(targetTotal, savedQList.length);
 
     if (_questionsList.length != qCount) {
       _questionsList = List.generate(
@@ -1052,7 +1201,24 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     setState(() => _isSavingBatch = true);
 
     int savedCount = 0;
+    int updatedCount = 0;
+    int insertedCount = 0;
+    int deletedCount = 0;
 
+    // 1. Process staged question deletions if in edit mode
+    if (_isEditMode && _deletedQuestionIds.isNotEmpty) {
+      for (final delId in _deletedQuestionIds) {
+        try {
+          final ok = await SupabaseService.deleteQuestionFromSupabase(delId);
+          if (ok) deletedCount++;
+        } catch (e) {
+          debugPrint('Notice deleting staged question $delId: $e');
+        }
+      }
+      _deletedQuestionIds.clear();
+    }
+
+    // 2. Process and save/update active questions
     for (int i = 0; i < _questionsList.length; i++) {
       final q = _questionsList[i];
       if (_hasEssentialDetails(q)) {
@@ -1062,7 +1228,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
             ? q.options[correctIdx]
             : 'Option $correctLetter';
 
-        final String qId = q.id.isNotEmpty ? q.id : 'q_${_paperId}_${q.number}';
+        final String qId = q.id.isNotEmpty
+            ? q.id
+            : (_isEditMode
+                ? SupabaseService.toValidUuid('q_${_paperId}_${DateTime.now().millisecondsSinceEpoch}_${q.number}')
+                : 'q_${_paperId}_${q.number}');
 
         final qMap = {
           'id': qId,
@@ -1087,6 +1257,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           'marks': double.tryParse(q.positiveMarks) ?? 4.0,
           'negativeMarks': double.tryParse(q.negativeMarks) ?? 1.0,
           'qType': q.questionType,
+          'chapter_id': (q.chapterId.isNotEmpty && SupabaseService.isValidUuid(q.chapterId)) ? q.chapterId : null,
           'subject': q.subject,
           'chapter': q.chapter,
           'topic': q.topic,
@@ -1100,26 +1271,54 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
           'test_series_title': _paperData?['test_series_title'] ?? _paperData?['testSeriesTitle'] ?? '',
         };
 
-        final ok = await SupabaseService.saveQuestionMap(qMap);
-        if (ok) {
+        final res = await SupabaseService.saveQuestionMapWithStatus(qMap);
+        if (res['success'] == true) {
+          final bool wasExisting = _originalQuestionIds.contains(qId);
+          if (wasExisting) {
+            updatedCount++;
+          } else {
+            insertedCount++;
+          }
           q.isSaved = true;
           q.id = qId;
+          _originalQuestionIds.add(qId);
           savedCount++;
+        } else {
+          debugPrint('Notice saving question ${q.number}: ${res['error']}');
         }
       }
     }
 
-    if (savedCount > 0) {
+    if (savedCount > 0 || deletedCount > 0) {
       setState(() {
         _addedCount = _questionsList.where((q) => q.isSaved).length;
       });
 
-      // Update paper record with saved questions count and mark Published
+      // Update canonical paper record with actual question count and subject breakdown
       try {
         final updatedPaper = Map<String, dynamic>.from(_paperData ?? {});
+        updatedPaper['id'] = _paperId;
+        updatedPaper['question_count'] = _addedCount;
         updatedPaper['saved_questions_count'] = _addedCount;
-        updatedPaper['status'] = 'Published';
+        if (updatedPaper['status'] == null || updatedPaper['status'].toString().isEmpty) {
+          updatedPaper['status'] = 'Published';
+        }
+
+        final Map<String, int> subjectCounts = {};
+        for (final q in _questionsList.where((q) => q.isSaved)) {
+          final sub = q.subject.trim().toLowerCase();
+          subjectCounts[sub] = (subjectCounts[sub] ?? 0) + 1;
+        }
+        updatedPaper['subject_distribution'] = subjectCounts;
+        if (subjectCounts.containsKey('physics')) updatedPaper['physics_count'] = subjectCounts['physics'];
+        if (subjectCounts.containsKey('chemistry')) updatedPaper['chemistry_count'] = subjectCounts['chemistry'];
+        if (subjectCounts.containsKey('botany')) updatedPaper['botany_count'] = subjectCounts['botany'];
+        if (subjectCounts.containsKey('zoology')) updatedPaper['zoology_count'] = subjectCounts['zoology'];
+        if (subjectCounts.containsKey('biology')) updatedPaper['biology_count'] = subjectCounts['biology'];
+        if (subjectCounts.containsKey('mathematics')) updatedPaper['maths_count'] = subjectCounts['mathematics'];
+
         await SupabaseService.savePaperRecord(updatedPaper);
+        SupabaseService.invalidatePaperQuestionsCache(_paperId);
 
         final tsTitle = (updatedPaper['test_series_title'] ?? updatedPaper['new_test_series_name'] ?? updatedPaper['existing_test_series'] ?? '').toString().trim();
         if (tsTitle.isNotEmpty || updatedPaper['source_category'] == 'Test Series') {
@@ -1142,11 +1341,15 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       }
 
       if (showToast && mounted) {
+        final String toastMsg = _isEditMode
+            ? '✓ Existing paper updated! (Modified: $updatedCount, Added: $insertedCount, Removed: $deletedCount, Total Questions: $_addedCount)'
+            : '✓ Persisted $savedCount question(s) to Supabase Question Bank! (Total Saved: $_addedCount / ${_questionsList.length})';
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✓ Persisted $savedCount question(s) to Supabase Question Bank! (Total Saved: $_addedCount / ${_questionsList.length})'),
+            content: Text(toastMsg),
             backgroundColor: const Color(0xFF10B981),
-            duration: const Duration(seconds: 3),
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -1184,7 +1387,11 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
         ? q.options[correctIdx]
         : 'Option $correctLetter';
 
-    final String qId = q.id.isNotEmpty ? q.id : 'q_${_paperId}_${q.number}';
+    final String qId = q.id.isNotEmpty
+        ? q.id
+        : (_isEditMode
+            ? SupabaseService.toValidUuid('q_${_paperId}_${DateTime.now().millisecondsSinceEpoch}_${q.number}')
+            : 'q_${_paperId}_${q.number}');
 
     final qMap = {
       'id': qId,
@@ -1229,13 +1436,16 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
       setState(() {
         q.isSaved = true;
         q.id = qId;
+        _originalQuestionIds.add(qId);
         _addedCount = _questionsList.where((item) => item.isSaved).length;
       });
+
+      SupabaseService.invalidatePaperQuestionsCache(_paperId);
 
       if (mounted && showToast) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✓ Question ${q.number} saved successfully to Supabase Question Bank!'),
+            content: Text('✓ Question ${q.number} saved successfully!'),
             backgroundColor: const Color(0xFF10B981),
             duration: const Duration(seconds: 2),
           ),
@@ -1383,13 +1593,66 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     });
   }
 
-  void _deleteQuestion(int index) {
-    if (_questionsList.length > 1) {
-      setState(() {
-        _questionsList.removeAt(index);
-        _reindexQuestions();
-      });
+  Future<void> _deleteQuestion(int index) async {
+    if (_questionsList.length <= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot delete the only remaining question in the paper.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
     }
+
+    final q = _questionsList[index];
+    final bool isExistingOrSaved = (_isEditMode && (_originalQuestionIds.contains(q.id) || q.isSaved)) || q.text.trim().isNotEmpty;
+
+    if (isExistingOrSaved) {
+      final bool? confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          title: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 24),
+              const SizedBox(width: 8),
+              Text('Remove Question #${q.number}?'),
+            ],
+          ),
+          content: Text(
+            _isEditMode
+                ? 'Are you sure you want to remove Question #${q.number}? In Edit Existing Paper mode, this question will be permanently detached/deleted from this paper upon saving.'
+                : 'Are you sure you want to remove Question #${q.number} from this paper upload?',
+            style: const TextStyle(fontSize: 14, color: Color(0xFF334155)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Remove Question'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true) return;
+    }
+
+    setState(() {
+      if (q.id.isNotEmpty && _originalQuestionIds.contains(q.id)) {
+        _deletedQuestionIds.add(q.id);
+      }
+      _questionsList.removeAt(index);
+      _reindexQuestions();
+    });
   }
 
   void _reindexQuestions() {
@@ -2903,62 +3166,105 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
   // 3. TITLE & ACTION HEADER ROW
   // ===========================================================================
   Widget _buildTitleHeaderRow() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Upload Questions in Bulk - Step 2 of 2',
-              style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A), letterSpacing: -0.4),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Add all questions for ${widget.paperName}. Target total: $expectedQuestionCount questions ($savedQuestionCount saved, $pendingQuestionCount pending).',
-              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w400, color: const Color(0xFF64748B)),
-            ),
-          ],
-        ),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Back to Step 1 Button
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => AdminBulkUploadStep1Screen(userProfile: widget.userProfile)),
-                );
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF334155),
-                backgroundColor: Colors.white,
-                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              icon: const Icon(Icons.arrow_back_rounded, size: 16, color: Color(0xFF334155)),
-              label: Text('Back to Step 1', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _isEditMode
+                      ? 'Edit Existing Paper Questions - Step 2 of 2'
+                      : 'Upload Questions in Bulk - Step 2 of 2',
+                  style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A), letterSpacing: -0.4),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _isEditMode
+                      ? 'Editing existing paper: ${widget.paperName}. Loaded ${_questionsList.length} questions ($_addedCount saved).'
+                      : 'Add all questions for ${widget.paperName}. Target total: $expectedQuestionCount questions ($savedQuestionCount saved, $pendingQuestionCount pending).',
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w400, color: const Color(0xFF64748B)),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),            // Save All Questions Primary Button
-            ElevatedButton.icon(
-              onPressed: () => _saveCurrentBatch(showToast: true),
-              icon: _isSavingBatch
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.cloud_upload_rounded, size: 16, color: Colors.white),
-              label: Text(
-                _isSavingBatch ? 'Saving...' : 'Save All Questions',
-                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4F46E5),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                elevation: 0,
-              ),
+            Row(
+              children: [
+                // Back to Step 1 Button
+                OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => AdminBulkUploadStep1Screen(
+                          userProfile: widget.userProfile,
+                          initialWorkflowMode: _isEditMode ? 'edit' : 'create',
+                          initialPaperId: _isEditMode ? _paperId : null,
+                        ),
+                      ),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF334155),
+                    backgroundColor: Colors.white,
+                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.arrow_back_rounded, size: 16, color: Color(0xFF334155)),
+                  label: Text('Back to Step 1', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
+                ),
+                const SizedBox(width: 12),
+                // Save All Questions Primary Button
+                ElevatedButton.icon(
+                  onPressed: () => _saveCurrentBatch(showToast: true),
+                  icon: _isSavingBatch
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Icon(_isEditMode ? Icons.check_circle_rounded : Icons.cloud_upload_rounded, size: 16, color: Colors.white),
+                  label: Text(
+                    _isSavingBatch ? 'Saving...' : (_isEditMode ? 'Save & Update Paper' : 'Save All Questions'),
+                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isEditMode ? const Color(0xFF2563EB) : const Color(0xFF4F46E5),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
+        if (_isEditMode) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFBFDBFE)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline_rounded, color: Color(0xFF2563EB), size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Editing existing paper — changes will update this paper and its questions in place. Canonical Paper ID: $_paperId',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1E40AF),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }

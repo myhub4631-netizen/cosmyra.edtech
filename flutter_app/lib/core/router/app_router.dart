@@ -1248,33 +1248,70 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/admin/questions/upload',
-      builder: (context, state) => AdminBulkUploadStep1Screen(
-        userProfile: SupabaseService.getMockProfile(role: 'admin'),
-      ),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final mode = extra?['workflowMode'] as String? ?? state.uri.queryParameters['mode'];
+        final pId = extra?['paperId'] as String? ?? state.uri.queryParameters['paper_id'];
+        return AdminBulkUploadStep1Screen(
+          userProfile: SupabaseService.getMockProfile(role: 'admin'),
+          initialWorkflowMode: mode,
+          initialPaperId: pId,
+        );
+      },
     ),
     GoRoute(
       path: '/admin/bulk-upload',
-      builder: (context, state) => AdminBulkUploadStep1Screen(
-        userProfile: SupabaseService.getMockProfile(role: 'admin'),
-      ),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final mode = extra?['workflowMode'] as String? ?? state.uri.queryParameters['mode'];
+        final pId = extra?['paperId'] as String? ?? state.uri.queryParameters['paper_id'];
+        return AdminBulkUploadStep1Screen(
+          userProfile: SupabaseService.getMockProfile(role: 'admin'),
+          initialWorkflowMode: mode,
+          initialPaperId: pId,
+        );
+      },
     ),
     GoRoute(
       path: '/admin/upload-step1',
-      builder: (context, state) => AdminBulkUploadStep1Screen(
-        userProfile: SupabaseService.getMockProfile(role: 'admin'),
-      ),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final mode = extra?['workflowMode'] as String? ?? state.uri.queryParameters['mode'];
+        final pId = extra?['paperId'] as String? ?? state.uri.queryParameters['paper_id'];
+        return AdminBulkUploadStep1Screen(
+          userProfile: SupabaseService.getMockProfile(role: 'admin'),
+          initialWorkflowMode: mode,
+          initialPaperId: pId,
+        );
+      },
     ),
     GoRoute(
       path: '/admin/upload-step2',
-      builder: (context, state) => AdminBulkUploadStep2Screen(
-        userProfile: SupabaseService.getMockProfile(role: 'admin'),
-      ),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return AdminBulkUploadStep2Screen(
+          userProfile: SupabaseService.getMockProfile(role: 'admin'),
+          paperRecord: extra?['paperRecord'] as Map<String, dynamic>?,
+          paperName: (extra?['paperName'] ?? 'NEET 2026 Phase 1').toString(),
+          totalQuestionsCount: (extra?['totalQuestionsCount'] as int?) ?? 180,
+          isEditMode: extra?['isEditMode'] == true,
+          editingPaperId: extra?['editingPaperId'] as String?,
+        );
+      },
     ),
     GoRoute(
       path: '/admin/bulk-upload-step2',
-      builder: (context, state) => AdminBulkUploadStep2Screen(
-        userProfile: SupabaseService.getMockProfile(role: 'admin'),
-      ),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return AdminBulkUploadStep2Screen(
+          userProfile: SupabaseService.getMockProfile(role: 'admin'),
+          paperRecord: extra?['paperRecord'] as Map<String, dynamic>?,
+          paperName: (extra?['paperName'] ?? 'NEET 2026 Phase 1').toString(),
+          totalQuestionsCount: (extra?['totalQuestionsCount'] as int?) ?? 180,
+          isEditMode: extra?['isEditMode'] == true,
+          editingPaperId: extra?['editingPaperId'] as String?,
+        );
+      },
     ),
     GoRoute(
       path: '/admin/questions/:questionId',

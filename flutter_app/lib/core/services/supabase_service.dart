@@ -4060,12 +4060,34 @@ class SupabaseService {
 
   static Future<bool> deleteQuestionFromSupabase(String id) async {
     try {
-      await client.from('questions').delete().eq('id', id);
+      final validUuid = toValidUuid(id);
+      try {
+        await client.from('question_options').delete().or('question_id.eq.$id,question_id.eq.$validUuid');
+      } catch (_) {}
+      try {
+        await client.from('paper_questions').delete().or('question_id.eq.$id,question_id.eq.$validUuid');
+      } catch (_) {}
+      await client.from('questions').delete().or('id.eq.$id,id.eq.$validUuid');
+      invalidatePaperQuestionsCache();
       return true;
     } catch (e) {
       debugPrint('Error deleting question from Supabase: $e');
       return true;
     }
+  }
+
+  /// Invalidate cached paper questions and associated lists
+  static void invalidatePaperQuestionsCache([String? paperId]) {
+    if (paperId != null && paperId.isNotEmpty) {
+      final validUuid = toValidUuid(paperId);
+      _cachedPaperQuestions.removeWhere((k, _) => k.contains(paperId) || k.contains(validUuid));
+      _paperQuestionsCacheTime.removeWhere((k, _) => k.contains(paperId) || k.contains(validUuid));
+    } else {
+      _cachedPaperQuestions.clear();
+      _paperQuestionsCacheTime.clear();
+    }
+    _liveQuestionsCache.clear();
+    _cachedDbPapers = null;
   }
 
   static Future<bool> deleteBulkQuestionsFromSupabase(List<String> ids) async {

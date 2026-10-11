@@ -10,12 +10,16 @@ class AdminBulkUploadStep1Screen extends StatefulWidget {
   final UserProfileModel userProfile;
   final VoidCallback? onBack;
   final Function(Map<String, dynamic> paperDetails)? onProceedToStep2;
+  final String? initialWorkflowMode;
+  final String? initialPaperId;
 
   const AdminBulkUploadStep1Screen({
     Key? key,
     required this.userProfile,
     this.onBack,
     this.onProceedToStep2,
+    this.initialWorkflowMode,
+    this.initialPaperId,
   }) : super(key: key);
 
   @override
@@ -23,6 +27,13 @@ class AdminBulkUploadStep1Screen extends StatefulWidget {
 }
 
 class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen> {
+  // Workflow Mode: 'create' (default) or 'edit'
+  String _workflowMode = 'create';
+  String? _selectedEditPaperId;
+  Map<String, dynamic>? _selectedEditPaperRecord;
+  List<Map<String, dynamic>> _availableEditPapers = [];
+  bool _isLoadingEditPapers = false;
+  final TextEditingController _editPaperSearchCtrl = TextEditingController();
   // Years range from 2029 down to 1988
   static final List<String> availableYears = List<String>.generate(
     2029 - 1988 + 1,
@@ -1298,6 +1309,156 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     _selectedTestDateTime = DateTime.now();
     _testDateTimeCtrl = TextEditingController(text: DateFormat('yyyy-MM-dd HH:mm').format(_selectedTestDateTime!));
     _loadCustomTestSeries();
+    if (widget.initialWorkflowMode == 'edit') {
+      _workflowMode = 'edit';
+      _selectedEditPaperId = widget.initialPaperId;
+      _loadMatchingEditPapers();
+    }
+  }
+
+  Future<void> _loadMatchingEditPapers() async {
+    if (!mounted) return;
+    setState(() => _isLoadingEditPapers = true);
+    try {
+      List<Map<String, dynamic>> papers = [];
+      final query = _editPaperSearchCtrl.text.trim();
+
+      if (_sourceCategory == 'PYQ') {
+        papers = await SupabaseService.fetchExistingPYQPapers(
+          exam: _examName,
+          search: query,
+        );
+      } else if (_sourceCategory == 'NTA') {
+        papers = await SupabaseService.fetchExistingNTAPapers(
+          exam: _examName,
+          search: query,
+        );
+      } else {
+        final all = await SupabaseService.fetchAllPapersAndTestSeries(exam: _examName);
+        papers = all.where((p) {
+          final pExam = (p['exam'] ?? p['exam_name'] ?? '').toString().toUpperCase();
+          if (!pExam.contains(_examName.toUpperCase())) return false;
+          final cat = (p['source_category'] ?? p['sourceCategory'] ?? p['category'] ?? '').toString().toUpperCase();
+          if (_sourceCategory == 'Test Series') {
+            final isTs = cat.contains('TEST SERIES') || p['is_test_series'] == true;
+            if (!isTs) return false;
+          } else {
+            if (cat.contains('TEST SERIES') || p['is_test_series'] == true) return false;
+          }
+          if (query.isNotEmpty) {
+            final name = (p['paper_name'] ?? p['title'] ?? '').toString().toLowerCase();
+            if (!name.contains(query.toLowerCase())) return false;
+          }
+          return true;
+        }).toList();
+      }
+
+      final Map<String, Map<String, dynamic>> dedup = {};
+      for (var p in papers) {
+        final id = (p['id'] ?? p['paper_id'] ?? '').toString();
+        if (id.isNotEmpty && !dedup.containsKey(id)) {
+          dedup[id] = p;
+        }
+      }
+      final dedupList = dedup.values.toList();
+
+      if (mounted) {
+        setState(() {
+          _availableEditPapers = dedupList;
+          _isLoadingEditPapers = false;
+
+          if (_selectedEditPaperId != null) {
+            final found = dedupList.firstWhere(
+              (p) => (p['id'] ?? p['paper_id'] ?? '').toString() == _selectedEditPaperId,
+              orElse: () => {},
+            );
+            if (found.isNotEmpty) {
+              _selectExistingPaperForEdit(found);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingEditPapers = false);
+    }
+  }
+
+  void _selectExistingPaperForEdit(Map<String, dynamic> paper) {
+    setState(() {
+      _selectedEditPaperId = (paper['id'] ?? paper['paper_id'] ?? '').toString();
+      _selectedEditPaperRecord = paper;
+
+      final name = (paper['paper_name'] ?? paper['paperName'] ?? paper['title'] ?? '').toString();
+      if (name.isNotEmpty) _paperNameCtrl.text = name;
+
+      final code = (paper['paper_code'] ?? paper['paperCode'] ?? '').toString();
+      _paperCodeCtrl.text = code;
+
+      final yearStr = (paper['year'] ?? '').toString();
+      if (availableYears.contains(yearStr)) _year = yearStr;
+
+      final phase = (paper['phase_session'] ?? paper['phaseSession'] ?? '').toString();
+      if (['Phase 1', 'Phase 2', 'Session 1', 'Session 2', 'Full Paper'].contains(phase)) {
+        _phaseSession = phase;
+      }
+
+      final pType = (paper['paper_type'] ?? paper['paperType'] ?? '').toString();
+      if (['Medical (UG)', 'Engineering', 'Foundation', 'Board'].contains(pType)) {
+        _paperType = pType;
+      }
+
+      final lang = (paper['language'] ?? '').toString();
+      if (['English', 'Hindi', 'Bilingual'].contains(lang)) _language = lang;
+
+      final cond = (paper['conducting_body'] ?? paper['conductingBody'] ?? '').toString();
+      if (['NTA', 'CBSE', 'IIT', 'AIIMS', 'State Board', 'Cosmyra'].contains(cond)) {
+        _conductingBody = cond;
+      }
+
+      final qCount = paper['question_count'] ?? paper['expected_question_count'] ?? paper['saved_questions_count'];
+      if (qCount != null) _questionCountCtrl.text = qCount.toString();
+
+      final tMarks = paper['total_marks'] ?? paper['totalMarks'];
+      if (tMarks != null) _totalMarksCtrl.text = tMarks.toString();
+
+      final dur = paper['duration_minutes'] ?? paper['duration'];
+      if (dur != null) _durationCtrl.text = dur.toString();
+
+      final tDate = (paper['test_date_time'] ?? paper['test_date'] ?? paper['scheduled_at'] ?? '').toString();
+      if (tDate.isNotEmpty) _testDateTimeCtrl.text = tDate;
+
+      final neg = paper['negative_marking'] ?? paper['negativeMarking'];
+      _negativeMarking = (neg == false || neg == 'No') ? 'No' : 'Yes';
+
+      final negM = paper['negative_marks'] ?? paper['negativeMarks'];
+      if (negM != null) _negativeMarksCtrl.text = negM.toString();
+
+      final posM = paper['positive_marks'] ?? paper['positiveMarks'];
+      if (posM != null) _positiveMarksCtrl.text = posM.toString();
+
+      final instr = (paper['instructions'] ?? '').toString();
+      _instructionsCtrl.text = instr;
+
+      final dynamic subs = paper['subjects'];
+      if (subs is List && subs.isNotEmpty) {
+        final lowerSubs = subs.map((s) => s.toString().toLowerCase()).toList();
+        _subjectPhysics = lowerSubs.any((s) => s.contains('phys'));
+        _subjectChemistry = lowerSubs.any((s) => s.contains('chem'));
+        _subjectBotany = lowerSubs.any((s) => s.contains('botan') || s.contains('bio'));
+        _subjectZoology = lowerSubs.any((s) => s.contains('zool') || s.contains('bio'));
+        _subjectMathematics = lowerSubs.any((s) => s.contains('math'));
+      }
+
+      final dynamic avail = paper['available_in'] ?? paper['availableIn'];
+      if (avail is List && avail.isNotEmpty) {
+        final lowerAvail = avail.map((a) => a.toString().toLowerCase()).toList();
+        _visCustomPractice = lowerAvail.contains('custom_practice');
+        _visCustomTest = lowerAvail.contains('custom_test');
+        _visPyqPractice = lowerAvail.contains('pyq_practice');
+        _visNtaQuestions = lowerAvail.contains('nta_questions');
+        _visTestSeries = lowerAvail.contains('test_series');
+      }
+    });
   }
 
   Future<void> _pickTestDateTime() async {
@@ -1382,6 +1543,11 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
 
       // 3. Reload Exam-scoped data
       _loadCustomTestSeries();
+      if (_workflowMode == 'edit') {
+        _selectedEditPaperId = null;
+        _selectedEditPaperRecord = null;
+        _loadMatchingEditPapers();
+      }
       if (_uploadMethod == 'pyq') _loadStep1PyqPapers();
       if (_uploadMethod == 'nta') _loadStep1NtaPapers();
       if (_uploadMethod == 'qbank') _loadStep1QBankQuestions();
@@ -1758,6 +1924,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     _newTestSeriesCtrl.dispose();
     _testSeriesDescCtrl.dispose();
     _testSeriesBannerCtrl.dispose();
+    _editPaperSearchCtrl.dispose();
     _priceCtrlDispose();
     super.dispose();
   }
@@ -1792,7 +1959,18 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     
     // If existing paper was selected, reuse its exact ID so Step 2 loads its existing questions
     String paperId = SupabaseService.toValidUuid('paper_${_examName}_${_year}_${_phaseSession}_$pName');
-    if (_sourceCategory == 'Test Series' && _paperOption == 'existing' && _existingPaper.isNotEmpty) {
+    if (_workflowMode == 'edit') {
+      if (_selectedEditPaperId == null || _selectedEditPaperId!.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select an existing paper to edit from the list above, or switch to "Create New Paper".'),
+            backgroundColor: Color(0xFFDC2626),
+          ),
+        );
+        return;
+      }
+      paperId = _selectedEditPaperId!;
+    } else if (_sourceCategory == 'Test Series' && _paperOption == 'existing' && _existingPaper.isNotEmpty) {
       Map<String, dynamic> foundExisting = _loadedPapersList.firstWhere(
         (p) => (p['paper_name'] ?? p['paperName'] ?? '').toString().trim().toLowerCase() == _existingPaper.trim().toLowerCase(),
         orElse: () => {},
@@ -1834,6 +2012,9 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
 
     final Map<String, dynamic> paperDetails = {
       'id': paperId,
+      'isEditMode': _workflowMode == 'edit',
+      'editingPaperId': _selectedEditPaperId,
+      'originalPaperRecord': _selectedEditPaperRecord,
       'sourceCategory': _sourceCategory,
       'source_category': _sourceCategory,
       'available_in': availableInModules,
@@ -1965,7 +2146,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
         _uploadMethod == 'qbank' ||
         _uploadMethod == 'combine';
 
-    if (isExistingContent) {
+    if (_workflowMode != 'edit' && isExistingContent) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1993,6 +2174,8 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
             paperRecord: paperDetails,
             paperName: pName,
             totalQuestionsCount: paperDetails['questionCount'] as int? ?? 180,
+            isEditMode: _workflowMode == 'edit',
+            editingPaperId: _selectedEditPaperId,
           ),
         ),
       );
@@ -2058,7 +2241,18 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                         // Stepper Bar
                         _buildStepperBar(),
 
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 24),
+
+                        // Mode Selector (Create New Paper vs Edit Existing Paper)
+                        _buildWorkflowModeSelector(),
+
+                        const SizedBox(height: 20),
+
+                        // If in edit mode, show Existing Paper selection card
+                        if (_workflowMode == 'edit') ...[
+                          _buildEditExistingPaperCard(),
+                          const SizedBox(height: 20),
+                        ],
 
                         // Card 1: Paper / Exam Details
                         _buildPaperExamDetailsCard(),
@@ -2492,6 +2686,367 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
     );
   }
 
+  Widget _buildWorkflowModeSelector() {
+    final bool isCreate = _workflowMode == 'create';
+    final bool isEdit = _workflowMode == 'edit';
+
+    return Container(
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                if (!isCreate) {
+                  setState(() {
+                    _workflowMode = 'create';
+                    _selectedEditPaperId = null;
+                    _selectedEditPaperRecord = null;
+                    _applyExamDefaults(_examName);
+                  });
+                }
+              },
+              borderRadius: BorderRadius.circular(9),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: isCreate ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9),
+                  boxShadow: isCreate
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_circle_outline_rounded,
+                      size: 18,
+                      color: isCreate ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Create New Paper',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: isCreate ? FontWeight.bold : FontWeight.w600,
+                        color: isCreate ? const Color(0xFF1E1B4B) : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: InkWell(
+              onTap: () {
+                if (!isEdit) {
+                  setState(() {
+                    _workflowMode = 'edit';
+                  });
+                  _loadMatchingEditPapers();
+                }
+              },
+              borderRadius: BorderRadius.circular(9),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: isEdit ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9),
+                  boxShadow: isEdit
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.edit_document,
+                      size: 18,
+                      color: isEdit ? const Color(0xFFD97706) : const Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Edit Existing Paper',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: isEdit ? FontWeight.bold : FontWeight.w600,
+                        color: isEdit ? const Color(0xFF92400E) : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditExistingPaperCard() {
+    return _buildCardContainer(
+      title: 'Select Existing Paper to Edit',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Choose an existing $_sourceCategory paper for $_examName. Selecting a paper loads its canonical record and questions for in-place editing in Step 2.',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, size: 20, color: Color(0xFF4F46E5)),
+                tooltip: 'Refresh paper list',
+                onPressed: _loadMatchingEditPapers,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Search Box
+          TextField(
+            controller: _editPaperSearchCtrl,
+            onChanged: (_) => _loadMatchingEditPapers(),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF94A3B8)),
+              hintText: 'Search $_sourceCategory $_examName papers by name, year, or code...',
+              hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              filled: true,
+              fillColor: const Color(0xFFF8FAFC),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+              suffixIcon: _editPaperSearchCtrl.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF94A3B8)),
+                      onPressed: () {
+                        _editPaperSearchCtrl.clear();
+                        _loadMatchingEditPapers();
+                      },
+                    )
+                  : null,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Papers List
+          if (_isLoadingEditPapers)
+            Container(
+              padding: const EdgeInsets.all(24),
+              alignment: Alignment.center,
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF4F46E5))),
+                  SizedBox(width: 12),
+                  Text('Loading existing papers from Supabase...', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                ],
+              ),
+            )
+          else if (_availableEditPapers.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded, size: 20, color: Color(0xFFD97706)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'No existing $_sourceCategory papers found for $_examName matching current filters.',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'You can switch exams or categories above, or create a brand new paper instead.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFFB45309)),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _workflowMode = 'create';
+                        _selectedEditPaperId = null;
+                        _selectedEditPaperRecord = null;
+                        _applyExamDefaults(_examName);
+                      });
+                    },
+                    icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                    label: const Text('Switch to Create New Paper'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFB45309),
+                      side: const BorderSide(color: Color(0xFFD97706)),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            Text(
+              'Select Paper to Edit (${_availableEditPapers.length} available):',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 260),
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _availableEditPapers.length,
+                separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                itemBuilder: (context, idx) {
+                  final paper = _availableEditPapers[idx];
+                  final paperId = (paper['id'] ?? paper['paper_id'] ?? '').toString();
+                  final title = (paper['paper_name'] ?? paper['title'] ?? 'Unnamed Paper').toString();
+                  final count = paper['question_count'] ?? paper['saved_questions_count'] ?? 180;
+                  final status = (paper['status'] ?? 'Published').toString();
+                  final year = (paper['year'] ?? '').toString();
+                  final isSelected = _selectedEditPaperId == paperId;
+
+                  return InkWell(
+                    onTap: () => _selectExistingPaperForEdit(paper),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      color: isSelected ? const Color(0xFFEEF2FF) : Colors.white,
+                      child: Row(
+                        children: [
+                          Icon(
+                            isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                            size: 18,
+                            color: isSelected ? const Color(0xFF4F46E5) : const Color(0xFF94A3B8),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                    color: isSelected ? const Color(0xFF1E1B4B) : const Color(0xFF1E293B),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    if (year.isNotEmpty) ...[
+                                      Text(
+                                        year,
+                                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                      ),
+                                      const Text(' · ', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                                    ],
+                                    Text(
+                                      '$count questions',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
+                                    ),
+                                    const Text(' · ', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                                    Text(
+                                      status,
+                                      style: const TextStyle(fontSize: 11, color: Color(0xFF16A34A), fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE0E7FF),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                'Selected for Edit',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF3730A3)),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+
+          if (_selectedEditPaperId != null && _selectedEditPaperRecord != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFA7F3D0)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 22),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Editing existing paper — changes will update this paper and its questions.',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF065F46)),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Canonical ID: $_selectedEditPaperId · Question Count: ${_selectedEditPaperRecord?['question_count'] ?? _questionCountCtrl.text} · Status: ${_selectedEditPaperRecord?['status'] ?? 'Published'}',
+                          style: const TextStyle(fontSize: 11.5, color: Color(0xFF047857)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   // ==========================================
   // CARD 1: PAPER / EXAM DETAILS
   // ==========================================
@@ -2501,6 +3056,31 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_workflowMode == 'edit') ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFF59E0B)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.edit_note_rounded, color: Color(0xFFB45309), size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _selectedEditPaperId != null
+                          ? 'Editing existing paper: ${_paperNameCtrl.text} (ID: $_selectedEditPaperId). Adjusting details below will update this canonical paper record upon save.'
+                          : 'Select an existing paper from the card above to load and edit its metadata.',
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           // Row 1 (5 Dropdowns)
           LayoutBuilder(
             builder: (context, constraints) {
@@ -2515,6 +3095,11 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                     onChanged: (val) {
                       setState(() {
                         _sourceCategory = val!;
+                        if (_workflowMode == 'edit') {
+                          _selectedEditPaperId = null;
+                          _selectedEditPaperRecord = null;
+                          _loadMatchingEditPapers();
+                        }
                         if (_sourceCategory == 'Test Series') {
                           if (_availableTestSeriesList.isNotEmpty) {
                             _testSeriesOption = 'existing';
@@ -4080,15 +4665,28 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
               // Right: Action Button
               Builder(
                 builder: (context) {
-                  final bool isExisting = _uploadMethod == 'pyq' ||
+                  final bool isEditWorkflow = _workflowMode == 'edit';
+                  final bool isExisting = !isEditWorkflow && (_uploadMethod == 'pyq' ||
                       _uploadMethod == 'nta' ||
                       _uploadMethod == 'qbank' ||
-                      _uploadMethod == 'combine';
+                      _uploadMethod == 'combine');
+
+                  final String buttonText = isEditWorkflow
+                      ? 'Proceed to Step 2: Edit Questions (${_questionCountCtrl.text.trim().isNotEmpty ? _questionCountCtrl.text.trim() : '0'} Qs)'
+                      : (isExisting ? 'Create & Build Paper From Existing Content' : 'Proceed to Add Questions');
+
+                  final IconData buttonIcon = isEditWorkflow
+                      ? Icons.edit_note_rounded
+                      : (isExisting ? Icons.check_circle_rounded : Icons.arrow_forward_rounded);
+
+                  final Color buttonBg = isEditWorkflow
+                      ? const Color(0xFF2563EB)
+                      : (isExisting ? const Color(0xFF16A34A) : const Color(0xFF4F46E5));
 
                   return ElevatedButton.icon(
                     onPressed: _handleProceed,
                     icon: Text(
-                      isExisting ? 'Create & Build Paper From Existing Content' : 'Proceed to Add Questions',
+                      buttonText,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -4096,12 +4694,12 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                       ),
                     ),
                     label: Icon(
-                      isExisting ? Icons.check_circle_rounded : Icons.arrow_forward_rounded,
+                      buttonIcon,
                       size: 18,
                       color: Colors.white,
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isExisting ? const Color(0xFF16A34A) : const Color(0xFF4F46E5),
+                      backgroundColor: buttonBg,
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
