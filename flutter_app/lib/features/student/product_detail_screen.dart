@@ -208,9 +208,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with TickerPr
     final String title = (match['title'] ?? match['name'] ?? 'Test Series').toString().trim();
     final exam = (match['exam'] ?? 'NEET').toString();
     final year = (match['year'] ?? '2027').toString();
-    final qCount = (match['question_count'] is num) ? (match['question_count'] as num).toInt() : 200;
+    final qCount = (match['question_count'] is num) ? (match['question_count'] as num).toInt() : 0;
     final duration = (match['duration_minutes'] is num) ? (match['duration_minutes'] as num).toInt() : 180;
-    final testCount = (match['test_count'] is num) ? (match['test_count'] as num).toInt() : 33;
+    final testCount = (match['test_count'] is num) ? (match['test_count'] as num).toInt() : 0;
     final difficulty = (match['difficulty'] ?? 'Moderate').toString();
     final testType = (match['test_type'] ?? match['testType'] ?? 'Full').toString();
     final validity = (match['validity'] ?? 'Valid until exam').toString();
@@ -233,7 +233,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with TickerPr
       title: title,
       exam: exam,
       targetYear: year,
-      subtitle: '$exam $year Series ($qCount Qs)',
+      subtitle: qCount > 0 ? '$exam $year Series ($qCount Qs)' : '$exam $year Series',
       description: (match['description'] ?? '').toString().trim().isNotEmpty
           ? match['description'].toString().trim()
           : 'Complete $exam $year preparation with practice tests, full syllabus papers, and detailed step-by-step solutions following the latest NTA pattern.',
@@ -287,12 +287,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with TickerPr
 
     _product = loadedProduct;
     final resolvedTests = _resolveSeriesTests();
-    final int realCount = resolvedTests.isNotEmpty ? resolvedTests.length : testCount;
+    final int realCount = resolvedTests.length;
 
     String cleanDesc = loadedProduct.description;
-    cleanDesc = cleanDesc.replaceAll(RegExp(r'\b\d+\s+full-syllabus', caseSensitive: false), '$realCount full-syllabus');
-    cleanDesc = cleanDesc.replaceAll(RegExp(r'\b\d+\s+progressive', caseSensitive: false), '$realCount progressive');
-    cleanDesc = cleanDesc.replaceAll(RegExp(r'\b\d+\s+tests', caseSensitive: false), '$realCount tests');
+    if (realCount > 0) {
+      cleanDesc = cleanDesc.replaceAll(RegExp(r'\b\d+\s+full-syllabus', caseSensitive: false), '$realCount full-syllabus');
+      cleanDesc = cleanDesc.replaceAll(RegExp(r'\b\d+\s+progressive', caseSensitive: false), '$realCount progressive');
+      cleanDesc = cleanDesc.replaceAll(RegExp(r'\b\d+\s+tests', caseSensitive: false), '$realCount tests');
+    }
 
     final finalProduct = TestSeriesCardData(
       id: loadedProduct.id,
@@ -425,19 +427,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> with TickerPr
     final itemIdLower = item.id.trim().toLowerCase();
 
     for (var p in _dbPapers) {
+      if (p['is_deleted'] == true || p['is_archived'] == true || p['deleted_at'] != null) continue;
       final pId = (p['id'] ?? '').toString().trim();
       final pSeriesId = (p['test_series_id'] ?? p['series_id'] ?? p['testSeriesId'] ?? '').toString().trim().toLowerCase();
-      final pSeriesTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? p['test_series'] ?? p['testSeriesTitle'] ?? p['test_series_name'] ?? '').toString().trim().toLowerCase();
-      final pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? p['name'] ?? '').toString().trim().toLowerCase();
 
       bool isDirectMatch = false;
-      if (pSeriesId.isNotEmpty && (pSeriesId == itemIdLower || itemIdLower.contains(pSeriesId) || pSeriesId.contains(itemIdLower))) {
-        isDirectMatch = true;
-      }
-      if (pSeriesTitle.isNotEmpty && (pSeriesTitle == itemTitleLower || itemTitleLower.contains(pSeriesTitle) || pSeriesTitle.contains(itemTitleLower))) {
-        isDirectMatch = true;
-      }
-      if (pName.isNotEmpty && pSeriesTitle.isEmpty && (pName == itemTitleLower || itemTitleLower.contains(pName))) {
+      if (pSeriesId.isNotEmpty && pSeriesId == itemIdLower) {
         isDirectMatch = true;
       }
 

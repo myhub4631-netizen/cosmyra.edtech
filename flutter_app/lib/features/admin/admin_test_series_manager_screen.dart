@@ -972,8 +972,8 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     _linkCtrl = TextEditingController(text: linkText);
 
     _buttonTextCtrl = TextEditingController(text: d['purchase_button_text'] ?? 'Join');
-    _testCountCtrl = TextEditingController(text: (d['test_count'] ?? 10).toString());
-    _questionCountCtrl = TextEditingController(text: (d['question_count'] ?? 200).toString());
+    _testCountCtrl = TextEditingController(text: (d['test_count'] ?? 0).toString());
+    _questionCountCtrl = TextEditingController(text: (d['question_count'] ?? 0).toString());
     _durationCtrl = TextEditingController(text: (d['duration_minutes'] ?? 180).toString());
     _validityCtrl = TextEditingController(text: d['validity'] ?? 'Valid until exam');
     _syllabusCtrl = TextEditingController(text: d['syllabus_url'] ?? d['syllabusUrl'] ?? '');
@@ -1053,54 +1053,13 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
     _f4TitleCtrl = TextEditingController(text: f4['title']);
     _f4DescCtrl = TextEditingController(text: f4['description']);
 
-    // Tests List init
+    // Tests List init - strictly initialize from explicitly configured series tests (never auto-import)
     if (d['tests'] is List && (d['tests'] as List).isNotEmpty) {
       _tests = (d['tests'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
     } else {
       _tests = [];
     }
-
-    // Auto-sync matching papers from availablePapers into _tests
-    final sId = _seriesId.toLowerCase().trim();
-    final sTitle = (_titleCtrl.text).toLowerCase().trim();
-    for (var p in widget.availablePapers) {
-      final pId = (p['id'] ?? '').toString().toLowerCase().trim();
-      final pTsOption = (p['existing_test_series'] ?? p['test_series_title'] ?? p['new_test_series_name'] ?? '').toString().toLowerCase().trim();
-      final pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toLowerCase().trim();
-      final dPaperId = (d['paper_id'] ?? '').toString().toLowerCase().trim();
-
-      bool isMatch = false;
-      if (pId.isNotEmpty && dPaperId.isNotEmpty && pId == dPaperId) isMatch = true;
-      if (pTsOption.isNotEmpty && (pTsOption == sId || pTsOption == sTitle)) isMatch = true;
-      if (p['is_test_series'] == true && pName.isNotEmpty && (pName == sTitle || sTitle.contains(pName) || pName.contains(sTitle))) isMatch = true;
-
-      if (isMatch) {
-        final rawPaperId = p['id']?.toString() ?? '';
-        final pTitleStr = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? 'Test Paper').toString();
-        final idx = _tests.indexWhere((t) =>
-            (t['id']?.toString().toLowerCase().trim() ?? '') == rawPaperId.toLowerCase().trim() ||
-            (t['paper_id']?.toString().toLowerCase().trim() ?? '') == rawPaperId.toLowerCase().trim() ||
-            (t['title']?.toString().toLowerCase().trim() ?? '') == pTitleStr.toLowerCase().trim());
-        final testItem = {
-          'id': rawPaperId,
-          'paper_id': rawPaperId,
-          'title': pTitleStr,
-          'questions': p['saved_questions_count'] ?? p['question_count'] ?? (_exam.contains('JEE') ? 90 : 200),
-          'marks': p['total_marks'] ?? (_exam.contains('JEE') ? 300 : 720),
-          'duration': p['duration_minutes'] ?? 180,
-          'type': _testType,
-          'status': p['status'] ?? 'Published',
-        };
-        if (idx != -1) {
-          _tests[idx] = {...testItem, ..._tests[idx]};
-        } else {
-          _tests.add(testItem);
-        }
-      }
-    }
-    if (_tests.isNotEmpty) {
-      _testCountCtrl.text = _tests.length.toString();
-    }
+    _testCountCtrl.text = _tests.length.toString();
 
     // Reviews List init
     if (d['reviews'] is List && (d['reviews'] as List).isNotEmpty) {
@@ -1216,8 +1175,10 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
       'checkout_url': checkoutUrl,
       'purchase_button_text': _buttonTextCtrl.text.trim().isNotEmpty ? _buttonTextCtrl.text.trim() : 'Join',
       'show_purchase_button': _showPurchaseButton,
-      'test_count': _tests.isNotEmpty ? _tests.length : (int.tryParse(_testCountCtrl.text) ?? 1),
-      'question_count': int.tryParse(_questionCountCtrl.text) ?? 200,
+      'test_count': _tests.length,
+      'question_count': _tests.isEmpty
+          ? 0
+          : (int.tryParse(_questionCountCtrl.text) ?? _tests.fold<int>(0, (sum, t) => sum + ((t['questions'] as num?)?.toInt() ?? 0))),
       'duration_minutes': int.tryParse(_durationCtrl.text) ?? 180,
       'difficulty': _difficulty,
       'test_type': _testType,
@@ -1788,6 +1749,19 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
               onPressed: () {
                 final name = (selectedPaper['paper_name'] ?? selectedPaper['paperName'] ?? selectedPaper['title'] ?? 'Test Paper').toString();
                 final pId = selectedPaper['id']?.toString() ?? 'p_${DateTime.now().millisecondsSinceEpoch}';
+
+                final alreadyLinked = _tests.any((t) => (t['id'] ?? t['paper_id'] ?? '').toString().toLowerCase() == pId.toLowerCase());
+                if (alreadyLinked) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Paper "$name" is already linked to this series.'),
+                      backgroundColor: const Color(0xFFEF4444),
+                    ),
+                  );
+                  Navigator.pop(ctx);
+                  return;
+                }
+
                 final qCount = selectedPaper['question_count'] ?? selectedPaper['saved_questions_count'] ?? (_exam.contains('JEE') ? 90 : 200);
                 final marks = selectedPaper['total_marks'] ?? (_exam.contains('JEE') ? 300 : 720);
                 final duration = selectedPaper['duration_minutes'] ?? 180;

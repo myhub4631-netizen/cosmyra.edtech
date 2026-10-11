@@ -6161,11 +6161,15 @@ class SupabaseService {
         'Detailed Solutions & Explanations',
         'All India Ranking',
       ],
-      'tests': seriesData['tests'] ?? [],
+      'tests': (seriesData['tests'] is List) ? seriesData['tests'] : [],
       'reviews': seriesData['reviews'] ?? [],
       'top_scores': seriesData['top_scores'] ?? seriesData['topScores'] ?? {},
-      'test_count': (seriesData['test_count'] is num) ? (seriesData['test_count'] as num).toInt() : (seriesData['testCount'] ?? 1),
-      'question_count': (seriesData['question_count'] is num) ? (seriesData['question_count'] as num).toInt() : (seriesData['questionCount'] ?? (seriesData['exam']?.toString().contains('JEE') == true ? 90 : 200)),
+      'test_count': (seriesData['tests'] is List)
+          ? (seriesData['tests'] as List).length
+          : ((seriesData['test_count'] is num) ? (seriesData['test_count'] as num).toInt() : (seriesData['testCount'] ?? 0)),
+      'question_count': ((seriesData['tests'] is List) && (seriesData['tests'] as List).isEmpty)
+          ? 0
+          : ((seriesData['question_count'] is num) ? (seriesData['question_count'] as num).toInt() : (seriesData['questionCount'] ?? (seriesData['exam']?.toString().contains('JEE') == true ? 90 : 200))),
       'total_marks': (seriesData['total_marks'] is num) ? (seriesData['total_marks'] as num).toDouble() : (seriesData['totalMarks'] != null ? double.tryParse(seriesData['totalMarks'].toString()) : (seriesData['exam']?.toString().contains('JEE') == true ? 300.0 : 720.0)),
       'duration_minutes': (seriesData['duration_minutes'] is num) ? (seriesData['duration_minutes'] as num).toInt() : (seriesData['durationMinutes'] ?? 180),
       'conducting_body': seriesData['conducting_body'] ?? seriesData['conductingBody'] ?? 'NTA',
@@ -6300,31 +6304,6 @@ class SupabaseService {
 
       final idx = cloudList.indexWhere((item) => item['id'] == seriesId || item['title'] == title || item['name'] == title);
       if (idx != -1) {
-        final existingSeries = cloudList[idx];
-        final existingTests = (existingSeries['tests'] is List)
-            ? List<Map<String, dynamic>>.from((existingSeries['tests'] as List).map((t) => Map<String, dynamic>.from(t as Map)))
-            : <Map<String, dynamic>>[];
-        final incomingTests = (fullData['tests'] is List)
-            ? List<Map<String, dynamic>>.from((fullData['tests'] as List).map((t) => Map<String, dynamic>.from(t as Map)))
-            : <Map<String, dynamic>>[];
-
-        if (existingTests.length > incomingTests.length) {
-          for (var incTest in incomingTests) {
-            final tId = (incTest['id'] ?? incTest['paper_id'] ?? '').toString();
-            final tTitle = (incTest['title'] ?? incTest['name'] ?? '').toString().trim().toLowerCase();
-            final tIdx = existingTests.indexWhere((et) =>
-                (et['id'] ?? et['paper_id'] ?? '').toString() == tId ||
-                (et['title'] ?? et['name'] ?? '').toString().trim().toLowerCase() == tTitle);
-            if (tIdx != -1) {
-              existingTests[tIdx] = {...existingTests[tIdx], ...incTest};
-            } else {
-              existingTests.add(incTest);
-            }
-          }
-          fullData['tests'] = existingTests;
-          fullData['test_count'] = existingTests.length;
-        }
-
         cloudList[idx] = fullData;
       } else {
         cloudList.insert(0, fullData);
@@ -6335,6 +6314,40 @@ class SupabaseService {
         'value': cloudList,
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'key');
+
+      // Also sync home_recommendations if a recommendation card references this test series
+      try {
+        final recRes = await client.from('system_config').select('value').eq('key', 'home_recommendations').maybeSingle();
+        if (recRes != null && recRes['value'] is List) {
+          final List<Map<String, dynamic>> recList = (recRes['value'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          bool recChanged = false;
+          final int count = (fullData['tests'] is List) ? (fullData['tests'] as List).length : 0;
+          int totalQuestions = 0;
+          if (fullData['tests'] is List) {
+            for (var t in fullData['tests'] as List) {
+              if (t is Map) {
+                totalQuestions += (t['questions'] is num ? (t['questions'] as num).toInt() : (int.tryParse(t['questions']?.toString() ?? '0') ?? 0));
+              }
+            }
+          }
+          for (var r in recList) {
+            if (r['test_series_id']?.toString() == seriesId) {
+              r['tests_count'] = count;
+              r['questions_count'] = count > 0 ? (totalQuestions > 0 ? totalQuestions : (fullData['question_count'] ?? 180)) : 0;
+              recChanged = true;
+            }
+          }
+          if (recChanged) {
+            await client.from('system_config').upsert({
+              'key': 'home_recommendations',
+              'value': recList,
+              'updated_at': DateTime.now().toIso8601String(),
+            }, onConflict: 'key');
+          }
+        }
+      } catch (e) {
+        debugPrint('Notice syncing home_recommendations from saveTestSeries: $e');
+      }
     } catch (e) {
       debugPrint('Notice saving test series to system_config: $e');
     }
@@ -6386,13 +6399,23 @@ class SupabaseService {
 
     // 3. Delete from Supabase system_config ('admin_custom_test_series')
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString('cosmyra_saved_test_series') ?? '[]';
-      List<dynamic> existingList = [];
+      List<Map<String, dynamic>> cloudList = [];
       try {
-        existingList = jsonDecode(raw);
+        final sysRes = await client.from('system_config').select('value').eq('key', 'admin_custom_test_series').maybeSingle();
+        if (sysRes != null && sysRes['value'] is List) {
+          cloudList = (sysRes['value'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
       } catch (_) {}
-      final List<Map<String, dynamic>> cloudList = existingList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
+      if (cloudList.isEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        final raw = prefs.getString('cosmyra_saved_test_series') ?? '[]';
+        try {
+          final List<dynamic> localDecoded = jsonDecode(raw);
+          cloudList = localDecoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        } catch (_) {}
+      }
+
       cloudList.removeWhere((item) => item['id'] == seriesId);
       await client.from('system_config').upsert({
         'key': 'admin_custom_test_series',
@@ -6623,13 +6646,12 @@ class SupabaseService {
       return deletedIds.contains(sId) || legacyDemoTestSeriesIds.contains(sId);
     });
 
-    // 5. Auto-link all created/published papers into matching test series
+    // 5. Explicitly link papers whose foreign key matches this test series ID
     try {
       final allPapers = await fetchAllPapersAndTestSeries();
       if (allPapers.isNotEmpty) {
         for (var s in list) {
           final sId = (s['id'] ?? '').toString().toLowerCase().trim();
-          final sTitle = (s['title'] ?? s['name'] ?? '').toString().toLowerCase().trim();
           final sPaperId = (s['paper_id'] ?? '').toString().toLowerCase().trim();
 
           List<Map<String, dynamic>> seriesTests = [];
@@ -6637,20 +6659,16 @@ class SupabaseService {
             seriesTests = (s['tests'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
           }
 
+          // ONLY link if paper carries an explicit canonical foreign key to this series
           for (var p in allPapers) {
             final pId = (p['id'] ?? '').toString().toLowerCase().trim();
-            final pTsOption = (p['existing_test_series'] ?? p['test_series_title'] ?? p['new_test_series_name'] ?? p['test_series'] ?? p['testSeriesTitle'] ?? '').toString().toLowerCase().trim();
             final pSeriesId = (p['test_series_id'] ?? p['series_id'] ?? '').toString().toLowerCase().trim();
-            final pName = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? '').toString().toLowerCase().trim();
 
-            bool isMatch = false;
-            if (pId.isNotEmpty && sPaperId.isNotEmpty && pId == sPaperId) isMatch = true;
-            if (pSeriesId.isNotEmpty && (pSeriesId == sId || sId.contains(pSeriesId) || pSeriesId.contains(sId))) isMatch = true;
-            if (pTsOption.isNotEmpty && (pTsOption == sId || pTsOption == sTitle || sTitle.contains(pTsOption) || pTsOption.contains(sTitle))) isMatch = true;
-            if (pName.isNotEmpty && (pName == sTitle || sTitle.contains(pName) || pName.contains(sTitle))) isMatch = true;
-            if (p['is_test_series'] == true && pName.isNotEmpty && (pName == sTitle || sTitle.contains(pName) || pName.contains(sTitle))) isMatch = true;
+            bool isExplicitMatch = false;
+            if (pId.isNotEmpty && sPaperId.isNotEmpty && pId == sPaperId) isExplicitMatch = true;
+            if (pSeriesId.isNotEmpty && sId.isNotEmpty && pSeriesId == sId) isExplicitMatch = true;
 
-            if (isMatch) {
+            if (isExplicitMatch) {
               final rawPaperId = p['id']?.toString() ?? '';
               final pTitleStr = (p['paper_name'] ?? p['paperName'] ?? p['title'] ?? 'Test Paper').toString();
               final qCount = p['saved_questions_count'] ?? p['question_count'] ?? (s['exam']?.toString().contains('JEE') == true ? 90 : 200);
@@ -6660,8 +6678,7 @@ class SupabaseService {
 
               final idx = seriesTests.indexWhere((t) =>
                   (t['id']?.toString().toLowerCase().trim() ?? '') == rawPaperId.toLowerCase().trim() ||
-                  (t['paper_id']?.toString().toLowerCase().trim() ?? '') == rawPaperId.toLowerCase().trim() ||
-                  (t['title']?.toString().toLowerCase().trim() ?? '') == pTitleStr.toLowerCase().trim());
+                  (t['paper_id']?.toString().toLowerCase().trim() ?? '') == rawPaperId.toLowerCase().trim());
 
               final testDateTimeStr = p['test_date_time'] ?? p['scheduled_at'] ?? p['test_date'] ?? p['start_time'] ?? p['date_time'];
 
@@ -6681,11 +6698,6 @@ class SupabaseService {
 
               if (idx != -1) {
                 seriesTests[idx] = {...itemMap, ...seriesTests[idx]};
-                if (testDateTimeStr != null && (seriesTests[idx]['test_date_time'] == null || seriesTests[idx]['test_date_time'].toString().trim().isEmpty)) {
-                  seriesTests[idx]['test_date_time'] = testDateTimeStr;
-                  seriesTests[idx]['scheduled_at'] = testDateTimeStr;
-                  seriesTests[idx]['test_date'] = testDateTimeStr;
-                }
               } else {
                 seriesTests.add(itemMap);
               }
@@ -6693,11 +6705,11 @@ class SupabaseService {
           }
 
           s['tests'] = seriesTests;
-          s['test_count'] = seriesTests.isNotEmpty ? seriesTests.length : (s['test_count'] ?? 1);
+          s['test_count'] = seriesTests.length;
         }
       }
     } catch (e) {
-      debugPrint('Notice auto-linking papers to test series in fetchAllTestSeries: $e');
+      debugPrint('Notice linking explicit papers to test series in fetchAllTestSeries: $e');
     }
 
     // 6. Cache list in SharedPreferences for instantaneous offline availability
