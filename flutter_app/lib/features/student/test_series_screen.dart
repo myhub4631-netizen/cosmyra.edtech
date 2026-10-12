@@ -344,17 +344,21 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   @override
   void initState() {
     super.initState();
+    _currentUser = SupabaseService.activeUserSession;
     _loadPapers();
     _loadUserProfile();
   }
 
   Future<void> _loadUserProfile() async {
     final user = await SupabaseService.getCurrentUser();
-    if (mounted) {
-      setState(() {
-        _currentUser = user ?? SupabaseService.activeUserSession;
-      });
-      _fetchStudentEnrollments();
+    if (mounted && user != null) {
+      final changed = _currentUser == null || _currentUser!.id != user.id || _currentUser!.email != user.email;
+      if (changed) {
+        setState(() {
+          _currentUser = user;
+        });
+        _fetchStudentEnrollments();
+      }
     }
   }
 

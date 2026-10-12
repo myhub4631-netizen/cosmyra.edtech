@@ -190,6 +190,21 @@ class SupabaseService {
   static Future<List<Map<String, dynamic>>>? _inFlightFetchPapersAndSeries;
   static final Map<String, Future<List<Map<String, dynamic>>>> _inFlightQuestionsForPaper = {};
 
+  static final Map<String, Future<Map<String, Map<String, dynamic>>>> _inFlightEnrollmentMaps = {};
+  static final Map<String, Map<String, Map<String, dynamic>>> _cachedEnrollmentMaps = {};
+  static final Map<String, DateTime> _enrollmentMapsCacheTime = {};
+  static const Duration _enrollmentCacheTtl = Duration(seconds: 30);
+
+  static void invalidateEnrollmentCache([String? userKey]) {
+    if (userKey != null && userKey.isNotEmpty) {
+      _cachedEnrollmentMaps.remove(userKey.toLowerCase());
+      _enrollmentMapsCacheTime.remove(userKey.toLowerCase());
+    } else {
+      _cachedEnrollmentMaps.clear();
+      _enrollmentMapsCacheTime.clear();
+    }
+  }
+
   static const Duration _cacheTtl = Duration(minutes: 5);
 
   static void invalidateCaches() {
@@ -201,6 +216,8 @@ class SupabaseService {
     _questionModelsCacheTime.clear();
     _cachedPaperQuestions.clear();
     _paperQuestionsCacheTime.clear();
+    _cachedEnrollmentMaps.clear();
+    _enrollmentMapsCacheTime.clear();
   }
 
   static bool get hasCachedTestSeries =>
@@ -220,6 +237,18 @@ class SupabaseService {
       );
       _isInitialized = true;
       _setupDeepLinkListener();
+
+      // Zero-latency instant restoration of active user session from local storage cache
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final rawActiveUser = prefs.getString('cosmyra_active_user_session');
+        if (rawActiveUser != null && rawActiveUser.isNotEmpty) {
+          final decoded = jsonDecode(rawActiveUser) as Map<String, dynamic>;
+          final profile = _ensureSuperAdminRole(UserProfileModel.fromJson(decoded));
+          activeUserSession = profile;
+          authNotifier.value = profile;
+        }
+      } catch (_) {}
 
       // Handle OAuth deep link callbacks and real-time auth changes
       client.auth.onAuthStateChange.listen((data) async {
@@ -249,7 +278,13 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Supabase init warning: $e');
     }
-    await _loadTaxonomyFromLocalStorage();
+
+    // Non-blocking background loading of taxonomy and remote profile verification
+    unawaited(_loadTaxonomyFromLocalStorage());
+    unawaited(_refreshInitialProfileInBackground());
+  }
+
+  static Future<void> _refreshInitialProfileInBackground() async {
     try {
       final initialProfile = await getCurrentUser();
       if (initialProfile != null) {
@@ -6379,6 +6414,29 @@ class SupabaseService {
 
   /// Fetch all created Test Series from Supabase, local cache, and fallback baseline
   static Future<List<Map<String, dynamic>>> fetchAllTestSeries({String? exam, bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _cachedTestSeries != null &&
+        _testSeriesCacheTime != null &&
+        DateTime.now().difference(_testSeriesCacheTime!) < _cacheTtl) {
+      return _filterTestSeriesByExam(_cachedTestSeries!, exam);
+    }
+    if (!forceRefresh && _inFlightFetchTestSeries != null) {
+      final res = await _inFlightFetchTestSeries!;
+      return _filterTestSeriesByExam(res, exam);
+    }
+    final future = _fetchAllTestSeriesInternal(forceRefresh: forceRefresh);
+    _inFlightFetchTestSeries = future;
+    try {
+      final res = await future;
+      _cachedTestSeries = res;
+      _testSeriesCacheTime = DateTime.now();
+      return _filterTestSeriesByExam(res, exam);
+    } finally {
+      _inFlightFetchTestSeries = null;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> _fetchAllTestSeriesInternal({bool forceRefresh = false}) async {
     final List<Map<String, dynamic>> list = [];
     final Set<String> seenIds = {};
     Set<String> deletedIds = {};
@@ -6544,6 +6602,10 @@ class SupabaseService {
       await prefs.setString('cosmyra_saved_test_series', jsonEncode(list));
     } catch (_) {}
 
+    return list;
+  }
+
+  static List<Map<String, dynamic>> _filterTestSeriesByExam(List<Map<String, dynamic>> list, String? exam) {
     if (exam != null && exam.trim().isNotEmpty && exam.trim() != 'All') {
       final String targetExamUpper = exam.trim().toUpperCase();
       final bool isJee = targetExamUpper.contains('JEE');
@@ -6568,7 +6630,6 @@ class SupabaseService {
         return itemExam.contains(targetExamUpper) || itemTitle.contains(targetExamUpper);
       }).toList();
     }
-
     return list;
   }
 
@@ -7604,6 +7665,8 @@ class SupabaseService {
       await prefs.setString('cosmyra_user_entitlements', jsonEncode(list));
     } catch (_) {}
 
+    invalidateEnrollmentCache();
+
     return {
       'success': true,
       'message': 'Successfully enrolled in $seriesTitle',
@@ -7616,18 +7679,58 @@ class SupabaseService {
   static Future<Map<String, Map<String, dynamic>>> fetchStudentEnrollmentStatusMap({
     required String userId,
     required String userEmail,
+    bool forceRefresh = false,
+  }) async {
+    final Map<String, Map<String, dynamic>> resultMap = {};
+    if (userId.isEmpty && userEmail.isEmpty) return resultMap;
+
+    final resolvedEmail = userEmail.trim().toLowerCase();
+    final userKey = '${userId.toLowerCase()}_$resolvedEmail';
+
+    if (!forceRefresh &&
+        _cachedEnrollmentMaps.containsKey(userKey) &&
+        _enrollmentMapsCacheTime.containsKey(userKey) &&
+        DateTime.now().difference(_enrollmentMapsCacheTime[userKey]!) < _enrollmentCacheTtl) {
+      return _cachedEnrollmentMaps[userKey]!;
+    }
+
+    if (!forceRefresh && _inFlightEnrollmentMaps.containsKey(userKey)) {
+      return _inFlightEnrollmentMaps[userKey]!;
+    }
+
+    final future = _fetchStudentEnrollmentStatusMapInternal(userId: userId, userEmail: resolvedEmail);
+    _inFlightEnrollmentMaps[userKey] = future;
+    try {
+      final res = await future;
+      _cachedEnrollmentMaps[userKey] = res;
+      _enrollmentMapsCacheTime[userKey] = DateTime.now();
+      return res;
+    } finally {
+      _inFlightEnrollmentMaps.remove(userKey);
+    }
+  }
+
+  static Future<Map<String, Map<String, dynamic>>> _fetchStudentEnrollmentStatusMapInternal({
+    required String userId,
+    required String userEmail,
   }) async {
     final Map<String, Map<String, dynamic>> resultMap = {};
     if (userId.isEmpty && userEmail.isEmpty) return resultMap;
 
     final resolvedEmail = userEmail.trim().toLowerCase();
 
-    // 1. Fetch entitlements (include pending)
-    final entitlements = await fetchUserEntitlements(
-      userId,
-      userEmail: resolvedEmail,
-      includePending: true,
-    );
+    // 1. Concurrently fetch entitlements and user orders in parallel
+    final results = await Future.wait([
+      fetchUserEntitlements(
+        userId,
+        userEmail: resolvedEmail,
+        includePending: true,
+      ),
+      fetchUserOrders(userId, userEmail: resolvedEmail),
+    ]);
+
+    final entitlements = results[0];
+    final userOrders = results[1];
 
     for (var ent in entitlements) {
       final pId = (ent['product_id'] ?? '').toString().trim();
@@ -7683,7 +7786,6 @@ class SupabaseService {
 
     // 2. Cross-check orders for completed or pending orders
     try {
-      final userOrders = await fetchUserOrders(userId, userEmail: resolvedEmail);
       for (var ord in userOrders) {
         final ordStatus = (ord['status'] ?? ord['payment_status'] ?? '').toString().trim().toLowerCase();
         final isCompleted = ordStatus == 'completed' || ordStatus == 'approved' || ordStatus == 'verified' || ordStatus == 'paid' || ordStatus == 'success';
@@ -8263,7 +8365,23 @@ class SupabaseService {
         DateTime.now().difference(_paperQuestionsCacheTime[cacheKey]!) < _cacheTtl) {
       return _cachedPaperQuestions[cacheKey]!;
     }
+    if (!forceRefresh && _inFlightQuestionsForPaper.containsKey(cacheKey)) {
+      return _inFlightQuestionsForPaper[cacheKey]!;
+    }
+    final future = _fetchQuestionsForPaperInternal(paperId, paperName: paperName, forceRefresh: forceRefresh);
+    _inFlightQuestionsForPaper[cacheKey] = future;
+    try {
+      final res = await future;
+      _cachedPaperQuestions[cacheKey] = res;
+      _paperQuestionsCacheTime[cacheKey] = DateTime.now();
+      return res;
+    } finally {
+      _inFlightQuestionsForPaper.remove(cacheKey);
+    }
+  }
 
+  static Future<List<Map<String, dynamic>>> _fetchQuestionsForPaperInternal(String paperId, {String? paperName, bool forceRefresh = false}) async {
+    final cacheKey = '${paperId}_${paperName ?? ''}';
     final List<Map<String, dynamic>> results = [];
     final String paperUuid = toValidUuid(paperId);
     String targetName = (paperName ?? '').trim();
@@ -8938,6 +9056,28 @@ class SupabaseService {
 
   /// Fetch all saved papers/test series records from DB and local cache
   static Future<List<Map<String, dynamic>>> fetchAllPapersAndTestSeries({String? exam, bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _cachedDbPapers != null &&
+        _dbPapersCacheTime != null &&
+        DateTime.now().difference(_dbPapersCacheTime!) < _cacheTtl) {
+      return _cachedDbPapers!;
+    }
+    if (!forceRefresh && _inFlightFetchPapersAndSeries != null) {
+      return _inFlightFetchPapersAndSeries!;
+    }
+    final future = _fetchAllPapersAndTestSeriesInternal(exam: exam, forceRefresh: forceRefresh);
+    _inFlightFetchPapersAndSeries = future;
+    try {
+      final res = await future;
+      _cachedDbPapers = res;
+      _dbPapersCacheTime = DateTime.now();
+      return res;
+    } finally {
+      _inFlightFetchPapersAndSeries = null;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> _fetchAllPapersAndTestSeriesInternal({String? exam, bool forceRefresh = false}) async {
     final List<Map<String, dynamic>> papers = [];
     final Set<String> seenIds = {};
     final Set<String> deletedPaperIds = await getDeletedPaperIds();
@@ -12571,6 +12711,10 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Notice caching granted entitlements: $e');
     }
+
+    // Invalidate enrollment and catalogue caches so changes reflect immediately
+    invalidateEnrollmentCache();
+    invalidateCaches();
 
     // Trigger Order Placed automation (Brevo Order Confirmation Email + WhatsApp Confirmation)
     try {

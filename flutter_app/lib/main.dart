@@ -16,18 +16,30 @@ import 'core/services/platform_time_tracker_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy(); // Removes # hash from Flutter Web URLs
-
-  // Initialize Crash Analytics & global exception handlers with Firebase options
-  await CrashAnalyticsService.initialize(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  await SupabaseService.initialize();
-  await PlatformTimeTrackerService.initialize();
-  await FeatureConfigService.init();
-  await SeoTrackingService.initialize();
   AppBackButtonHandler.initialize();
+
+  // Fast client & local cached session initialization (< 60ms)
+  await SupabaseService.initialize();
+
+  // Instantly render application shell and first useful frame
   runApp(const CosmyraApp());
+
+  // Concurrently run secondary and non-essential background initializations
+  _initializeBackgroundServices();
+}
+
+void _initializeBackgroundServices() {
+  Future.wait([
+    CrashAnalyticsService.initialize(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ),
+    PlatformTimeTrackerService.initialize(),
+    FeatureConfigService.init(),
+    SeoTrackingService.initialize(),
+  ]).catchError((e) {
+    debugPrint('Background services initialization notice: $e');
+    return <void>[];
+  });
 }
 
 class CosmyraApp extends StatelessWidget {

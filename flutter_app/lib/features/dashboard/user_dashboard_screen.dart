@@ -80,9 +80,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
   bool _isSectionVisible(String key) => true;
 
   Future<void> _loadCurrentUser() async {
-    final currentUser = await SupabaseService.getCurrentUser();
-    final stats = await SupabaseService.fetchUserRealStats();
-    final activeSession = await SupabaseService.loadActiveTestSession(isExplicitResume: true);
+    final results = await Future.wait([
+      SupabaseService.getCurrentUser(),
+      SupabaseService.fetchUserRealStats(),
+      SupabaseService.loadActiveTestSession(isExplicitResume: true),
+    ]);
+    final currentUser = results[0] as UserProfileModel?;
+    final stats = results[1] as Map<String, dynamic>;
+    final activeSession = results[2] as Map<String, dynamic>?;
 
     if (mounted) {
       setState(() {

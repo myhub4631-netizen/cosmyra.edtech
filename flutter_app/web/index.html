@@ -42,20 +42,6 @@
   <title>Cosmyra Neet Jee</title>
   <link rel="manifest" href="manifest.json">
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for (let registration of registrations) {
-          registration.unregister();
-        }
-      });
-    }
-    if ('caches' in window) {
-      caches.keys().then(function(names) {
-        for (let name of names) caches.delete(name);
-      });
-    }
-  </script>
-  <script>
     // Intermediate Web-to-Mobile OAuth Bounceback
     // If a mobile browser receives an OAuth callback, instantly hand over to the native app
     (function() {
