@@ -1,0 +1,8 @@
+*.apk
+flutter_app/build/
+flutter_app/.dart_tool/
+.git/
+.idea/
+.vscode/
+scratch/
+docs/
