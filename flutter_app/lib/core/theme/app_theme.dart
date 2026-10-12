@@ -12,21 +12,28 @@ class SmoothPageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
+    final bool reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (reduceMotion) {
+      return child;
+    }
+
     final curvedAnimation = CurvedAnimation(
       parent: animation,
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     );
 
-    final slideAnimation = Tween<Offset>(
-      begin: const Offset(0.0, 0.015),
-      end: Offset.zero,
-    ).animate(curvedAnimation);
-
     return FadeTransition(
       opacity: curvedAnimation,
-      child: SlideTransition(
-        position: slideAnimation,
+      child: AnimatedBuilder(
+        animation: curvedAnimation,
+        builder: (context, child) {
+          final double dx = (1.0 - curvedAnimation.value) * 16.0;
+          return Transform.translate(
+            offset: Offset(dx, 0.0),
+            child: child,
+          );
+        },
         child: child,
       ),
     );
@@ -56,6 +63,7 @@ class AppTheme {
       TargetPlatform.macOS: SmoothPageTransitionsBuilder(),
       TargetPlatform.windows: SmoothPageTransitionsBuilder(),
       TargetPlatform.linux: SmoothPageTransitionsBuilder(),
+      TargetPlatform.fuchsia: SmoothPageTransitionsBuilder(),
     },
   );
 

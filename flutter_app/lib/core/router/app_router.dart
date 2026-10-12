@@ -144,32 +144,78 @@ Page<dynamic> buildSmoothPage({
   required GoRouterState state,
   required Widget child,
 }) {
+  final mediaQuery = MediaQuery.maybeOf(context);
+  final bool reduceMotion = mediaQuery?.disableAnimations ?? false;
+
   return CustomTransitionPage<void>(
     key: state.pageKey,
+    name: state.name ?? state.matchedLocation,
     child: child,
-    transitionDuration: const Duration(milliseconds: 250),
-    reverseTransitionDuration: const Duration(milliseconds: 200),
+    transitionDuration: reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 220),
+    reverseTransitionDuration: reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 180),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      if (reduceMotion) {
+        return child;
+      }
+
       final curvedAnimation = CurvedAnimation(
         parent: animation,
         curve: Curves.easeOutCubic,
         reverseCurve: Curves.easeInCubic,
       );
 
-      final slideAnimation = Tween<Offset>(
-        begin: const Offset(0.0, 0.015),
-        end: Offset.zero,
-      ).animate(curvedAnimation);
-
       return FadeTransition(
         opacity: curvedAnimation,
-        child: SlideTransition(
-          position: slideAnimation,
+        child: AnimatedBuilder(
+          animation: curvedAnimation,
+          builder: (context, child) {
+            final double dx = (1.0 - curvedAnimation.value) * 16.0;
+            return Transform.translate(
+              offset: Offset(dx, 0.0),
+              child: child,
+            );
+          },
           child: child,
         ),
       );
     },
   );
+}
+
+List<RouteBase> _applySmoothTransitions(List<RouteBase> routes) {
+  return routes.map((route) {
+    if (route is GoRoute) {
+      if (route.pageBuilder == null && route.builder != null) {
+        final originalBuilder = route.builder!;
+        return GoRoute(
+          path: route.path,
+          name: route.name,
+          parentNavigatorKey: route.parentNavigatorKey,
+          redirect: route.redirect,
+          routes: _applySmoothTransitions(route.routes),
+          pageBuilder: (context, state) => buildSmoothPage(
+            context: context,
+            state: state,
+            child: originalBuilder(context, state),
+          ),
+        );
+      } else if (route.routes.isNotEmpty) {
+        return GoRoute(
+          path: route.path,
+          name: route.name,
+          parentNavigatorKey: route.parentNavigatorKey,
+          redirect: route.redirect,
+          pageBuilder: route.pageBuilder,
+          routes: _applySmoothTransitions(route.routes),
+        );
+      }
+    }
+    return route;
+  }).toList();
 }
 
 class AuthRouteObserver extends NavigatorObserver {
@@ -305,7 +351,7 @@ final GoRouter appRouter = GoRouter(
 
     return null; // Public routes allowed
   },
-  routes: [
+  routes: _applySmoothTransitions([
     // =========================================================================
     // PUBLIC & AUTHENTICATION ROUTES
     // =========================================================================
@@ -1688,5 +1734,5 @@ final GoRouter appRouter = GoRouter(
       path: '/superadmin/analytics',
       builder: (context, state) => const AnalyticsScreen(),
     ),
-  ],
+  ]),
 );
