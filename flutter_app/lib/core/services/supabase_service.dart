@@ -7681,14 +7681,50 @@ class SupabaseService {
       }
     }
 
-    // 2. Cross-check orders for any pending verification orders not yet in entitlements
+    // 2. Cross-check orders for completed or pending orders
     try {
-      final userOrders = await fetchUserOrders(userId);
+      final userOrders = await fetchUserOrders(userId, userEmail: resolvedEmail);
       for (var ord in userOrders) {
         final ordStatus = (ord['status'] ?? ord['payment_status'] ?? '').toString().trim().toLowerCase();
-        if (ordStatus == 'pending_verification' || ordStatus == 'pending') {
-          final pId = (ord['product_id'] ?? '').toString().trim();
-          final pTitle = (ord['product_name'] ?? ord['title'] ?? '').toString().trim();
+        final isCompleted = ordStatus == 'completed' || ordStatus == 'approved' || ordStatus == 'verified' || ordStatus == 'paid' || ordStatus == 'success';
+        final isPending = ordStatus == 'pending_verification' || ordStatus == 'pending';
+
+        final List<Map<String, String>> targets = [];
+        final pId = (ord['product_id'] ?? '').toString().trim();
+        final pTitle = (ord['product_name'] ?? ord['title'] ?? '').toString().trim();
+        if (pId.isNotEmpty || pTitle.isNotEmpty) {
+          targets.add({'id': pId, 'title': pTitle});
+        }
+        if (ord['items'] is List) {
+          for (var it in (ord['items'] as List).whereType<Map>()) {
+            final itId = (it['id'] ?? it['product_id'] ?? '').toString().trim();
+            final itTitle = (it['title'] ?? it['name'] ?? it['product_name'] ?? '').toString().trim();
+            if (itId.isNotEmpty || itTitle.isNotEmpty) {
+              targets.add({'id': itId, 'title': itTitle});
+            }
+          }
+        }
+
+        if (isCompleted) {
+          final isFree = ord['payment_method'] == 'Free' || (ord['total_amount'] is num && (ord['total_amount'] as num) == 0);
+          final completedData = {
+            'is_enrolled': true,
+            'enrollment_type': isFree ? 'Free' : 'Paid',
+            'status': 'Active',
+            'order_id': ord['order_number'] ?? ord['id'] ?? '',
+            'created_at': ord['created_at'],
+          };
+          for (var t in targets) {
+            final tId = t['id'] ?? '';
+            final tTitle = t['title'] ?? '';
+            if (tId.isNotEmpty) {
+              resultMap[tId.toLowerCase()] = completedData;
+            }
+            if (tTitle.isNotEmpty) {
+              resultMap[tTitle.toLowerCase()] = completedData;
+            }
+          }
+        } else if (isPending) {
           final pendingData = {
             'is_enrolled': false,
             'enrollment_type': 'Paid',
@@ -7696,11 +7732,21 @@ class SupabaseService {
             'order_id': ord['order_number'] ?? ord['id'] ?? '',
             'created_at': ord['created_at'],
           };
-          if (pId.isNotEmpty && !resultMap.containsKey(pId.toLowerCase())) {
-            resultMap[pId.toLowerCase()] = pendingData;
-          }
-          if (pTitle.isNotEmpty && !resultMap.containsKey(pTitle.toLowerCase())) {
-            resultMap[pTitle.toLowerCase()] = pendingData;
+          for (var t in targets) {
+            final tId = t['id'] ?? '';
+            final tTitle = t['title'] ?? '';
+            if (tId.isNotEmpty) {
+              final existing = resultMap[tId.toLowerCase()];
+              if (existing == null || existing['is_enrolled'] != true) {
+                resultMap[tId.toLowerCase()] = pendingData;
+              }
+            }
+            if (tTitle.isNotEmpty) {
+              final existing = resultMap[tTitle.toLowerCase()];
+              if (existing == null || existing['is_enrolled'] != true) {
+                resultMap[tTitle.toLowerCase()] = pendingData;
+              }
+            }
           }
         }
       }
@@ -11375,11 +11421,11 @@ class SupabaseService {
     try {
       var orderQuery = client.from('orders').select();
       if (userId.isNotEmpty && resolvedEmail.isNotEmpty) {
-        orderQuery = orderQuery.or('user_id.eq.$userId,user_email.eq.$resolvedEmail,student_email.eq.$resolvedEmail');
+        orderQuery = orderQuery.or('user_id.eq.$userId,user_email.eq.$resolvedEmail');
       } else if (userId.isNotEmpty) {
         orderQuery = orderQuery.eq('user_id', userId);
       } else if (resolvedEmail.isNotEmpty) {
-        orderQuery = orderQuery.or('user_email.eq.$resolvedEmail,student_email.eq.$resolvedEmail');
+        orderQuery = orderQuery.eq('user_email', resolvedEmail);
       }
 
       final ordersRes = await orderQuery;
@@ -11430,38 +11476,7 @@ class SupabaseService {
       debugPrint('Notice checking Supabase orders for entitlement: $e');
     }
 
-    // 3.5 Check Supabase order_items table (for completed orders)
-    try {
-      final itemsRes = await client.from('order_items').select('*, orders!inner(id, user_id, user_email, student_email, status, payment_status)');
-      if (itemsRes is List && itemsRes.isNotEmpty) {
-        for (var itemRow in itemsRes.whereType<Map>()) {
-          final parentOrder = itemRow['orders'] is Map ? itemRow['orders'] as Map : {};
-          final ordUserId = (parentOrder['user_id'] ?? '').toString();
-          final ordUserEmail = (parentOrder['user_email'] ?? parentOrder['student_email'] ?? '').toString().trim().toLowerCase();
-          final st = (parentOrder['status'] ?? parentOrder['payment_status'] ?? '').toString().trim().toLowerCase();
-          final isCompleted = st == 'completed' || st == 'approved' || st == 'verified' || st == 'paid' || st == 'success';
-          if (!isCompleted) continue;
 
-          final matchesUser = (userId.isNotEmpty && ordUserId == userId) ||
-                              (resolvedEmail.isNotEmpty && ordUserEmail == resolvedEmail);
-          if (!matchesUser) continue;
-
-          final itemPId = (itemRow['product_id'] ?? itemRow['id'] ?? '').toString().trim();
-          final itemPName = (itemRow['title'] ?? itemRow['product_name'] ?? itemRow['name'] ?? '').toString().trim();
-
-          if (_isProductMatch(
-            targetProductId: cleanProductId,
-            targetTitle: productTitle,
-            purchasedProductId: itemPId,
-            purchasedProductName: itemPName,
-          )) {
-            return true;
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Notice checking order_items table for entitlement: $e');
-    }
 
     // 3.6 Check aggregated fetchAdminOrders() (covers system_config cloud order logs)
     try {
@@ -11669,45 +11684,15 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Notice fetching entitlements from Supabase: $e');
     }
-    if (resolvedEmail.isEmpty) {
-      final activeUser = activeUserSession;
-      if (activeUser != null && activeUser.email.isNotEmpty) {
-        resolvedEmail = activeUser.email.trim().toLowerCase();
-      } else {
-        final authUser = client.auth.currentUser;
-        if (authUser != null && authUser.email != null && authUser.email!.isNotEmpty) {
-          resolvedEmail = authUser.email!.trim().toLowerCase();
-        }
-      }
-    }
-
-    try {
-      var query = client.from('entitlements').select();
-      if (userId.isNotEmpty && resolvedEmail.isNotEmpty) {
-        query = query.or('user_id.eq.$userId,user_email.eq.$resolvedEmail');
-      } else if (userId.isNotEmpty) {
-        query = query.eq('user_id', userId);
-      } else if (resolvedEmail.isNotEmpty) {
-        query = query.eq('user_email', resolvedEmail);
-      }
-      final res = await query.order('created_at', ascending: false);
-
-      if (res is List) {
-        results.addAll(res.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
-      }
-    } catch (e) {
-      debugPrint('Notice fetching entitlements from Supabase: $e');
-    }
-
     // Also check completed/approved orders from orders table to synthesize entitlements if missing
     try {
       var orderQuery = client.from('orders').select();
       if (userId.isNotEmpty && resolvedEmail.isNotEmpty) {
-        orderQuery = orderQuery.or('user_id.eq.$userId,user_email.eq.$resolvedEmail,student_email.eq.$resolvedEmail');
+        orderQuery = orderQuery.or('user_id.eq.$userId,user_email.eq.$resolvedEmail');
       } else if (userId.isNotEmpty) {
         orderQuery = orderQuery.eq('user_id', userId);
       } else if (resolvedEmail.isNotEmpty) {
-        orderQuery = orderQuery.or('user_email.eq.$resolvedEmail,student_email.eq.$resolvedEmail');
+        orderQuery = orderQuery.eq('user_email', resolvedEmail);
       }
 
       final ordersRes = await orderQuery;
@@ -11738,6 +11723,100 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Notice synthesizing user entitlements from orders: $e');
     }
+
+    // Also check system_config cloud orders and entitlements
+    try {
+      final configRes = await client.from('system_config').select('*').like('key', 'order_%');
+      if (configRes is List) {
+        for (var row in configRes.whereType<Map>()) {
+          final rawVal = row['value'];
+          Map<String, dynamic>? ord;
+          if (rawVal is Map) {
+            ord = Map<String, dynamic>.from(rawVal);
+          } else if (rawVal is String && rawVal.trim().isNotEmpty) {
+            try {
+              final decoded = jsonDecode(rawVal);
+              if (decoded is Map) ord = Map<String, dynamic>.from(decoded);
+            } catch (_) {}
+          }
+          if (ord != null) {
+            final st = (ord['status'] ?? ord['payment_status'] ?? '').toString().toLowerCase();
+            final isCompleted = st == 'completed' || st == 'approved' || st == 'verified' || st == 'paid' || st == 'success';
+            if (isCompleted) {
+              final ordUid = (ord['user_id'] ?? ord['student_id'] ?? '').toString();
+              final ordEmail = (ord['user_email'] ?? ord['student_email'] ?? '').toString().trim().toLowerCase();
+              final matches = (userId.isNotEmpty && ordUid == userId) ||
+                              (resolvedEmail.isNotEmpty && ordEmail == resolvedEmail);
+              if (matches) {
+                final List<Map<String, String>> targets = [];
+                final pId = (ord['product_id'] ?? '').toString().trim();
+                final pTitle = (ord['product_name'] ?? ord['title'] ?? '').toString().trim();
+                if (pId.isNotEmpty || pTitle.isNotEmpty) targets.add({'id': pId, 'title': pTitle});
+                if (ord['items'] is List) {
+                  for (var it in (ord['items'] as List).whereType<Map>()) {
+                    final itId = (it['id'] ?? it['product_id'] ?? '').toString().trim();
+                    final itTitle = (it['title'] ?? it['name'] ?? it['product_name'] ?? '').toString().trim();
+                    if (itId.isNotEmpty || itTitle.isNotEmpty) targets.add({'id': itId, 'title': itTitle});
+                  }
+                }
+                for (var t in targets) {
+                  final targetId = t['id'] ?? '';
+                  final targetTitle = t['title'] ?? 'Test Series Access';
+                  final ordNum = ord['order_number'] ?? ord['id'];
+                  if (!results.any((r) => (r['product_id']?.toString().toLowerCase() == targetId.toLowerCase() && targetId.isNotEmpty) || r['order_id'] == ordNum)) {
+                    results.add({
+                      'id': ord['id'] ?? 'ent_$ordNum',
+                      'user_id': userId,
+                      'user_email': resolvedEmail,
+                      'product_id': targetId.isNotEmpty ? targetId : 'ts_all_access',
+                      'product_title': targetTitle,
+                      'product_type': 'test_series',
+                      'order_id': ordNum,
+                      'access_type': 'full',
+                      'is_active': true,
+                      'created_at': ord['created_at'] ?? DateTime.now().toIso8601String(),
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice synthesizing user entitlements from system_config orders: $e');
+    }
+
+    // Also check system_config explicit entitlements
+    try {
+      final entConfigRes = await client.from('system_config').select('*').like('key', 'entitlement_%');
+      if (entConfigRes is List) {
+        for (var row in entConfigRes.whereType<Map>()) {
+          final rawVal = row['value'];
+          Map<String, dynamic>? ent;
+          if (rawVal is Map) {
+            ent = Map<String, dynamic>.from(rawVal);
+          } else if (rawVal is String && rawVal.trim().isNotEmpty) {
+            try {
+              final decoded = jsonDecode(rawVal);
+              if (decoded is Map) ent = Map<String, dynamic>.from(decoded);
+            } catch (_) {}
+          }
+          if (ent != null) {
+            final entUid = (ent['user_id'] ?? '').toString();
+            final entEmail = (ent['user_email'] ?? '').toString().trim().toLowerCase();
+            final matches = (userId.isNotEmpty && entUid == userId) ||
+                            (resolvedEmail.isNotEmpty && entEmail == resolvedEmail);
+            if (matches) {
+              final pId = (ent['product_id'] ?? '').toString();
+              if (!results.any((r) => r['product_id'] == pId)) {
+                results.add(ent);
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
 
     // Also merge local cache
     try {
@@ -12259,6 +12338,18 @@ class SupabaseService {
     final expiry = now.add(const Duration(days: 365));
     final cleanOrderId = orderId.trim();
 
+    String? validUserId;
+    if (isValidUuid(user.id)) {
+      validUserId = user.id;
+    } else if (user.email.isNotEmpty) {
+      try {
+        final profile = await getProfileByEmail(user.email);
+        if (profile != null && isValidUuid(profile.id)) {
+          validUserId = profile.id;
+        }
+      } catch (_) {}
+    }
+
     // 1. Primary update orders table
     try {
       final Map<String, dynamic> updatePayload = {
@@ -12268,12 +12359,12 @@ class SupabaseService {
         'payment_method': paymentMethod,
         'updated_at': now.toIso8601String(),
       };
-      if (user.id.isNotEmpty && !user.id.startsWith('usr_')) {
-        updatePayload['user_id'] = user.id;
+
+      if (validUserId != null) {
+        updatePayload['user_id'] = validUserId;
       }
       if (user.email.isNotEmpty) {
         updatePayload['user_email'] = user.email.trim().toLowerCase();
-        updatePayload['student_email'] = user.email.trim().toLowerCase();
       }
       await client.from('orders').update(updatePayload).or('id.eq.$cleanOrderId,order_number.eq.$cleanOrderId,order_id.eq.$cleanOrderId,payment_reference.eq.$cleanOrderId');
     } catch (e) {
@@ -12392,15 +12483,16 @@ class SupabaseService {
       final pId = it['id']?.toString() ?? '';
       final pTitle = it['title']?.toString() ?? 'Test Series';
       final pType = it['product_type']?.toString() ?? 'test_series';
+      final cleanEmail = user.email.trim().toLowerCase();
 
       final ent = {
-        'id': toValidUuid('ent_${now.millisecondsSinceEpoch}_$pId'),
-        'user_id': user.id,
-        'user_email': user.email,
+        'id': toValidUuid('ent_${cleanOrderId}_$pId'),
+        'user_id': validUserId,
+        'user_email': cleanEmail,
         'product_id': pId,
         'product_title': pTitle,
         'product_type': pType,
-        'order_id': orderId,
+        'order_id': cleanOrderId,
         'access_type': 'full',
         'valid_from': now.toIso8601String(),
         'valid_until': expiry.toIso8601String(),
@@ -12409,11 +12501,36 @@ class SupabaseService {
         'updated_at': now.toIso8601String(),
       };
 
+      // 1. Update any existing pending entitlement in database
       try {
-        await client.from('entitlements').insert(ent);
+        await client.from('entitlements').update({
+          'is_active': true,
+          'access_type': 'full',
+          'updated_at': now.toIso8601String(),
+        }).or('order_id.eq.$cleanOrderId,and(user_email.eq.$cleanEmail,product_id.eq.$pId)');
+      } catch (_) {}
+
+      // 2. Insert or upsert new entitlement row
+      try {
+        await client.from('entitlements').upsert(ent);
       } catch (e) {
-        debugPrint('Notice inserting entitlement: $e');
+        debugPrint('Notice upserting entitlement: $e');
+        try {
+          await client.from('entitlements').upsert({
+            ...ent,
+            'user_id': null,
+          });
+        } catch (_) {}
       }
+
+      // 3. Persist to system_config cloud store
+      try {
+        await client.from('system_config').upsert({
+          'key': 'entitlement_${cleanOrderId}_$pId',
+          'value': jsonEncode(ent),
+          'updated_at': now.toIso8601String(),
+        });
+      } catch (_) {}
 
       // If subscription, insert into subscriptions table
       if (pType == 'subscription') {
@@ -12899,9 +13016,9 @@ class SupabaseService {
   }
 
   /// Student: Fetch personal order history for the active user
-  static Future<List<Map<String, dynamic>>> fetchUserOrders(String userId) async {
+  static Future<List<Map<String, dynamic>>> fetchUserOrders(String userId, {String? userEmail}) async {
     final allOrders = await fetchAdminOrders();
-    final currentEmail = activeUserSession?.email.trim().toLowerCase() ?? '';
+    final currentEmail = (userEmail ?? activeUserSession?.email ?? '').trim().toLowerCase();
     final currentPhone = (activeUserSession?.phoneNumber ?? '').replaceAll(RegExp(r'\D'), '');
 
     final userOrders = allOrders.where((o) {

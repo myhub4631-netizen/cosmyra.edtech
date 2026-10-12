@@ -2833,7 +2833,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             OutlinedButton.icon(
-                              onPressed: () => _quickApproveOrder(u, ordNum, pTitle),
+                              onPressed: () => _quickApproveOrder(u, ord),
                               icon: const Icon(Icons.check_circle_outline_rounded, size: 14, color: Color(0xFF059669)),
                               label: const Text('Approve & Grant Access', style: TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.bold)),
                               style: OutlinedButton.styleFrom(
@@ -2968,21 +2968,56 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
     }
   }
 
-  Future<void> _quickApproveOrder(AdminUserModel u, String orderNumber, String title) async {
+  Future<void> _quickApproveOrder(AdminUserModel u, Map<String, dynamic> ord) async {
+    final orderNumber = (ord['order_number'] ?? ord['order_id'] ?? ord['id'] ?? '').toString().trim();
+    final title = (ord['product_title'] ?? ord['product_name'] ?? (ord['items'] is List && (ord['items'] as List).isNotEmpty ? ord['items'][0]['title'] : 'Purchased Product')).toString().trim();
+
+    String uid = u.id;
+    if (!SupabaseService.isValidUuid(uid) && u.email.isNotEmpty) {
+      try {
+        final profile = await SupabaseService.getProfileByEmail(u.email);
+        if (profile != null && SupabaseService.isValidUuid(profile.id)) {
+          uid = profile.id;
+        }
+      } catch (_) {}
+    }
+
     final userProfile = UserProfileModel(
-      id: u.id,
+      id: uid,
       email: u.email,
       fullName: u.name,
       role: 'student',
     );
+
+    List<Map<String, dynamic>> items = [];
+    if (ord['items'] is List && (ord['items'] as List).isNotEmpty) {
+      for (var it in ord['items']) {
+        if (it is Map) {
+          items.add({
+            'id': (it['id'] ?? it['product_id'] ?? ord['product_id'] ?? 'ts_all_access').toString(),
+            'title': (it['title'] ?? it['name'] ?? it['product_name'] ?? title).toString(),
+            'product_type': (it['product_type'] ?? ord['product_type'] ?? 'test_series').toString(),
+          });
+        }
+      }
+    }
+    if (items.isEmpty) {
+      final pId = (ord['product_id'] ?? '').toString().trim();
+      items = [
+        {
+          'id': pId.isNotEmpty ? pId : 'ts_all_access',
+          'title': title,
+          'product_type': (ord['product_type'] ?? 'test_series').toString(),
+        }
+      ];
+    }
+
     final res = await SupabaseService.verifyPaymentAndGrantAccess(
       orderId: orderNumber,
-      paymentId: 'manual_admin_approval_${DateTime.now().millisecondsSinceEpoch}',
-      paymentMethod: 'Admin Override',
+      paymentId: (ord['payment_id'] ?? ord['payment_reference'] ?? 'manual_admin_approval_${DateTime.now().millisecondsSinceEpoch}').toString(),
+      paymentMethod: (ord['payment_method'] ?? 'Admin Override').toString(),
       user: userProfile,
-      items: [
-        {'id': orderNumber, 'title': title, 'type': 'product'},
-      ],
+      items: items,
     );
     if (res['success'] == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

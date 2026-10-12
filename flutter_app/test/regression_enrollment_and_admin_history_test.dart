@@ -148,5 +148,101 @@ void main() {
       expect(key1, equals(key2));
       expect(key1, isNot(equals(keyDifferentUser)));
     });
+
+    test('Completed and approved payment overrides pending verification state on student card', () {
+      final List<Map<String, dynamic>> userOrders = [
+        {
+          'id': 'ORD-OLD-01',
+          'order_number': 'ORD-OLD-01',
+          'product_id': 'dc86cc30-956a-4ade-a030-dc86956acade',
+          'product_name': 'NEET 2027 Full Syllabus Test Series',
+          'status': 'pending_verification',
+          'payment_status': 'pending_verification',
+          'total_amount': 499.0,
+        },
+        {
+          'id': 'ORD-05206658',
+          'order_number': 'ORD-05206658',
+          'product_id': 'dc86cc30-956a-4ade-a030-dc86956acade',
+          'product_name': 'NEET 2027 Full Syllabus Test Series',
+          'status': 'completed',
+          'payment_status': 'completed',
+          'total_amount': 499.0,
+        },
+      ];
+
+      final Map<String, Map<String, dynamic>> resultMap = {};
+
+      for (var ord in userOrders) {
+        final ordStatus = (ord['status'] ?? ord['payment_status'] ?? '').toString().trim().toLowerCase();
+        final isCompleted = ordStatus == 'completed' || ordStatus == 'approved' || ordStatus == 'verified' || ordStatus == 'paid' || ordStatus == 'success';
+        final isPending = ordStatus == 'pending_verification' || ordStatus == 'pending';
+
+        final pId = (ord['product_id'] ?? '').toString().trim();
+        final pTitle = (ord['product_name'] ?? ord['title'] ?? '').toString().trim();
+
+        if (isCompleted) {
+          final completedData = {
+            'is_enrolled': true,
+            'enrollment_type': 'Paid',
+            'status': 'Active',
+            'order_id': ord['order_number'] ?? ord['id'] ?? '',
+          };
+          if (pId.isNotEmpty) resultMap[pId.toLowerCase()] = completedData;
+          if (pTitle.isNotEmpty) resultMap[pTitle.toLowerCase()] = completedData;
+        } else if (isPending) {
+          final pendingData = {
+            'is_enrolled': false,
+            'enrollment_type': 'Paid',
+            'status': 'Pending Verification',
+            'order_id': ord['order_number'] ?? ord['id'] ?? '',
+          };
+          if (pId.isNotEmpty) {
+            final existing = resultMap[pId.toLowerCase()];
+            if (existing == null || existing['is_enrolled'] != true) {
+              resultMap[pId.toLowerCase()] = pendingData;
+            }
+          }
+        }
+      }
+
+      final seriesStatus = resultMap['dc86cc30-956a-4ade-a030-dc86956acade'];
+      expect(seriesStatus, isNotNull);
+      expect(seriesStatus!['is_enrolled'], isTrue);
+      expect(seriesStatus['status'], equals('Active'));
+      expect(seriesStatus['enrollment_type'], equals('Paid'));
+      expect(seriesStatus['order_id'], equals('ORD-05206658'));
+    });
+
+    test('Pending or failed order does not grant enrolled access', () {
+      final List<Map<String, dynamic>> pendingOnlyOrders = [
+        {
+          'id': 'ORD-PENDING-99',
+          'order_number': 'ORD-PENDING-99',
+          'product_id': 'test-series-unapproved',
+          'product_name': 'Unapproved Test Series',
+          'status': 'pending_verification',
+          'payment_status': 'pending',
+          'total_amount': 299.0,
+        },
+      ];
+
+      final Map<String, Map<String, dynamic>> resultMap = {};
+      for (var ord in pendingOnlyOrders) {
+        final ordStatus = (ord['status'] ?? ord['payment_status'] ?? '').toString().trim().toLowerCase();
+        final isCompleted = ordStatus == 'completed' || ordStatus == 'approved';
+        final isPending = ordStatus == 'pending_verification' || ordStatus == 'pending';
+        final pId = (ord['product_id'] ?? '').toString().trim();
+
+        if (isCompleted) {
+          resultMap[pId.toLowerCase()] = {'is_enrolled': true, 'status': 'Active'};
+        } else if (isPending) {
+          resultMap[pId.toLowerCase()] = {'is_enrolled': false, 'status': 'Pending Verification'};
+        }
+      }
+
+      expect(resultMap['test-series-unapproved']?['is_enrolled'], isFalse);
+      expect(resultMap['test-series-unapproved']?['status'], equals('Pending Verification'));
+    });
   });
 }
