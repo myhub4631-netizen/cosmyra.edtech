@@ -5,6 +5,10 @@
     "build": "echo 'Deploying pre-built Flutter Web application from public directory'",
     "build-local": "cd flutter_app && flutter build web --release && rm -rf ../public/* && cp -r build/web/* ../public/",
     "sync-public": "rm -rf public/* && cp -r flutter_app/build/web/* public/",
-    "start": "cd flutter_app && flutter run -d chrome"
+    "start": "cd flutter_app && flutter run -d chrome",
+    "build-v2": "cd cosmyra_neet_jee_v2 && flutter build web --release && rm -rf ../public/* && cp -r build/web/* ../public/",
+    "sync-public-v2": "rm -rf public/* && cp -r cosmyra_neet_jee_v2/build/web/* public/",
+    "test-v2": "cd cosmyra_neet_jee_v2 && flutter test",
+    "start-v2": "cd cosmyra_neet_jee_v2 && flutter run -d chrome"
   }
 }

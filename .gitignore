@@ -12,6 +12,8 @@ node_modules/
 
 # Flutter build outputs
 flutter_app/build/
+cosmyra_neet_jee_v2/build/
+cosmyra_neet_jee_v2/.dart_tool/
 build/
 
 # Environment secrets
@@ -24,6 +26,11 @@ flutter_app/ios/Pods/
 flutter_app/ios/.symlinks/
 flutter_app/ios/Flutter/Flutter.framework
 flutter_app/ios/Flutter/Flutter.podspec
+cosmyra_neet_jee_v2/android/local.properties
+cosmyra_neet_jee_v2/ios/Pods/
+cosmyra_neet_jee_v2/ios/.symlinks/
+cosmyra_neet_jee_v2/ios/Flutter/Flutter.framework
+cosmyra_neet_jee_v2/ios/Flutter/Flutter.podspec
 .github/
 *.apk
 .tmp.driveupload/
