@@ -1362,7 +1362,7 @@ class _TestRunnerLoaderScreenState extends State<TestRunnerLoaderScreen> {
       debugPrint('Notice loading paper questions: $e');
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = 'Failed to load test questions. Please check your connection and tap Retry.';
         _state = TestLoaderState.error;
       });
     }

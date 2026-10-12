@@ -7985,7 +7985,192 @@ class SupabaseService {
       }
     }
 
-    // 0. Check relational join tables (paper_questions / test_questions) first for question references
+    // 0. Check custom paper metadata from system_config (authoritative for created/linked papers)
+    try {
+      Map<String, dynamic>? customPaperMeta;
+      try {
+        final pRes = await client.from('system_config').select('value').eq('key', 'admin_custom_papers').maybeSingle();
+        if (pRes != null && pRes['value'] != null) {
+          final dynamic raw = pRes['value'] is String ? jsonDecode(pRes['value']) : pRes['value'];
+          if (raw is List) {
+            for (var item in raw) {
+              if (item is Map) {
+                final id = (item['id'] ?? item['paper_id'] ?? '').toString();
+                final name = (item['paper_name'] ?? item['paperName'] ?? item['title'] ?? '').toString().trim().toLowerCase();
+                if (id == paperId || id == paperUuid || (targetName.isNotEmpty && name == targetName.toLowerCase())) {
+                  customPaperMeta = Map<String, dynamic>.from(item);
+                  break;
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Notice checking admin_custom_papers: $e');
+      }
+
+      if (customPaperMeta == null) {
+        try {
+          final tsRes = await client.from('system_config').select('value').eq('key', 'admin_custom_test_series').maybeSingle();
+          if (tsRes != null && tsRes['value'] != null) {
+            final dynamic raw = tsRes['value'] is String ? jsonDecode(tsRes['value']) : tsRes['value'];
+            if (raw is List) {
+              for (var ts in raw) {
+                if (ts is Map && ts['tests'] is List) {
+                  for (var t in (ts['tests'] as List)) {
+                    if (t is Map) {
+                      final id = (t['id'] ?? t['paper_id'] ?? '').toString();
+                      final name = (t['title'] ?? t['name'] ?? '').toString().trim().toLowerCase();
+                      if (id == paperId || id == paperUuid || (targetName.isNotEmpty && name == targetName.toLowerCase())) {
+                        customPaperMeta = Map<String, dynamic>.from(t);
+                        break;
+                      }
+                    }
+                  }
+                }
+                if (customPaperMeta != null) break;
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Notice checking admin_custom_test_series: $e');
+        }
+      }
+
+      // Case A: Custom paper has explicit question UUIDs
+      if (customPaperMeta != null &&
+          (customPaperMeta['question_ids'] is List || customPaperMeta['questionIds'] is List)) {
+        final rawQIds = (customPaperMeta['question_ids'] ?? customPaperMeta['questionIds']) as List;
+        final List<String> qIds = rawQIds.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+        if (qIds.isNotEmpty) {
+          final List<Map<String, dynamic>> rawQList = [];
+          for (int i = 0; i < qIds.length; i += 100) {
+            final chunk = qIds.sublist(i, (i + 100 > qIds.length) ? qIds.length : i + 100);
+            final chunkRes = await client.from('questions').select().inFilter('id', chunk);
+            if (chunkRes != null && (chunkRes as List).isNotEmpty) {
+              rawQList.addAll((chunkRes as List).map((r) => Map<String, dynamic>.from(r as Map)));
+            }
+          }
+
+          if (rawQList.isNotEmpty) {
+            final Map<String, Map<String, dynamic>> qMap = {};
+            for (var row in rawQList) {
+              final qDict = processEnumerateInQuestionMap(row);
+              qMap[qDict['id'].toString()] = qDict;
+            }
+
+            for (int i = 0; i < qIds.length; i++) {
+              final qId = qIds[i];
+              if (qMap.containsKey(qId)) {
+                final dict = Map<String, dynamic>.from(qMap[qId]!);
+                dict['question_number'] = i + 1;
+                dict['sequence_order'] = i + 1;
+                final curSub = dict['subject']?.toString().trim() ?? '';
+                if (curSub.isEmpty || curSub.length >= 35 || curSub.toLowerCase().contains('uuid')) {
+                  final subId = dict['subject_id']?.toString() ?? '';
+                  if (subId.isNotEmpty) {
+                    final mapped = NeetSubjectHelper.getSubjectNameFromId(subId);
+                    if (mapped.isNotEmpty && mapped != subId) {
+                      dict['subject'] = mapped;
+                      dict['subject_name'] = mapped;
+                    }
+                  }
+                }
+                results.add(dict);
+              }
+            }
+          }
+
+          if (results.isNotEmpty) {
+            await enrichQuestionOptions(results);
+            _cachedPaperQuestions[cacheKey] = results;
+            _paperQuestionsCacheTime[cacheKey] = DateTime.now();
+
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              final encoded = jsonEncode(results);
+              await prefs.setString('cosmyra_paper_questions_$paperId', encoded);
+              await prefs.setString('cosmyra_paper_questions_$paperUuid', encoded);
+            } catch (_) {}
+
+            return results;
+          }
+        }
+      }
+
+      // Case B: Custom paper references source paper and selection mode
+      if (customPaperMeta != null &&
+          (customPaperMeta['source_paper_id'] != null || customPaperMeta['source_paper_name'] != null || customPaperMeta['source_paper'] != null) &&
+          customPaperMeta['selection_mode'] != null) {
+        final srcId = (customPaperMeta['source_paper_id'] ?? '').toString();
+        final srcName = (customPaperMeta['source_paper_name'] ?? customPaperMeta['source_paper'] ?? '').toString();
+        final mode = customPaperMeta['selection_mode'].toString().toLowerCase().trim();
+
+        final srcKey = srcId.isNotEmpty ? srcId : srcName;
+        if (srcKey.isNotEmpty && srcKey != paperId && srcKey != paperUuid) {
+          final srcQuestions = await fetchQuestionsForPaper(srcKey, paperName: srcName.isNotEmpty ? srcName : null);
+          if (srcQuestions.isNotEmpty) {
+            final filtered = srcQuestions.where((q) {
+              final sId = (q['subject_id'] ?? '').toString().trim();
+              final rawNum = q['question_number'] ?? q['questionNumber'] ?? 0;
+              final int qNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum.toString()) ?? 0;
+              if (mode == 'biology') {
+                if (sId == 'a3333333-3333-3333-3333-333333333333') return true;
+                final sName = (q['subject'] ?? '').toString().toLowerCase();
+                if (sName.contains('bio') || sName.contains('botan') || sName.contains('zool')) return true;
+                if (qNum >= 91 && qNum <= 180) return true;
+                return false;
+              } else if (mode == 'physics') {
+                if (sId == 'a1111111-1111-1111-1111-111111111111') return true;
+                final sName = (q['subject'] ?? '').toString().toLowerCase();
+                if (sName.contains('phys')) return true;
+                if (qNum >= 1 && qNum <= 45) return true;
+                return false;
+              } else if (mode == 'chemistry') {
+                if (sId == 'a2222222-2222-2222-2222-222222222222') return true;
+                final sName = (q['subject'] ?? '').toString().toLowerCase();
+                if (sName.contains('chem')) return true;
+                if (qNum >= 46 && qNum <= 90) return true;
+                return false;
+              }
+              return true;
+            }).toList();
+
+            filtered.sort((a, b) {
+              final numA = (a['question_number'] ?? a['questionNumber'] ?? 0) as int;
+              final numB = (b['question_number'] ?? b['questionNumber'] ?? 0) as int;
+              return numA.compareTo(numB);
+            });
+
+            for (int i = 0; i < filtered.length; i++) {
+              final qCopy = Map<String, dynamic>.from(filtered[i]);
+              qCopy['question_number'] = i + 1;
+              qCopy['sequence_order'] = i + 1;
+              results.add(qCopy);
+            }
+
+            if (results.isNotEmpty) {
+              await enrichQuestionOptions(results);
+              _cachedPaperQuestions[cacheKey] = results;
+              _paperQuestionsCacheTime[cacheKey] = DateTime.now();
+
+              try {
+                final prefs = await SharedPreferences.getInstance();
+                final encoded = jsonEncode(results);
+                await prefs.setString('cosmyra_paper_questions_$paperId', encoded);
+                await prefs.setString('cosmyra_paper_questions_$paperUuid', encoded);
+              } catch (_) {}
+
+              return results;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice resolving custom paper questions: $e');
+    }
+
+    // 1. Check relational join tables (paper_questions / test_questions)
     try {
       dynamic pqRes;
       try {
@@ -8000,77 +8185,19 @@ class SupabaseService {
         try {
           pqRes = await client
               .from('test_questions')
-              .select('question_id, order_index, marks, negative_marks')
+              .select('question_id, sequence_order, marks, negative_marks')
               .or('test_id.eq.$paperId,test_id.eq.$paperUuid')
-              .order('order_index', ascending: true);
-        } catch (_) {}
-      }
-
-      if (pqRes != null && (pqRes as List).isNotEmpty) {
-        final List<String> qIds = [];
-        final Map<String, Map<String, dynamic>> pqMeta = {};
-        for (var row in (pqRes as List)) {
-          final qId = row['question_id']?.toString() ?? '';
-          if (qId.isNotEmpty) {
-            qIds.add(qId);
-            pqMeta[qId] = Map<String, dynamic>.from(row as Map);
-          }
-        }
-
-        if (qIds.isNotEmpty) {
-          final qRes = await client.from('questions').select().inFilter('id', qIds);
-          if (qRes != null && (qRes as List).isNotEmpty) {
-            final Map<String, Map<String, dynamic>> qMap = {};
-            for (var row in (qRes as List)) {
-              final qDict = processEnumerateInQuestionMap(Map<String, dynamic>.from(row as Map));
-              qMap[qDict['id'].toString()] = qDict;
-            }
-
-            for (int i = 0; i < qIds.length; i++) {
-              final qId = qIds[i];
-              if (qMap.containsKey(qId)) {
-                final dict = Map<String, dynamic>.from(qMap[qId]!);
-                final meta = pqMeta[qId];
-                if (meta != null) {
-                  final seq = meta['sequence_order'] ?? meta['order_index'] ?? (i + 1);
-                  dict['question_number'] = seq;
-                  dict['sequence_order'] = seq;
-                  if (meta['section_name'] != null) dict['section_name'] = meta['section_name'];
-                  if (meta['marks'] != null) dict['marks'] = meta['marks'];
-                  if (meta['negative_marks'] != null) dict['negative_marks'] = meta['negative_marks'];
-                }
-                results.add(dict);
-              }
-            }
-          }
-        }
-
-        if (results.isNotEmpty) {
-          await enrichQuestionOptions(results);
-          results.sort((a, b) {
-            final numA = (a['question_number'] ?? a['sequence_order'] ?? 999) as int;
-            final numB = (b['question_number'] ?? b['sequence_order'] ?? 999) as int;
-            return numA.compareTo(numB);
-          });
-          _cachedPaperQuestions[cacheKey] = results;
-          _paperQuestionsCacheTime[cacheKey] = DateTime.now();
-          return results;
+              .order('sequence_order', ascending: true);
+        } catch (_) {
+          try {
+            pqRes = await client
+                .from('test_questions')
+                .select('question_id, order_index, marks, negative_marks')
+                .or('test_id.eq.$paperId,test_id.eq.$paperUuid')
+                .order('order_index', ascending: true);
+          } catch (_) {}
         }
       }
-    } catch (e) {
-      debugPrint('Notice checking join table: $e');
-    }
-
-    // 1. Check join tables (test_questions) first if applicable
-    try {
-      dynamic pqRes;
-      try {
-        pqRes = await client
-            .from('test_questions')
-            .select('question_id, order_index, marks, negative_marks')
-            .or('test_id.eq.$paperId,test_id.eq.$paperUuid')
-            .order('order_index', ascending: true);
-      } catch (_) {}
 
       if (pqRes != null && (pqRes as List).isNotEmpty) {
         final List<String> qIds = [];
@@ -8106,7 +8233,7 @@ class SupabaseService {
                 final dict = Map<String, dynamic>.from(qMap[qId]!);
                 final meta = pqMeta[qId];
                 if (meta != null) {
-                  final seq = meta['order_index'] ?? meta['sequence_order'] ?? (i + 1);
+                  final seq = meta['sequence_order'] ?? meta['order_index'] ?? (i + 1);
                   dict['question_number'] = seq;
                   dict['sequence_order'] = seq;
                   if (meta['section_name'] != null) dict['section_name'] = meta['section_name'];
@@ -8129,7 +8256,6 @@ class SupabaseService {
           _cachedPaperQuestions[cacheKey] = results;
           _paperQuestionsCacheTime[cacheKey] = DateTime.now();
 
-          // Sync to SharedPreferences
           try {
             final prefs = await SharedPreferences.getInstance();
             final encoded = jsonEncode(results);
@@ -8332,6 +8458,11 @@ class SupabaseService {
       source: (map['sourceType'] ?? map['source_type'] ?? map['source'] ?? map['category'] ?? 'pyq').toString().toLowerCase(),
       sourceName: map['paperName']?.toString() ?? map['paper_name']?.toString() ?? map['sourceType']?.toString() ?? 'Test Series Question',
       year: (map['year'] is num) ? (map['year'] as num).toInt() : int.tryParse(map['year']?.toString() ?? '2026'),
+      questionNumber: (map['question_number'] is num)
+          ? (map['question_number'] as num).toInt()
+          : (map['questionNumber'] is num
+              ? (map['questionNumber'] as num).toInt()
+              : int.tryParse(map['question_number']?.toString() ?? map['questionNumber']?.toString() ?? '')),
       marks: (map['marks'] is num) ? (map['marks'] as num).toDouble() : double.tryParse(map['marks']?.toString() ?? '4') ?? 4.0,
       negativeMarks: (map['negativeMarks'] is num) ? (map['negativeMarks'] as num).toDouble() : double.tryParse(map['negativeMarks']?.toString() ?? '1') ?? 1.0,
       explanation: map['explanation']?.toString() ?? '',
@@ -9200,6 +9331,11 @@ class SupabaseService {
     final String paperId = paperDetails['id'] ?? toValidUuid('paper_ts_${DateTime.now().millisecondsSinceEpoch}');
     final String paperName = paperDetails['paper_name'] ?? paperDetails['paperName'] ?? 'Test Series Paper';
 
+    final List<String> questionIdList = uniqueQuestions
+        .map((q) => (q['id'] ?? q['question_id'] ?? '').toString().trim())
+        .where((id) => id.isNotEmpty)
+        .toList();
+
     // 2. Prepare Paper DB Payload
     final Map<String, dynamic> paperPayload = {
       'id': paperId,
@@ -9224,6 +9360,7 @@ class SupabaseService {
       'subjects': paperDetails['subjects'] ?? ['Biology', 'Botany', 'Zoology'],
       'instructions': paperDetails['instructions'] ?? '',
       'status': 'Published',
+      'question_ids': questionIdList,
       'source_paper_id': paperDetails['source_paper_id'],
       'source_paper_name': paperDetails['source_paper_name'],
       'source_paper': paperDetails['source_paper_name'] ?? paperDetails['source_paper'],
@@ -9249,13 +9386,31 @@ class SupabaseService {
         List<dynamic> existingTests = [];
         Map<String, dynamic>? existingTsRow;
 
+        // Try direct lookup
         if (tsId != null && tsId.isNotEmpty) {
-          final res = await client.from('test_series').select().eq('id', tsId).maybeSingle();
-          if (res != null) existingTsRow = Map<String, dynamic>.from(res);
+          try {
+            final res = await client.from('test_series').select().eq('id', tsId).maybeSingle();
+            if (res != null) existingTsRow = Map<String, dynamic>.from(res);
+          } catch (_) {}
         }
         if (existingTsRow == null && tsTitle.isNotEmpty) {
-          final res = await client.from('test_series').select().ilike('title', tsTitle).maybeSingle();
-          if (res != null) existingTsRow = Map<String, dynamic>.from(res);
+          try {
+            final res = await client.from('test_series').select().ilike('title', tsTitle).maybeSingle();
+            if (res != null) existingTsRow = Map<String, dynamic>.from(res);
+          } catch (_) {}
+        }
+
+        // Fallback to fetchAllTestSeries() / system_config
+        if (existingTsRow == null) {
+          try {
+            final allSeries = await fetchAllTestSeries();
+            final matchIdx = allSeries.indexWhere((s) =>
+                (tsId != null && s['id']?.toString() == tsId) ||
+                (tsTitle.isNotEmpty && (s['title'] ?? s['name'] ?? '').toString().trim().toLowerCase() == tsTitle.toLowerCase()));
+            if (matchIdx != -1) {
+              existingTsRow = Map<String, dynamic>.from(allSeries[matchIdx]);
+            }
+          } catch (_) {}
         }
 
         if (existingTsRow != null && existingTsRow['tests'] is List) {
@@ -9270,6 +9425,7 @@ class SupabaseService {
           'source_paper_id': paperDetails['source_paper_id'],
           'source_paper_name': paperDetails['source_paper_name'],
           'selection_mode': paperDetails['selection_mode'],
+          'question_ids': questionIdList,
           'questions': uniqueQuestions.length,
           'marks': paperPayload['total_marks'],
           'duration': paperPayload['duration_minutes'],
@@ -9288,13 +9444,15 @@ class SupabaseService {
         }
 
         final tsPayload = {
-          'title': tsTitle.isNotEmpty ? tsTitle : paperName,
+          if (existingTsRow != null) ...existingTsRow,
+          'title': tsTitle.isNotEmpty ? tsTitle : (existingTsRow?['title'] ?? paperName),
+          'name': tsTitle.isNotEmpty ? tsTitle : (existingTsRow?['name'] ?? paperName),
           'description': testSeriesDetails['description'] ?? (existingTsRow?['description'] ?? 'Curated test series'),
-          'exam': paperDetails['exam'] ?? 'NEET',
-          'year': (paperDetails['year'] ?? '2026').toString(),
+          'exam': paperDetails['exam'] ?? (existingTsRow?['exam'] ?? 'NEET'),
+          'year': (paperDetails['year'] ?? (existingTsRow?['year'] ?? '2026')).toString(),
           'category': 'Test Series',
-          'price': testSeriesDetails['price'] ?? 299.00,
-          'original_price': testSeriesDetails['original_price'] ?? 999.00,
+          'price': testSeriesDetails['price'] ?? (existingTsRow?['price'] ?? 299.00),
+          'original_price': testSeriesDetails['original_price'] ?? (existingTsRow?['original_price'] ?? 999.00),
           'banner_image_url': testSeriesDetails['banner_image_url'] ?? (existingTsRow?['banner_image_url'] ?? ''),
           'paper_id': paperId,
           'paper_name': paperName,
@@ -9336,7 +9494,6 @@ class SupabaseService {
 
     if (pqRows.isNotEmpty) {
       try {
-        // Delete existing relationships for clean atomic update
         await client.from('paper_questions').delete().eq('paper_id', paperId);
         await client.from('paper_questions').insert(pqRows);
       } catch (e) {
@@ -9349,12 +9506,14 @@ class SupabaseService {
           uniqueQuestions.asMap().entries.map((e) => {
             'test_id': paperId,
             'question_id': (e.value['id'] ?? e.value['question_id'] ?? '').toString(),
-            'order_index': e.key + 1,
+            'sequence_order': e.key + 1,
             'marks': e.value['marks'] != null ? double.tryParse(e.value['marks'].toString()) ?? 4.0 : 4.0,
             'negative_marks': e.value['negative_marks'] != null ? double.tryParse(e.value['negative_marks'].toString()) ?? 1.0 : 1.0,
           }).toList(),
         );
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Notice inserting test_questions relationships: $e');
+      }
     }
 
     // 5. Cache locally in SharedPreferences for instant UI availability

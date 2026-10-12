@@ -1891,7 +1891,7 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
               ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981), foregroundColor: Colors.white),
                 icon: const Icon(Icons.link_rounded, size: 16),
-                onPressed: () {
+                onPressed: () async {
                   final destTestName = testNameCtrl.text.trim().isNotEmpty
                       ? testNameCtrl.text.trim()
                       : srcPaperName;
@@ -1911,28 +1911,27 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
 
                   final destTestId = SupabaseService.toValidUuid('test_ts_${DateTime.now().millisecondsSinceEpoch}_${_tests.length + 1}');
 
-                  setState(() {
-                    _tests.add({
-                      'id': destTestId,
-                      'paper_id': destTestId,
-                      'source_paper_id': pId,
-                      'source_paper_name': srcPaperName,
-                      'selection_mode': selectedMode,
-                      'title': destTestName,
-                      'questions': qCount,
-                      'marks': marks,
-                      'duration': duration,
-                      'type': _testType,
-                      'status': 'Not Attempted',
-                    });
-                    _testCountCtrl.text = _tests.length.toString();
-                  });
+                  Navigator.pop(ctx);
 
-                  // Persist question relationships for linked test
-                  SupabaseService.fetchQuestionsForPaper(pId, paperName: srcPaperName).then((srcQuestions) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                          const SizedBox(width: 12),
+                          Expanded(child: Text('Linking "$destTestName" to series...')),
+                        ],
+                      ),
+                      duration: const Duration(seconds: 4),
+                    ),
+                  );
+
+                  try {
+                    final srcQuestions = await SupabaseService.fetchQuestionsForPaper(pId, paperName: srcPaperName);
                     final filtered = srcQuestions.where((q) {
                       final sId = (q['subject_id'] ?? '').toString().trim();
-                      final qNum = int.tryParse((q['question_number'] ?? '0').toString()) ?? 0;
+                      final rawNum = q['question_number'] ?? q['questionNumber'] ?? 0;
+                      final int qNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum.toString()) ?? 0;
                       if (selectedMode == 'biology') {
                         if (sId == 'a3333333-3333-3333-3333-333333333333') return true;
                         final sName = (q['subject'] ?? '').toString().toLowerCase();
@@ -1955,36 +1954,78 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                       return true;
                     }).toList();
 
-                    if (filtered.isNotEmpty) {
-                      SupabaseService.createTestSeriesPaperFromExistingQuestions(
-                        paperDetails: {
-                          'id': destTestId,
-                          'paper_name': destTestName,
-                          'destination_test_name': destTestName,
-                          'source_paper_id': pId,
-                          'source_paper_name': srcPaperName,
-                          'selection_mode': selectedMode,
-                          'exam': _exam,
-                          'year': int.tryParse(_year) ?? 2026,
-                          'total_marks': marks,
-                          'duration_minutes': duration,
-                        },
-                        selectedQuestionItems: filtered,
-                        testSeriesDetails: {
-                          'id': _seriesId.isNotEmpty ? _seriesId : SupabaseService.toValidUuid('ts_${_titleCtrl.text}'),
-                          'title': _titleCtrl.text,
-                        },
-                      );
-                    }
-                  });
+                    filtered.sort((a, b) {
+                      final numA = (a['question_number'] ?? a['questionNumber'] ?? 0) as int;
+                      final numB = (b['question_number'] ?? b['questionNumber'] ?? 0) as int;
+                      return numA.compareTo(numB);
+                    });
 
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('✓ Linked "$destTestName" ($qCount Qs) from $srcPaperName!'),
-                      backgroundColor: const Color(0xFF10B981),
-                    ),
-                  );
+                    final List<String> questionIds = filtered
+                        .map((q) => (q['id'] ?? q['question_id'] ?? '').toString().trim())
+                        .where((id) => id.isNotEmpty)
+                        .toList();
+
+                    final newTestRecord = {
+                      'id': destTestId,
+                      'paper_id': destTestId,
+                      'source_paper_id': pId,
+                      'source_paper_name': srcPaperName,
+                      'selection_mode': selectedMode,
+                      'question_ids': questionIds,
+                      'title': destTestName,
+                      'questions': filtered.isNotEmpty ? filtered.length : qCount,
+                      'marks': marks,
+                      'duration': duration,
+                      'type': _testType,
+                      'status': 'Published',
+                    };
+
+                    setState(() {
+                      _tests.add(newTestRecord);
+                      _testCountCtrl.text = _tests.length.toString();
+                    });
+
+                    final effectiveSeriesId = _seriesId.isNotEmpty
+                        ? _seriesId
+                        : SupabaseService.toValidUuid('ts_${_titleCtrl.text}');
+
+                    await SupabaseService.createTestSeriesPaperFromExistingQuestions(
+                      paperDetails: {
+                        'id': destTestId,
+                        'paper_name': destTestName,
+                        'destination_test_name': destTestName,
+                        'source_paper_id': pId,
+                        'source_paper_name': srcPaperName,
+                        'selection_mode': selectedMode,
+                        'question_ids': questionIds,
+                        'exam': _exam,
+                        'year': int.tryParse(_year) ?? 2026,
+                        'total_marks': marks,
+                        'duration_minutes': duration,
+                      },
+                      selectedQuestionItems: filtered,
+                      testSeriesDetails: {
+                        'id': effectiveSeriesId,
+                        'title': _titleCtrl.text,
+                      },
+                    );
+
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('✓ Successfully linked "$destTestName" (${filtered.length} Qs) to series!'),
+                        backgroundColor: const Color(0xFF10B981),
+                      ),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error linking paper: $e'),
+                        backgroundColor: const Color(0xFFEF4444),
+                      ),
+                    );
+                  }
                 },
                 label: const Text('Link Paper'),
               ),
@@ -3208,6 +3249,8 @@ class _TestSeriesEditorDialogState extends State<_TestSeriesEditorDialog> with S
                                       'source_category': 'Test Series',
                                       'testSeriesTitle': _titleCtrl.text,
                                       'test_series_title': _titleCtrl.text,
+                                      'testSeriesId': _seriesId,
+                                      'test_series_id': _seriesId,
                                       'existingTestSeries': _titleCtrl.text,
                                       'existingPaper': paperTitle,
                                       'questionCount': qCount,
