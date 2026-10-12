@@ -115,5 +115,11 @@ void main() {
       expect(SupabaseService.cachedTestSeries, isEmpty);
       expect(SupabaseService.cachedDbPapers, isEmpty);
     });
+
+    test('5. Logout clears active session and invalidates user-scoped caches', () async {
+      await SupabaseService.logoutUserSession();
+      expect(SupabaseService.activeUserSession, isNull);
+      expect(SupabaseService.authNotifier.value, isNull);
+    });
   });
 }

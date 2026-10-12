@@ -269,6 +269,7 @@ class SupabaseService {
         } else if (event == AuthChangeEvent.signedOut) {
           activeUserSession = null;
           authNotifier.value = null;
+          invalidateEnrollmentCache();
           try {
             final prefs = await SharedPreferences.getInstance();
             await prefs.remove('cosmyra_active_user_session');
@@ -289,6 +290,14 @@ class SupabaseService {
       final initialProfile = await getCurrentUser();
       if (initialProfile != null) {
         authNotifier.value = initialProfile;
+      } else {
+        // If server confirms no valid session, clear active session
+        final hasSupabaseSession = client.auth.currentSession != null;
+        if (!hasSupabaseSession) {
+          activeUserSession = null;
+          authNotifier.value = null;
+          invalidateEnrollmentCache();
+        }
       }
     } catch (_) {}
   }
@@ -617,6 +626,7 @@ class SupabaseService {
   static Future<void> logoutUserSession() async {
     activeUserSession = null;
     authNotifier.value = null;
+    invalidateEnrollmentCache();
     try {
       await client.auth.signOut();
       final prefs = await SharedPreferences.getInstance();
