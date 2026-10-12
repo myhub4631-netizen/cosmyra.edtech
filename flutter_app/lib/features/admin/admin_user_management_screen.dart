@@ -114,6 +114,10 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   bool _isLoadingUserDetailData = false;
   List<Map<String, dynamic>> _userSubscriptions = [];
   List<Map<String, dynamic>> _userEntitlements = [];
+  List<Map<String, dynamic>> _userAdminEnrollments = [];
+  List<Map<String, dynamic>> _userAdminOrders = [];
+  String _purchasesSubTab = 'All'; // 'All', 'Test Series', 'Orders'
+  String _purchasesStatusFilter = 'All'; // 'All', 'Free', 'Paid', 'Active', 'Pending', 'Revoked'
   Map<String, dynamic>? _userPerformance;
   List<Map<String, dynamic>> _userActivityLogs = [];
   List<Map<String, dynamic>> _availablePlansForModal = [];
@@ -131,6 +135,8 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
     try {
       final subs = await SupabaseService.getUserSubscriptions(u.id, userEmail: u.email);
       final ents = await SupabaseService.getUserEntitlements(u.id, userEmail: u.email);
+      final enrollments = await SupabaseService.getUserEnrollmentsForAdmin(userId: u.id, userEmail: u.email);
+      final orders = await SupabaseService.getUserOrdersForAdmin(userId: u.id, userEmail: u.email);
       final perf = await SupabaseService.getUserPerformanceAnalytics(u.id, userEmail: u.email);
       final logs = await SupabaseService.getUserActivityLogs(u.id, userEmail: u.email);
       final plans = await SupabaseService.fetchSubscriptionPlans();
@@ -140,6 +146,8 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         setState(() {
           _userSubscriptions = subs;
           _userEntitlements = ents;
+          _userAdminEnrollments = enrollments;
+          _userAdminOrders = orders;
           _userPerformance = perf;
           _userActivityLogs = logs;
           _availablePlansForModal = plans;
@@ -2147,9 +2155,34 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
   Widget _buildInspectorPurchasesTab(AdminUserModel u) {
     if (_isLoadingUserDetailData) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 30),
-        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF4F46E5)),
+              SizedBox(height: 12),
+              Text('Loading purchase & enrollment history...', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+            ],
+          ),
+        ),
       );
+    }
+
+    // 1. Calculate Summary Metrics
+    final int activeSeriesCount = _userAdminEnrollments.where((e) => e['is_active'] == true).length;
+    final int paidSeriesCount = _userAdminEnrollments.where((e) => e['enrollment_type'] == 'Paid').length;
+    final int freeSeriesCount = _userAdminEnrollments.where((e) => e['enrollment_type'] == 'Free').length;
+    final int productOrdersCount = _userAdminOrders.length;
+
+    double totalSpend = 0.0;
+    for (var ord in _userAdminOrders) {
+      final pStatus = (ord['payment_status'] ?? '').toString().toLowerCase();
+      final ordStatus = (ord['status'] ?? '').toString().toLowerCase();
+      if (pStatus == 'completed' || pStatus == 'paid' || ordStatus == 'completed') {
+        final amt = (ord['total_amount'] as num?)?.toDouble() ?? 0.0;
+        totalSpend += amt;
+      }
     }
 
     final activeSub = _userSubscriptions.firstWhere(
@@ -2163,11 +2196,120 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         : 'Lifetime / Free';
     final subStatus = activeSub['status'] ?? 'Active';
 
+    // 2. Filter records based on sub-tab and status filter
+    final filteredEnrollments = _userAdminEnrollments.where((e) {
+      if (_purchasesStatusFilter == 'Free' && e['enrollment_type'] != 'Free') return false;
+      if (_purchasesStatusFilter == 'Paid' && e['enrollment_type'] != 'Paid') return false;
+      if (_purchasesStatusFilter == 'Active' && e['is_active'] != true) return false;
+      if (_purchasesStatusFilter == 'Revoked' && e['is_active'] == true) return false;
+      if (_purchasesStatusFilter == 'Pending') {
+        final pStat = (e['payment_status'] ?? '').toString().toLowerCase();
+        final aStat = (e['access_status'] ?? '').toString().toLowerCase();
+        if (!pStat.contains('pending') && !aStat.contains('pending')) return false;
+      }
+      return true;
+    }).toList();
+
+    final filteredOrders = _userAdminOrders.where((ord) {
+      if (_purchasesStatusFilter == 'Paid') {
+        final pStat = (ord['payment_status'] ?? '').toString().toLowerCase();
+        return pStat == 'completed' || pStat == 'paid';
+      }
+      if (_purchasesStatusFilter == 'Free') {
+        final pMethod = (ord['payment_method'] ?? '').toString().toLowerCase();
+        final amt = (ord['total_amount'] as num?)?.toDouble() ?? 0.0;
+        return pMethod == 'free' || amt == 0.0;
+      }
+      if (_purchasesStatusFilter == 'Pending') {
+        final pStat = (ord['payment_status'] ?? '').toString().toLowerCase();
+        final oStat = (ord['status'] ?? '').toString().toLowerCase();
+        return pStat.contains('pending') || oStat.contains('pending');
+      }
+      if (_purchasesStatusFilter == 'Active' || _purchasesStatusFilter == 'Revoked') {
+        return true;
+      }
+      return true;
+    }).toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // =====================================================================
+        // SECTION 1: USER SUMMARY CARDS
+        // =====================================================================
+        LayoutBuilder(
+          builder: (context, constraints) {
+            return Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildSummaryMetricMiniCard(
+                        icon: Icons.quiz_rounded,
+                        title: 'Active Series',
+                        value: '$activeSeriesCount',
+                        color: const Color(0xFF059669),
+                        bgColor: const Color(0xFFECFDF5),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildSummaryMetricMiniCard(
+                        icon: Icons.shopping_bag_rounded,
+                        title: 'Paid Series',
+                        value: '$paidSeriesCount',
+                        color: const Color(0xFF4F46E5),
+                        bgColor: const Color(0xFFEEF2FF),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildSummaryMetricMiniCard(
+                        icon: Icons.card_giftcard_rounded,
+                        title: 'Free Series',
+                        value: '$freeSeriesCount',
+                        color: const Color(0xFF0284C7),
+                        bgColor: const Color(0xFFF0F9FF),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildSummaryMetricMiniCard(
+                        icon: Icons.receipt_long_rounded,
+                        title: 'Product Orders',
+                        value: '$productOrdersCount',
+                        color: const Color(0xFFD97706),
+                        bgColor: const Color(0xFFFFFBEB),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildSummaryMetricMiniCard(
+                        icon: Icons.currency_rupee_rounded,
+                        title: 'Confirmed Spend',
+                        value: '₹${totalSpend.toInt()}',
+                        color: const Color(0xFF7C3AED),
+                        bgColor: const Color(0xFFF5F3FF),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+
+        const SizedBox(height: 14),
+
+        // =====================================================================
+        // SECTION 2: ACTIVE SUBSCRIPTION BANNER & ACTIONS
+        // =====================================================================
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFF4F46E5), Color(0xFF6366F1)],
@@ -2177,9 +2319,9 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
             borderRadius: BorderRadius.circular(10),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF4F46E5).withOpacity(0.2),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                color: const Color(0xFF4F46E5).withValues(alpha: 0.18),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
@@ -2191,7 +2333,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 20),
+                      Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 18),
                       SizedBox(width: 6),
                       Text(
                         'ACTIVE SUBSCRIPTION PLAN',
@@ -2200,24 +2342,24 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       subStatus.toString().toUpperCase(),
-                      style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 9.5, color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 subTitle,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 'Valid Until: $subExpiry',
                 style: const TextStyle(fontSize: 11, color: Colors.white70),
@@ -2225,19 +2367,21 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 12),
+
+        const SizedBox(height: 10),
 
         Row(
           children: [
             Expanded(
               child: ElevatedButton.icon(
                 onPressed: () => _showGrantSubscriptionModal(u),
-                icon: const Icon(Icons.bolt_rounded, size: 16, color: Colors.white),
+                icon: const Icon(Icons.bolt_rounded, size: 15, color: Colors.white),
                 label: const Text('Grant / Change Plan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4F46E5),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 9),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
                 ),
               ),
             ),
@@ -2245,111 +2389,607 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () => _showGrantEntitlementModal(u),
-                icon: const Icon(Icons.card_giftcard_rounded, size: 16, color: Color(0xFF4F46E5)),
+                icon: const Icon(Icons.card_giftcard_rounded, size: 15, color: Color(0xFF4F46E5)),
                 label: const Text('Grant Product', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5))),
                 style: OutlinedButton.styleFrom(
                   backgroundColor: const Color(0xFFEEF2FF),
                   side: const BorderSide(color: Color(0xFFC7D2FE)),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 9),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
             ),
           ],
         ),
+
         const SizedBox(height: 16),
 
-        const Text(
-          'Purchased Products & Test Series Access',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        // =====================================================================
+        // SECTION 3: NAVIGATION TABS & FILTERS
+        // =====================================================================
+        // Category Pills
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _buildCategoryPill('All', 'All (${_userAdminEnrollments.length + _userAdminOrders.length})'),
+              const SizedBox(width: 6),
+              _buildCategoryPill('Test Series', 'Test Series (${_userAdminEnrollments.length})'),
+              const SizedBox(width: 6),
+              _buildCategoryPill('Orders', 'Product Orders (${_userAdminOrders.length})'),
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
 
-        if (_userEntitlements.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: const Text(
-              'No additional purchased products or test series granted yet.',
-              style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
-              textAlign: TextAlign.center,
-            ),
-          )
-        else
-          Column(
-            children: _userEntitlements.map((ent) {
-              final title = ent['product_title'] ?? ent['product_id'] ?? 'Test Series Access';
-              final type = ent['product_type'] ?? 'test_series';
-              final isActive = ent['is_active'] == true;
-              final entId = ent['id'] ?? '';
-              final until = ent['valid_until'] != null ? ent['valid_until'].toString().split('T').first : 'Unlimited';
+        const SizedBox(height: 10),
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Icon(
-                        type == 'subscription' ? Icons.star_rounded : Icons.quiz_rounded,
-                        size: 18,
-                        color: const Color(0xFF4F46E5),
+        // Status Filter Chips
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              const Text('Filter: ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+              const SizedBox(width: 4),
+              for (final f in ['All', 'Free', 'Paid', 'Active', 'Pending', 'Revoked']) ...[
+                InkWell(
+                  onTap: () => setState(() => _purchasesStatusFilter = f),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: _purchasesStatusFilter == f ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      f,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.bold,
+                        color: _purchasesStatusFilter == f ? Colors.white : const Color(0xFF475569),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // =====================================================================
+        // SECTION 4: TEST SERIES ENROLLMENTS
+        // =====================================================================
+        if (_purchasesSubTab == 'All' || _purchasesSubTab == 'Test Series') ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Test Series Enrollments (${filteredEnrollments.length})',
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              ),
+              if (_userAdminEnrollments.isNotEmpty)
+                Text(
+                  '${_userAdminEnrollments.where((e) => e['is_active'] == true).length} active',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.w600),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          if (filteredEnrollments.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Text(
+                _purchasesStatusFilter != 'All'
+                    ? 'No test series enrollments match filter "$_purchasesStatusFilter".'
+                    : 'No test series enrollments found for this student.',
+                style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            Column(
+              children: filteredEnrollments.map((ent) {
+                final String title = ent['title'] ?? ent['product_title'] ?? 'Test Series';
+                final String entType = ent['enrollment_type'] ?? (ent['is_free'] == true ? 'Free' : 'Paid');
+                final bool isFree = entType == 'Free';
+                final bool isActive = ent['is_active'] == true;
+                final String entId = (ent['id'] ?? '').toString();
+                final String dateStr = ent['created_at'] != null ? ent['created_at'].toString().split('T').first : 'N/A';
+                final double amount = (ent['amount_paid'] as num?)?.toDouble() ?? 0.0;
+                final String orderId = ent['order_id'] ?? 'N/A';
+                final String paymentRef = ent['payment_reference'] ?? 'N/A';
+                final String accessStatus = ent['access_status'] ?? (isActive ? 'Active' : 'Revoked');
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isActive ? const Color(0xFFE2E8F0) : const Color(0xFFFCA5A5),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header: Title + Type & Status Badges
+                      Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            title,
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: isFree ? const Color(0xFFEFF6FF) : const Color(0xFFEEF2FF),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Icon(
+                              Icons.quiz_rounded,
+                              size: 16,
+                              color: isFree ? const Color(0xFF2563EB) : const Color(0xFF4F46E5),
+                            ),
                           ),
-                          Text(
-                            'Valid: $until • Status: ${isActive ? 'Active' : 'Revoked'}',
-                            style: TextStyle(fontSize: 10.5, color: isActive ? const Color(0xFF059669) : const Color(0xFFDC2626)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    // Free vs Paid Pill
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isFree ? const Color(0xFFEFF6FF) : const Color(0xFFF5F3FF),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: isFree ? const Color(0xFFBFDBFE) : const Color(0xFFDDD6FE),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        isFree ? 'FREE ENROLLMENT' : 'PAID ENROLLMENT',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: isFree ? const Color(0xFF1D4ED8) : const Color(0xFF6D28D9),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    // Active vs Revoked Pill
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isActive ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: isActive ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        isActive ? 'ACTIVE ACCESS' : 'ACCESS REVOKED',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: isActive ? const Color(0xFF047857) : const Color(0xFFB91C1C),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                    if (isActive && entId.isNotEmpty)
-                      IconButton(
-                        icon: const Icon(Icons.block_rounded, size: 16, color: Color(0xFFEF4444)),
-                        tooltip: 'Revoke Access',
-                        onPressed: () async {
-                          final ok = await SupabaseService.revokeUserEntitlement(entId.toString());
-                          if (ok && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Access revoked successfully'), backgroundColor: Color(0xFFDC2626)),
-                            );
-                            _fetchSelectedUserDetailData(u);
-                          }
-                        },
+
+                      const SizedBox(height: 10),
+                      const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                      const SizedBox(height: 8),
+
+                      // Details Grid
+                      Wrap(
+                        spacing: 14,
+                        runSpacing: 6,
+                        children: [
+                          _buildMiniAuditField('📅 Enrolled', dateStr),
+                          _buildMiniAuditField('💰 Amount Paid', isFree ? '₹0 (Free)' : '₹${amount.toInt()}'),
+                          if (orderId != 'N/A' && orderId.isNotEmpty)
+                            _buildMiniAuditField('🔖 Order Ref', orderId),
+                          if (paymentRef != 'N/A' && paymentRef.isNotEmpty)
+                            _buildMiniAuditField('💳 Payment Ref', paymentRef),
+                          _buildMiniAuditField('🔐 Access Status', accessStatus),
+                        ],
                       ),
-                  ],
+
+                      const SizedBox(height: 8),
+
+                      // Actions Row: Revoke or Restore Access
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (isActive && entId.isNotEmpty)
+                            OutlinedButton.icon(
+                              onPressed: () => _confirmRevokeEntitlement(u, entId, title),
+                              icon: const Icon(Icons.block_rounded, size: 14, color: Color(0xFFDC2626)),
+                              label: const Text('Revoke Access', style: TextStyle(fontSize: 11, color: Color(0xFFDC2626), fontWeight: FontWeight.bold)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Color(0xFFFCA5A5)),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              ),
+                            )
+                          else if (!isActive && entId.isNotEmpty)
+                            OutlinedButton.icon(
+                              onPressed: () => _restoreEntitlement(u, entId, title),
+                              icon: const Icon(Icons.restore_rounded, size: 14, color: Color(0xFF059669)),
+                              label: const Text('Restore Access', style: TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.bold)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Color(0xFFA7F3D0)),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          const SizedBox(height: 14),
+        ],
+
+        // =====================================================================
+        // SECTION 5: PRODUCT PURCHASES & ORDERS
+        // =====================================================================
+        if (_purchasesSubTab == 'All' || _purchasesSubTab == 'Orders') ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Product Purchases & Orders (${filteredOrders.length})',
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              ),
+              if (_userAdminOrders.isNotEmpty)
+                Text(
+                  'Spend: ₹${totalSpend.toInt()}',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF7C3AED), fontWeight: FontWeight.bold),
                 ),
-              );
-            }).toList(),
+            ],
           ),
+          const SizedBox(height: 8),
+
+          if (filteredOrders.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Text(
+                _purchasesStatusFilter != 'All'
+                    ? 'No product orders match filter "$_purchasesStatusFilter".'
+                    : 'No product purchases or orders found for this student.',
+                style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            Column(
+              children: filteredOrders.map((ord) {
+                final String ordNum = (ord['order_number'] ?? ord['order_id'] ?? ord['id'] ?? 'ORD').toString();
+                final String pTitle = (ord['product_title'] ?? (ord['items'] is List && (ord['items'] as List).isNotEmpty ? ord['items'][0]['title'] : 'Purchased Product')).toString();
+                final String dateStr = ord['created_at'] != null ? ord['created_at'].toString().split('T').first : 'N/A';
+                final double amount = (ord['total_amount'] as num?)?.toDouble() ?? 0.0;
+                final String paymentStatus = (ord['payment_status'] ?? ord['status'] ?? 'pending').toString().toLowerCase();
+                final String paymentMethod = ord['payment_method'] ?? 'UPI';
+                final String paymentRef = ord['payment_reference'] ?? ord['payment_id'] ?? 'N/A';
+                final bool hasAccess = ord['has_access'] == true || paymentStatus == 'completed' || paymentStatus == 'paid';
+
+                final bool isCompleted = paymentStatus == 'completed' || paymentStatus == 'paid';
+                final bool isPending = paymentStatus.contains('pending');
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header: Order # + Title + Status Badge
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFFBEB),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(Icons.receipt_long_rounded, size: 16, color: Color(0xFFD97706)),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Order #$ordNum',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isCompleted
+                                            ? const Color(0xFFECFDF5)
+                                            : isPending
+                                                ? const Color(0xFFFFFBEB)
+                                                : const Color(0xFFFEF2F2),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: isCompleted
+                                              ? const Color(0xFFA7F3D0)
+                                              : isPending
+                                                  ? const Color(0xFFFDE68A)
+                                                  : const Color(0xFFFECACA),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        isCompleted
+                                            ? 'COMPLETED'
+                                            : isPending
+                                                ? 'PENDING'
+                                                : 'FAILED',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: isCompleted
+                                              ? const Color(0xFF047857)
+                                              : isPending
+                                                  ? const Color(0xFFB45309)
+                                                  : const Color(0xFFB91C1C),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  pTitle,
+                                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569), fontWeight: FontWeight.w600),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 10),
+                      const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                      const SizedBox(height: 8),
+
+                      // Details Grid
+                      Wrap(
+                        spacing: 14,
+                        runSpacing: 6,
+                        children: [
+                          _buildMiniAuditField('📅 Order Date', dateStr),
+                          _buildMiniAuditField('💵 Amount', '₹${amount.toInt()} ($paymentMethod)'),
+                          if (paymentRef != 'N/A' && paymentRef.isNotEmpty)
+                            _buildMiniAuditField('🔖 Payment Ref', paymentRef),
+                          _buildMiniAuditField(
+                            '🔐 Access Status',
+                            hasAccess ? 'Access Granted' : 'Pending Verification',
+                          ),
+                        ],
+                      ),
+
+                      if (isPending) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => _quickApproveOrder(u, ordNum, pTitle),
+                              icon: const Icon(Icons.check_circle_outline_rounded, size: 14, color: Color(0xFF059669)),
+                              label: const Text('Approve & Grant Access', style: TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.bold)),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Color(0xFFA7F3D0)),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+        ],
       ],
     );
+  }
+
+  Widget _buildSummaryMetricMiniCard({
+    required IconData icon,
+    required String title,
+    required String value,
+    required Color color,
+    required Color bgColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 13, color: color),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryPill(String tabKey, String label) {
+    final bool isSel = _purchasesSubTab == tabKey;
+    return InkWell(
+      onTap: () => setState(() => _purchasesSubTab = tabKey),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSel ? const Color(0xFF4F46E5) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: isSel ? Colors.white : const Color(0xFF475569),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniAuditField(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+        const SizedBox(height: 1),
+        Text(value, style: const TextStyle(fontSize: 11, color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Future<void> _confirmRevokeEntitlement(AdminUserModel u, String entId, String title) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Revoke Access?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to revoke access to "$title" for ${u.name}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            child: const Text('Revoke Access', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final ok = await SupabaseService.revokeUserEntitlement(entId);
+      if (ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Access revoked successfully'), backgroundColor: Color(0xFFDC2626)),
+        );
+        _fetchSelectedUserDetailData(u);
+      }
+    }
+  }
+
+  Future<void> _restoreEntitlement(AdminUserModel u, String entId, String title) async {
+    final ok = await SupabaseService.restoreUserEntitlement(entId);
+    if (ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Access restored for "$title"'), backgroundColor: const Color(0xFF059669)),
+      );
+      _fetchSelectedUserDetailData(u);
+    }
+  }
+
+  Future<void> _quickApproveOrder(AdminUserModel u, String orderNumber, String title) async {
+    final userProfile = UserProfileModel(
+      id: u.id,
+      email: u.email,
+      fullName: u.name,
+      role: 'student',
+    );
+    final res = await SupabaseService.verifyPaymentAndGrantAccess(
+      orderId: orderNumber,
+      paymentId: 'manual_admin_approval_${DateTime.now().millisecondsSinceEpoch}',
+      paymentMethod: 'Admin Override',
+      user: userProfile,
+      items: [
+        {'id': orderNumber, 'title': title, 'type': 'product'},
+      ],
+    );
+    if (res['success'] == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Order #$orderNumber approved and access granted'), backgroundColor: const Color(0xFF059669)),
+      );
+      _fetchSelectedUserDetailData(u);
+    }
   }
 
   Widget _buildInspectorActivityTab(AdminUserModel u) {

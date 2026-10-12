@@ -7450,6 +7450,372 @@ class SupabaseService {
     }
   }
 
+  /// Admin: Restore or reactivate a previously revoked user entitlement
+  static Future<bool> restoreUserEntitlement(String entitlementId) async {
+    try {
+      await client.from('entitlements').update({'is_active': true, 'updated_at': DateTime.now().toIso8601String()}).eq('id', entitlementId);
+      return true;
+    } catch (e) {
+      debugPrint('Error restoring entitlement: $e');
+      return false;
+    }
+  }
+
+  /// Student: Enroll in a free test series and persist canonical entitlement + order records
+  static Future<Map<String, dynamic>> enrollInFreeTestSeries({
+    required UserProfileModel user,
+    required String seriesId,
+    required String seriesTitle,
+    String? bannerImageUrl,
+  }) async {
+    final cleanSeriesId = seriesId.trim();
+    if (cleanSeriesId.isEmpty) {
+      return {'success': false, 'message': 'Invalid test series ID'};
+    }
+
+    final resolvedEmail = user.email.trim().toLowerCase();
+    if (resolvedEmail.isEmpty) {
+      return {'success': false, 'message': 'Email address required for enrollment'};
+    }
+
+    // 1. Check if user is already actively enrolled
+    final hasActive = await hasActiveEntitlement(
+      user.id,
+      cleanSeriesId,
+      userEmail: resolvedEmail,
+      productTitle: seriesTitle,
+    );
+    if (hasActive) {
+      return {
+        'success': true,
+        'message': 'Already enrolled in $seriesTitle',
+        'already_enrolled': true,
+      };
+    }
+
+    final now = DateTime.now();
+    final expiry = now.add(const Duration(days: 365));
+    final customOrderId = await generateOrderId(userId: user.id);
+    final validOrderId = toValidUuid(customOrderId);
+    final deterministicEntId = toValidUuid('ent_${user.id}_$cleanSeriesId');
+    final String? profileUserId = await _getValidOrNullProfileId(user.id, user.email, user.fullName);
+
+    // 2. Persist order record (Free enrollment)
+    final orderData = {
+      'id': validOrderId,
+      'order_id': customOrderId,
+      'order_number': customOrderId,
+      'user_id': profileUserId,
+      'user_email': resolvedEmail,
+      'user_name': user.fullName,
+      'user_phone': user.phoneNumber ?? '',
+      'product_name': seriesTitle,
+      'product_id': cleanSeriesId,
+      'subtotal_amount': 0.0,
+      'discount_amount': 0.0,
+      'total_amount': 0.0,
+      'coupon_code': 'FREE_ENROLLMENT',
+      'status': 'completed',
+      'payment_status': 'completed',
+      'payment_method': 'Free',
+      'payment_id': 'free_grant_${now.millisecondsSinceEpoch}',
+      'payment_reference': customOrderId,
+      'notes': 'Free Test Series Enrollment: $seriesTitle',
+      'created_at': now.toIso8601String(),
+      'updated_at': now.toIso8601String(),
+    };
+
+    try {
+      await client.from('orders').insert(orderData);
+    } catch (e) {
+      debugPrint('Notice inserting free order to orders table: $e');
+    }
+
+    // 3. Persist order item
+    try {
+      await client.from('order_items').insert({
+        'id': toValidUuid('item_${now.millisecondsSinceEpoch}_$cleanSeriesId'),
+        'order_id': validOrderId,
+        'product_id': cleanSeriesId,
+        'product_title': seriesTitle,
+        'product_type': 'test_series',
+        'price': 0.0,
+        'original_price': 0.0,
+        'validity': 'Valid until exam',
+        'created_at': now.toIso8601String(),
+      });
+    } catch (_) {}
+
+    // 4. Persist canonical entitlement
+    final entData = {
+      'id': deterministicEntId,
+      'user_id': profileUserId,
+      'user_email': resolvedEmail,
+      'product_id': cleanSeriesId,
+      'product_title': seriesTitle,
+      'product_type': 'test_series',
+      'order_id': validOrderId,
+      'access_type': 'free',
+      'valid_from': now.toIso8601String(),
+      'valid_until': expiry.toIso8601String(),
+      'is_active': true,
+      'metadata': {
+        'enrollment_type': 'free',
+        'order_number': customOrderId,
+        'amount': 0.0,
+        'source': 'web_student_catalogue',
+        'enrolled_at': now.toIso8601String(),
+      },
+      'created_at': now.toIso8601String(),
+      'updated_at': now.toIso8601String(),
+    };
+
+    try {
+      await client.from('entitlements').upsert(entData);
+    } catch (e) {
+      debugPrint('Notice upserting free entitlement: $e');
+      try {
+        await client.from('entitlements').upsert({
+          ...entData,
+          'user_id': null,
+          'order_id': null,
+        });
+      } catch (retryE) {
+        debugPrint('Retry notice upserting free entitlement: $retryE');
+      }
+    }
+
+    // 5. Cloud system_config backup for orders
+    try {
+      await client.from('system_config').upsert({
+        'key': 'order_$customOrderId',
+        'value': jsonEncode(orderData),
+        'updated_at': now.toIso8601String(),
+      });
+    } catch (_) {}
+
+    // 6. Sync local cache
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheStr = prefs.getString('cosmyra_user_entitlements');
+      final List list = cacheStr != null && cacheStr.isNotEmpty ? jsonDecode(cacheStr) : [];
+      list.removeWhere((x) => x['product_id'] == cleanSeriesId);
+      list.insert(0, entData);
+      await prefs.setString('cosmyra_user_entitlements', jsonEncode(list));
+    } catch (_) {}
+
+    return {
+      'success': true,
+      'message': 'Successfully enrolled in $seriesTitle',
+      'enrollment': entData,
+      'order': orderData,
+    };
+  }
+
+  /// Student: Batch fetch enrollment status map for student Test Series catalogue
+  static Future<Map<String, Map<String, dynamic>>> fetchStudentEnrollmentStatusMap({
+    required String userId,
+    required String userEmail,
+  }) async {
+    final Map<String, Map<String, dynamic>> resultMap = {};
+    if (userId.isEmpty && userEmail.isEmpty) return resultMap;
+
+    final resolvedEmail = userEmail.trim().toLowerCase();
+
+    // 1. Fetch entitlements (include pending)
+    final entitlements = await fetchUserEntitlements(
+      userId,
+      userEmail: resolvedEmail,
+      includePending: true,
+    );
+
+    for (var ent in entitlements) {
+      final pId = (ent['product_id'] ?? '').toString().trim();
+      final pTitle = (ent['product_title'] ?? ent['title'] ?? '').toString().trim();
+      final isActive = ent['is_active'] == true;
+      final accessType = (ent['access_type'] ?? '').toString().trim().toLowerCase();
+      final status = (ent['status'] ?? ent['payment_status'] ?? '').toString().trim().toLowerCase();
+
+      final expiry = DateTime.tryParse(ent['valid_until']?.toString() ?? '');
+      final isExpired = expiry != null && expiry.isBefore(DateTime.now());
+
+      final bool isPending = accessType == 'pending_verification' ||
+                             accessType == 'pending' ||
+                             status == 'pending_verification' ||
+                             status == 'pending';
+
+      final String resolvedStatus;
+      final bool isEnrolled;
+      if (isPending) {
+        resolvedStatus = 'Pending Verification';
+        isEnrolled = false;
+      } else if (!isActive) {
+        resolvedStatus = 'Revoked';
+        isEnrolled = false;
+      } else if (isExpired) {
+        resolvedStatus = 'Expired';
+        isEnrolled = false;
+      } else {
+        resolvedStatus = 'Active';
+        isEnrolled = true;
+      }
+
+      final String enrollmentType = (accessType == 'free' || (ent['metadata'] is Map && ent['metadata']['enrollment_type'] == 'free'))
+          ? 'Free'
+          : 'Paid';
+
+      final data = {
+        'is_enrolled': isEnrolled,
+        'enrollment_type': enrollmentType,
+        'status': resolvedStatus,
+        'order_id': ent['order_id'] ?? '',
+        'valid_until': ent['valid_until'],
+        'created_at': ent['created_at'],
+      };
+
+      if (pId.isNotEmpty) {
+        resultMap[pId.toLowerCase()] = data;
+      }
+      if (pTitle.isNotEmpty) {
+        resultMap[pTitle.toLowerCase()] = data;
+      }
+    }
+
+    // 2. Cross-check orders for any pending verification orders not yet in entitlements
+    try {
+      final userOrders = await fetchUserOrders(userId);
+      for (var ord in userOrders) {
+        final ordStatus = (ord['status'] ?? ord['payment_status'] ?? '').toString().trim().toLowerCase();
+        if (ordStatus == 'pending_verification' || ordStatus == 'pending') {
+          final pId = (ord['product_id'] ?? '').toString().trim();
+          final pTitle = (ord['product_name'] ?? ord['title'] ?? '').toString().trim();
+          final pendingData = {
+            'is_enrolled': false,
+            'enrollment_type': 'Paid',
+            'status': 'Pending Verification',
+            'order_id': ord['order_number'] ?? ord['id'] ?? '',
+            'created_at': ord['created_at'],
+          };
+          if (pId.isNotEmpty && !resultMap.containsKey(pId.toLowerCase())) {
+            resultMap[pId.toLowerCase()] = pendingData;
+          }
+          if (pTitle.isNotEmpty && !resultMap.containsKey(pTitle.toLowerCase())) {
+            resultMap[pTitle.toLowerCase()] = pendingData;
+          }
+        }
+      }
+    } catch (_) {}
+
+    return resultMap;
+  }
+
+  /// Admin: Fetch comprehensive Test Series enrollments for a specific user
+  static Future<List<Map<String, dynamic>>> getUserEnrollmentsForAdmin({
+    required String userId,
+    required String userEmail,
+  }) async {
+    final List<Map<String, dynamic>> list = [];
+
+    // 1. Fetch raw entitlements from database
+    final rawEnts = await getUserEntitlements(userId, userEmail: userEmail);
+
+    // 2. Fetch all orders for this user to correlate payment & pricing data
+    final userOrders = await getUserOrdersForAdmin(userId: userId, userEmail: userEmail);
+    final Map<String, Map<String, dynamic>> orderMap = {};
+    for (var o in userOrders) {
+      final ordId = (o['order_number'] ?? o['order_id'] ?? o['id'] ?? '').toString().trim().toLowerCase();
+      final pId = (o['product_id'] ?? '').toString().trim().toLowerCase();
+      if (ordId.isNotEmpty) orderMap[ordId] = o;
+      if (pId.isNotEmpty && !orderMap.containsKey(pId)) orderMap[pId] = o;
+    }
+
+    final Set<String> seenEnts = {};
+
+    for (var ent in rawEnts) {
+      final entId = (ent['id'] ?? '').toString();
+      final pId = (ent['product_id'] ?? '').toString().trim();
+      final pTitle = (ent['product_title'] ?? ent['title'] ?? 'Test Series').toString().trim();
+      final pType = (ent['product_type'] ?? 'test_series').toString();
+
+      // Filter only test series enrollments
+      if (pType != 'test_series' && !pTitle.toLowerCase().contains('test') && !pTitle.toLowerCase().contains('series')) {
+        continue;
+      }
+
+      final dedupKey = '$pId-${ent['user_id']}-${ent['user_email']}'.toLowerCase();
+      if (seenEnts.contains(dedupKey)) continue;
+      seenEnts.add(dedupKey);
+
+      final orderId = (ent['order_id'] ?? '').toString();
+      final linkedOrder = orderMap[orderId.toLowerCase()] ?? orderMap[pId.toLowerCase()];
+
+      final accessType = (ent['access_type'] ?? '').toString().toLowerCase();
+      final meta = ent['metadata'] is Map ? Map<String, dynamic>.from(ent['metadata']) : <String, dynamic>{};
+
+      final bool isFree = accessType == 'free' ||
+                          meta['enrollment_type'] == 'free' ||
+                          (linkedOrder != null && (linkedOrder['payment_method'] == 'Free' || (linkedOrder['total_amount'] is num && linkedOrder['total_amount'] == 0)));
+
+      final double amountPaid = isFree
+          ? 0.0
+          : ((linkedOrder != null && linkedOrder['total_amount'] is num)
+              ? (linkedOrder['total_amount'] as num).toDouble()
+              : (meta['amount'] is num ? (meta['amount'] as num).toDouble() : 499.0));
+
+      final isActive = ent['is_active'] == true;
+      final expiry = DateTime.tryParse(ent['valid_until']?.toString() ?? '');
+      final isExpired = expiry != null && expiry.isBefore(DateTime.now());
+
+      final String resolvedStatus;
+      if (!isActive) {
+        resolvedStatus = 'Revoked';
+      } else if (isExpired) {
+        resolvedStatus = 'Expired';
+      } else if (accessType == 'pending_verification' || accessType == 'pending') {
+        resolvedStatus = 'Pending';
+      } else {
+        resolvedStatus = 'Active';
+      }
+
+      list.add({
+        'id': entId,
+        'series_id': pId,
+        'title': pTitle,
+        'enrollment_type': isFree ? 'Free' : 'Paid',
+        'status': resolvedStatus,
+        'access_status': isActive && !isExpired ? 'Active' : 'Locked',
+        'is_active': isActive,
+        'enrolled_at': ent['created_at'] ?? ent['valid_from'] ?? DateTime.now().toIso8601String(),
+        'valid_until': ent['valid_until'] ?? 'Valid until exam',
+        'order_id': orderId.isNotEmpty ? orderId : (linkedOrder != null ? (linkedOrder['order_number'] ?? linkedOrder['id']) : 'Direct / Grant'),
+        'payment_reference': linkedOrder != null ? (linkedOrder['payment_reference'] ?? linkedOrder['payment_id'] ?? '') : '',
+        'amount_paid': amountPaid,
+        'user_id': ent['user_id'] ?? userId,
+        'user_email': ent['user_email'] ?? userEmail,
+      });
+    }
+
+    return list;
+  }
+
+  /// Admin: Fetch all product purchases & orders for a specific user
+  static Future<List<Map<String, dynamic>>> getUserOrdersForAdmin({
+    required String userId,
+    required String userEmail,
+  }) async {
+    final allOrders = await fetchAdminOrders();
+    final cleanUid = userId.trim().toLowerCase();
+    final cleanEmail = userEmail.trim().toLowerCase();
+
+    return allOrders.where((ord) {
+      final ordUid = (ord['user_id'] ?? ord['student_id'] ?? '').toString().trim().toLowerCase();
+      final ordEmail = (ord['user_email'] ?? ord['student_email'] ?? '').toString().trim().toLowerCase();
+      final matchesId = cleanUid.isNotEmpty && ordUid == cleanUid;
+      final matchesEmail = cleanEmail.isNotEmpty && ordEmail == cleanEmail;
+      return matchesId || matchesEmail;
+    }).toList();
+  }
+
   /// Admin: Fetch real individual user performance & stats analytics
   static Future<Map<String, dynamic>> getUserPerformanceAnalytics(String userId, {String? userEmail}) async {
     int totalQuestionsAttempted = 0;

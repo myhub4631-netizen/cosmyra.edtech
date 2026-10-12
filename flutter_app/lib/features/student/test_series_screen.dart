@@ -210,6 +210,9 @@ class TestSeriesCardData {
 
   final String bannerImageFit;
   final String leaderboardType; // 'realtime' or 'marketing'
+  final bool isEnrolled;
+  final String enrollmentType; // 'Free' or 'Paid'
+  final String enrollmentStatus; // 'Active', 'Pending Verification', 'Revoked', 'None'
 
   TestSeriesCardData({
     required this.id,
@@ -250,6 +253,9 @@ class TestSeriesCardData {
     this.feature2Label = '',
     this.feature3Label = '',
     this.isFavorite = false,
+    this.isEnrolled = false,
+    this.enrollmentType = '',
+    this.enrollmentStatus = 'None',
   });
 
   BoxFit get imageBoxFit {
@@ -333,6 +339,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   List<Map<String, dynamic>> _dbPapers = [];
   List<Map<String, dynamic>> _customSeriesList = [];
   UserProfileModel? _currentUser;
+  Map<String, Map<String, dynamic>> _userEnrollments = {};
 
   @override
   void initState() {
@@ -347,6 +354,39 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
       setState(() {
         _currentUser = user ?? SupabaseService.activeUserSession;
       });
+      _fetchStudentEnrollments();
+    }
+  }
+
+  Future<void> _fetchStudentEnrollments() async {
+    final user = _currentUser ?? SupabaseService.activeUserSession ?? (SupabaseService.client.auth.currentUser != null
+        ? UserProfileModel(
+            id: SupabaseService.client.auth.currentUser!.id,
+            email: SupabaseService.client.auth.currentUser!.email ?? '',
+            fullName: '',
+          )
+        : null);
+
+    if (user != null && user.email.isNotEmpty) {
+      try {
+        final enrMap = await SupabaseService.fetchStudentEnrollmentStatusMap(
+          userId: user.id,
+          userEmail: user.email,
+        );
+        if (mounted) {
+          setState(() {
+            _userEnrollments = enrMap;
+          });
+        }
+      } catch (e) {
+        debugPrint('Notice fetching student enrollments: $e');
+      }
+    } else {
+      if (mounted && _userEnrollments.isNotEmpty) {
+        setState(() {
+          _userEnrollments = {};
+        });
+      }
     }
   }
 
@@ -376,6 +416,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         _isLoading = false;
         _hasError = false;
       });
+      _fetchStudentEnrollments();
       _refreshPapersSilently();
       return;
     }
@@ -397,6 +438,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
           _isLoading = false;
           _hasError = false;
         });
+        _fetchStudentEnrollments();
       }
     } catch (e) {
       debugPrint('Notice loading test series: $e');
@@ -422,6 +464,7 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
           _customSeriesList = List<Map<String, dynamic>>.from(results[1]);
           _hasError = false;
         });
+        _fetchStudentEnrollments();
       }
     } catch (e) {
       debugPrint('Notice refreshing test series: $e');
@@ -601,6 +644,11 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         final buttonText = (cs['purchase_button_text'] ?? 'Join').toString();
         final showPurchaseButton = cs['show_purchase_button'] != false;
 
+        final enrollment = _userEnrollments[sId.toLowerCase()] ?? _userEnrollments[title.toLowerCase()];
+        final bool isEnrolled = enrollment != null && enrollment['is_enrolled'] == true;
+        final String enrollmentType = enrollment != null ? (enrollment['enrollment_type'] ?? (isFree ? 'Free' : 'Paid')) : (isFree ? 'Free' : 'Paid');
+        final String enrollmentStatus = enrollment != null ? (enrollment['status'] ?? 'None') : 'None';
+
         list.add(
           TestSeriesCardData(
             id: sId,
@@ -642,6 +690,9 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             feature1Label: (cs['feature1'] ?? '').toString(),
             feature2Label: (cs['feature2'] ?? '').toString(),
             feature3Label: (cs['feature3'] ?? '').toString(),
+            isEnrolled: isEnrolled,
+            enrollmentType: enrollmentType,
+            enrollmentStatus: enrollmentStatus,
           ),
         );
       }
@@ -786,8 +837,101 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   }
 
   void _handlePurchaseOrEnroll(TestSeriesCardData item) async {
-    if (item.isFree) {
+    // 1. If already actively enrolled, immediately launch/view test series tests
+    if (item.isEnrolled) {
       _startTestSeries(item.id, item.title, item.durationMinutes);
+      return;
+    }
+
+    // 2. If payment is pending verification, route to checkout for status check
+    if (item.enrollmentStatus == 'Pending Verification') {
+      final cartItem = CartItem(
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        price: item.price,
+        originalPrice: item.originalPrice,
+        bannerImageUrl: item.bannerImageUrl ?? '',
+        exam: item.exam,
+        validity: item.validity,
+        testCount: item.testCount,
+      );
+      context.push('/checkout', extra: cartItem);
+      return;
+    }
+
+    // 3. If Free Series, perform authenticated enrollment
+    if (item.isFree) {
+      final user = _currentUser ?? SupabaseService.activeUserSession ?? (SupabaseService.client.auth.currentUser != null
+          ? UserProfileModel(
+              id: SupabaseService.client.auth.currentUser!.id,
+              email: SupabaseService.client.auth.currentUser!.email ?? '',
+              fullName: '',
+            )
+          : null);
+
+      if (user == null || user.email.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please sign in or create an account to enroll in "${item.title}".'),
+              action: SnackBarAction(label: 'Sign In', textColor: Colors.white, onPressed: () => context.go('/login')),
+              backgroundColor: const Color(0xFF4F46E5),
+            ),
+          );
+        }
+        return;
+      }
+
+      setState(() => _isLoading = true);
+      final enrRes = await SupabaseService.enrollInFreeTestSeries(
+        user: user,
+        seriesId: item.id,
+        seriesTitle: item.title,
+        bannerImageUrl: item.bannerImageUrl,
+      );
+      setState(() => _isLoading = false);
+
+      if (enrRes['success'] == true) {
+        final enrData = {
+          'is_enrolled': true,
+          'enrollment_type': 'Free',
+          'status': 'Active',
+          'order_id': enrRes['order']?['order_number'] ?? '',
+        };
+        setState(() {
+          _userEnrollments[item.id.toLowerCase()] = enrData;
+          _userEnrollments[item.title.toLowerCase()] = enrData;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('🎉 Enrolled in "${item.title}" successfully! All tests unlocked.'),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFF059669),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        _startTestSeries(item.id, item.title, item.durationMinutes);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(enrRes['message']?.toString() ?? 'Enrollment failed. Please try again.'),
+              backgroundColor: const Color(0xFFEF4444),
+            ),
+          );
+        }
+      }
       return;
     }
 
@@ -1568,37 +1712,111 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                     ),
                   ),
 
-                  // Top-Left Glassmorphic Tag Badge
+                  // Top-Left Glassmorphic Tag & Enrolled Status Badges
                   Positioned(
                     top: 10,
                     left: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            item.dynamicTagColor.withValues(alpha: 0.95),
-                            item.dynamicTagColor.withValues(alpha: 0.8),
-                          ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                item.dynamicTagColor.withValues(alpha: 0.95),
+                                item.dynamicTagColor.withValues(alpha: 0.8),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: [
+                              BoxShadow(
+                                color: item.dynamicTagColor.withValues(alpha: 0.35),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            item.dynamicTag,
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(6),
-                        boxShadow: [
-                          BoxShadow(
-                            color: item.dynamicTagColor.withValues(alpha: 0.35),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
+                        if (item.isEnrolled) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF059669), Color(0xFF10B981)],
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 12),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'ENROLLED',
+                                  style: GoogleFonts.inter(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else if (item.enrollmentStatus == 'Pending Verification') ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFD97706), Color(0xFFF59E0B)],
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.hourglass_top_rounded, color: Colors.white, size: 12),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'PENDING',
+                                  style: GoogleFonts.inter(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
-                      ),
-                      child: Text(
-                        item.dynamicTag,
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
+                      ],
                     ),
                   ),
 
@@ -1722,69 +1940,128 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                     const Divider(height: 1, color: Color(0xFFF1F5F9)),
                     const SizedBox(height: 12),
 
-                    // Footer Row: Pricing Stack + Shaking Red Gradient Buy Now Button
+                    // Footer Row: Pricing Stack / Enrolled State + Action Button
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Price Column
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  '₹${item.price.toInt()}',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 19,
-                                    fontWeight: FontWeight.w900,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                ),
-                                if (item.originalPrice > item.price) ...[
-                                  const SizedBox(width: 6),
+                        // Price / Status Column
+                        if (item.isEnrolled)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 16),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    '₹${item.originalPrice.toInt()}',
+                                    item.enrollmentType.isNotEmpty ? 'Enrolled (${item.enrollmentType})' : 'Enrolled',
                                     style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      decoration: TextDecoration.lineThrough,
-                                      color: const Color(0xFF94A3B8),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFF065F46),
                                     ),
                                   ),
                                 ],
-                              ],
-                            ),
-                            if (discountPct > 0) ...[
-                              const SizedBox(height: 2),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFEF2F2),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: const Color(0xFFFCA5A5)),
-                                ),
-                                child: Text(
-                                  '$discountPct% OFF',
-                                  style: GoogleFonts.inter(
-                                    color: const Color(0xFFDC2626),
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                'Access Active',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: const Color(0xFF10B981),
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
-                          ],
-                        ),
+                          )
+                        else
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    '₹${item.price.toInt()}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.w900,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  if (item.originalPrice > item.price) ...[
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '₹${item.originalPrice.toInt()}',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        decoration: TextDecoration.lineThrough,
+                                        color: const Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              if (discountPct > 0) ...[
+                                const SizedBox(height: 2),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFEF2F2),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0xFFFCA5A5)),
+                                  ),
+                                  child: Text(
+                                    '$discountPct% OFF',
+                                    style: GoogleFonts.inter(
+                                      color: const Color(0xFFDC2626),
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
 
-                        // Shaking Vibrant Red Buy Now Button
-                        ShakingBuyNowButton(
-                          label: item.isFree ? 'Enroll Free' : 'Buy Now',
-                          isFree: item.isFree,
-                          height: 38,
-                          fontSize: 12.5,
-                          onTap: () => _handlePurchaseOrEnroll(item),
-                        ),
+                        // Action Button
+                        if (item.isEnrolled)
+                          ElevatedButton.icon(
+                            onPressed: () => _handlePurchaseOrEnroll(item),
+                            icon: const Icon(Icons.play_circle_fill_rounded, size: 16),
+                            label: const Text('View Tests'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF059669),
+                              foregroundColor: Colors.white,
+                              elevation: 1,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              textStyle: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700),
+                            ),
+                          )
+                        else if (item.enrollmentStatus == 'Pending Verification')
+                          OutlinedButton.icon(
+                            onPressed: () => _handlePurchaseOrEnroll(item),
+                            icon: const Icon(Icons.hourglass_top_rounded, size: 14, color: Color(0xFFD97706)),
+                            label: const Text('Pending Verification'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFD97706),
+                              side: const BorderSide(color: Color(0xFFF59E0B)),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              textStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          )
+                        else
+                          ShakingBuyNowButton(
+                            label: item.isFree ? 'Enroll Free' : 'Buy Now',
+                            isFree: item.isFree,
+                            height: 38,
+                            fontSize: 12.5,
+                            onTap: () => _handlePurchaseOrEnroll(item),
+                          ),
                       ],
                     ),
                   ],
@@ -1850,37 +2127,111 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
                     ),
                   ),
 
-                  // Dynamic Tag
+                  // Dynamic Tag & Enrolled Status Badges
                   Positioned(
                     top: 10,
                     left: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            item.dynamicTagColor.withValues(alpha: 0.95),
-                            item.dynamicTagColor.withValues(alpha: 0.8),
-                          ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                item.dynamicTagColor.withValues(alpha: 0.95),
+                                item.dynamicTagColor.withValues(alpha: 0.8),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: [
+                              BoxShadow(
+                                color: item.dynamicTagColor.withValues(alpha: 0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            item.dynamicTag,
+                            style: GoogleFonts.inter(
+                              color: Colors.white,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(6),
-                        boxShadow: [
-                          BoxShadow(
-                            color: item.dynamicTagColor.withValues(alpha: 0.3),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
+                        if (item.isEnrolled) ...[
+                          const SizedBox(width: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF059669), Color(0xFF10B981)],
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 11),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'ENROLLED',
+                                  style: GoogleFonts.inter(
+                                    color: Colors.white,
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else if (item.enrollmentStatus == 'Pending Verification') ...[
+                          const SizedBox(width: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFD97706), Color(0xFFF59E0B)],
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.hourglass_top_rounded, color: Colors.white, size: 11),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'PENDING',
+                                  style: GoogleFonts.inter(
+                                    color: Colors.white,
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
-                      ),
-                      child: Text(
-                        item.dynamicTag,
-                        style: GoogleFonts.inter(
-                          color: Colors.white,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
+                      ],
                     ),
                   ),
 
@@ -1992,67 +2343,128 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
 
                       const SizedBox(height: 10),
 
-                      // Footer Row with Shaking Red Buy Now Button
+                      // Footer Row: Pricing Stack / Enrolled State + Action Button
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    '₹${item.price.toInt()}',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w900,
-                                      color: const Color(0xFF0F172A),
-                                    ),
-                                  ),
-                                  if (item.originalPrice > item.price) ...[
+                          // Price / Enrolled Column
+                          if (item.isEnrolled)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.verified_rounded, color: Color(0xFF10B981), size: 15),
                                     const SizedBox(width: 4),
                                     Text(
-                                      '₹${item.originalPrice.toInt()}',
+                                      item.enrollmentType.isNotEmpty ? 'Enrolled (${item.enrollmentType})' : 'Enrolled',
                                       style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        decoration: TextDecoration.lineThrough,
-                                        color: const Color(0xFF94A3B8),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: const Color(0xFF065F46),
                                       ),
                                     ),
                                   ],
-                                ],
-                              ),
-                              if (discountPct > 0) ...[
-                                const SizedBox(height: 2),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFEF2F2),
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: const Color(0xFFFCA5A5)),
-                                  ),
-                                  child: Text(
-                                    '$discountPct% OFF',
-                                    style: GoogleFonts.inter(
-                                      color: const Color(0xFFDC2626),
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                                ),
+                                const SizedBox(height: 1),
+                                Text(
+                                  'Access Active',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.5,
+                                    color: const Color(0xFF10B981),
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
-                            ],
-                          ),
+                            )
+                          else
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      '₹${item.price.toInt()}',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w900,
+                                        color: const Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                    if (item.originalPrice > item.price) ...[
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '₹${item.originalPrice.toInt()}',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          decoration: TextDecoration.lineThrough,
+                                          color: const Color(0xFF94A3B8),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                if (discountPct > 0) ...[
+                                  const SizedBox(height: 2),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEF2F2),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                                    ),
+                                    child: Text(
+                                      '$discountPct% OFF',
+                                      style: GoogleFonts.inter(
+                                        color: const Color(0xFFDC2626),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
 
-                          ShakingBuyNowButton(
-                            label: item.isFree ? 'Enroll Free' : 'Buy Now',
-                            isFree: item.isFree,
-                            height: 36,
-                            fontSize: 11.5,
-                            onTap: () => _handlePurchaseOrEnroll(item),
-                          ),
+                          // Action Button
+                          if (item.isEnrolled)
+                            ElevatedButton.icon(
+                              onPressed: () => _handlePurchaseOrEnroll(item),
+                              icon: const Icon(Icons.play_circle_fill_rounded, size: 15),
+                              label: const Text('View Tests'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF059669),
+                                foregroundColor: Colors.white,
+                                elevation: 1,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                                textStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700),
+                              ),
+                            )
+                          else if (item.enrollmentStatus == 'Pending Verification')
+                            OutlinedButton.icon(
+                              onPressed: () => _handlePurchaseOrEnroll(item),
+                              icon: const Icon(Icons.hourglass_top_rounded, size: 13, color: Color(0xFFD97706)),
+                              label: const Text('Pending Verification'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFFD97706),
+                                side: const BorderSide(color: Color(0xFFF59E0B)),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                                textStyle: GoogleFonts.inter(fontSize: 10.5, fontWeight: FontWeight.bold),
+                              ),
+                            )
+                          else
+                            ShakingBuyNowButton(
+                              label: item.isFree ? 'Enroll Free' : 'Buy Now',
+                              isFree: item.isFree,
+                              height: 36,
+                              fontSize: 11.5,
+                              onTap: () => _handlePurchaseOrEnroll(item),
+                            ),
                         ],
                       ),
                     ],
