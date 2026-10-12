@@ -309,46 +309,48 @@ void main() {
 
       expect(biologyQuestions.length, equals(90), reason: 'Must find 90 Biology questions');
 
-      // Create test series paper from existing questions
-      final result = await SupabaseService.createTestSeriesPaperFromExistingQuestions(
-        paperDetails: {
-          'id': destTestId,
-          'paper_id': destTestId,
-          'paper_name': destTestName,
-          'destination_test_name': destTestName,
-          'source_paper_id': sourcePaperId,
-          'source_paper_name': sourcePaperName,
-          'selection_mode': 'biology',
-          'exam': 'NEET',
-          'questionCount': 90,
-          'question_count': 90,
-        },
-        selectedQuestionItems: biologyQuestions,
-        testSeriesDetails: {
-          'title': 'Biology Full Syllabus Regression Test',
-        },
-      );
+      try {
+        // Create test series paper from existing questions
+        final result = await SupabaseService.createTestSeriesPaperFromExistingQuestions(
+          paperDetails: {
+            'id': destTestId,
+            'paper_id': destTestId,
+            'paper_name': destTestName,
+            'destination_test_name': destTestName,
+            'source_paper_id': sourcePaperId,
+            'source_paper_name': sourcePaperName,
+            'selection_mode': 'biology',
+            'exam': 'NEET',
+            'questionCount': 90,
+            'question_count': 90,
+          },
+          selectedQuestionItems: biologyQuestions,
+          testSeriesDetails: {
+            'title': 'BIO Fst v2',
+          },
+        );
 
-      expect(result['paper_id'], equals(destTestId));
-      expect(result['paper_name'], equals(destTestName));
-      expect(result['source_paper_name'], equals(sourcePaperName));
-      expect(result['questionCount'], equals(90));
+        expect(result['paper_id'], equals(destTestId));
+        expect(result['paper_name'], equals(destTestName));
+        expect(result['source_paper_name'], equals(sourcePaperName));
+        expect(result['questionCount'], equals(90));
 
-      // Verify fetchQuestionsForPaper returns exactly 90 questions for the destination test
-      final loadedForDest = await SupabaseService.fetchQuestionsForPaper(destTestId);
-      expect(loadedForDest.length, equals(90),
-          reason: 'Loaded destination test questions must be exactly 90');
+        // Verify fetchQuestionsForPaper returns exactly 90 questions for the destination test
+        final loadedForDest = await SupabaseService.fetchQuestionsForPaper(destTestId);
+        expect(loadedForDest.length, equals(90),
+            reason: 'Loaded destination test questions must be exactly 90');
 
-      // Verify that the canonical source paper NEET 2026 Paper 1 is completely untouched
-      final loadedForSource = await SupabaseService.client
-          .from('questions')
-          .select('id')
-          .eq('paper', sourcePaperName);
-      expect((loadedForSource as List).length, equals(180),
-          reason: 'Source paper NEET 2026 Paper 1 must still have all 180 questions');
-
-      // Clean up local mock preferences and system config if needed
-      await SupabaseService.deletePaperRecord(destTestId);
+        // Verify that the canonical source paper NEET 2026 Paper 1 is completely untouched
+        final loadedForSource = await SupabaseService.client
+            .from('questions')
+            .select('id')
+            .eq('paper', sourcePaperName);
+        expect((loadedForSource as List).length, equals(180),
+            reason: 'Source paper NEET 2026 Paper 1 must still have all 180 questions');
+      } finally {
+        // Clean up local mock preferences and system config if needed
+        await SupabaseService.deletePaperRecord(destTestId);
+      }
     });
 
     // -------------------------------------------------------------

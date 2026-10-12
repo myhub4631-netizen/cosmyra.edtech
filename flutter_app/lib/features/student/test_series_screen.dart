@@ -328,6 +328,8 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
   String _selectedCategory = 'All Series';
   String _selectedExamFilter = 'All Exams';
   bool _isLoading = false;
+  bool _hasError = false;
+  String _errorMessage = '';
   List<Map<String, dynamic>> _dbPapers = [];
   List<Map<String, dynamic>> _customSeriesList = [];
   UserProfileModel? _currentUser;
@@ -372,35 +374,57 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
         _dbPapers = SupabaseService.cachedDbPapers;
         _customSeriesList = SupabaseService.cachedTestSeries;
         _isLoading = false;
+        _hasError = false;
       });
       _refreshPapersSilently();
       return;
     }
 
-    setState(() => _isLoading = true);
-    final results = await Future.wait([
-      SupabaseService.fetchAllPapersAndTestSeries(),
-      SupabaseService.fetchAllTestSeries(),
-    ]);
-    if (mounted) {
-      setState(() {
-        _dbPapers = List<Map<String, dynamic>>.from(results[0]);
-        _customSeriesList = List<Map<String, dynamic>>.from(results[1]);
-        _isLoading = false;
-      });
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+
+    try {
+      final results = await Future.wait([
+        SupabaseService.fetchAllPapersAndTestSeries(),
+        SupabaseService.fetchAllTestSeries(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _dbPapers = List<Map<String, dynamic>>.from(results[0]);
+          _customSeriesList = List<Map<String, dynamic>>.from(results[1]);
+          _isLoading = false;
+          _hasError = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Notice loading test series: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = _customSeriesList.isEmpty;
+          _errorMessage = 'Unable to load test series. Please try again.';
+        });
+      }
     }
   }
 
   Future<void> _refreshPapersSilently() async {
-    final results = await Future.wait([
-      SupabaseService.fetchAllPapersAndTestSeries(forceRefresh: true),
-      SupabaseService.fetchAllTestSeries(forceRefresh: true),
-    ]);
-    if (mounted) {
-      setState(() {
-        _dbPapers = List<Map<String, dynamic>>.from(results[0]);
-        _customSeriesList = List<Map<String, dynamic>>.from(results[1]);
-      });
+    try {
+      final results = await Future.wait([
+        SupabaseService.fetchAllPapersAndTestSeries(forceRefresh: true),
+        SupabaseService.fetchAllTestSeries(forceRefresh: true),
+      ]);
+      if (mounted) {
+        setState(() {
+          _dbPapers = List<Map<String, dynamic>>.from(results[0]);
+          _customSeriesList = List<Map<String, dynamic>>.from(results[1]);
+          _hasError = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Notice refreshing test series: $e');
     }
   }
 
@@ -512,8 +536,14 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
     final List<TestSeriesCardData> list = [];
     final Set<String> seenTitles = {};
 
-    // 1. Load from custom series (from Supabase test_series / tests / shared_prefs)
+    // 1. Load from custom series (from canonical system_config admin_custom_test_series)
     for (var cs in _customSeriesList) {
+      // Respect publication and archive status
+      final bool isArchived = cs['is_archived'] == true || cs['archived'] == true;
+      final String status = (cs['status'] ?? 'Published').toString().trim().toLowerCase();
+      final bool isPublished = status == 'published' || status.isEmpty;
+      if (isArchived || !isPublished) continue;
+
       final String title = (cs['title'] ?? cs['name'] ?? '').toString().trim();
       final String sId = (cs['id'] ?? cs['paper_id'] ?? 'ts_${title.hashCode}').toString();
       if (title.isNotEmpty && !seenTitles.contains(title.toLowerCase())) {
@@ -612,81 +642,6 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
             feature1Label: (cs['feature1'] ?? '').toString(),
             feature2Label: (cs['feature2'] ?? '').toString(),
             feature3Label: (cs['feature3'] ?? '').toString(),
-          ),
-        );
-      }
-    }
-
-    // 2. Load from dbPapers marked as test series (Only standalone Test Series packages, excluding individual test papers)
-    for (var p in _dbPapers) {
-      final String pId = p['id']?.toString() ?? '';
-      final String tsTitle = (p['test_series_title'] ?? p['new_test_series_name'] ?? p['existing_test_series'] ?? '').toString().trim();
-      final String pName = (p['paper_name'] ?? p['paperName'] ?? '').toString().trim();
-      final String effectiveTitle = tsTitle.isNotEmpty ? tsTitle : pName;
-
-      final bool isIndividualPaper = (p['is_paper'] == true || p['isPaper'] == true) ||
-          pName.toLowerCase().contains('paper') ||
-          pName.toLowerCase().contains('mock paper') ||
-          effectiveTitle.toLowerCase().contains('paper 1') ||
-          effectiveTitle.toLowerCase().contains('paper 2') ||
-          effectiveTitle.toLowerCase().contains('paper 3') ||
-          effectiveTitle.toLowerCase().contains('paper-') ||
-          effectiveTitle.toLowerCase().contains('paper_') ||
-          (p['test_series_id'] != null && p['test_series_id'].toString().isNotEmpty) ||
-          (p['test_series_title'] != null && p['test_series_title'].toString().isNotEmpty);
-
-      final bool isTestSeries = !isIndividualPaper &&
-          ((p['source_category'] == 'Test Series') ||
-           (p['category'] == 'Test Series') ||
-           (p['is_test_series'] == true) ||
-           ((p['available_in'] is List) && (p['available_in'] as List).contains('test_series')));
-
-      if (isTestSeries && effectiveTitle.isNotEmpty && !seenTitles.contains(effectiveTitle.toLowerCase())) {
-        seenTitles.add(effectiveTitle.toLowerCase());
-        final exam = (p['exam'] ?? 'NEET').toString();
-        final year = (p['year'] ?? '2027').toString();
-        final qCount = (p['saved_questions_count'] is num) ? (p['saved_questions_count'] as num).toInt() : (p['question_count'] ?? 200);
-        final duration = (p['duration_minutes'] is num) ? (p['duration_minutes'] as num).toInt() : (p['duration'] ?? 180);
-        final difficulty = (p['difficulty'] ?? 'Moderate').toString();
-        final testType = (p['test_type'] ?? (p['category'] != null && p['category'].toString().contains('Part') ? 'Part' : (p['category'] != null && p['category'].toString().contains('Chapter') ? 'Chapter' : 'Full'))).toString();
-        final validity = (p['validity'] ?? 'Valid until exam').toString();
-        final attemptStatus = (p['attempt_status'] ?? 'Not Attempted').toString();
-        final syllabusUrl = (p['syllabus_url'] ?? '').toString();
-        final isFree = p['is_free'] == true || p['isFree'] == true;
-        final price = (p['price'] is num) ? (p['price'] as num).toDouble() : 299.0;
-        final origPrice = (p['original_price'] is num) ? (p['original_price'] as num).toDouble() : 999.0;
-        final purchaseLink = (p['purchase_link'] ?? '').toString();
-        final buttonText = (p['purchase_button_text'] ?? 'Join').toString();
-
-        list.add(
-          TestSeriesCardData(
-            id: pId,
-            title: effectiveTitle,
-            exam: exam,
-            targetYear: year,
-            subtitle: '$exam $year Series (${qCount > 0 ? qCount : 200} Qs)',
-            description: (p['description'] ?? '').toString().trim().isNotEmpty
-                ? p['description'].toString().trim()
-                : 'Complete mock tests covering full syllabus with step-by-step solutions.',
-            testCount: 1,
-            durationMinutes: duration,
-            difficulty: difficulty,
-            testType: testType,
-            validity: validity,
-            attemptStatus: attemptStatus,
-            syllabusUrl: syllabusUrl,
-            status: p['status'] == 'Completed' ? 'Completed' : 'Ready',
-            nextTestName: pName,
-            iconBgColor: const Color(0xFF7C3AED),
-            icon: Icons.assignment_turned_in_rounded,
-            bannerImageUrl: p['banner_image_url'] ?? p['bannerImageUrl'],
-            bannerImageFit: (p['banner_image_fit'] ?? p['bannerImageFit'] ?? 'contain').toString(),
-            isFree: isFree,
-            price: price,
-            originalPrice: origPrice,
-            purchaseLink: purchaseLink,
-            purchaseButtonText: buttonText,
-            showPurchaseButton: p['show_purchase_button'] != false,
           ),
         );
       }
@@ -950,8 +905,19 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
 
                           const SizedBox(height: 24),
 
-                          // Responsive Grid of Test Series Cards
-                          _buildCardsGrid(filteredSeries, screenWidth),
+                          // Responsive Grid of Test Series Cards / Loading / Error State
+                          if (_isLoading && allRealSeries.isEmpty) ...[
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 60),
+                              child: Center(
+                                child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF4F46E5)),
+                              ),
+                            ),
+                          ] else if (_hasError && allRealSeries.isEmpty) ...[
+                            _buildErrorRetryWidget(),
+                          ] else ...[
+                            _buildCardsGrid(filteredSeries, screenWidth),
+                          ],
 
                           const SizedBox(height: 40),
                         ],
@@ -1447,6 +1413,47 @@ class _TestSeriesScreenState extends State<TestSeriesScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  // ===========================================================================
+  Widget _buildErrorRetryWidget() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.cloud_off_rounded, size: 44, color: Color(0xFFEF4444)),
+          const SizedBox(height: 12),
+          Text(
+            'Unable to Load Test Series',
+            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _errorMessage.isNotEmpty ? _errorMessage : 'A network error occurred while loading test series.',
+            style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () => _loadPapers(),
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Retry'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4F46E5),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

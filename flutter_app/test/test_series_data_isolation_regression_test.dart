@@ -122,47 +122,49 @@ void main() {
       final String paperId = 'global_paper_preserve_${DateTime.now().millisecondsSinceEpoch}';
       final String seriesId = 'test_series_preserve_${DateTime.now().millisecondsSinceEpoch}';
 
-      // 1. Create a global paper
-      await SupabaseService.savePaperRecord({
-        'id': paperId,
-        'paper_name': 'Preserved Global Paper',
-        'exam': 'NEET',
-        'year': '2026',
-        'source_category': 'Test Series',
-        'is_test_series': true,
-        'status': 'Published',
-      });
+      try {
+        // 1. Create a global paper
+        await SupabaseService.savePaperRecord({
+          'id': paperId,
+          'paper_name': 'Preserved Global Paper',
+          'exam': 'NEET',
+          'year': '2026',
+          'source_category': 'Test Series',
+          'is_test_series': true,
+          'status': 'Published',
+        });
 
-      // 2. Add it to a series
-      await SupabaseService.saveTestSeries({
-        'id': seriesId,
-        'title': 'Series with Global Paper',
-        'exam': 'NEET',
-        'year': '2026',
-        'tests': [
-          {'id': paperId, 'paper_id': paperId, 'title': 'Preserved Global Paper', 'questions': 90},
-        ],
-        'test_count': 1,
-      });
+        // 2. Add it to a series
+        await SupabaseService.saveTestSeries({
+          'id': seriesId,
+          'title': 'Test Fixture Ephemeral Series $seriesId',
+          'exam': 'NEET',
+          'year': '2026',
+          'tests': [
+            {'id': paperId, 'paper_id': paperId, 'title': 'Preserved Global Paper', 'questions': 90},
+          ],
+          'test_count': 1,
+        });
 
-      // 3. Remove paper from the series
-      await SupabaseService.saveTestSeries({
-        'id': seriesId,
-        'title': 'Series with Global Paper',
-        'exam': 'NEET',
-        'year': '2026',
-        'tests': <Map<String, dynamic>>[],
-        'test_count': 0,
-      });
+        // 3. Remove paper from the series
+        await SupabaseService.saveTestSeries({
+          'id': seriesId,
+          'title': 'Test Fixture Ephemeral Series $seriesId',
+          'exam': 'NEET',
+          'year': '2026',
+          'tests': <Map<String, dynamic>>[],
+          'test_count': 0,
+        });
 
-      // 4. Verify global paper still exists in catalogue!
-      final allPapers = await SupabaseService.fetchAllPapersAndTestSeries(forceRefresh: true);
-      final paperStillExists = allPapers.any((p) => (p['id'] ?? p['paper_id'] ?? '') == paperId);
-      expect(paperStillExists, isTrue, reason: 'Removing from a series must not delete the underlying global paper');
-
-      // Cleanup
-      await SupabaseService.deletePaperRecord(paperId);
-      await SupabaseService.deleteTestSeries(seriesId);
+        // 4. Verify global paper still exists in catalogue!
+        final allPapers = await SupabaseService.fetchAllPapersAndTestSeries(forceRefresh: true);
+        final paperStillExists = allPapers.any((p) => (p['id'] ?? p['paper_id'] ?? '') == paperId);
+        expect(paperStillExists, isTrue, reason: 'Removing from a series must not delete the underlying global paper');
+      } finally {
+        // Guaranteed cleanup
+        await SupabaseService.deletePaperRecord(paperId);
+        await SupabaseService.deleteTestSeries(seriesId);
+      }
     });
 
     test('5. Two independent test series must maintain strict isolation', () async {

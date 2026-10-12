@@ -6420,7 +6420,7 @@ class SupabaseService {
       debugPrint('Notice querying system_config for test series: $e');
     }
 
-    // 1. Fetch from Supabase test_series table
+    // 1. Fetch from Supabase test_series table (if available)
     try {
       final res = await client.from('test_series').select().order('created_at', ascending: false);
       if (res != null && (res as List).isNotEmpty) {
@@ -6437,96 +6437,33 @@ class SupabaseService {
       debugPrint('Notice querying Supabase test_series table: $e');
     }
 
-    // 2. Fetch from Supabase tests table
-    try {
-      final res = await client.from('tests').select().order('created_at', ascending: false);
-      if (res != null && (res as List).isNotEmpty) {
-        for (var row in res) {
-          final map = Map<String, dynamic>.from(row as Map);
-          final String sId = map['id']?.toString() ?? '';
-          if (sId.isNotEmpty && !seenIds.contains(sId) && !deletedIds.contains(sId)) {
-            seenIds.add(sId);
-            list.add({
-              'id': sId,
-              'title': map['title'] ?? 'Test Series',
-              'name': map['title'] ?? 'Test Series',
-              'description': map['description'] ?? 'Curated test series for comprehensive exam readiness.',
-              'exam': 'NEET',
-              'year': '2026',
-              'category': 'Full Syllabus',
-              'banner_image_url': 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=800&auto=format&fit=crop&q=60',
-              'is_free': false,
-              'price': 299.0,
-              'original_price': 999.0,
-              'purchase_link': 'https://neet-jee.in/test-series',
-              'purchase_button_text': 'Enroll Now - ₹299',
-              'show_purchase_button': true,
-              'test_count': 1,
-              'question_count': 200,
-              'duration_minutes': map['duration_minutes'] ?? 180,
-              'difficulty': 'High',
-              'status': 'Published',
-              'paper_id': sId,
-            });
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Notice querying Supabase tests table: $e');
-    }
-
-    // 3. Local cache merge
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString('cosmyra_saved_test_series');
-      if (raw != null && raw.isNotEmpty) {
-        final List<dynamic> decoded = jsonDecode(raw);
-        for (var item in decoded) {
-          final map = Map<String, dynamic>.from(item as Map);
-          final sId = map['id']?.toString() ?? '';
-          if (sId.isNotEmpty && !deletedIds.contains(sId)) {
-            final idx = list.indexWhere((i) => i['id'] == sId);
-            if (idx != -1) {
-              // Merge local tests safely without overwriting fresh cloud test dates
-              final cloudMap = list[idx];
-              final cloudTests = (cloudMap['tests'] is List) ? List<dynamic>.from(cloudMap['tests']) : [];
-              final localTests = (map['tests'] is List) ? List<dynamic>.from(map['tests']) : [];
-
-              for (var lt in localTests) {
-                if (lt is Map) {
-                  final ltMap = Map<String, dynamic>.from(lt);
-                  final ltId = (ltMap['id'] ?? ltMap['paper_id'] ?? '').toString().trim().toLowerCase();
-                  final ltTitle = (ltMap['title'] ?? '').toString().trim().toLowerCase();
-
-                  final cIdx = cloudTests.indexWhere((ct) => ct is Map && (
-                      (ct['id']?.toString().toLowerCase().trim() ?? '') == ltId ||
-                      (ct['paper_id']?.toString().toLowerCase().trim() ?? '') == ltId ||
-                      (ct['title']?.toString().toLowerCase().trim() ?? '') == ltTitle
-                  ));
-
-                  if (cIdx != -1 && cloudTests[cIdx] is Map) {
-                    final ctMap = Map<String, dynamic>.from(cloudTests[cIdx] as Map);
-                    final pDate = ctMap['test_date_time'] ?? ctMap['scheduled_at'] ?? ctMap['test_date'] ?? ltMap['test_date_time'] ?? ltMap['scheduled_at'] ?? ltMap['test_date'];
-                    ctMap['test_date_time'] = pDate;
-                    ctMap['scheduled_at'] = pDate;
-                    ctMap['test_date'] = pDate;
-                    cloudTests[cIdx] = ctMap;
-                  } else {
-                    cloudTests.add(ltMap);
-                  }
-                }
+    // 2. Offline fallback ONLY if remote query returned nothing (e.g. offline/network failure)
+    if (list.isEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final raw = prefs.getString('cosmyra_saved_test_series');
+        if (raw != null && raw.isNotEmpty) {
+          final List<dynamic> decoded = jsonDecode(raw);
+          for (var item in decoded) {
+            if (item is Map) {
+              final map = Map<String, dynamic>.from(item);
+              final sId = map['id']?.toString() ?? '';
+              if (sId.isNotEmpty && !seenIds.contains(sId) && !deletedIds.contains(sId) && !legacyDemoTestSeriesIds.contains(sId)) {
+                seenIds.add(sId);
+                list.add(map);
               }
-              cloudMap['tests'] = cloudTests;
-              list[idx] = cloudMap;
-            } else {
-              seenIds.add(sId);
-              list.add(map);
             }
           }
         }
+      } catch (e) {
+        debugPrint('Notice loading local test series: $e');
       }
-    } catch (e) {
-      debugPrint('Notice loading local test series: $e');
+    } else {
+      // Remote succeeded: sync local cache to match canonical remote data, evicting stale/demo records
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cosmyra_saved_test_series', jsonEncode(list));
+      } catch (_) {}
     }
 
     // Final filter pass to guarantee demo IDs and deleted IDs are completely excluded
@@ -6997,6 +6934,12 @@ class SupabaseService {
       } catch (e) {
         debugPrint('Notice reading local home recommendations: $e');
       }
+    } else {
+      // Remote succeeded: sync local cache to evict stale recommendations
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cosmyra_home_recommendations', jsonEncode(list));
+      } catch (_) {}
     }
 
     // Clean sort by order_index
