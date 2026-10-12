@@ -448,33 +448,35 @@ class _PracticeScreenState extends State<PracticeScreen> {
         child: Container(
           width: 700,
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Question ${_currentIndex + 1} Detail', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              LaTeXView(
-                text: question.questionText,
-                style: const TextStyle(fontSize: 16, height: 1.5),
-              ),
-              if (question.questionImage != null && question.questionImage!.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Center(
-                  child: SmartImage(
-                    url: question.questionImage,
-                    height: 300,
-                    fit: BoxFit.contain,
-                  ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Question ${_currentIndex + 1} Detail', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                  ],
                 ),
+                const SizedBox(height: 16),
+                LaTeXView(
+                  text: question.questionText,
+                  style: const TextStyle(fontSize: 16, height: 1.5),
+                ),
+                if (question.questionImage != null && question.questionImage!.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Center(
+                    child: SmartImage(
+                      url: question.questionImage,
+                      height: 300,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
