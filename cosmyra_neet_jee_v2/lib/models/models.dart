@@ -722,9 +722,15 @@ class QuestionModel {
 
     return QuestionModel(
       id: json['id']?.toString() ?? '',
-      examId: json['exam_id']?.toString() ?? '',
-      subjectId: json['subject_id']?.toString() ?? '',
-      chapterId: json['chapter_id']?.toString() ?? '',
+      examId: (json['exam_id'] ?? json['examId'] ?? json['exam'])?.toString() ?? '',
+      subjectId: (json['subject_id'] ??
+              json['subjectId'] ??
+              json['subject'] ??
+              json['subject_name'] ??
+              json['subjectName'])
+          ?.toString() ??
+          '',
+      chapterId: (json['chapter_id'] ?? json['chapterId'] ?? json['chapter'])?.toString() ?? '',
       topicId: json['topic_id']?.toString(),
       questionText: json['question_text'] ?? json['questionText'] ?? '',
       questionImage: json['question_image'] ?? json['questionImage'],
@@ -859,6 +865,8 @@ class TestAttemptModel {
   final double accuracy;
   final int timeSpentSeconds;
 
+  String get testId => testTemplateId;
+
   TestAttemptModel({
     required this.id,
     required this.userId,
@@ -883,24 +891,84 @@ class TestAttemptModel {
 
   factory TestAttemptModel.fromJson(Map<String, dynamic> json) {
     return TestAttemptModel(
-      id: json['id'] ?? '',
-      userId: json['user_id'] ?? '',
-      testTemplateId: json['test_template_id'] ?? '',
-      testTitle: json['test_title'] ?? json['title'] ?? 'Custom Test',
-      startedAt: DateTime.parse(json['started_at'] ?? DateTime.now().toIso8601String()),
-      expiresAt: DateTime.parse(json['expires_at'] ?? DateTime.now().add(const Duration(hours: 1)).toIso8601String()),
-      submittedAt: json['submitted_at'] != null ? DateTime.parse(json['submitted_at']) : null,
-      status: json['status'] ?? 'in_progress',
-      totalScore: (json['total_score'] as num?)?.toDouble(),
-      maxMarks: (json['max_marks'] as num?)?.toDouble(),
-      totalQuestions: json['total_questions'] ?? 0,
-      attemptedCount: json['attempted_count'] ?? 0,
-      correctCount: json['correct_count'] ?? 0,
-      incorrectCount: json['incorrect_count'] ?? 0,
-      unattemptedCount: json['unattempted_count'] ?? 0,
-      accuracy: (json['accuracy'] as num?)?.toDouble() ?? 0.0,
-      timeSpentSeconds: json['time_spent_seconds'] ?? 0,
+      id: json['id']?.toString() ?? '',
+      userId: (json['user_id'] ?? json['userId'] ?? json['student_id'])?.toString() ?? '',
+      testTemplateId: (json['test_template_id'] ?? json['testTemplateId'] ?? json['test_id'])?.toString() ?? '',
+      testTitle: json['test_title'] ?? json['testTitle'] ?? json['title'] ?? 'Test Paper',
+      startedAt: DateTime.parse(json['started_at'] ?? json['startedAt'] ?? DateTime.now().toIso8601String()),
+      expiresAt: DateTime.parse(json['expires_at'] ?? json['expiresAt'] ?? DateTime.now().add(const Duration(hours: 3)).toIso8601String()),
+      submittedAt: json['submitted_at'] != null
+          ? DateTime.parse(json['submitted_at'])
+          : (json['submittedAt'] != null ? DateTime.parse(json['submittedAt']) : null),
+      status: json['status'] ?? 'submitted',
+      totalScore: (json['total_score'] ?? json['totalScore'] as num?)?.toDouble(),
+      maxMarks: (json['max_score'] ?? json['max_marks'] ?? json['maxMarks'] as num?)?.toDouble(),
+      totalQuestions: (json['total_questions'] ?? json['totalQuestions'] as num?)?.toInt() ?? 0,
+      attemptedCount: (json['attempted_count'] ?? json['attemptedCount'] as num?)?.toInt() ?? 0,
+      correctCount: (json['correct_count'] ?? json['correctCount'] as num?)?.toInt() ?? 0,
+      incorrectCount: (json['incorrect_count'] ?? json['incorrectCount'] as num?)?.toInt() ?? 0,
+      unattemptedCount: (json['unattempted_count'] ?? json['unattemptedCount'] as num?)?.toInt() ?? 0,
+      accuracy: (json['accuracy_percentage'] ?? json['accuracy'] as num?)?.toDouble() ?? 0.0,
+      timeSpentSeconds: (json['time_spent_seconds'] ?? json['timeSpentSeconds'] as num?)?.toInt() ?? 0,
     );
+  }
+}
+
+/// Genuine cohort statistics for test comparison
+class TestCohortStats {
+  final int totalAttempts;
+  final double topperScore;
+  final int topperCorrect;
+  final int topperIncorrect;
+  final int topperSkipped;
+  final double topperAccuracy;
+
+  final double avgScore;
+  final int avgCorrect;
+  final int avgIncorrect;
+  final int avgSkipped;
+  final double avgAccuracy;
+  final List<double> allScores;
+
+  TestCohortStats({
+    required this.totalAttempts,
+    required this.topperScore,
+    required this.topperCorrect,
+    required this.topperIncorrect,
+    required this.topperSkipped,
+    required this.topperAccuracy,
+    required this.avgScore,
+    required this.avgCorrect,
+    required this.avgIncorrect,
+    required this.avgSkipped,
+    required this.avgAccuracy,
+    this.allScores = const [],
+  });
+
+  double get averageScore => avgScore;
+  int get averageCorrect => avgCorrect;
+  int get averageIncorrect => avgIncorrect;
+  int get averageSkipped => avgSkipped;
+  double get averageAccuracy => avgAccuracy;
+
+  /// Calculate student's 1-indexed rank within this cohort
+  int calculateRank(double userScore) {
+    if (allScores.isEmpty) return 1;
+    int higherCount = 0;
+    for (final s in allScores) {
+      if (s > userScore) higherCount++;
+    }
+    return higherCount + 1;
+  }
+
+  /// Calculate student's percentile within this cohort: (attempts below score / total) * 100
+  double calculatePercentile(double userScore) {
+    if (allScores.isEmpty || totalAttempts <= 1) return 100.0;
+    int belowCount = 0;
+    for (final s in allScores) {
+      if (s < userScore) belowCount++;
+    }
+    return (belowCount / totalAttempts) * 100.0;
   }
 }
 

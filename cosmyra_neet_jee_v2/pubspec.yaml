@@ -1,7 +1,7 @@
 name: cosmyra_neet_jee
 description: "Cosmyra NEET | JEE v2 - Extreme Performance Edition"
 publish_to: 'none'
-version: 2.2.0+1
+version: 2.2.1+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

@@ -774,8 +774,9 @@ final GoRouter appRouter = GoRouter(
           testId: testId,
           testTitle: title,
           durationMins: durationMins,
-          onSubmitted: (attempt, answers) {
+          onSubmitted: (attempt, questions, answers) {
             _lastTestAttempt = attempt;
+            _lastTestQuestions = List<QuestionModel>.from(questions);
             _lastTestUserAnswers = answers;
             context.go('/test/$testId/result');
           },
@@ -796,8 +797,9 @@ final GoRouter appRouter = GoRouter(
           testId: testId,
           testTitle: title,
           durationMins: durationMins,
-          onSubmitted: (attempt, answers) {
+          onSubmitted: (attempt, questions, answers) {
             _lastTestAttempt = attempt;
+            _lastTestQuestions = List<QuestionModel>.from(questions);
             _lastTestUserAnswers = answers;
             context.go('/test/$testId/result');
           },
@@ -806,30 +808,25 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/test/:testId/result',
-      builder: (context, state) => TestResultScreen(
-        attempt: TestAttemptModel(
-          id: 'attempt_1',
-          userId: 'student_1',
-          testTemplateId: 'template_1',
-          testTitle: 'NEET Full Length Test 1',
-          startedAt: DateTime.now().subtract(const Duration(hours: 3)),
-          expiresAt: DateTime.now(),
-          submittedAt: DateTime.now(),
-          status: 'submitted',
-          totalScore: 680,
-          maxMarks: 720,
-          totalQuestions: 180,
-          attemptedCount: 170,
-          correctCount: 165,
-          incorrectCount: 5,
-          unattemptedCount: 10,
-          accuracy: 94.4,
-          timeSpentSeconds: 9600,
-        ),
-        questions: SupabaseService.getSampleQuestions(20),
-        userAnswers: const {0: 'A', 1: 'B', 2: 'C'},
-        onBackToDashboard: () => context.go('/dashboard'),
-      ),
+      builder: (context, state) {
+        final String testId = state.pathParameters['testId'] ?? '';
+        if (_lastTestAttempt != null &&
+            (_lastTestAttempt!.testId == testId ||
+                testId.isEmpty ||
+                _lastTestAttempt!.id == testId ||
+                _lastTestAttempt!.testTemplateId == testId)) {
+          return TestResultScreen(
+            attempt: _lastTestAttempt!,
+            questions: _lastTestQuestions ?? [],
+            userAnswers: _lastTestUserAnswers ?? {},
+            onBackToDashboard: () => context.go('/dashboard'),
+          );
+        }
+        return TestResultLoaderScreen(
+          testId: testId,
+          onBackToDashboard: () => context.go('/dashboard'),
+        );
+      },
     ),
     // Custom Practice & Custom Test Routes
     GoRoute(
@@ -889,34 +886,24 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/custom-test/result/:attemptId',
       builder: (context, state) {
-        final attempt = _lastTestAttempt ??
-            TestAttemptModel(
-              id: state.pathParameters['attemptId'] ?? 'attempt_1',
-              userId: 'student_1',
-              testTemplateId: 'template_1',
-              testTitle: 'Custom Test Score Report',
-              startedAt: DateTime.now().subtract(const Duration(minutes: 30)),
-              expiresAt: DateTime.now(),
-              submittedAt: DateTime.now(),
-              status: 'submitted',
-              totalScore: 140,
-              maxMarks: 160,
-              totalQuestions: 40,
-              attemptedCount: 38,
-              correctCount: 35,
-              incorrectCount: 3,
-              unattemptedCount: 2,
-              accuracy: 92.1,
-              timeSpentSeconds: 1800,
-            );
-        final questions = _lastTestQuestions ?? SupabaseService.getSampleQuestions(20);
-        final userAnswers = _lastTestUserAnswers ?? const {0: 'A', 1: 'B', 2: 'C'};
-
+        final attemptId = state.pathParameters['attemptId'] ?? '';
+        if (_lastTestAttempt != null &&
+            (_lastTestAttempt!.id == attemptId ||
+                attemptId.isEmpty ||
+                _lastTestAttempt!.testId == attemptId)) {
+          return Scaffold(
+            body: TestResultScreen(
+              attempt: _lastTestAttempt!,
+              questions: _lastTestQuestions ?? [],
+              userAnswers: _lastTestUserAnswers ?? {},
+              onBackToDashboard: () => context.go('/dashboard'),
+            ),
+          );
+        }
         return Scaffold(
-          body: TestResultScreen(
-            attempt: attempt,
-            questions: questions,
-            userAnswers: userAnswers,
+          body: TestResultLoaderScreen(
+            testId: attemptId,
+            attemptId: attemptId,
             onBackToDashboard: () => context.go('/dashboard'),
           ),
         );
@@ -1025,24 +1012,67 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/pyq/result/:attemptId',
       builder: (context, state) {
+        if (_lastTestAttempt == null) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('PYQ Result'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.go('/pyq'),
+              ),
+            ),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.assignment_late_outlined, size: 54, color: Color(0xFF94A3B8)),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'No Recorded PYQ Session Found',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Please complete a practice session to view your score breakdown.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () => context.go('/pyq'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Go to PYQ Practice'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
         final pyqResult = PYQSessionResultModel(
-          id: state.pathParameters['attemptId'] ?? 'pyq_1',
-          userId: 'student_1',
-          exam: 'NEET',
+          id: _lastTestAttempt!.id,
+          userId: _lastTestAttempt!.userId,
+          exam: _lastTestAttempt!.testTitle.toLowerCase().contains('jee') ? 'JEE' : 'NEET',
           mode: PYQPracticeMode.chapterWise,
           subjects: const ['Physics', 'Chemistry', 'Biology'],
           years: const [2024, 2025, 2026],
-          attemptedAt: DateTime.now(),
-          totalQuestions: 45,
-          attemptedCount: 42,
-          correctCount: 40,
-          incorrectCount: 2,
-          skippedCount: 3,
-          accuracy: 95.2,
-          timeSpentSeconds: 2700,
+          attemptedAt: _lastTestAttempt!.submittedAt ?? DateTime.now(),
+          totalQuestions: _lastTestAttempt!.totalQuestions,
+          attemptedCount: _lastTestAttempt!.attemptedCount,
+          correctCount: _lastTestAttempt!.correctCount,
+          incorrectCount: _lastTestAttempt!.incorrectCount,
+          skippedCount: _lastTestAttempt!.unattemptedCount,
+          accuracy: _lastTestAttempt!.accuracy,
+          timeSpentSeconds: _lastTestAttempt!.timeSpentSeconds,
         );
-        final questions = _lastTestQuestions ?? SupabaseService.getSampleQuestions(20);
-        final userAnswers = _lastTestUserAnswers ?? const {0: 'A', 1: 'B', 2: 'C'};
+        final questions = _lastTestQuestions ?? [];
+        final userAnswers = _lastTestUserAnswers ?? {};
 
         return PYQResultScreen(
           result: pyqResult,
@@ -1106,34 +1136,24 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/nta-practice/result/:attemptId',
       builder: (context, state) {
-        final attempt = _lastTestAttempt ??
-            TestAttemptModel(
-              id: state.pathParameters['attemptId'] ?? 'nta_1',
-              userId: 'student_1',
-              testTemplateId: 'nta_template_1',
-              testTitle: 'NTA Mock Test Score Report',
-              startedAt: DateTime.now().subtract(const Duration(hours: 3)),
-              expiresAt: DateTime.now(),
-              submittedAt: DateTime.now(),
-              status: 'submitted',
-              totalScore: 680,
-              maxMarks: 720,
-              totalQuestions: 180,
-              attemptedCount: 175,
-              correctCount: 170,
-              incorrectCount: 5,
-              unattemptedCount: 5,
-              accuracy: 97.1,
-              timeSpentSeconds: 10800,
-            );
-        final questions = _lastTestQuestions ?? SupabaseService.getSampleQuestions(20);
-        final userAnswers = _lastTestUserAnswers ?? const {0: 'A', 1: 'B', 2: 'C'};
-
+        final attemptId = state.pathParameters['attemptId'] ?? '';
+        if (_lastTestAttempt != null &&
+            (_lastTestAttempt!.id == attemptId ||
+                attemptId.isEmpty ||
+                _lastTestAttempt!.testId == attemptId)) {
+          return Scaffold(
+            body: TestResultScreen(
+              attempt: _lastTestAttempt!,
+              questions: _lastTestQuestions ?? [],
+              userAnswers: _lastTestUserAnswers ?? {},
+              onBackToDashboard: () => context.go('/nta-practice'),
+            ),
+          );
+        }
         return Scaffold(
-          body: TestResultScreen(
-            attempt: attempt,
-            questions: questions,
-            userAnswers: userAnswers,
+          body: TestResultLoaderScreen(
+            testId: attemptId,
+            attemptId: attemptId,
             onBackToDashboard: () => context.go('/nta-practice'),
           ),
         );

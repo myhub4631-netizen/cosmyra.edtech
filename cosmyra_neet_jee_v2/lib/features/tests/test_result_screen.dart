@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/latex_view.dart';
@@ -6,7 +5,7 @@ import '../../shared/widgets/smart_image.dart';
 import '../../shared/widgets/solution_video_player.dart';
 import '../../shared/utils/question_copy_helper.dart';
 import '../../shared/utils/neet_subject_helper.dart';
-import 'exam_config_engine.dart';
+import '../../core/services/supabase_service.dart';
 import '../leaderboard/leaderboard_screen.dart';
 
 class TestResultScreen extends StatefulWidget {
@@ -37,28 +36,65 @@ class _TestResultScreenState extends State<TestResultScreen> {
   int _activeTab = 0; // 0: Result Summary, 1: Leaderboard
   String _selectedAttempt = 'Attempt 1';
   late String _selectedSubject;
+  TestCohortStats? _cohortStats;
+  bool _isLoadingCohort = false;
 
   final ScrollController _scrollController = ScrollController();
-  late ExamPredictionModel _prediction;
 
   @override
   void initState() {
     super.initState();
-    _prediction = ExamConfigEngine.calculatePredictions(
-      testTitle: widget.attempt.testTitle,
-      score: widget.attempt.totalScore ?? 0,
-      maxScore: widget.attempt.maxMarks ?? (widget.questions.length * 4.0),
-      accuracy: widget.attempt.accuracy,
-      totalQuestions: widget.questions.length,
-      attemptedCount: widget.attempt.attemptedCount,
-    );
-
     final subjects = _getAvailableSubjects();
     _selectedSubject = subjects.isNotEmpty ? subjects.first : 'Physics';
+    _loadCohortStats();
+  }
+
+  Future<void> _loadCohortStats() async {
+    final templateId = widget.attempt.testTemplateId;
+    if (templateId.isEmpty) return;
+    setState(() => _isLoadingCohort = true);
+    try {
+      final cohort = await SupabaseService.fetchTestCohortStats(testTemplateId: templateId);
+      if (mounted) {
+        setState(() {
+          _cohortStats = cohort;
+          _isLoadingCohort = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingCohort = false);
+    }
   }
 
   List<String> _getAvailableSubjects() {
-    return ['Physics', 'Chemistry', 'Botany', 'Zoology'];
+    final isJee = widget.attempt.testTitle.toLowerCase().contains('jee');
+    if (widget.questions.isNotEmpty) {
+      final subs = <String>{};
+      for (int i = 0; i < widget.questions.length; i++) {
+        final q = widget.questions[i];
+        final sub = NeetSubjectHelper.getSubjectForQuestionIndex(
+          i,
+          widget.questions.length,
+          explicitSubject: q.subjectId,
+          isNeet: !isJee,
+          useBotanyZoology: true,
+        );
+        subs.add(sub);
+      }
+      if (subs.isNotEmpty) {
+        final preferredOrder = isJee
+            ? ['Physics', 'Chemistry', 'Mathematics']
+            : ['Physics', 'Chemistry', 'Botany', 'Zoology', 'Biology'];
+        final ordered = preferredOrder.where((s) => subs.contains(s)).toList();
+        for (var s in subs) {
+          if (!ordered.contains(s)) ordered.add(s);
+        }
+        return ordered;
+      }
+    }
+    return isJee
+        ? ['Physics', 'Chemistry', 'Mathematics']
+        : ['Physics', 'Chemistry', 'Botany', 'Zoology'];
   }
 
   void _scrollToSolutions() {
@@ -74,33 +110,65 @@ class _TestResultScreenState extends State<TestResultScreen> {
     });
   }
 
-  bool _isOptSelected(String? userAns, String optKey, String optLetter, String optText) {
+  bool _isOptSelected(String? userAns, String optKey, String optLetter, String optText, [int? optIndex]) {
     if (userAns == null || userAns.isEmpty) return false;
     final parts = userAns.split(',');
     for (var p in parts) {
       final trimmed = p.trim();
+      if (trimmed.isEmpty) continue;
       if (trimmed == optKey) return true;
-      if (trimmed == optLetter || trimmed == 'Option $optLetter') return true;
-      if (optText.isNotEmpty && trimmed == optText) return true;
+      if (trimmed.toLowerCase() == optLetter.toLowerCase()) return true;
+      if (trimmed.toLowerCase() == 'option ${optLetter.toLowerCase()}') return true;
+      if (trimmed.toLowerCase() == 'opt ${optLetter.toLowerCase()}') return true;
+      if (optIndex != null && trimmed == optIndex.toString()) return true;
+      if (optText.isNotEmpty && trimmed.toLowerCase() == optText.trim().toLowerCase()) return true;
     }
     return false;
   }
 
   Map<String, dynamic> _computeSubjectStats(String subject) {
+    if (widget.questions.isEmpty) {
+      return {
+        'count': 0,
+        'correct': 0,
+        'incorrect': 0,
+        'skipped': 0,
+        'score': 0,
+        'accuracy': 0.0,
+        'percentile': 'Not available',
+        'rank': 'Not available',
+        'timeStr': '00:00:00',
+        'isAvailable': false,
+      };
+    }
+
     int count = 0;
     int correct = 0;
     int incorrect = 0;
     int skipped = 0;
+    double score = 0.0;
+    final isJee = widget.attempt.testTitle.toLowerCase().contains('jee');
 
     for (int i = 0; i < widget.questions.length; i++) {
       final q = widget.questions[i];
-      final qSub = (q.subjectId.isNotEmpty && !q.subjectId.contains('-') && q.subjectId.length < 25)
-          ? q.subjectId.trim()
-          : 'Physics';
+      final qSub = NeetSubjectHelper.getSubjectForQuestionIndex(
+        i,
+        widget.questions.length,
+        explicitSubject: q.subjectId,
+        isNeet: !isJee,
+        useBotanyZoology: true,
+      );
 
-      if (qSub.toLowerCase() == subject.toLowerCase()) {
+      final matchesSubject = (qSub.toLowerCase() == subject.toLowerCase()) ||
+          (subject.toLowerCase() == 'biology' &&
+              (qSub.toLowerCase() == 'botany' || qSub.toLowerCase() == 'zoology'));
+
+      if (matchesSubject) {
         count++;
         final ans = widget.userAnswers[i];
+        final double qMarks = (q.marks > 0) ? q.marks.toDouble() : 4.0;
+        final double qNeg = (q.negativeMarks > 0) ? q.negativeMarks.toDouble() : 1.0;
+
         if (ans != null && ans.trim().isNotEmpty) {
           bool isCorrect = false;
           if (q.qType == 'numerical') {
@@ -117,9 +185,9 @@ class _TestResultScreenState extends State<TestResultScreen> {
           } else {
             for (int optIdx = 0; optIdx < q.options.length; optIdx++) {
               final opt = q.options[optIdx];
-              final optKey = (opt.id != null && opt.id.isNotEmpty) ? opt.id : 'opt_${q.id}_$optIdx';
+              final optKey = (opt.id.isNotEmpty) ? opt.id : 'opt_${q.id}_$optIdx';
               final optLetter = String.fromCharCode(65 + optIdx);
-              if (_isOptSelected(ans, optKey, optLetter, opt.optionText) && opt.isCorrect) {
+              if (_isOptSelected(ans, optKey, optLetter, opt.optionText, optIdx) && opt.isCorrect) {
                 isCorrect = true;
                 break;
               }
@@ -127,8 +195,10 @@ class _TestResultScreenState extends State<TestResultScreen> {
           }
           if (isCorrect) {
             correct++;
+            score += qMarks;
           } else {
             incorrect++;
+            score -= qNeg;
           }
         } else {
           skipped++;
@@ -136,16 +206,11 @@ class _TestResultScreenState extends State<TestResultScreen> {
       }
     }
 
-    final double score = (correct * 4.0) - (incorrect * 1.0);
     final attempted = correct + incorrect;
     final double accuracy = attempted > 0 ? (correct / attempted) * 100 : 0.0;
-    final double maxSubMarks = count > 0 ? (count * 4.0) : 100.0;
-    final double scoreRatio = maxSubMarks > 0 ? (score / maxSubMarks).clamp(-0.25, 1.0) : 0.0;
-    final double percentile = (50.0 + (scoreRatio * 49.5)).clamp(0.0, 99.9);
-    final int rank = count > 0 ? ((100.0 - percentile) * 584.0 + 1).round() : 0;
-    final int subTimeSecs = widget.attempt.timeSpentSeconds > 0 && widget.questions.isNotEmpty
+    final int subTimeSecs = widget.attempt.timeSpentSeconds > 0 && widget.questions.isNotEmpty && count > 0
         ? ((widget.attempt.timeSpentSeconds * (count / widget.questions.length))).round()
-        : 471;
+        : 0;
 
     final mins = subTimeSecs ~/ 60;
     final secs = subTimeSecs % 60;
@@ -158,19 +223,28 @@ class _TestResultScreenState extends State<TestResultScreen> {
       'skipped': skipped,
       'score': score.toInt(),
       'accuracy': accuracy,
-      'percentile': percentile,
-      'rank': rank,
+      'percentile': (_cohortStats != null && _cohortStats!.totalAttempts >= 2)
+          ? '${_cohortStats!.calculatePercentile(score).toStringAsFixed(2)}%'
+          : 'Not available',
+      'rank': (_cohortStats != null && _cohortStats!.totalAttempts >= 2)
+          ? '${_cohortStats!.calculateRank(score)}'
+          : 'Not available',
       'timeStr': timeStr,
+      'isAvailable': count > 0,
     };
   }
 
   @override
   Widget build(BuildContext context) {
     final attempt = widget.attempt;
-    final totalQ = widget.questions.length > 0 ? widget.questions.length : 180;
-    final double maxScore = attempt.maxMarks ?? (totalQ * 4.0);
+    final totalQ = widget.questions.isNotEmpty
+        ? widget.questions.length
+        : (attempt.totalQuestions > 0 ? attempt.totalQuestions : 0);
+    final double maxScore = attempt.maxMarks != null && attempt.maxMarks! > 0
+        ? attempt.maxMarks!
+        : (totalQ > 0 ? (totalQ * 4.0) : 0.0);
     final double userScore = attempt.totalScore ?? 0.0;
-    final int timeSpent = attempt.timeSpentSeconds > 0 ? attempt.timeSpentSeconds : 471;
+    final int timeSpent = attempt.timeSpentSeconds > 0 ? attempt.timeSpentSeconds : 0;
     final int hours = timeSpent ~/ 3600;
     final int mins = (timeSpent % 3600) ~/ 60;
     final int secs = timeSpent % 60;
@@ -179,7 +253,9 @@ class _TestResultScreenState extends State<TestResultScreen> {
     final dateSubmitted = attempt.submittedAt ?? DateTime.now();
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
     final String dateStr = '${dateSubmitted.day} ${months[dateSubmitted.month - 1]} ${dateSubmitted.year}';
-    final int durationMins = (attempt.timeSpentSeconds > 0 ? (attempt.timeSpentSeconds ~/ 60) : 180).clamp(1, 300);
+    final int durationMins = attempt.expiresAt.difference(attempt.startedAt).inMinutes > 0
+        ? attempt.expiresAt.difference(attempt.startedAt).inMinutes
+        : (timeSpent > 0 ? (timeSpent ~/ 60) : 0);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -325,7 +401,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
                           SizedBox(
                             height: 500,
                             child: LeaderboardScreen(
-                              initialExam: _prediction.examName,
+                              initialExam: widget.attempt.testTitle.toLowerCase().contains('jee') ? 'JEE Main' : 'NEET UG',
                             ),
                           ),
                         ],
@@ -502,7 +578,11 @@ class _TestResultScreenState extends State<TestResultScreen> {
 
   // 3. SCORE CARD (MATCHING IMAGE 1)
   Widget _buildScoreCard(double userScore, double maxScore) {
-    final double pct = _prediction.percentile;
+    final hasCohort = _cohortStats != null && _cohortStats!.totalAttempts >= 2;
+    final String pctText = hasCohort
+        ? 'Percentile: ${_cohortStats!.calculatePercentile(userScore).toStringAsFixed(2)}'
+        : 'Percentile: Not available';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -543,7 +623,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Percentile: ${pct.toStringAsFixed(2)} (Predicted)',
+            pctText,
             style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
           ),
         ],
@@ -553,7 +633,10 @@ class _TestResultScreenState extends State<TestResultScreen> {
 
   // 3. RANK CARD (MATCHING IMAGE 1)
   Widget _buildRankCard() {
-    final int rank = _prediction.estimatedRank > 0 ? _prediction.estimatedRank : 58405;
+    final hasCohort = _cohortStats != null && _cohortStats!.totalAttempts >= 2;
+    final String rankText = hasCohort ? '${_cohortStats!.calculateRank(widget.attempt.totalScore ?? 0)}' : 'Not available';
+    final String subtitleText = hasCohort ? 'Out of ${_cohortStats!.totalAttempts} students' : 'Awaiting cohort data';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -572,13 +655,21 @@ class _TestResultScreenState extends State<TestResultScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          const Text('RANK (Predicted)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B), letterSpacing: 0.5)),
+          const Text('RANK', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B), letterSpacing: 0.5)),
           const SizedBox(height: 4),
           Text(
-            '$rank',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+            rankText,
+            style: TextStyle(
+              fontSize: hasCohort ? 24 : 18,
+              fontWeight: FontWeight.w900,
+              color: hasCohort ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+            ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 6),
+          Text(
+            subtitleText,
+            style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+          ),
         ],
       ),
     );
@@ -593,6 +684,50 @@ class _TestResultScreenState extends State<TestResultScreen> {
     final double correctRatio = totalQ > 0 ? (correctCount / totalQ) : 0;
     final double incorrectRatio = totalQ > 0 ? (incorrectCount / totalQ) : 0;
     final double skippedRatio = totalQ > 0 ? (skippedCount / totalQ) : 0;
+
+    double marksObtained = 0.0;
+    double marksLost = 0.0;
+    if (widget.questions.isNotEmpty) {
+      for (int i = 0; i < widget.questions.length; i++) {
+        final q = widget.questions[i];
+        final ans = widget.userAnswers[i];
+        final double qMarks = (q.marks > 0) ? q.marks : 4.0;
+        final double qNeg = (q.negativeMarks > 0) ? q.negativeMarks : 1.0;
+        if (ans != null && ans.trim().isNotEmpty) {
+          bool isCorr = false;
+          if (q.qType == 'numerical') {
+            final expected = (q.numericalAnswer ?? '').trim();
+            if (expected.isNotEmpty) {
+              final uNum = double.tryParse(ans.trim());
+              final eNum = double.tryParse(expected);
+              if (uNum != null && eNum != null) {
+                isCorr = (uNum - eNum).abs() < 0.01;
+              } else {
+                isCorr = ans.trim().toLowerCase() == expected.toLowerCase();
+              }
+            }
+          } else {
+            for (int optIdx = 0; optIdx < q.options.length; optIdx++) {
+              final opt = q.options[optIdx];
+              final optKey = (opt.id.isNotEmpty) ? opt.id : 'opt_${q.id}_$optIdx';
+              final optLetter = String.fromCharCode(65 + optIdx);
+              if (_isOptSelected(ans, optKey, optLetter, opt.optionText, optIdx) && opt.isCorrect) {
+                isCorr = true;
+                break;
+              }
+            }
+          }
+          if (isCorr) {
+            marksObtained += qMarks;
+          } else {
+            marksLost += qNeg;
+          }
+        }
+      }
+    } else {
+      marksObtained = correctCount * 4.0;
+      marksLost = incorrectCount * 1.0;
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -622,7 +757,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const SizedBox(),
-              Text('Marks Obtained: ${(correctCount * 4).toInt()}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+              Text('Marks Obtained: +${marksObtained.toInt()}', style: const TextStyle(fontSize: 11, color: Color(0xFF16A34A), fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 4),
@@ -657,7 +792,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const SizedBox(),
-              Text('Marks Lost: -${(incorrectCount * 1).toInt()}', style: const TextStyle(fontSize: 11, color: Color(0xFFDC2626))),
+              Text('Marks Lost: -${marksLost.toInt()}', style: const TextStyle(fontSize: 11, color: Color(0xFFDC2626), fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 4),
@@ -692,7 +827,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const SizedBox(),
-              Text('Marks Skipped: ${(skippedCount * 4).toInt()}', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+              Text('Unattempted Questions: $skippedCount', style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
             ],
           ),
           const SizedBox(height: 4),
@@ -795,11 +930,63 @@ class _TestResultScreenState extends State<TestResultScreen> {
 
   // 4. PERFORMANCE COMPARISON CARDS (MATCHING IMAGE 2)
   Widget _buildPerformanceComparisonCards(int totalQ, double maxScore) {
-    final int avgCorrect = (totalQ * 0.34).round();
-    final int avgIncorrect = (totalQ * 0.23).round();
-    final int avgSkipped = (totalQ * 0.43).round();
-    final double avgScore = (maxScore * 0.287);
+    if (_isLoadingCohort) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Center(
+          child: Column(
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
+              ),
+              SizedBox(height: 10),
+              Text(
+                'Loading comparison data...',
+                style: TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
+    if (_cohortStats == null || _cohortStats!.totalAttempts < 2) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          children: const [
+            Icon(Icons.analytics_outlined, size: 32, color: Color(0xFF94A3B8)),
+            SizedBox(height: 8),
+            Text(
+              'Not enough comparison data yet',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Topper and cohort averages will be displayed once more students complete this test.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final stats = _cohortStats!;
     return Row(
       children: [
         // TOPPER CARD (YELLOWISH)
@@ -828,11 +1015,11 @@ class _TestResultScreenState extends State<TestResultScreen> {
                   ],
                 ),
                 const SizedBox(height: 14),
-                _buildCompRow('Score', '${maxScore.toInt()}'),
-                _buildCompRow('Correct', '$totalQ'),
-                _buildCompRow('Incorrect', '0'),
-                _buildCompRow('Skipped', '0'),
-                _buildCompRow('Accuracy', '100%'),
+                _buildCompRow('Score', stats.topperScore.toStringAsFixed(1)),
+                _buildCompRow('Correct', '${stats.topperCorrect}'),
+                _buildCompRow('Incorrect', '${stats.topperIncorrect}'),
+                _buildCompRow('Skipped', '${stats.topperSkipped}'),
+                _buildCompRow('Accuracy', '${stats.topperAccuracy.toStringAsFixed(1)}%'),
               ],
             ),
           ),
@@ -865,11 +1052,11 @@ class _TestResultScreenState extends State<TestResultScreen> {
                   ],
                 ),
                 const SizedBox(height: 14),
-                _buildCompRow('Score', avgScore.toStringAsFixed(2)),
-                _buildCompRow('Correct', '$avgCorrect'),
-                _buildCompRow('Incorrect', '$avgIncorrect'),
-                _buildCompRow('Skipped', '$avgSkipped'),
-                _buildCompRow('Accuracy', '54.9%'),
+                _buildCompRow('Score', stats.averageScore.toStringAsFixed(2)),
+                _buildCompRow('Correct', '${stats.averageCorrect}'),
+                _buildCompRow('Incorrect', '${stats.averageIncorrect}'),
+                _buildCompRow('Skipped', '${stats.averageSkipped}'),
+                _buildCompRow('Accuracy', '${stats.averageAccuracy.toStringAsFixed(1)}%'),
               ],
             ),
           ),
@@ -893,7 +1080,8 @@ class _TestResultScreenState extends State<TestResultScreen> {
 
   // 5. MARKS VS RANK GAUGE / SCALE CARD (MATCHING IMAGE 3)
   Widget _buildRankGaugeScaleCard(double userScore, double maxScore) {
-    final int rank = _prediction.estimatedRank > 0 ? _prediction.estimatedRank : 58405;
+    final hasCohort = _cohortStats != null && _cohortStats!.totalAttempts >= 2;
+    final int? rank = hasCohort ? _cohortStats!.calculateRank(userScore) : null;
     final double norm = maxScore > 0 ? ((userScore + (maxScore * 0.25)) / (maxScore * 1.25)).clamp(0.05, 0.95) : 0.1;
 
     return Container(
@@ -914,7 +1102,10 @@ class _TestResultScreenState extends State<TestResultScreen> {
                 color: const Color(0xFF818CF8),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text('Rank: $rank', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+              child: Text(
+                rank != null ? 'Rank: $rank' : 'Rank: Pending cohort data',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+              ),
             ),
           ),
           const SizedBox(height: 6),
@@ -982,14 +1173,63 @@ class _TestResultScreenState extends State<TestResultScreen> {
           ),
           const SizedBox(height: 14),
 
-          _buildSectionalItem(Icons.text_fields_rounded, const Color(0xFF6366F1), 'Score', '${stats['score']}'),
-          _buildSectionalItem(Icons.percent_rounded, const Color(0xFF0EA5E9), 'Percentile', '${(stats['percentile'] as double).toStringAsFixed(2)}'),
-          _buildSectionalItem(Icons.star_outline_rounded, const Color(0xFFEAB308), 'Rank', '${stats['rank']}'),
-          _buildSectionalItem(Icons.check_circle_outline_rounded, const Color(0xFF22C55E), 'Correct', '${stats['correct']}'),
-          _buildSectionalItem(Icons.cancel_outlined, const Color(0xFFEF4444), 'Incorrect', '${stats['incorrect']}'),
-          _buildSectionalItem(Icons.arrow_right_alt_rounded, const Color(0xFF3B82F6), 'Skipped', '${stats['skipped']}'),
-          _buildSectionalItem(Icons.track_changes_rounded, const Color(0xFF8B5CF6), 'Accuracy', '${(stats['accuracy'] as double).toStringAsFixed(1)}%'),
-          _buildSectionalItem(Icons.timer_outlined, const Color(0xFFF59E0B), 'Time Taken', '${stats['timeStr']}'),
+          if (widget.questions.isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Column(
+                children: [
+                  Icon(Icons.pie_chart_outline_rounded, size: 36, color: Color(0xFF94A3B8)),
+                  SizedBox(height: 10),
+                  Text(
+                    'Subject breakdown is unavailable',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Detailed question records for this attempt could not be loaded.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            )
+          else if ((stats['count'] as int? ?? 0) == 0)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.info_outline_rounded, size: 28, color: Color(0xFF94A3B8)),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No questions assigned to $_selectedSubject in this test paper.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            _buildSectionalItem(Icons.text_fields_rounded, const Color(0xFF6366F1), 'Score', '${stats['score']}'),
+            _buildSectionalItem(Icons.percent_rounded, const Color(0xFF0EA5E9), 'Percentile', '${stats['percentile']}'),
+            _buildSectionalItem(Icons.star_outline_rounded, const Color(0xFFEAB308), 'Rank', '${stats['rank']}'),
+            _buildSectionalItem(Icons.check_circle_outline_rounded, const Color(0xFF22C55E), 'Correct', '${stats['correct']}'),
+            _buildSectionalItem(Icons.cancel_outlined, const Color(0xFFEF4444), 'Incorrect', '${stats['incorrect']}'),
+            _buildSectionalItem(Icons.arrow_right_alt_rounded, const Color(0xFF3B82F6), 'Skipped', '${stats['skipped']}'),
+            _buildSectionalItem(Icons.track_changes_rounded, const Color(0xFF8B5CF6), 'Accuracy', '${(stats['accuracy'] as double).toStringAsFixed(1)}%'),
+            _buildSectionalItem(Icons.timer_outlined, const Color(0xFFF59E0B), 'Time Taken', '${stats['timeStr']}'),
+          ],
         ],
       ),
     );
@@ -1023,7 +1263,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
         if (q.qType == 'numerical') {
           final expected = (q.numericalAnswer ?? '').trim();
           if (expected.isNotEmpty) {
-            final uNum = double.tryParse(userAns!.trim());
+            final uNum = double.tryParse(userAns.trim());
             final eNum = double.tryParse(expected);
             if (uNum != null && eNum != null) {
               isCorrect = (uNum - eNum).abs() < 0.01;
@@ -1034,7 +1274,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
         } else {
           for (int i = 0; i < q.options.length; i++) {
             final opt = q.options[i];
-            final optKey = (opt.id != null && opt.id.isNotEmpty) ? opt.id : 'opt_${q.id}_$i';
+            final optKey = opt.id.isNotEmpty ? opt.id : 'opt_${q.id}_$i';
             final optLetter = String.fromCharCode(65 + i);
             if (_isOptSelected(userAns, optKey, optLetter, opt.optionText) && opt.isCorrect) {
               isCorrect = true;
@@ -1107,7 +1347,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
                 if (q.qType == 'numerical') {
                   final expected = (q.numericalAnswer ?? '').trim();
                   if (expected.isNotEmpty) {
-                    final uNum = double.tryParse(userAns!.trim());
+                    final uNum = double.tryParse(userAns.trim());
                     final eNum = double.tryParse(expected);
                     if (uNum != null && eNum != null) {
                       isCorrect = (uNum - eNum).abs() < 0.01;
@@ -1118,7 +1358,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
                 } else {
                   for (int i = 0; i < q.options.length; i++) {
                     final opt = q.options[i];
-                    final optKey = (opt.id != null && opt.id.isNotEmpty) ? opt.id : 'opt_${q.id}_$i';
+                    final optKey = opt.id.isNotEmpty ? opt.id : 'opt_${q.id}_$i';
                     final optLetter = String.fromCharCode(65 + i);
                     if (_isOptSelected(userAns, optKey, optLetter, opt.optionText) && opt.isCorrect) {
                       isCorrect = true;
@@ -1177,7 +1417,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
                     ...q.options.asMap().entries.map((entry) {
                       final optIdx = entry.key;
                       final opt = entry.value;
-                      final optKey = (opt.id != null && opt.id.isNotEmpty) ? opt.id : 'opt_${q.id}_$optIdx';
+                      final optKey = opt.id.isNotEmpty ? opt.id : 'opt_${q.id}_$optIdx';
                       final optLetter = String.fromCharCode(65 + optIdx);
                       final isSelected = _isOptSelected(userAns, optKey, optLetter, opt.optionText);
 
@@ -1284,6 +1524,161 @@ class _TestResultScreenState extends State<TestResultScreen> {
       onSelected: (sel) {
         if (sel) setState(() => _filter = key);
       },
+    );
+  }
+}
+
+/// Robust loader for direct navigation or page refresh on result routes
+class TestResultLoaderScreen extends StatefulWidget {
+  final String testId;
+  final String? attemptId;
+  final VoidCallback onBackToDashboard;
+
+  const TestResultLoaderScreen({
+    Key? key,
+    required this.testId,
+    this.attemptId,
+    required this.onBackToDashboard,
+  }) : super(key: key);
+
+  @override
+  State<TestResultLoaderScreen> createState() => _TestResultLoaderScreenState();
+}
+
+class _TestResultLoaderScreenState extends State<TestResultLoaderScreen> {
+  bool _isLoading = true;
+  String? _error;
+  TestAttemptModel? _attempt;
+  List<QuestionModel> _questions = [];
+  Map<int, String> _userAnswers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAttemptData();
+  }
+
+  Future<void> _loadAttemptData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final attemptMap = await SupabaseService.fetchLatestTestAttempt(testId: widget.testId);
+      if (attemptMap == null) {
+        setState(() {
+          _error = 'No recorded attempt found for this test paper.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final attempt = TestAttemptModel.fromJson(attemptMap);
+      final questions = await SupabaseService.fetchAttemptQuestions(
+        attemptId: attempt.id,
+        testId: widget.testId,
+      );
+
+      final answers = <int, String>{};
+      if (attemptMap['user_answers'] is Map) {
+        final uAnsMap = attemptMap['user_answers'] as Map;
+        uAnsMap.forEach((k, v) {
+          final idx = int.tryParse(k.toString());
+          if (idx != null) {
+            answers[idx] = v.toString();
+          }
+        });
+      }
+
+      setState(() {
+        _attempt = attempt;
+        _questions = questions;
+        _userAnswers = answers;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Unable to load test results. Please try again.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF8FAFC),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: Color(0xFF2563EB)),
+              SizedBox(height: 16),
+              Text(
+                'Loading test results...',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_error != null || _attempt == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          title: const Text('Test Result'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: widget.onBackToDashboard,
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.assignment_late_outlined, size: 54, color: Color(0xFF94A3B8)),
+                const SizedBox(height: 16),
+                Text(
+                  _error ?? 'Result Unavailable',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Please take this test or check your test history to view completed results.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: widget.onBackToDashboard,
+                  icon: const Icon(Icons.dashboard_rounded, size: 18),
+                  label: const Text('Back to Dashboard'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return TestResultScreen(
+      attempt: _attempt!,
+      questions: _questions,
+      userAnswers: _userAnswers,
+      onBackToDashboard: widget.onBackToDashboard,
     );
   }
 }

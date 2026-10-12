@@ -489,6 +489,7 @@ class SupabaseService {
   }
 
   static UserProfileModel? activeUserSession;
+  static UserProfileModel? get currentUser => activeUserSession;
 
   static Future<void> setActiveUserSession(UserProfileModel profile) async {
     activeUserSession = profile;
@@ -4358,23 +4359,60 @@ class SupabaseService {
         debugPrint('Supabase table insert failed (fallback to RPC or local): $e');
       }
 
-      // 2. Persist submitted attempt result in SharedPreferences
+      // 2. Persist submitted attempt result and user answers in SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       final existingStr = prefs.getString('cosmyra_test_attempts_history') ?? '[]';
       final List<dynamic> history = jsonDecode(existingStr);
+
+      final userAnswersSerialized = <String, String>{};
+      userAnswers.forEach((k, v) => userAnswersSerialized[k.toString()] = v);
+
       history.insert(0, {
         'id': attempt.id,
+        'test_id': attempt.testTemplateId,
+        'test_template_id': attempt.testTemplateId,
+        'testTemplateId': attempt.testTemplateId,
         'testTitle': attempt.testTitle,
+        'test_title': attempt.testTitle,
+        'started_at': attempt.startedAt.toIso8601String(),
+        'expires_at': attempt.expiresAt.toIso8601String(),
         'submittedAt': (attempt.submittedAt ?? DateTime.now()).toIso8601String(),
+        'submitted_at': (attempt.submittedAt ?? DateTime.now()).toIso8601String(),
+        'status': 'submitted',
         'totalScore': attempt.totalScore,
+        'total_score': attempt.totalScore,
         'maxMarks': attempt.maxMarks,
+        'max_score': attempt.maxMarks,
+        'totalQuestions': attempt.totalQuestions,
+        'total_questions': attempt.totalQuestions,
+        'attemptedCount': attempt.attemptedCount,
+        'attempted_count': attempt.attemptedCount,
         'correctCount': attempt.correctCount,
+        'correct_count': attempt.correctCount,
         'incorrectCount': attempt.incorrectCount,
+        'incorrect_count': attempt.incorrectCount,
         'unattemptedCount': attempt.unattemptedCount,
+        'unattempted_count': attempt.unattemptedCount,
         'accuracy': attempt.accuracy,
+        'accuracy_percentage': attempt.accuracy,
         'timeSpentSeconds': attempt.timeSpentSeconds,
+        'time_spent_seconds': attempt.timeSpentSeconds,
+        'user_answers': userAnswersSerialized,
       });
       await prefs.setString('cosmyra_test_attempts_history', jsonEncode(history));
+
+      // Cache attempt questions for refresh or direct result navigation
+      if (questions.isNotEmpty) {
+        try {
+          final qJsonList = questions.map((q) => q.toJson()).toList();
+          await prefs.setString('cosmyra_attempt_questions_${attempt.id}', jsonEncode(qJsonList));
+          if (attempt.testTemplateId.isNotEmpty) {
+            await prefs.setString('cosmyra_attempt_questions_${attempt.testTemplateId}', jsonEncode(qJsonList));
+          }
+        } catch (e) {
+          debugPrint('Notice caching attempt questions: $e');
+        }
+      }
 
       // Clear active test session state
       await clearActiveTestSession();
@@ -4384,6 +4422,143 @@ class SupabaseService {
       debugPrint('Error submitting test attempt: $e');
       return false;
     }
+  }
+
+  /// Retrieve cached or persisted questions for an attempt
+  static Future<List<QuestionModel>> fetchAttemptQuestions({
+    required String attemptId,
+    String? testId,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? jsonStr = prefs.getString('cosmyra_attempt_questions_$attemptId');
+      if ((jsonStr == null || jsonStr.isEmpty) && testId != null && testId.isNotEmpty) {
+        jsonStr = prefs.getString('cosmyra_attempt_questions_$testId');
+      }
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(jsonStr);
+        final list = decoded.map((item) => QuestionModel.fromJson(Map<String, dynamic>.from(item as Map))).toList();
+        if (list.isNotEmpty) return list;
+      }
+    } catch (e) {
+      debugPrint('Notice retrieving cached attempt questions: $e');
+    }
+
+    // Fallback to querying questions for paper/testId
+    final targetPaperId = (testId != null && testId.isNotEmpty) ? testId : attemptId;
+    if (targetPaperId.isNotEmpty) {
+      return fetchTestSeriesQuestions(paperId: targetPaperId);
+    }
+    return [];
+  }
+
+  /// Retrieve the latest test attempt for a test paper or session
+  static Future<Map<String, dynamic>?> fetchLatestTestAttempt({
+    required String testId,
+    String? userId,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existingStr = prefs.getString('cosmyra_test_attempts_history') ?? '[]';
+      final List<dynamic> history = jsonDecode(existingStr);
+      for (final item in history) {
+        if (item is Map) {
+          final id = item['id']?.toString() ?? '';
+          final tTitle = item['testTitle']?.toString() ?? '';
+          final tId = item['test_id']?.toString() ?? item['test_template_id']?.toString() ?? '';
+          if (id == testId || id.contains(testId) || tId == testId || tTitle.toLowerCase().contains(testId.toLowerCase())) {
+            return Map<String, dynamic>.from(item);
+          }
+        }
+      }
+
+      // Query Supabase test_attempts table if available
+      final query = client.from('test_attempts').select('*');
+      final uid = userId ?? currentUser?.id ?? activeUserSession?.id;
+      if (uid != null && uid.isNotEmpty) {
+        query.eq('student_id', uid);
+      }
+      final res = await query
+          .or('id.eq.$testId,test_id.eq.$testId')
+          .order('submitted_at', ascending: false)
+          .limit(1);
+
+      if (res is List && res.isNotEmpty) {
+        return Map<String, dynamic>.from(res.first);
+      }
+    } catch (e) {
+      debugPrint('Notice loading latest attempt: $e');
+    }
+    return null;
+  }
+
+  /// Fetch genuine peer cohort statistics for a test without fabricating fallback numbers
+  static Future<TestCohortStats?> fetchTestCohortStats({
+    required String testTemplateId,
+  }) async {
+    if (testTemplateId.isEmpty) return null;
+    try {
+      final res = await client
+          .from('test_attempts')
+          .select('total_score, correct_count, incorrect_count, unattempted_count, accuracy_percentage')
+          .eq('status', 'submitted')
+          .or('test_id.eq.$testTemplateId,mode.eq.$testTemplateId')
+          .limit(100);
+
+      if (res is List && res.length >= 2) {
+        double maxScore = -99999.0;
+        Map<String, dynamic>? topperRow;
+        double sumScore = 0;
+        int sumCorrect = 0;
+        int sumIncorrect = 0;
+        int sumSkipped = 0;
+        double sumAccuracy = 0;
+        final List<double> scores = [];
+
+        for (var row in res) {
+          final s = (row['total_score'] as num?)?.toDouble() ?? 0.0;
+          final c = (row['correct_count'] as num?)?.toInt() ?? 0;
+          final inc = (row['incorrect_count'] as num?)?.toInt() ?? 0;
+          final sk = (row['unattempted_count'] as num?)?.toInt() ?? 0;
+          final acc = (row['accuracy_percentage'] as num?)?.toDouble() ?? 0.0;
+
+          scores.add(s);
+          if (s > maxScore) {
+            maxScore = s;
+            topperRow = row;
+          }
+          sumScore += s;
+          sumCorrect += c;
+          sumIncorrect += inc;
+          sumSkipped += sk;
+          sumAccuracy += acc;
+        }
+
+        final n = res.length;
+        final tCorrect = (topperRow?['correct_count'] as num?)?.toInt() ?? 0;
+        final tInc = (topperRow?['incorrect_count'] as num?)?.toInt() ?? 0;
+        final tSk = (topperRow?['unattempted_count'] as num?)?.toInt() ?? 0;
+        final tAcc = (topperRow?['accuracy_percentage'] as num?)?.toDouble() ?? 0.0;
+
+        return TestCohortStats(
+          totalAttempts: n,
+          topperScore: maxScore,
+          topperCorrect: tCorrect,
+          topperIncorrect: tInc,
+          topperSkipped: tSk,
+          topperAccuracy: tAcc,
+          avgScore: sumScore / n,
+          avgCorrect: (sumCorrect / n).round(),
+          avgIncorrect: (sumIncorrect / n).round(),
+          avgSkipped: (sumSkipped / n).round(),
+          avgAccuracy: sumAccuracy / n,
+          allScores: scores,
+        );
+      }
+    } catch (e) {
+      debugPrint('Notice querying cohort statistics: $e');
+    }
+    return null;
   }
 
   // ================= ACTIVE SESSION PERSISTENCE FOR REFRESH / RECONNECT =================
