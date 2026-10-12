@@ -422,7 +422,7 @@ class _AdminBulkUploadStep2ScreenState extends State<AdminBulkUploadStep2Screen>
     }
 
     final String paperNameParam = _paperData?['paperName'] ?? _paperData?['paper_name'] ?? widget.paperName;
-    final savedQList = await SupabaseService.fetchQuestionsForPaper(_paperId, paperName: paperNameParam);
+    final savedQList = await SupabaseService.fetchQuestionsForPaper(_paperId, paperName: paperNameParam, forceRefresh: true);
 
     final dynamic paperAvailRaw = widget.paperRecord?['available_in'] ?? widget.paperRecord?['availableIn'] ?? _paperData?['available_in'] ?? _paperData?['availableIn'];
     final List<String> defaultAvailableIn = (paperAvailRaw is List && paperAvailRaw.isNotEmpty)

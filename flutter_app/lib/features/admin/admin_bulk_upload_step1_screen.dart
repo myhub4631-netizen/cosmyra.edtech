@@ -199,6 +199,18 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       if (sLower.contains('math')) return 'Mathematics';
     }
 
+    // 4. Sequence-based fallback for NEET official papers
+    final bool isNeet = exam == null || exam.toUpperCase().contains('NEET');
+    if (isNeet) {
+      final rawNum = q['question_number'] ?? q['questionNumber'] ?? q['order_index'] ?? q['sequence_order'];
+      final int? qNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum?.toString() ?? '');
+      if (qNum != null && qNum > 0) {
+        if (qNum >= 1 && qNum <= 45) return 'Physics';
+        if (qNum >= 46 && qNum <= 90) return 'Chemistry';
+        if (qNum >= 91 && qNum <= 180) return 'Biology';
+      }
+    }
+
     return 'Unknown';
   }
 
@@ -1225,7 +1237,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
       ),
     );
 
-    final questions = await SupabaseService.fetchQuestionsForPaper(paperId, paperName: pName);
+    final questions = await SupabaseService.fetchQuestionsForPaper(paperId, paperName: pName, forceRefresh: true);
     final rawList = List<Map<String, dynamic>>.from(questions);
     final paperExam = (paperMap['exam'] ?? _examName ?? 'NEET').toString();
 
@@ -4684,9 +4696,21 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                                         ),
                                         const SizedBox(height: 2),
-                                        Text(
-                                          'Source contains $rawTotal total questions',
-                                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              'Source contains $rawTotal total questions',
+                                              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                            ),
+                                            if (rawTotal < 180 && !isJee) ...[
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                                decoration: BoxDecoration(color: const Color(0xFFFEF2F2), borderRadius: BorderRadius.circular(4)),
+                                                child: const Text('⚠️ Incomplete Source Paper', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFDC2626))),
+                                              ),
+                                            ],
+                                          ],
                                         ),
                                       ],
                                     ),
@@ -5539,7 +5563,7 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
   Future<void> _showStep1PaperPreviewDialog(Map<String, dynamic> paperMap) async {
     final String paperId = paperMap['id']?.toString() ?? '';
     final String pName = paperMap['paper_name'] ?? paperMap['paperName'] ?? 'Paper Preview';
-    final qList = await SupabaseService.fetchQuestionsForPaper(paperId, paperName: pName);
+    final qList = await SupabaseService.fetchQuestionsForPaper(paperId, paperName: pName, forceRefresh: true);
 
     if (!mounted) return;
     showDialog(
@@ -5608,10 +5632,12 @@ class _AdminBulkUploadStep1ScreenState extends State<AdminBulkUploadStep1Screen>
                     itemCount: deduplicated.length,
                     itemBuilder: (c, i) {
                       final q = deduplicated[i];
+                      final rawNum = q['question_number'] ?? q['questionNumber'] ?? q['sequence_order'];
+                      final int? qNum = rawNum is num ? rawNum.toInt() : int.tryParse(rawNum?.toString() ?? '');
                       return ListTile(
                         leading: CircleAvatar(radius: 12, backgroundColor: const Color(0xFFDCFCE7), child: Text('${i + 1}', style: const TextStyle(fontSize: 10, color: Color(0xFF15803D)))),
-                        title: Text(q['question_text'] ?? q['questionText'] ?? 'Q${i + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        subtitle: Text('${q['subject'] ?? 'Physics'} • ${q['chapter'] ?? 'General'} • Canonical ID: ${q['id'] ?? q['question_id'] ?? 'N/A'}', style: const TextStyle(fontSize: 10)),
+                        title: Text(q['question_text'] ?? q['questionText'] ?? 'Q${qNum ?? i + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        subtitle: Text('${qNum != null ? 'Source Q#$qNum • ' : ''}${q['subject'] ?? 'Physics'} • ${q['chapter'] ?? 'General'} • Canonical ID: ${q['id'] ?? q['question_id'] ?? 'N/A'}', style: const TextStyle(fontSize: 10)),
                       );
                     },
                   ),
