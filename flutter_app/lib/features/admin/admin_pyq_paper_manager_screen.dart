@@ -51,73 +51,7 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
   }
 
   String _getPaperCatalogue(Map<String, dynamic> p) {
-    // 0. Defensive invariant: Test series containers must NEVER be classified as papers
-    if (SupabaseService.isTestSeriesContainer(p)) {
-      debugPrint('[Catalogue Filter] Series container "${p['id']}" rejected from paper catalogues');
-      return 'InvalidContainer';
-    }
-
-    final cat = (p['source_category'] ?? p['sourceCategory'] ?? p['category'] ?? p['paper_type'] ?? '').toString().toUpperCase();
-    
-    // Safely resolve title handling empty strings
-    final title = ((p['paper_name']?.toString().trim().isNotEmpty == true)
-            ? p['paper_name'].toString().trim()
-            : ((p['paperName']?.toString().trim().isNotEmpty == true)
-                ? p['paperName'].toString().trim()
-                : ((p['title']?.toString().trim().isNotEmpty == true)
-                    ? p['title'].toString().trim()
-                    : ((p['name']?.toString().trim().isNotEmpty == true) ? p['name'].toString().trim() : ''))))
-        .toLowerCase();
-
-    final id = (p['id'] ?? p['paper_id'] ?? '').toString().toLowerCase().trim();
-    final isPyq = p['is_pyq'] == true;
-    final isNta = p['is_nta'] == true;
-    final isTestSeries = p['is_test_series'] == true;
-    final hasSeriesParent = (p['test_series_id'] != null && p['test_series_id'].toString().trim().isNotEmpty);
-
-    // 1. Test Series papers classification
-    if (isTestSeries ||
-        hasSeriesParent ||
-        cat == 'TEST_SERIES' ||
-        cat == 'TEST SERIES' ||
-        cat == 'TEST_SERIES_PAPERS' ||
-        title.contains('test series') ||
-        title.contains('mock test') ||
-        title.contains('fst') ||
-        title.contains('leader test series') ||
-        title.contains('beginner test series') ||
-        title.contains('full syllabus test series') ||
-        p.containsKey('series_name')) {
-      return 'Test Series';
-    }
-
-    // 2. NTA papers classification
-    if (isNta || cat == 'NTA' || (title.contains('nta') && !title.contains('pyq') && !isPyq)) {
-      return 'NTA';
-    }
-
-    // 3. PYQ papers classification
-    if (isPyq ||
-        cat == 'PYQ' ||
-        id.startsWith('neet_') ||
-        id.startsWith('jee_') ||
-        title.contains('official pyq') ||
-        title.contains('phase 1') ||
-        title.contains('phase 2') ||
-        title.contains('re-neet') ||
-        title.contains('paper 1') ||
-        title.contains('pyq')) {
-      return 'PYQ';
-    }
-
-    // 4. Secondary checks based on title contents
-    if (title.contains('test') || title.contains('series') || title.contains('mock')) {
-      return 'Test Series';
-    }
-
-    // 5. Defensive invariant: Ambiguous records must be logged and flagged, NOT silently classified as PYQ!
-    debugPrint('[Catalogue Invariant] Ambiguous paper record "$id" (title: "$title") could not be classified; flagged as Ambiguous');
-    return 'Ambiguous';
+    return SupabaseService.getPaperCatalogue(p);
   }
 
   List<Map<String, dynamic>> get _cataloguePapers {
@@ -127,14 +61,31 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
     }).toList();
   }
 
-  Future<void> _loadPapers() async {
-    setState(() => _isLoading = true);
-    final papers = await SupabaseService.fetchAllPapersAndTestSeries(forceRefresh: true);
-    if (mounted) {
-      setState(() {
-        _allPapers = papers;
-        _isLoading = false;
-      });
+  String? _errorMessage;
+
+  Future<void> _loadPapers({bool forceRefresh = true}) async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final papers = await SupabaseService.fetchAllPapersAndTestSeries(forceRefresh: forceRefresh);
+      if (mounted) {
+        setState(() {
+          _allPapers = papers;
+          _isLoading = false;
+          _errorMessage = null;
+        });
+      }
+    } catch (e, stack) {
+      debugPrint('[AdminPyqPaperManagerScreen] Failed to load papers: $e\n$stack');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load paper catalogue: $e';
+        });
+      }
     }
   }
 
@@ -363,8 +314,42 @@ class _AdminPyqPaperManagerScreenState extends State<AdminPyqPaperManagerScreen>
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadPapers,
+          : _errorMessage != null
+              ? Center(
+                  child: Container(
+                    margin: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFECACA)),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline_rounded, size: 48, color: Color(0xFFDC2626)),
+                        const SizedBox(height: 12),
+                        Text(
+                          _errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF991B1B)),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () => _loadPapers(forceRefresh: true),
+                          icon: const Icon(Icons.refresh_rounded, size: 16),
+                          label: const Text('Retry'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFDC2626),
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: () => _loadPapers(forceRefresh: true),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Column(

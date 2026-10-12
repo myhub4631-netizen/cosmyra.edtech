@@ -4656,20 +4656,21 @@ class SupabaseService {
     final isTestSeries = p['is_test_series'] == true;
     final hasSeriesParent = (p['test_series_id'] != null && p['test_series_id'].toString().trim().isNotEmpty);
 
-    // 1. Test Series papers
-    if (isTestSeries ||
-        hasSeriesParent ||
-        cat == 'TEST_SERIES' ||
-        cat == 'TEST SERIES' ||
-        cat == 'CUSTOM_PRACTICE' ||
-        cat == 'TEST_SERIES_PAPERS' ||
-        title.contains('test series') ||
-        title.contains('mock test') ||
-        title.contains('fst') ||
-        title.contains('leader test series') ||
-        title.contains('beginner test series') ||
-        title.contains('full syllabus test series') ||
-        p.containsKey('series_name')) {
+    // 1. Explicit Test Series checks (ensuring it is NOT a valid PYQ or NTA paper)
+    final bool isExplicitTs = (cat == 'TEST_SERIES' ||
+            cat == 'TEST SERIES' ||
+            cat == 'TEST_SERIES_PAPERS' ||
+            title.contains('test series') ||
+            title.contains('mock test') ||
+            title.contains('leader test series') ||
+            title.contains('beginner test series') ||
+            title.contains('full syllabus test series') ||
+            title.contains('fst')) &&
+        !isPyq &&
+        cat != 'PYQ' &&
+        cat != 'OFFICIAL_PYQ';
+
+    if (isExplicitTs) {
       return 'Test Series';
     }
 
@@ -4678,7 +4679,7 @@ class SupabaseService {
       return 'NTA';
     }
 
-    // 3. PYQ papers
+    // 3. PYQ papers (authoritative classification; merging cannot overwrite with Test Series)
     if (isPyq ||
         cat == 'PYQ' ||
         cat == 'OFFICIAL_PYQ' ||
@@ -4688,9 +4689,20 @@ class SupabaseService {
         title.contains('phase 1') ||
         title.contains('phase 2') ||
         title.contains('re-neet') ||
-        title.contains('paper 1') ||
+        (title.contains('paper 1') && (title.contains('neet') || title.contains('jee'))) ||
         (title.contains('pyq') && !title.contains('mock') && !title.contains('series'))) {
       return 'PYQ';
+    }
+
+    // 4. Test Series fallback
+    if (isTestSeries ||
+        hasSeriesParent ||
+        cat == 'CUSTOM_PRACTICE' ||
+        title.contains('test') ||
+        title.contains('series') ||
+        title.contains('mock') ||
+        p.containsKey('series_name')) {
+      return 'Test Series';
     }
 
     return 'Other';
@@ -7855,6 +7867,18 @@ class SupabaseService {
   static Future<String> resolvePaperTitle(String paperId) async {
     final cleanId = paperId.trim();
     if (cleanId.isEmpty) return '';
+
+    // 1. Canonical official PYQ papers mapping
+    if (cleanId == 'neet_2026_phase_1' || cleanId == '49bfe774-1e41-495e-a029-49bf1e41595e') {
+      return 'NEET 2026 Paper 1';
+    }
+    if (cleanId == 'neet_2026_reneet') return 'NEET 2026 Re-NEET';
+    if (cleanId == 'neet_2025_paper_1') return 'NEET 2025 (Official PYQ)';
+    if (cleanId == 'neet_2024_paper_1') return 'NEET 2024 (Official PYQ)';
+    if (cleanId == 'neet_2023_paper_1') return 'NEET 2023 (Official PYQ)';
+    if (cleanId == 'neet_2022_paper_1') return 'NEET 2022 (Official PYQ)';
+    if (cleanId == 'neet_2021_paper_1') return 'NEET 2021 (Official PYQ)';
+
     try {
       final allSeries = await fetchAllTestSeries();
       for (var s in allSeries) {
@@ -8083,6 +8107,10 @@ class SupabaseService {
         if (targetName.isNotEmpty && targetName != paperId && targetName != paperUuid) targetName,
         paperId,
         paperUuid,
+        if (paperId == 'neet_2026_phase_1' || paperId == '49bfe774-1e41-495e-a029-49bf1e41595e') ...[
+          'NEET 2026 Paper 1',
+          'NEET 2026 Phase 1',
+        ],
         if (paperId == '6237b088-76ac-4eaf-a03e-623776ac5eaf') 'NEET 2027 Leader Test Series - Paper 1',
       };
 
@@ -8404,9 +8432,29 @@ class SupabaseService {
 
               final id = (map['id'] ?? map['paper_id'] ?? '').toString().trim();
               if (id.isNotEmpty && !deletedPaperIds.contains(id)) {
+                final rawCat = (map['source_category'] ?? map['sourceCategory'] ?? map['category'] ?? '').toString().toUpperCase();
+                final bool isPyqPaper = map['is_pyq'] == true || rawCat.contains('PYQ') || id.startsWith('neet_') || id.startsWith('jee_');
+                if (isPyqPaper) {
+                  map['is_test_series'] = false;
+                  map['test_series_id'] = null;
+                  map['source_category'] = 'PYQ';
+                  map['is_pyq'] = true;
+                }
+
                 final idx = papers.indexWhere((p) => (p['id'] ?? p['paper_id'] ?? '').toString() == id);
                 if (idx != -1) {
-                  papers[idx] = {...papers[idx], ...map};
+                  final existing = papers[idx];
+                  final bool existingIsPyq = existing['is_pyq'] == true || (existing['source_category'] ?? '').toString().toUpperCase().contains('PYQ');
+                  papers[idx] = {
+                    ...papers[idx],
+                    ...map,
+                    if (isPyqPaper || existingIsPyq) ...{
+                      'is_test_series': false,
+                      'test_series_id': null,
+                      'source_category': 'PYQ',
+                      'is_pyq': true,
+                    },
+                  };
                 } else if (!seenIds.contains(id)) {
                   seenIds.add(id);
                   papers.add(map);
@@ -8563,6 +8611,8 @@ class SupabaseService {
           'title': cop['title'],
           'source_category': 'PYQ',
           'is_pyq': true,
+          'is_test_series': false,
+          'test_series_id': null,
           'exam': cop['exam'] ?? papers[idx]['exam'] ?? 'NEET',
           'year': cop['year'] ?? papers[idx]['year'] ?? '2026',
         };
@@ -8571,16 +8621,25 @@ class SupabaseService {
 
     // 6. Dynamically query actual question counts and subject breakdowns from `questions` table
     try {
-      final qRes = await client.from('questions').select('paper, year, subject_id');
+      final qRes = await client.from('questions').select('id, question_number, paper, year, subject_id');
       if (qRes != null && (qRes as List).isNotEmpty) {
-        final Map<String, int> countsByPaperStr = {};
+        final Map<String, Set<String>> distinctQuestionIdsByPaper = {};
+        final Map<String, Set<int>> distinctQuestionNumsByPaper = {};
         final Map<String, Map<String, int>> subjectsByPaperStr = {};
 
         for (var row in (qRes as List)) {
           final String pStr = (row['paper'] ?? '').toString().trim();
+          final String qId = (row['id'] ?? '').toString().trim();
           final String sId = (row['subject_id'] ?? '').toString().trim();
+          final int qNum = int.tryParse((row['question_number'] ?? '0').toString()) ?? 0;
+
           if (pStr.isNotEmpty) {
-            countsByPaperStr[pStr] = (countsByPaperStr[pStr] ?? 0) + 1;
+            distinctQuestionIdsByPaper.putIfAbsent(pStr, () => {});
+            if (qId.isNotEmpty) distinctQuestionIdsByPaper[pStr]!.add(qId);
+
+            distinctQuestionNumsByPaper.putIfAbsent(pStr, () => {});
+            if (qNum > 0) distinctQuestionNumsByPaper[pStr]!.add(qNum);
+
             subjectsByPaperStr.putIfAbsent(pStr, () => {});
             if (sId.isNotEmpty) {
               subjectsByPaperStr[pStr]![sId] = (subjectsByPaperStr[pStr]![sId] ?? 0) + 1;
@@ -8597,29 +8656,55 @@ class SupabaseService {
           int actualCount = 0;
           Map<String, int> subjCounts = {};
 
-          if (countsByPaperStr.containsKey(pTitle)) {
-            actualCount += countsByPaperStr[pTitle]!;
+          if (distinctQuestionIdsByPaper.containsKey(pTitle)) {
+            actualCount = distinctQuestionIdsByPaper[pTitle]!.length;
             subjCounts.addAll(subjectsByPaperStr[pTitle] ?? {});
-          }
-          if (countsByPaperStr.containsKey(pId)) {
-            actualCount += countsByPaperStr[pId]!;
+          } else if (distinctQuestionIdsByPaper.containsKey(pId)) {
+            actualCount = distinctQuestionIdsByPaper[pId]!.length;
             subjCounts.addAll(subjectsByPaperStr[pId] ?? {});
           }
 
           // Grouping for NEET 2026 Paper 1 / NEET 2026 Phase 1
-          if (pId == 'neet_2026_phase_1' || pId == '49bfe774-1e41-495e-a029-49bf1e41595e' || pTitle.contains('NEET 2026')) {
-            final p1Count = countsByPaperStr['NEET 2026 Paper 1'] ?? 0;
-            final phase1Count = countsByPaperStr['NEET 2026 Phase 1'] ?? 0;
-            if (p1Count > 0 || phase1Count > 0) {
-              actualCount = p1Count + phase1Count; // 178 + 2 = 180!
+          final bool isNeet2026P1 = pId == 'neet_2026_phase_1' ||
+              pId == '49bfe774-1e41-495e-a029-49bf1e41595e' ||
+              (pTitle.toLowerCase().contains('neet 2026') &&
+                  (pTitle.toLowerCase().contains('paper 1') ||
+                      pTitle.toLowerCase().contains('phase 1') ||
+                      pTitle.toLowerCase().trim() == 'neet 2026 paper'));
+
+          if (isNeet2026P1) {
+            final p1Ids = distinctQuestionIdsByPaper['NEET 2026 Paper 1'] ?? {};
+            if (p1Ids.length == 180) {
+              actualCount = 180;
+            } else {
+              final combinedNums = <int>{
+                ...(distinctQuestionNumsByPaper['NEET 2026 Paper 1'] ?? {}),
+                ...(distinctQuestionNumsByPaper['NEET 2026 Phase 1'] ?? {}),
+              };
+              actualCount = combinedNums.isNotEmpty ? combinedNums.length : p1Ids.length;
             }
-            p['exam'] ??= 'NEET';
-            p['target_exam'] ??= 'NEET';
-            p['year'] ??= '2026';
-            p['status'] ??= 'Published';
+            p['exam'] = 'NEET';
+            p['target_exam'] = 'NEET';
+            p['year'] = '2026';
+            p['status'] = 'Published';
             p['source_category'] = 'PYQ';
             p['is_pyq'] = true;
-            subjCounts = {'physics': 45, 'chemistry': 45, 'biology': 90};
+            p['is_test_series'] = false;
+            p['test_series_id'] = null;
+
+            final rawSubjs = subjectsByPaperStr['NEET 2026 Paper 1'] ?? {};
+            int pC = 0, cC = 0, bC = 0;
+            rawSubjs.forEach((sId, count) {
+              final mapped = NeetSubjectHelper.getSubjectNameFromId(sId).toLowerCase();
+              if (mapped == 'physics') pC += count;
+              else if (mapped == 'chemistry') cC += count;
+              else if (mapped == 'biology') bC += count;
+            });
+            subjCounts = {
+              'physics': pC > 0 ? pC : 45,
+              'chemistry': cC > 0 ? cC : 45,
+              'biology': bC > 0 ? bC : 90,
+            };
           } else if (actualCount >= 180 && (examName.toUpperCase().contains('NEET') || pTitle.toUpperCase().contains('NEET'))) {
             subjCounts = {'physics': 45, 'chemistry': 45, 'biology': 90};
           } else if (actualCount > 0 && subjCounts.isEmpty) {
@@ -8678,6 +8763,13 @@ class SupabaseService {
           p['title'] = 'NEET 2026 Paper 1';
           p['source_category'] = 'PYQ';
           p['is_pyq'] = true;
+          p['is_test_series'] = false;
+          p['test_series_id'] = null;
+          p['exam'] = 'NEET';
+          p['target_exam'] = 'NEET';
+          p['year'] = '2026';
+          p['phase_session'] = 'Phase 1';
+          p['status'] ??= 'Published';
           deduped.add(p);
         }
       } else if (!seenKeys.contains(key) && !seenKeys.contains(id)) {
