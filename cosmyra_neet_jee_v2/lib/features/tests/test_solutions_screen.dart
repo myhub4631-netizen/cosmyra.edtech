@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/latex_view.dart';
 import '../../shared/widgets/smart_image.dart';
@@ -45,6 +47,8 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
   final Set<String> _bookmarkedQuestionIds = {};
   final Set<int> _reviewIndices = {};
 
+  final List<Map<int, String>> _peerAnswers = [];
+
   final ScrollController _paletteScrollController = ScrollController();
   final ScrollController _contentScrollController = ScrollController();
 
@@ -66,6 +70,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
 
     _initSections();
     _loadBookmarks();
+    _loadPeerAnswers();
     _findFirstValidQuestionIndex();
   }
 
@@ -112,6 +117,75 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
         });
       }
     } catch (_) {}
+  }
+
+  Future<void> _loadPeerAnswers() async {
+    try {
+      final List<Map<int, String>> peerList = [];
+      peerList.add(Map<int, String>.from(_currentUserAnswers));
+
+      final prefs = await SharedPreferences.getInstance();
+      final historyStr = prefs.getString('cosmyra_test_attempts_history');
+      if (historyStr != null && historyStr.isNotEmpty) {
+        final List<dynamic> list = jsonDecode(historyStr);
+        for (final item in list) {
+          if (item is Map && item['user_answers'] is Map) {
+            final uAns = item['user_answers'] as Map;
+            final map = <int, String>{};
+            uAns.forEach((k, v) {
+              final idx = int.tryParse(k.toString());
+              if (idx != null) map[idx] = v.toString();
+            });
+            if (map.isNotEmpty) peerList.add(map);
+          }
+        }
+      }
+
+      final testId = _currentAttempt.testTemplateId.isNotEmpty
+          ? _currentAttempt.testTemplateId
+          : _currentAttempt.id;
+      if (testId.isNotEmpty) {
+        final rawAttempts = await SupabaseService.fetchAllAttemptsForTest(testId: testId);
+        for (final item in rawAttempts) {
+          if (item['user_answers'] is Map) {
+            final uAns = item['user_answers'] as Map;
+            final map = <int, String>{};
+            uAns.forEach((k, v) {
+              final idx = int.tryParse(k.toString());
+              if (idx != null) map[idx] = v.toString();
+            });
+            if (map.isNotEmpty) peerList.add(map);
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _peerAnswers.clear();
+          _peerAnswers.addAll(peerList);
+        });
+      }
+    } catch (_) {}
+  }
+
+  String? _getOptionMarkedPercentage(int qIdx, QuestionOptionModel opt, int optNumber) {
+    if (_peerAnswers.isEmpty) return null;
+    final optKey = opt.id.isNotEmpty ? opt.id : 'opt_${widget.questions[qIdx].id}_${opt.optionIndex}';
+    final optLetter = String.fromCharCode(65 + opt.optionIndex);
+    int marked = 0;
+    int totalWithAnswers = 0;
+    for (final ansMap in _peerAnswers) {
+      final ans = ansMap[qIdx];
+      if (ans != null && ans.trim().isNotEmpty) {
+        totalWithAnswers++;
+        if (_isOptSelected(ans, optKey, optLetter, opt.optionText, optNumber)) {
+          marked++;
+        }
+      }
+    }
+    if (totalWithAnswers == 0 || marked == 0) return null;
+    final pct = (marked / totalWithAnswers) * 100.0;
+    return '${pct.toStringAsFixed(2)}%';
   }
 
   Future<void> _loadAllAttempts() async {
@@ -723,39 +797,48 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
   Widget _buildSolutionFilterTabs(Map<SolutionFilterType, int> counts) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildFilterTabItem(
-            type: SolutionFilterType.all,
-            title: 'All',
-            count: counts[SolutionFilterType.all] ?? 0,
-            badgeColor: const Color(0xFF1E293B),
+          Expanded(
+            child: _buildFilterTabItem(
+              type: SolutionFilterType.all,
+              title: 'All',
+              count: counts[SolutionFilterType.all] ?? 0,
+              badgeColor: const Color(0xFF1E293B),
+            ),
           ),
-          _buildFilterTabItem(
-            type: SolutionFilterType.correct,
-            title: 'Correct',
-            count: counts[SolutionFilterType.correct] ?? 0,
-            badgeColor: const Color(0xFF22C55E),
+          Expanded(
+            child: _buildFilterTabItem(
+              type: SolutionFilterType.correct,
+              title: 'Correct',
+              count: counts[SolutionFilterType.correct] ?? 0,
+              badgeColor: const Color(0xFF22C55E),
+            ),
           ),
-          _buildFilterTabItem(
-            type: SolutionFilterType.incorrect,
-            title: 'Incorrect',
-            count: counts[SolutionFilterType.incorrect] ?? 0,
-            badgeColor: const Color(0xFFEF4444),
+          Expanded(
+            child: _buildFilterTabItem(
+              type: SolutionFilterType.incorrect,
+              title: 'Incorrect',
+              count: counts[SolutionFilterType.incorrect] ?? 0,
+              badgeColor: const Color(0xFFEF4444),
+            ),
           ),
-          _buildFilterTabItem(
-            type: SolutionFilterType.skipped,
-            title: 'Skipped',
-            count: counts[SolutionFilterType.skipped] ?? 0,
-            badgeColor: const Color(0xFF475569),
+          Expanded(
+            child: _buildFilterTabItem(
+              type: SolutionFilterType.skipped,
+              title: 'Skipped',
+              count: counts[SolutionFilterType.skipped] ?? 0,
+              badgeColor: const Color(0xFF475569),
+            ),
           ),
-          _buildFilterTabItem(
-            type: SolutionFilterType.review,
-            title: 'Review',
-            count: counts[SolutionFilterType.review] ?? 0,
-            badgeColor: const Color(0xFF2563EB),
+          Expanded(
+            child: _buildFilterTabItem(
+              type: SolutionFilterType.review,
+              title: 'Review',
+              count: counts[SolutionFilterType.review] ?? 0,
+              badgeColor: const Color(0xFF2563EB),
+            ),
           ),
         ],
       ),
@@ -772,13 +855,12 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
 
     return InkWell(
       onTap: () => _onSelectFilter(type),
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 4),
+            child: Text(
               title,
               style: TextStyle(
                 fontSize: 12.5,
@@ -786,33 +868,32 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
                 color: isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
               ),
             ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
-              decoration: BoxDecoration(
-                color: badgeColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                count.toString(),
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+            decoration: BoxDecoration(
+              color: badgeColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              count.toString(),
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
             ),
-            const SizedBox(height: 5),
-            Container(
-              height: 2.5,
-              width: 32,
-              decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
-                borderRadius: BorderRadius.circular(2),
-              ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            height: 3.0,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: isSelected ? const Color(0xFF4F46E5) : Colors.transparent,
+              borderRadius: BorderRadius.circular(1.5),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1068,10 +1149,22 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.bottomRight,
-                  child: IconButton(
-                    icon: const Icon(Icons.fullscreen_rounded, color: Color(0xFF64748B), size: 22),
-                    tooltip: 'Expand',
-                    onPressed: () => _showZoomImageDialog(q.questionImage ?? ''),
+                  child: InkWell(
+                    onTap: () => _showZoomImageDialog(q.questionImage ?? ''),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF94A3B8),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(
+                        Icons.fullscreen_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -1209,20 +1302,23 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
         Color bg = const Color(0xFFFFFFFF);
         Color border = const Color(0xFFE2E8F0);
         Color txtColor = const Color(0xFF1E293B);
+        Color dividerColor = const Color(0xFFCBD5E1);
 
         if (opt.isCorrect) {
           bg = const Color(0xFFDCFCE7); // Light green background (Screenshot 2)
           border = const Color(0xFF86EFAC);
           txtColor = const Color(0xFF14532D);
+          dividerColor = const Color(0xFF86EFAC);
         } else if (isSelected && !opt.isCorrect) {
           bg = const Color(0xFFFEE2E2); // Light red background (Screenshot 2)
           border = const Color(0xFFFCA5A5);
           txtColor = const Color(0xFF7F1D1D);
+          dividerColor = const Color(0xFFFCA5A5);
         }
 
-        // Percentage marked placeholder / genuine metric
-        final percentages = ['18.29%', '22.46%', '35.10%', '24.15%'];
-        final markedPct = optIdx < percentages.length ? percentages[optIdx] : '20.00%';
+        // Real dynamic marked percentage
+        final dynamicPct = _getOptionMarkedPercentage(entry.key, opt, optIdx + 1);
+        final bool showPct = dynamicPct != null && (isSelected || opt.isCorrect);
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
@@ -1248,7 +1344,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
               Container(
                 width: 1,
                 height: 32,
-                color: const Color(0xFFCBD5E1),
+                color: dividerColor,
                 margin: const EdgeInsets.symmetric(horizontal: 12),
               ),
 
@@ -1265,17 +1361,19 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
                       const SizedBox(height: 6),
                       SmartImage(url: opt.optionImage, height: 70, fit: BoxFit.contain),
                     ],
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.info_outline, size: 13, color: Color(0xFF64748B)),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$markedPct Marked this option',
-                          style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
+                    if (showPct) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.info_outline, size: 13, color: Color(0xFF64748B)),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$dynamicPct Marked this option',
+                            style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1297,6 +1395,26 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle,
                         color: Color(0xFFEF4444),
+                      ),
+                    ),
+                  ),
+                ),
+              ] else if (isSelected && opt.isCorrect) ...[
+                const SizedBox(width: 8),
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF16A34A), width: 2),
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF16A34A),
                       ),
                     ),
                   ),
