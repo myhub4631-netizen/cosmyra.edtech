@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
-import '../../shared/widgets/latex_view.dart';
-import '../../shared/widgets/smart_image.dart';
-import '../../shared/widgets/solution_video_player.dart';
-import '../../shared/utils/question_copy_helper.dart';
 import '../../shared/utils/neet_subject_helper.dart';
 import '../../core/services/supabase_service.dart';
 import '../leaderboard/leaderboard_screen.dart';
@@ -32,8 +28,6 @@ class TestResultScreen extends StatefulWidget {
 }
 
 class _TestResultScreenState extends State<TestResultScreen> {
-  String _filter = 'ALL'; // ALL, CORRECT, INCORRECT, UNATTEMPTED
-  bool _showSolutions = false;
   int _activeTab = 0; // 0: Result Summary, 1: Leaderboard
   String _selectedAttempt = 'Attempt 1';
   late String _selectedSubject;
@@ -109,19 +103,6 @@ class _TestResultScreenState extends State<TestResultScreen> {
         ),
       ),
     );
-  }
-
-  void _scrollToSolutions() {
-    setState(() => _showSolutions = true);
-    Future.delayed(const Duration(milliseconds: 150), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 400),
-          curve: Curves.easeInOut,
-        );
-      }
-    });
   }
 
   bool _isOptSelected(String? userAns, String optKey, String optLetter, String optText, [int? optIndex]) {
@@ -374,7 +355,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _scrollToSolutions,
+                        onPressed: _openSolutionsScreen,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2563EB),
                           foregroundColor: Colors.white,
@@ -421,14 +402,6 @@ class _TestResultScreenState extends State<TestResultScreen> {
                         ],
                       ),
                     ),
-                  ],
-
-                  // 8. DETAILED QUESTION-BY-QUESTION SOLUTIONS REVIEW (IF TOGGLED)
-                  if (_showSolutions) ...[
-                    const SizedBox(height: 32),
-                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                    const SizedBox(height: 24),
-                    _buildSolutionsReviewSection(context, attempt),
                   ],
 
                   const SizedBox(height: 40),
@@ -1264,282 +1237,6 @@ class _TestResultScreenState extends State<TestResultScreen> {
     );
   }
 
-  // 8. SOLUTIONS REVIEW SECTION
-  Widget _buildSolutionsReviewSection(BuildContext context, TestAttemptModel attempt) {
-    final filteredQuestions = widget.questions.where((q) {
-      final idx = widget.questions.indexOf(q);
-      final userAns = widget.userAnswers[idx];
-
-      bool isCorrect = false;
-      bool isAnswered = userAns != null && userAns.trim().isNotEmpty;
-
-      if (isAnswered) {
-        if (q.qType == 'numerical') {
-          final expected = (q.numericalAnswer ?? '').trim();
-          if (expected.isNotEmpty) {
-            final uNum = double.tryParse(userAns.trim());
-            final eNum = double.tryParse(expected);
-            if (uNum != null && eNum != null) {
-              isCorrect = (uNum - eNum).abs() < 0.01;
-            } else {
-              isCorrect = userAns.trim().toLowerCase() == expected.toLowerCase();
-            }
-          }
-        } else {
-          for (int i = 0; i < q.options.length; i++) {
-            final opt = q.options[i];
-            final optKey = opt.id.isNotEmpty ? opt.id : 'opt_${q.id}_$i';
-            final optLetter = String.fromCharCode(65 + i);
-            if (_isOptSelected(userAns, optKey, optLetter, opt.optionText) && opt.isCorrect) {
-              isCorrect = true;
-              break;
-            }
-          }
-        }
-      }
-
-      if (_filter == 'CORRECT') return isCorrect;
-      if (_filter == 'INCORRECT') return isAnswered && !isCorrect;
-      if (_filter == 'UNATTEMPTED') return !isAnswered;
-      return true; // ALL
-    }).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Detailed Question Solutions',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-            ),
-            Text(
-              '${filteredQuestions.length} Questions',
-              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // FILTER CHIPS
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildFilterChip('ALL', 'All'),
-            _buildFilterChip('CORRECT', 'Correct'),
-            _buildFilterChip('INCORRECT', 'Incorrect'),
-            _buildFilterChip('UNATTEMPTED', 'Unattempted'),
-          ],
-        ),
-
-        const SizedBox(height: 20),
-
-        // QUESTIONS LIST
-        if (filteredQuestions.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(32),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-            child: const Text('No questions match the selected filter.', style: TextStyle(color: Color(0xFF64748B))),
-          )
-        else
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: filteredQuestions.length,
-            itemBuilder: (ctx, idx) {
-              final q = filteredQuestions[idx];
-              final originalIdx = widget.questions.indexOf(q);
-              final userAns = widget.userAnswers[originalIdx];
-
-              bool isCorrect = false;
-              bool isAnswered = userAns != null && userAns.trim().isNotEmpty;
-
-              if (isAnswered) {
-                if (q.qType == 'numerical') {
-                  final expected = (q.numericalAnswer ?? '').trim();
-                  if (expected.isNotEmpty) {
-                    final uNum = double.tryParse(userAns.trim());
-                    final eNum = double.tryParse(expected);
-                    if (uNum != null && eNum != null) {
-                      isCorrect = (uNum - eNum).abs() < 0.01;
-                    } else {
-                      isCorrect = userAns.trim().toLowerCase() == expected.toLowerCase();
-                    }
-                  }
-                } else {
-                  for (int i = 0; i < q.options.length; i++) {
-                    final opt = q.options[i];
-                    final optKey = opt.id.isNotEmpty ? opt.id : 'opt_${q.id}_$i';
-                    final optLetter = String.fromCharCode(65 + i);
-                    if (_isOptSelected(userAns, optKey, optLetter, opt.optionText) && opt.isCorrect) {
-                      isCorrect = true;
-                      break;
-                    }
-                  }
-                }
-              }
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 18),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Question Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isAnswered ? (isCorrect ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2)) : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'Question ${originalIdx + 1} (${isAnswered ? (isCorrect ? 'Correct' : 'Incorrect') : 'Skipped'})',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: isAnswered ? (isCorrect ? const Color(0xFF15803D) : const Color(0xFFB91C1C)) : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.copy_rounded, size: 18, color: Color(0xFF64748B)),
-                          tooltip: 'Copy Question',
-                          onPressed: () => QuestionCopyHelper.copyModelToClipboard(context, q, questionIndex: originalIdx + 1),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    LaTeXView(text: q.questionText, style: const TextStyle(fontSize: 15, height: 1.5, color: Color(0xFF0F172A))),
-                    if (q.questionImage != null && q.questionImage!.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      SmartImage(url: q.questionImage, height: 180, fit: BoxFit.contain),
-                    ],
-                    const SizedBox(height: 16),
-
-                    // Options
-                    ...q.options.asMap().entries.map((entry) {
-                      final optIdx = entry.key;
-                      final opt = entry.value;
-                      final optKey = opt.id.isNotEmpty ? opt.id : 'opt_${q.id}_$optIdx';
-                      final optLetter = String.fromCharCode(65 + optIdx);
-                      final isSelected = _isOptSelected(userAns, optKey, optLetter, opt.optionText);
-
-                      Color bg = const Color(0xFFF8FAFC);
-                      Color border = const Color(0xFFE2E8F0);
-                      Color txtColor = const Color(0xFF334155);
-
-                      if (opt.isCorrect) {
-                        bg = const Color(0xFFF0FDF4);
-                        border = const Color(0xFF22C55E);
-                        txtColor = const Color(0xFF15803D);
-                      } else if (isSelected && !opt.isCorrect) {
-                        bg = const Color(0xFFFEF2F2);
-                        border = const Color(0xFFEF4444);
-                        txtColor = const Color(0xFFB91C1C);
-                      }
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: bg,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: border),
-                        ),
-                        child: Row(
-                          children: [
-                            Text('${optIdx + 1}. ', style: TextStyle(fontWeight: FontWeight.bold, color: txtColor)),
-                            Expanded(child: LaTeXView(text: opt.optionText, style: TextStyle(fontSize: 14, color: txtColor))),
-                            if (opt.isCorrect) const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 20),
-                            if (isSelected && !opt.isCorrect) const Icon(Icons.cancel_rounded, color: Color(0xFFEF4444), size: 20),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-
-                    // Solution Box
-                    if ((q.explanation != null && q.explanation!.isNotEmpty) || (q.solution != null && q.solution!.isNotEmpty)) ...[
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Solution:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF334155))),
-                            const SizedBox(height: 4),
-                            LaTeXView(
-                              text: (q.explanation != null && q.explanation!.isNotEmpty) ? q.explanation! : q.solution!,
-                              style: const TextStyle(fontSize: 13.5, height: 1.4, color: Color(0xFF0F172A)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    if (q.solutionVideoUrl != null && q.solutionVideoUrl!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: const [
-                                Icon(Icons.play_circle_fill, color: Color(0xFF4F46E5), size: 18),
-                                SizedBox(width: 6),
-                                Text('Video Solution', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            SolutionVideoPlayerWidget(
-                              videoUrl: q.solutionVideoUrl!,
-                              height: 220,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              );
-            },
-          ),
-      ],
-    );
-  }
-
-  Widget _buildFilterChip(String key, String label) {
-    final bool isSelected = _filter == key;
-    return ChoiceChip(
-      label: Text(label, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.w500, color: isSelected ? Colors.white : const Color(0xFF475569))),
-      selected: isSelected,
-      selectedColor: const Color(0xFF2563EB),
-      backgroundColor: const Color(0xFFF1F5F9),
-      onSelected: (sel) {
-        if (sel) setState(() => _filter = key);
-      },
-    );
-  }
 }
 
 /// Robust loader for direct navigation or page refresh on result routes

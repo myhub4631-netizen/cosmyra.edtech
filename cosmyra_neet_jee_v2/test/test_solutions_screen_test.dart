@@ -114,6 +114,26 @@ void main() {
     });
 
     testWidgets('Renders top bar with Solutions title, attempt badge, and section', (tester) async {
+      final attempt2 = TestAttemptModel(
+        id: 'att_solutions_2',
+        userId: 'student_123',
+        testTemplateId: 'template_neet_1',
+        testTitle: 'NEET Full Syllabus Mock 1',
+        startedAt: DateTime.now(),
+        expiresAt: DateTime.now(),
+        submittedAt: DateTime.now(),
+        status: 'submitted',
+        totalScore: 12.0,
+        maxMarks: 16.0,
+        totalQuestions: 4,
+        attemptedCount: 3,
+        correctCount: 3,
+        incorrectCount: 0,
+        unattemptedCount: 1,
+        accuracy: 100.0,
+        timeSpentSeconds: 150,
+      );
+
       await tester.pumpWidget(
         MaterialApp(
           home: TestSolutionsScreen(
@@ -121,6 +141,7 @@ void main() {
             questions: questions,
             userAnswers: userAnswers,
             onBack: () {},
+            allAttempts: [attempt, attempt2],
           ),
         ),
       );
@@ -181,9 +202,9 @@ void main() {
       expect(find.text('20 m'), findsOneWidget);
       expect(find.text('10 m'), findsOneWidget);
 
-      // Performance comparison row
-      expect(find.text('You'), findsOneWidget);
-      expect(find.text('Topper (Live)'), findsOneWidget);
+      // Status and timing card (Reference screenshot 3)
+      expect(find.text('Status'), findsOneWidget);
+      expect(find.text('Time'), findsOneWidget);
 
       // Correct answer banner
       expect(find.text('Correct Answer : 1'), findsOneWidget);

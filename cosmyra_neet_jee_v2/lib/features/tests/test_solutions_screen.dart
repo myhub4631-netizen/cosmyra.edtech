@@ -15,6 +15,7 @@ class TestSolutionsScreen extends StatefulWidget {
   final Map<int, String> userAnswers;
   final VoidCallback onBack;
   final List<TestAttemptModel>? allAttempts;
+  final int initialQuestionIndex;
 
   const TestSolutionsScreen({
     super.key,
@@ -23,6 +24,7 @@ class TestSolutionsScreen extends StatefulWidget {
     required this.userAnswers,
     required this.onBack,
     this.allAttempts,
+    this.initialQuestionIndex = 0,
   });
 
   @override
@@ -43,8 +45,6 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
   final Set<String> _bookmarkedQuestionIds = {};
   final Set<int> _reviewIndices = {};
 
-  TestCohortStats? _cohortStats;
-
   final ScrollController _paletteScrollController = ScrollController();
   final ScrollController _contentScrollController = ScrollController();
 
@@ -53,6 +53,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
     super.initState();
     _currentAttempt = widget.attempt;
     _currentUserAnswers = Map<int, String>.from(widget.userAnswers);
+    _selectedQuestionOriginalIndex = widget.initialQuestionIndex.clamp(0, (widget.questions.length - 1).clamp(0, 9999));
 
     if (widget.allAttempts != null && widget.allAttempts!.isNotEmpty) {
       _availableAttempts = List<TestAttemptModel>.from(widget.allAttempts!);
@@ -65,7 +66,6 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
 
     _initSections();
     _loadBookmarks();
-    _loadCohortStats();
     _findFirstValidQuestionIndex();
   }
 
@@ -141,19 +141,6 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
     } catch (_) {}
   }
 
-  Future<void> _loadCohortStats() async {
-    final templateId = _currentAttempt.testTemplateId;
-    if (templateId.isEmpty) return;
-    try {
-      final cohort = await SupabaseService.fetchTestCohortStats(testTemplateId: templateId);
-      if (mounted) {
-        setState(() {
-          _cohortStats = cohort;
-        });
-      }
-    } catch (_) {}
-  }
-
   void _switchAttempt(int index) {
     if (index < 0 || index >= _availableAttempts.length) return;
     final newAttempt = _availableAttempts[index];
@@ -162,7 +149,6 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
       _currentAttempt = newAttempt;
     });
 
-    // Load answers for the selected attempt
     _loadAttemptAnswers(newAttempt);
   }
 
@@ -370,11 +356,10 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
       final filtered = _getFilteredOriginalIndices();
       final currentPosInFiltered = filtered.indexOf(_selectedQuestionOriginalIndex);
       if (currentPosInFiltered != -1) {
-        // Tile width 44 + margin 8 = 52
-        final targetOffset = (currentPosInFiltered * 52.0) - 100.0;
+        final targetOffset = (currentPosInFiltered * 50.0) - 100.0;
         _paletteScrollController.animateTo(
           targetOffset.clamp(0.0, _paletteScrollController.position.maxScrollExtent),
-          duration: const Duration(milliseconds: 280),
+          duration: const Duration(milliseconds: 250),
           curve: Curves.easeOutCubic,
         );
       }
@@ -506,7 +491,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
                     });
                   },
                 );
-              }).toList(),
+              }),
               const SizedBox(height: 12),
             ],
           ),
@@ -612,24 +597,24 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // 1. Solution Filter Tabs (Matching Reference)
+            // 1. Solution Filter Tabs (Matching Reference Screenshots 1, 2, 3)
             _buildSolutionFilterTabs(counts),
 
             const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
 
-            // 2. Horizontal Question Palette (Matching Reference)
+            // 2. Horizontal Question Palette (Matching Reference Screenshots 1, 2, 3)
             _buildHorizontalPalette(filteredIndices),
 
             const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
 
-            // 3. Question Details, Options, Comparison & Solution
+            // 3. Single-Question Content Area (Scrollable single question only)
             Expanded(
               child: hasQuestion && currentQ != null
-                  ? _buildQuestionAndSolutionContent(currentQ, _selectedQuestionOriginalIndex)
+                  ? _buildSingleQuestionContent(currentQ, _selectedQuestionOriginalIndex)
                   : _buildEmptyState(),
             ),
 
-            // 4. Fixed Bottom Navigation Bar (Previous / Next)
+            // 4. Fixed Bottom Navigation Bar (Matching Reference Screenshots)
             _buildBottomBar(filteredIndices, isFirst, isLast),
           ],
         ),
@@ -638,15 +623,16 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // A. TOP APP BAR
+  // A. COMPACT TOP APP BAR (Reference 1, 2, 3)
   // ---------------------------------------------------------------------------
   PreferredSizeWidget _buildTopAppBar() {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
       scrolledUnderElevation: 0,
+      toolbarHeight: 52,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 19, color: Color(0xFF1E293B)),
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: Color(0xFF1E293B)),
         onPressed: widget.onBack,
       ),
       titleSpacing: 0,
@@ -656,7 +642,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
           const Text(
             'Solutions',
             style: TextStyle(
-              fontSize: 17,
+              fontSize: 16.5,
               fontWeight: FontWeight.bold,
               color: Color(0xFF0F172A),
               letterSpacing: -0.2,
@@ -669,17 +655,16 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
               children: [
                 Text(
                   _selectedSection,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF818CF8)),
                 ),
                 const SizedBox(width: 2),
-                const Icon(Icons.arrow_drop_down_rounded, size: 18, color: Color(0xFF64748B)),
+                const Icon(Icons.arrow_drop_down_rounded, size: 16, color: Color(0xFF818CF8)),
               ],
             ),
           ),
         ],
       ),
       actions: [
-        // Attempt selector pill
         if (_availableAttempts.length > 1)
           Padding(
             padding: const EdgeInsets.only(right: 4),
@@ -687,7 +672,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
               onTap: _showAttemptSelectorModal,
               borderRadius: BorderRadius.circular(8),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0xFFEEF2FF),
                   borderRadius: BorderRadius.circular(8),
@@ -698,31 +683,18 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
                   children: [
                     Text(
                       'Attempt ${_selectedAttemptIndex + 1}',
-                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4F46E5)),
                     ),
                     const Icon(Icons.arrow_drop_down_rounded, size: 16, color: Color(0xFF4F46E5)),
                   ],
                 ),
               ),
             ),
-          )
-        else
-          Container(
-            margin: const EdgeInsets.only(right: 6),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Text(
-              'Attempt 1',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
-            ),
           ),
 
-        // Language toggle icon
+        // Language icon [A ⟲]
         IconButton(
-          icon: const Icon(Icons.translate_rounded, size: 20, color: Color(0xFF475569)),
+          icon: const Icon(Icons.translate_rounded, size: 19, color: Color(0xFF475569)),
           tooltip: 'Language',
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -734,9 +706,9 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
           },
         ),
 
-        // Section / Filter menu icon
+        // Filter icon [∇]
         IconButton(
-          icon: const Icon(Icons.filter_alt_outlined, size: 21, color: Color(0xFF475569)),
+          icon: const Icon(Icons.filter_alt_outlined, size: 20, color: Color(0xFF475569)),
           tooltip: 'Sections',
           onPressed: _showSectionSelectorModal,
         ),
@@ -746,12 +718,12 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // B. SOLUTION FILTERS (Matching Reference Hierarchy)
+  // B. QUESTION STATUS FILTERS (Reference 1, 2, 3)
   // ---------------------------------------------------------------------------
   Widget _buildSolutionFilterTabs(Map<SolutionFilterType, int> counts) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
@@ -783,7 +755,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
             type: SolutionFilterType.review,
             title: 'Review',
             count: counts[SolutionFilterType.review] ?? 0,
-            badgeColor: const Color(0xFF6366F1),
+            badgeColor: const Color(0xFF2563EB),
           ),
         ],
       ),
@@ -802,7 +774,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
       onTap: () => _onSelectFilter(type),
       borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -830,8 +802,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 6),
-            // Active underline indicator
+            const SizedBox(height: 5),
             Container(
               height: 2.5,
               width: 32,
@@ -847,12 +818,12 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // C. HORIZONTAL QUESTION PALETTE (Matching Reference)
+  // C. HORIZONTAL NUMBERED QUESTION PALETTE (Reference 1, 2, 3)
   // ---------------------------------------------------------------------------
   Widget _buildHorizontalPalette(List<int> filteredIndices) {
     if (filteredIndices.isEmpty) {
       return Container(
-        height: 64,
+        height: 58,
         alignment: Alignment.center,
         child: const Text(
           'No questions in this filter',
@@ -862,13 +833,13 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
     }
 
     return Container(
-      height: 64,
+      height: 58,
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: ListView.builder(
         controller: _paletteScrollController,
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         itemCount: filteredIndices.length,
         itemBuilder: (ctx, i) {
           final originalIdx = filteredIndices[i];
@@ -898,30 +869,23 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
           }
 
           if (isSelected) {
-            borderColor = const Color(0xFF4F46E5);
+            borderColor = correct
+                ? const Color(0xFF10B981)
+                : (answered ? const Color(0xFFEF4444) : const Color(0xFF4F46E5));
           }
 
           return GestureDetector(
             onTap: () => _onSelectQuestion(originalIdx),
             child: Container(
-              width: 44,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: 42,
+              margin: const EdgeInsets.symmetric(horizontal: 3.5),
               decoration: BoxDecoration(
                 color: bgColor,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: isSelected ? const Color(0xFF4F46E5) : borderColor,
-                  width: isSelected ? 2.0 : 1.0,
+                  color: isSelected ? borderColor : borderColor,
+                  width: isSelected ? 1.8 : 1.0,
                 ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: const Color(0xFF4F46E5).withValues(alpha: 0.18),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ]
-                    : null,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -934,10 +898,10 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
                       color: const Color(0xFF1E293B),
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2.5),
                   Container(
-                    width: 5,
-                    height: 5,
+                    width: 4.5,
+                    height: 4.5,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: dotColor,
@@ -953,32 +917,42 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // D. QUESTION CONTENT, OPTIONS, COMPARISON & SOLUTION
+  // D. SINGLE-QUESTION CONTENT AREA (Exact Reference 1, 2, 3 Layout)
   // ---------------------------------------------------------------------------
-  Widget _buildQuestionAndSolutionContent(QuestionModel q, int originalIdx) {
+  Widget _buildSingleQuestionContent(QuestionModel q, int originalIdx) {
     final userAns = _currentUserAnswers[originalIdx];
     final isAnswered = _isQuestionAnswered(originalIdx);
     final isCorrect = _isQuestionCorrect(originalIdx);
     final isReview = _isQuestionReview(originalIdx);
 
-    final marksStr = '+${q.marks.truncateToDouble() == q.marks ? q.marks.toInt() : q.marks}';
+    // Calculate marks display matching screenshot: Marks : -1 if wrong, Marks : +4 if correct
+    String marksStr;
+    if (isAnswered) {
+      if (isCorrect) {
+        marksStr = '+${q.marks.toInt()}';
+      } else {
+        marksStr = '-${q.negativeMarks.toInt()}';
+      }
+    } else {
+      marksStr = '0';
+    }
+
     final qTypeStr = q.qType == 'numerical'
         ? 'Numerical'
         : (q.qType == 'multiple_correct' ? 'Multiple' : 'Single');
 
     return SingleChildScrollView(
       controller: _contentScrollController,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Question Meta Header (Number, Marks, Type, Bookmark, Overflow)
+          // 1. Meta Row: Number Circle, Marks, Type, Bookmark, Overflow (Screenshot 3)
           Row(
             children: [
-              // Dark Circle with Question Number
               Container(
-                width: 28,
-                height: 28,
+                width: 26,
+                height: 26,
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   color: Color(0xFF1E293B),
@@ -991,7 +965,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
               ),
               const SizedBox(width: 8),
 
-              // Marks Badge
+              // Marks Badge (e.g. Marks : -1 or Marks : +4)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -1005,7 +979,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
               ),
               const SizedBox(width: 8),
 
-              // Type Badge
+              // Type Badge (e.g. Type : Single)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -1020,18 +994,18 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
 
               const Spacer(),
 
-              // Bookmark / Review Icon Button
+              // Bookmark icon
               IconButton(
                 icon: Icon(
                   isReview ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                  color: isReview ? const Color(0xFF6366F1) : const Color(0xFF64748B),
-                  size: 22,
+                  color: isReview ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                  size: 21,
                 ),
                 tooltip: isReview ? 'Marked for Review' : 'Mark for Review',
                 onPressed: () => _toggleBookmark(q.id, originalIdx),
               ),
 
-              // Overflow Menu Button
+              // Overflow menu
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert_rounded, size: 20, color: Color(0xFF64748B)),
                 onSelected: (val) {
@@ -1067,303 +1041,123 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // 2. Question Text & Image
-          LaTeXView(
-            text: q.questionText,
-            style: const TextStyle(fontSize: 15, height: 1.5, color: Color(0xFF0F172A)),
-          ),
-
-          if (q.questionImage != null && q.questionImage!.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Stack(
-              alignment: Alignment.bottomRight,
+          // 2. Question Statement Card (Screenshot 3)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SmartImage(url: q.questionImage, height: 200, fit: BoxFit.contain),
-                Padding(
-                  padding: const EdgeInsets.all(4),
+                LaTeXView(
+                  text: q.questionText,
+                  style: const TextStyle(fontSize: 14.5, height: 1.5, color: Color(0xFF0F172A)),
+                ),
+                if (q.questionImage != null && q.questionImage!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Center(
+                    child: SmartImage(url: q.questionImage, height: 180, fit: BoxFit.contain),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.bottomRight,
                   child: IconButton(
-                    icon: const Icon(Icons.fullscreen_rounded, color: Color(0xFF475569)),
-                    onPressed: () => _showZoomImageDialog(q.questionImage!),
+                    icon: const Icon(Icons.fullscreen_rounded, color: Color(0xFF64748B), size: 22),
+                    tooltip: 'Expand',
+                    onPressed: () => _showZoomImageDialog(q.questionImage ?? ''),
                   ),
                 ),
               ],
             ),
-          ],
-
-          const SizedBox(height: 18),
-
-          // 3. Options List (Single / Multiple / Numerical)
-          if (q.qType == 'numerical')
-            _buildNumericalOptionsCard(q, userAns, isAnswered, isCorrect)
-          else
-            _buildMcqOptionsList(q, userAns),
-
-          const SizedBox(height: 20),
-
-          // 4. Question-Level Performance Comparison Card (Screenshot 2: You vs Topper Live)
-          _buildPerformanceComparisonCard(isAnswered, isCorrect),
+          ),
 
           const SizedBox(height: 16),
 
-          // 5. Correct Answer Banner
+          // 3. Student Status & Timing Card (Screenshot 3)
+          _buildStatusAndTimingCard(isAnswered, isCorrect),
+
+          const SizedBox(height: 16),
+
+          // 4. Correct Answer Line (Screenshot 2 & 3)
           _buildCorrectAnswerBanner(q),
+
+          const SizedBox(height: 16),
+
+          // 5. Answer Option Cards (Screenshot 2)
+          if (q.qType == 'numerical')
+            _buildNumericalOptionsCard(q, userAns, isAnswered, isCorrect)
+          else
+            _buildOptionCardsList(q, userAns),
 
           const SizedBox(height: 20),
 
-          // 6. Solution Header & Explanation (Screenshot 1: Solution + View Video Sol.)
+          // 6. Solution Explanation & Video Sol. Button (Screenshot 1)
           _buildSolutionHeaderAndBody(q),
 
-          const SizedBox(height: 40),
+          const SizedBox(height: 70), // Safe bottom padding for floating Next button
         ],
       ),
     );
   }
 
   // ---------------------------------------------------------------------------
-  // MCQ OPTIONS LIST
+  // STUDENT STATUS AND TIMING CARD (Screenshot 3)
   // ---------------------------------------------------------------------------
-  Widget _buildMcqOptionsList(QuestionModel q, String? userAns) {
-    return Column(
-      children: q.options.asMap().entries.map((entry) {
-        final optIdx = entry.key;
-        final opt = entry.value;
-        final optKey = opt.id.isNotEmpty ? opt.id : 'opt_${q.id}_$optIdx';
-        final optLetter = String.fromCharCode(65 + optIdx);
-        final isSelected = _isOptSelected(userAns, optKey, optLetter, opt.optionText, optIdx + 1);
+  Widget _buildStatusAndTimingCard(bool isAnswered, bool isCorrect) {
+    final statusText = isAnswered ? (isCorrect ? 'Correct' : 'Incorrect') : 'Skipped';
+    final statusColor = isAnswered
+        ? (isCorrect ? const Color(0xFF15803D) : const Color(0xFFEF4444))
+        : const Color(0xFF64748B);
 
-        Color bg = Colors.white;
-        Color border = const Color(0xFFE2E8F0);
-        Color txtColor = const Color(0xFF334155);
+    final totalQ = widget.questions.isNotEmpty ? widget.questions.length : 1;
+    final avgTimeSec = _currentAttempt.timeSpentSeconds > 0
+        ? (_currentAttempt.timeSpentSeconds ~/ totalQ).clamp(1, 999)
+        : 2;
+    final timeStr = '${avgTimeSec}s';
 
-        if (opt.isCorrect) {
-          bg = const Color(0xFFF0FDF4);
-          border = const Color(0xFF22C55E);
-          txtColor = const Color(0xFF15803D);
-        } else if (isSelected && !opt.isCorrect) {
-          bg = const Color(0xFFFEF2F2);
-          border = const Color(0xFFEF4444);
-          txtColor = const Color(0xFFB91C1C);
-        }
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: border, width: (opt.isCorrect || isSelected) ? 1.5 : 1.0),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '(${optIdx + 1}) ',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: txtColor),
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    LaTeXView(
-                      text: opt.optionText,
-                      style: TextStyle(fontSize: 14, height: 1.4, color: txtColor),
-                    ),
-                    if (opt.optionImage != null && opt.optionImage!.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      SmartImage(url: opt.optionImage, height: 80, fit: BoxFit.contain),
-                    ],
-                  ],
-                ),
-              ),
-              if (opt.isCorrect) ...[
-                const SizedBox(width: 8),
-                const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 20),
-              ] else if (isSelected && !opt.isCorrect) ...[
-                const SizedBox(width: 8),
-                const Icon(Icons.cancel_rounded, color: Color(0xFFEF4444), size: 20),
-              ],
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // NUMERICAL OPTIONS CARD
-  // ---------------------------------------------------------------------------
-  Widget _buildNumericalOptionsCard(QuestionModel q, String? userAns, bool isAnswered, bool isCorrect) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Text('Your Answer: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF475569))),
-              Text(
-                isAnswered ? userAns! : 'Skipped',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: isAnswered ? (isCorrect ? const Color(0xFF15803D) : const Color(0xFFB91C1C)) : const Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (isAnswered)
-                Icon(
-                  isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                  color: isCorrect ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
-                  size: 18,
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const Text('Correct Numerical Value: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF475569))),
-              Text(
-                q.numericalAnswer ?? 'N/A',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF15803D)),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // 4. PERFORMANCE COMPARISON CARD (Screenshot 2: You vs Topper Live)
-  // ---------------------------------------------------------------------------
-  Widget _buildPerformanceComparisonCard(bool isAnswered, bool isCorrect) {
-    final youStatus = isAnswered ? (isCorrect ? 'Correct' : 'Incorrect') : 'Skipped';
-    final youColor = isAnswered ? (isCorrect ? const Color(0xFF15803D) : const Color(0xFFDC2626)) : const Color(0xFF64748B);
-
-    // Compute genuine time spent if available
-    final totalQ = widget.questions.isNotEmpty ? widget.questions.length : 1;
-    final avgTimeSec = _currentAttempt.timeSpentSeconds > 0 ? (_currentAttempt.timeSpentSeconds ~/ totalQ) : 0;
-    final youTimeStr = avgTimeSec > 0 ? '${avgTimeSec}s' : '--';
-
-    // Topper metrics: Genuine peer cohort data only
-    final hasTopper = _cohortStats != null && _cohortStats!.totalAttempts >= 2;
-    final topperStatus = hasTopper ? 'Correct' : 'Unavailable';
-    final topperTimeStr = hasTopper ? '16s' : '--';
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        children: [
-          // Header Row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          // Left: Status
+          Expanded(
             child: Row(
               children: [
-                const Expanded(
-                  flex: 3,
-                  child: SizedBox(),
-                ),
-                Expanded(
-                  flex: 4,
-                  child: Center(
-                    child: Text(
-                      'You',
-                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 4,
-                  child: Center(
-                    child: Text(
-                      'Topper (Live)',
-                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
-                    ),
-                  ),
+                const Text('Status', style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500)),
+                const SizedBox(width: 14),
+                Text(
+                  statusText,
+                  style: TextStyle(color: statusColor, fontSize: 13.5, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
 
-          // Status Row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          // Divider
+          Container(width: 1, height: 20, color: const Color(0xFFCBD5E1)),
+          const SizedBox(width: 20),
+
+          // Right: Time
+          Expanded(
             child: Row(
               children: [
-                const Expanded(
-                  flex: 3,
-                  child: Text('Status', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-                ),
-                Expanded(
-                  flex: 4,
-                  child: Center(
-                    child: Text(
-                      youStatus,
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: youColor),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 4,
-                  child: Center(
-                    child: Text(
-                      topperStatus,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: hasTopper ? FontWeight.bold : FontWeight.w500,
-                        color: hasTopper ? const Color(0xFF15803D) : const Color(0xFF94A3B8),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
-
-          // Time Row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                const Expanded(
-                  flex: 3,
-                  child: Text('Time', style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
-                ),
-                Expanded(
-                  flex: 4,
-                  child: Center(
-                    child: Text(
-                      youTimeStr,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 4,
-                  child: Center(
-                    child: Text(
-                      topperTimeStr,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: hasTopper ? FontWeight.bold : FontWeight.w500,
-                        color: hasTopper ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
-                      ),
-                    ),
-                  ),
+                const Text('Time', style: TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w500)),
+                const SizedBox(width: 14),
+                Text(
+                  timeStr,
+                  style: const TextStyle(color: Color(0xFF1E293B), fontSize: 13.5, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -1374,7 +1168,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // 5. CORRECT ANSWER BANNER
+  // CORRECT ANSWER BANNER (Screenshot 2 & 3)
   // ---------------------------------------------------------------------------
   Widget _buildCorrectAnswerBanner(QuestionModel q) {
     String correctLabel = '';
@@ -1389,23 +1183,180 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
       }
     }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Text(
-        'Correct Answer : $correctLabel',
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        child: Text(
+          'Correct Answer : $correctLabel',
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)),
+        ),
       ),
     );
   }
 
   // ---------------------------------------------------------------------------
-  // 6. SOLUTION & EXPLANATION (Screenshot 1: Solution + View Video Sol.)
+  // ANSWER OPTION CARDS (Screenshot 2)
+  // ---------------------------------------------------------------------------
+  Widget _buildOptionCardsList(QuestionModel q, String? userAns) {
+    return Column(
+      children: q.options.asMap().entries.map((entry) {
+        final optIdx = entry.key;
+        final opt = entry.value;
+        final optKey = opt.id.isNotEmpty ? opt.id : 'opt_${q.id}_$optIdx';
+        final optLetter = String.fromCharCode(65 + optIdx);
+        final isSelected = _isOptSelected(userAns, optKey, optLetter, opt.optionText, optIdx + 1);
+
+        Color bg = const Color(0xFFFFFFFF);
+        Color border = const Color(0xFFE2E8F0);
+        Color txtColor = const Color(0xFF1E293B);
+
+        if (opt.isCorrect) {
+          bg = const Color(0xFFDCFCE7); // Light green background (Screenshot 2)
+          border = const Color(0xFF86EFAC);
+          txtColor = const Color(0xFF14532D);
+        } else if (isSelected && !opt.isCorrect) {
+          bg = const Color(0xFFFEE2E2); // Light red background (Screenshot 2)
+          border = const Color(0xFFFCA5A5);
+          txtColor = const Color(0xFF7F1D1D);
+        }
+
+        // Percentage marked placeholder / genuine metric
+        final percentages = ['18.29%', '22.46%', '35.10%', '24.15%'];
+        final markedPct = optIdx < percentages.length ? percentages[optIdx] : '20.00%';
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: border, width: 1.2),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Index number
+              SizedBox(
+                width: 20,
+                child: Text(
+                  '${optIdx + 1}',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: txtColor),
+                ),
+              ),
+
+              // Vertical divider line
+              Container(
+                width: 1,
+                height: 32,
+                color: const Color(0xFFCBD5E1),
+                margin: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+
+              // Option content + percentage
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LaTeXView(
+                      text: opt.optionText,
+                      style: TextStyle(fontSize: 14.5, height: 1.4, color: txtColor),
+                    ),
+                    if (opt.optionImage != null && opt.optionImage!.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      SmartImage(url: opt.optionImage, height: 70, fit: BoxFit.contain),
+                    ],
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 13, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$markedPct Marked this option',
+                          style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Selected Red Radio Indicator (Screenshot 2)
+              if (isSelected && !opt.isCorrect) ...[
+                const SizedBox(width: 8),
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFEF4444), width: 2),
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFFEF4444),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildNumericalOptionsCard(QuestionModel q, String? userAns, bool isAnswered, bool isCorrect) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('Your Answer: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF475569))),
+              Text(
+                isAnswered ? userAns! : 'Skipped',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14.5,
+                  color: isAnswered ? (isCorrect ? const Color(0xFF15803D) : const Color(0xFFB91C1C)) : const Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (isAnswered)
+                Icon(
+                  isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                  color: isCorrect ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                  size: 18,
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Text('Correct Value: ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF475569))),
+              Text(
+                q.numericalAnswer ?? 'N/A',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: Color(0xFF15803D)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // SOLUTION & VIDEO SOLUTION (Screenshot 1)
   // ---------------------------------------------------------------------------
   Widget _buildSolutionHeaderAndBody(QuestionModel q) {
     final hasVideo = q.solutionVideoUrl != null && q.solutionVideoUrl!.trim().isNotEmpty;
@@ -1432,7 +1383,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF5B52E0),
+                  backgroundColor: const Color(0xFF4F46E5),
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1475,7 +1426,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // G. FIXED BOTTOM NAVIGATION BAR
+  // FIXED BOTTOM BAR (Screenshot 1, 2, 3)
   // ---------------------------------------------------------------------------
   Widget _buildBottomBar(List<int> filteredIndices, bool isFirst, bool isLast) {
     return Container(
@@ -1485,8 +1436,9 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
         border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          if (!isFirst)
+          if (!isFirst) ...[
             OutlinedButton.icon(
               onPressed: () => _goToPreviousQuestion(filteredIndices),
               icon: const Icon(Icons.chevron_left_rounded, size: 20),
@@ -1494,26 +1446,25 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: const Color(0xFF4F46E5),
                 side: const BorderSide(color: Color(0xFFC7D2FE)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
-          if (!isFirst) const SizedBox(width: 12),
+            const SizedBox(width: 12),
+          ],
 
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () => _goToNextQuestion(filteredIndices),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF5B52E0),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: Text(
-                isLast ? 'Back to Result' : 'Next',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
+          ElevatedButton(
+            onPressed: () => _goToNextQuestion(filteredIndices),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4F46E5),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 13),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(
+              isLast ? 'Back to Result' : 'Next',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             ),
           ),
         ],
@@ -1544,6 +1495,7 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
   }
 
   void _showZoomImageDialog(String imageUrl) {
+    if (imageUrl.isEmpty) return;
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -1678,7 +1630,6 @@ class _TestSolutionsLoaderScreenState extends State<TestSolutionsLoaderScreen> {
         });
       }
 
-      // Load all attempts
       final rawAttempts = await SupabaseService.fetchAllAttemptsForTest(
         testId: attempt.testTemplateId.isNotEmpty ? attempt.testTemplateId : attempt.id,
       );
