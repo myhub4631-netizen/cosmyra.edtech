@@ -4461,6 +4461,229 @@ class SupabaseService {
     }
   }
 
+  /// Retrieve cached or persisted questions for an attempt
+  static Future<List<QuestionModel>> fetchAttemptQuestions({
+    required String attemptId,
+    String? testId,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String? jsonStr = prefs.getString('cosmyra_attempt_questions_$attemptId');
+      if ((jsonStr == null || jsonStr.isEmpty) && testId != null && testId.isNotEmpty) {
+        jsonStr = prefs.getString('cosmyra_attempt_questions_$testId');
+      }
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(jsonStr);
+        final list = decoded.map((item) => QuestionModel.fromJson(Map<String, dynamic>.from(item as Map))).toList();
+        if (list.isNotEmpty) return list;
+      }
+    } catch (e) {
+      debugPrint('Notice retrieving cached attempt questions: $e');
+    }
+
+    // Fallback to querying questions for paper/testId
+    final targetPaperId = (testId != null && testId.isNotEmpty) ? testId : attemptId;
+    if (targetPaperId.isNotEmpty) {
+      return fetchTestSeriesQuestions(paperId: targetPaperId);
+    }
+    return [];
+  }
+
+  /// Retrieve the latest test attempt for a test paper or session
+  static Future<Map<String, dynamic>?> fetchLatestTestAttempt({
+    required String testId,
+    String? userId,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existingStr = prefs.getString('cosmyra_test_attempts_history') ?? '[]';
+      final List<dynamic> history = jsonDecode(existingStr);
+      for (final item in history) {
+        if (item is Map) {
+          final id = item['id']?.toString() ?? '';
+          final tTitle = item['testTitle']?.toString() ?? '';
+          final tId = item['test_id']?.toString() ?? item['test_template_id']?.toString() ?? '';
+          if (id == testId || id.contains(testId) || tId == testId || tTitle.toLowerCase().contains(testId.toLowerCase())) {
+            return Map<String, dynamic>.from(item);
+          }
+        }
+      }
+
+      // Query Supabase test_attempts table if available
+      final query = client.from('test_attempts').select('*');
+      final uid = userId ?? client.auth.currentUser?.id ?? activeUserSession?.id;
+      if (uid != null && uid.isNotEmpty) {
+        query.eq('student_id', uid);
+      }
+      final res = await query
+          .or('id.eq.$testId,test_id.eq.$testId')
+          .order('submitted_at', ascending: false)
+          .limit(1);
+
+      if (res is List && res.isNotEmpty) {
+        return Map<String, dynamic>.from(res.first);
+      }
+    } catch (e) {
+      debugPrint('Notice loading latest attempt: $e');
+    }
+    return null;
+  }
+
+  /// Retrieve all recorded test attempts for a test paper or session
+  static Future<List<Map<String, dynamic>>> fetchAllAttemptsForTest({
+    required String testId,
+    String? userId,
+  }) async {
+    final List<Map<String, dynamic>> results = [];
+    final Set<String> seenIds = {};
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existingStr = prefs.getString('cosmyra_test_attempts_history') ?? '[]';
+      final List<dynamic> history = jsonDecode(existingStr);
+      for (final item in history) {
+        if (item is Map) {
+          final id = item['id']?.toString() ?? '';
+          final tTitle = item['testTitle']?.toString() ?? '';
+          final tId = item['test_id']?.toString() ?? item['test_template_id']?.toString() ?? '';
+          if (id == testId || id.contains(testId) || tId == testId || tTitle.toLowerCase().contains(testId.toLowerCase())) {
+            if (id.isNotEmpty && !seenIds.contains(id)) {
+              seenIds.add(id);
+              results.add(Map<String, dynamic>.from(item));
+            }
+          }
+        }
+      }
+
+      final uid = userId ?? client.auth.currentUser?.id ?? activeUserSession?.id;
+      var query = client.from('test_attempts').select('*');
+      if (uid != null && uid.isNotEmpty) {
+        query = query.eq('student_id', uid);
+      }
+      final res = await query
+          .or('id.eq.$testId,test_id.eq.$testId')
+          .order('submitted_at', ascending: false)
+          .limit(20);
+
+      if (res is List) {
+        for (final row in res) {
+          if (row is Map) {
+            final id = row['id']?.toString() ?? '';
+            if (id.isNotEmpty && !seenIds.contains(id)) {
+              seenIds.add(id);
+              results.add(Map<String, dynamic>.from(row));
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice loading all attempts for test: $e');
+    }
+    return results;
+  }
+
+  /// Toggle bookmark/review state for a question
+  static Future<bool> toggleBookmarkQuestion({
+    required String questionId,
+    required bool isBookmarked,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('cosmyra_bookmarked_qids') ?? [];
+      final set = list.toSet();
+      if (isBookmarked) {
+        set.add(questionId);
+      } else {
+        set.remove(questionId);
+      }
+      await prefs.setStringList('cosmyra_bookmarked_qids', set.toList());
+      return true;
+    } catch (e) {
+      debugPrint('Notice toggling bookmark: $e');
+      return false;
+    }
+  }
+
+  /// Fetch set of all bookmarked question IDs
+  static Future<Set<String>> getBookmarkedQuestionIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('cosmyra_bookmarked_qids') ?? [];
+      return list.toSet();
+    } catch (e) {
+      return {};
+    }
+  }
+
+  /// Fetch genuine peer cohort statistics for a test without fabricating fallback numbers
+  static Future<TestCohortStats?> fetchTestCohortStats({
+    required String testTemplateId,
+  }) async {
+    if (testTemplateId.isEmpty) return null;
+    try {
+      final res = await client
+          .from('test_attempts')
+          .select('total_score, correct_count, incorrect_count, unattempted_count, accuracy_percentage')
+          .eq('status', 'submitted')
+          .or('test_id.eq.$testTemplateId,mode.eq.$testTemplateId')
+          .limit(100);
+
+      if (res is List && res.length >= 2) {
+        double maxScore = -99999.0;
+        Map<String, dynamic>? topperRow;
+        double sumScore = 0;
+        int sumCorrect = 0;
+        int sumIncorrect = 0;
+        int sumSkipped = 0;
+        double sumAccuracy = 0;
+        final List<double> scores = [];
+
+        for (var row in res) {
+          final s = (row['total_score'] as num?)?.toDouble() ?? 0.0;
+          final c = (row['correct_count'] as num?)?.toInt() ?? 0;
+          final inc = (row['incorrect_count'] as num?)?.toInt() ?? 0;
+          final sk = (row['unattempted_count'] as num?)?.toInt() ?? 0;
+          final acc = (row['accuracy_percentage'] as num?)?.toDouble() ?? 0.0;
+
+          scores.add(s);
+          if (s > maxScore) {
+            maxScore = s;
+            topperRow = row;
+          }
+          sumScore += s;
+          sumCorrect += c;
+          sumIncorrect += inc;
+          sumSkipped += sk;
+          sumAccuracy += acc;
+        }
+
+        final n = res.length;
+        final tCorrect = (topperRow?['correct_count'] as num?)?.toInt() ?? 0;
+        final tInc = (topperRow?['incorrect_count'] as num?)?.toInt() ?? 0;
+        final tSk = (topperRow?['unattempted_count'] as num?)?.toInt() ?? 0;
+        final tAcc = (topperRow?['accuracy_percentage'] as num?)?.toDouble() ?? 0.0;
+
+        return TestCohortStats(
+          totalAttempts: n,
+          topperScore: maxScore,
+          topperCorrect: tCorrect,
+          topperIncorrect: tInc,
+          topperSkipped: tSk,
+          topperAccuracy: tAcc,
+          avgScore: sumScore / n,
+          avgCorrect: (sumCorrect / n).round(),
+          avgIncorrect: (sumIncorrect / n).round(),
+          avgSkipped: (sumSkipped / n).round(),
+          avgAccuracy: sumAccuracy / n,
+          allScores: scores,
+        );
+      }
+    } catch (e) {
+      debugPrint('Notice querying cohort statistics: $e');
+    }
+    return null;
+  }
+
   /// Calculates user real cumulative stats across submitted attempts
   static Future<Map<String, dynamic>> fetchUserRealStats() async {
     try {

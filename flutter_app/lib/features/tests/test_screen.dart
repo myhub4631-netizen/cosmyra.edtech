@@ -14,6 +14,8 @@ class CustomTestScreen extends StatefulWidget {
   final List<QuestionModel> questions;
   final int durationMinutes;
   final String? sessionId;
+  final String? testTitle;
+  final String? testTemplateId;
   final bool isNewSession;
   final bool isPreview;
   final Function(TestAttemptModel attempt, Map<int, String> answers) onTestSubmitted;
@@ -23,6 +25,8 @@ class CustomTestScreen extends StatefulWidget {
     required this.questions,
     this.durationMinutes = 60,
     this.sessionId,
+    this.testTitle,
+    this.testTemplateId,
     this.isNewSession = false,
     this.isPreview = false,
     required this.onTestSubmitted,
@@ -121,14 +125,18 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
     super.dispose();
   }
 
-  bool _isOptSelected(String? userAns, String optKey, String optLetter, String optText) {
+  bool _isOptSelected(String? userAns, String optKey, String optLetter, String optText, [int? optIndex]) {
     if (userAns == null || userAns.isEmpty) return false;
     final parts = userAns.split(',');
     for (var p in parts) {
       final trimmed = p.trim();
+      if (trimmed.isEmpty) continue;
       if (trimmed == optKey) return true;
-      if (trimmed == optLetter || trimmed == 'Option $optLetter') return true;
-      if (optText.isNotEmpty && trimmed == optText) return true;
+      if (trimmed.toLowerCase() == optLetter.toLowerCase()) return true;
+      if (trimmed.toLowerCase() == 'option ${optLetter.toLowerCase()}') return true;
+      if (trimmed.toLowerCase() == 'opt ${optLetter.toLowerCase()}') return true;
+      if (optIndex != null && trimmed == optIndex.toString()) return true;
+      if (optText.isNotEmpty && trimmed.toLowerCase() == optText.trim().toLowerCase()) return true;
     }
     return false;
   }
@@ -241,13 +249,22 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
       if (userAns != null && userAns.isNotEmpty) {
         bool isCorrect = false;
         if (q.qType == 'numerical') {
-          isCorrect = userAns.trim() == (q.numericalAnswer ?? '').trim();
+          final expected = (q.numericalAnswer ?? '').trim();
+          if (expected.isNotEmpty) {
+            final uNum = double.tryParse(userAns.trim());
+            final eNum = double.tryParse(expected);
+            if (uNum != null && eNum != null) {
+              isCorrect = (uNum - eNum).abs() < 0.01;
+            } else {
+              isCorrect = userAns.trim().toLowerCase() == expected.toLowerCase();
+            }
+          }
         } else {
           final matchedOpt = q.options.firstWhere(
             (opt) {
-              final optKey = (opt.id != null && opt.id.isNotEmpty) ? opt.id : 'opt_${q.id}_${opt.optionIndex}';
+              final optKey = (opt.id.isNotEmpty) ? opt.id : 'opt_${q.id}_${opt.optionIndex}';
               final optLetter = String.fromCharCode(65 + opt.optionIndex);
-              return _isOptSelected(userAns, optKey, optLetter, opt.optionText);
+              return _isOptSelected(userAns, optKey, optLetter, opt.optionText, opt.optionIndex);
             },
             orElse: () => QuestionOptionModel(id: '', questionId: '', optionIndex: 0, optionText: '', isCorrect: false),
           );
@@ -269,17 +286,35 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
     final accuracy = attempted > 0 ? (correct / attempted) * 100 : 0.0;
     final timeSpent = (widget.durationMinutes * 60) - _secondsRemaining;
 
+    double calculatedMaxMarks = 0;
+    for (final q in widget.questions) {
+      calculatedMaxMarks += q.marks > 0 ? q.marks : 4.0;
+    }
+    if (calculatedMaxMarks == 0) {
+      calculatedMaxMarks = widget.questions.length * 4.0;
+    }
+
+    final currentUserId = SupabaseService.currentUser?.id ?? SupabaseService.activeUserSession?.id ?? 'student_anon';
+    final currentTitle = (widget.testTitle != null && widget.testTitle!.trim().isNotEmpty)
+        ? widget.testTitle!.trim()
+        : (widget.sessionId != null && widget.sessionId!.trim().isNotEmpty ? widget.sessionId!.trim() : 'Test Session');
+    final templateId = (widget.testTemplateId != null && widget.testTemplateId!.trim().isNotEmpty)
+        ? widget.testTemplateId!.trim()
+        : (widget.sessionId ?? 'tmpl-custom');
+
     final attempt = TestAttemptModel(
-      id: 'att-${DateTime.now().millisecondsSinceEpoch}',
-      userId: 'usr-current',
-      testTemplateId: 'tmpl-custom',
-      testTitle: 'Custom Test Session',
+      id: (widget.sessionId != null && widget.sessionId!.trim().isNotEmpty)
+          ? widget.sessionId!
+          : 'att-${DateTime.now().millisecondsSinceEpoch}',
+      userId: currentUserId,
+      testTemplateId: templateId,
+      testTitle: currentTitle,
       startedAt: _startedAt,
       expiresAt: _expiresAt,
       submittedAt: DateTime.now(),
       status: 'submitted',
       totalScore: score,
-      maxMarks: widget.questions.length * 4.0,
+      maxMarks: calculatedMaxMarks,
       totalQuestions: widget.questions.length,
       attemptedCount: attempted,
       correctCount: correct,
@@ -292,7 +327,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
     // Save to Supabase and storage (only when NOT in preview mode)
     if (!widget.isPreview) {
       await SupabaseService.submitTestAttempt(
-        userId: 'usr-current',
+        userId: currentUserId,
         attempt: attempt,
         questions: widget.questions,
         userAnswers: _userAnswers,
@@ -1143,7 +1178,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                           children: question.options.asMap().entries.map((entry) {
                             final idx = entry.key;
                             final opt = entry.value;
-                            final String optKey = (opt.id != null && opt.id.isNotEmpty) ? opt.id : 'opt_${question.id}_${opt.optionIndex}';
+                            final String optKey = opt.id.isNotEmpty ? opt.id : 'opt_${question.id}_${opt.optionIndex}';
                             final String optLetter = String.fromCharCode(65 + opt.optionIndex);
                             final bool isMultiple = (question.qType == 'multiple_correct' || question.qType == 'multiple');
                             final bool isSelected = _isOptSelected(selectedAns, optKey, optLetter, opt.optionText);
@@ -1302,7 +1337,7 @@ class TestRunnerLoaderScreen extends StatefulWidget {
   final String testId;
   final String testTitle;
   final int durationMins;
-  final Function(TestAttemptModel attempt, Map<int, String> answers)? onSubmitted;
+  final Function(TestAttemptModel attempt, List<QuestionModel> questions, Map<int, String> answers)? onSubmitted;
 
   const TestRunnerLoaderScreen({
     super.key,
@@ -1661,9 +1696,11 @@ class _TestRunnerLoaderScreenState extends State<TestRunnerLoaderScreen> {
       questions: _questions,
       durationMinutes: widget.durationMins > 0 ? widget.durationMins : 180,
       sessionId: widget.testId,
+      testTitle: widget.testTitle,
+      testTemplateId: widget.testId,
       onTestSubmitted: (attempt, answers) {
         if (widget.onSubmitted != null) {
-          widget.onSubmitted!(attempt, answers);
+          widget.onSubmitted!(attempt, _questions, answers);
         } else {
           context.go('/test/${widget.testId}/result');
         }

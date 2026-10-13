@@ -859,6 +859,8 @@ class TestAttemptModel {
   final double accuracy;
   final int timeSpentSeconds;
 
+  String get testId => testTemplateId;
+
   TestAttemptModel({
     required this.id,
     required this.userId,
@@ -1311,5 +1313,63 @@ class DashboardBannerModel {
       createdAt: createdAt,
       updatedAt: DateTime.now(),
     );
+  }
+}
+
+/// Genuine cohort statistics for test comparison
+class TestCohortStats {
+  final int totalAttempts;
+  final double topperScore;
+  final int topperCorrect;
+  final int topperIncorrect;
+  final int topperSkipped;
+  final double topperAccuracy;
+
+  final double avgScore;
+  final int avgCorrect;
+  final int avgIncorrect;
+  final int avgSkipped;
+  final double avgAccuracy;
+  final List<double> allScores;
+
+  TestCohortStats({
+    required this.totalAttempts,
+    required this.topperScore,
+    required this.topperCorrect,
+    required this.topperIncorrect,
+    required this.topperSkipped,
+    required this.topperAccuracy,
+    required this.avgScore,
+    required this.avgCorrect,
+    required this.avgIncorrect,
+    required this.avgSkipped,
+    required this.avgAccuracy,
+    this.allScores = const [],
+  });
+
+  double get averageScore => avgScore;
+  int get averageCorrect => avgCorrect;
+  int get averageIncorrect => avgIncorrect;
+  int get averageSkipped => avgSkipped;
+  double get averageAccuracy => avgAccuracy;
+
+  /// Calculate student's 1-indexed rank within this cohort
+  int calculateRank(double userScore) {
+    if (allScores.isEmpty) return 1;
+    int higherCount = 0;
+    for (final s in allScores) {
+      if (s > userScore) higherCount++;
+    }
+    return higherCount + 1;
+  }
+
+  /// Calculate student's percentile within this cohort: (attempts below score / total) * 100
+  double calculatePercentile(double userScore) {
+    if (allScores.isEmpty || totalAttempts <= 1) return 100.0;
+    int belowCount = 0;
+    for (final s in allScores) {
+      if (s < userScore) belowCount++;
+    }
+    return (belowCount / totalAttempts) * 100.0;
   }
 }
