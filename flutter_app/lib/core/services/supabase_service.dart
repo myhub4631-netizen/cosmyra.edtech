@@ -489,6 +489,7 @@ class SupabaseService {
   }
 
   static UserProfileModel? activeUserSession;
+  static UserProfileModel? get currentUser => activeUserSession;
 
   static Future<void> setActiveUserSession(UserProfileModel profile) async {
     activeUserSession = profile;
@@ -4358,23 +4359,60 @@ class SupabaseService {
         debugPrint('Supabase table insert failed (fallback to RPC or local): $e');
       }
 
-      // 2. Persist submitted attempt result in SharedPreferences
+      // 2. Persist submitted attempt result and user answers in SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       final existingStr = prefs.getString('cosmyra_test_attempts_history') ?? '[]';
       final List<dynamic> history = jsonDecode(existingStr);
+
+      final userAnswersSerialized = <String, String>{};
+      userAnswers.forEach((k, v) => userAnswersSerialized[k.toString()] = v);
+
       history.insert(0, {
         'id': attempt.id,
+        'test_id': attempt.testTemplateId,
+        'test_template_id': attempt.testTemplateId,
+        'testTemplateId': attempt.testTemplateId,
         'testTitle': attempt.testTitle,
+        'test_title': attempt.testTitle,
+        'started_at': attempt.startedAt.toIso8601String(),
+        'expires_at': attempt.expiresAt.toIso8601String(),
         'submittedAt': (attempt.submittedAt ?? DateTime.now()).toIso8601String(),
+        'submitted_at': (attempt.submittedAt ?? DateTime.now()).toIso8601String(),
+        'status': 'submitted',
         'totalScore': attempt.totalScore,
+        'total_score': attempt.totalScore,
         'maxMarks': attempt.maxMarks,
+        'max_score': attempt.maxMarks,
+        'totalQuestions': attempt.totalQuestions,
+        'total_questions': attempt.totalQuestions,
+        'attemptedCount': attempt.attemptedCount,
+        'attempted_count': attempt.attemptedCount,
         'correctCount': attempt.correctCount,
+        'correct_count': attempt.correctCount,
         'incorrectCount': attempt.incorrectCount,
+        'incorrect_count': attempt.incorrectCount,
         'unattemptedCount': attempt.unattemptedCount,
+        'unattempted_count': attempt.unattemptedCount,
         'accuracy': attempt.accuracy,
+        'accuracy_percentage': attempt.accuracy,
         'timeSpentSeconds': attempt.timeSpentSeconds,
+        'time_spent_seconds': attempt.timeSpentSeconds,
+        'user_answers': userAnswersSerialized,
       });
       await prefs.setString('cosmyra_test_attempts_history', jsonEncode(history));
+
+      // Cache attempt questions for refresh or direct result navigation
+      if (questions.isNotEmpty) {
+        try {
+          final qJsonList = questions.map((q) => q.toJson()).toList();
+          await prefs.setString('cosmyra_attempt_questions_${attempt.id}', jsonEncode(qJsonList));
+          if (attempt.testTemplateId.isNotEmpty) {
+            await prefs.setString('cosmyra_attempt_questions_${attempt.testTemplateId}', jsonEncode(qJsonList));
+          }
+        } catch (e) {
+          debugPrint('Notice caching attempt questions: $e');
+        }
+      }
 
       // Clear active test session state
       await clearActiveTestSession();
@@ -4383,81 +4421,6 @@ class SupabaseService {
     } catch (e) {
       debugPrint('Error submitting test attempt: $e');
       return false;
-    }
-  }
-
-  // ================= ACTIVE SESSION PERSISTENCE FOR REFRESH / RECONNECT =================
-  static Future<void> saveActiveTestSession({
-    required String sessionId,
-    required List<QuestionModel> questions,
-    required Map<int, String> userAnswers,
-    required Set<int> markedForReview,
-    required int secondsRemaining,
-    required DateTime startedAt,
-    required int durationMinutes,
-  }) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final sessionMap = {
-        'sessionId': sessionId,
-        'startedAt': startedAt.toIso8601String(),
-        'durationMinutes': durationMinutes,
-        'secondsRemaining': secondsRemaining,
-        'userAnswers': userAnswers.map((k, v) => MapEntry(k.toString(), v)),
-        'markedForReview': markedForReview.toList(),
-        'questions': questions.map((q) => {
-          'id': q.id,
-          'questionText': q.questionText,
-          'subjectId': q.subjectId,
-          'chapterId': q.chapterId,
-          'qType': q.qType,
-          'difficulty': q.difficulty,
-          'source': q.source,
-          'marks': q.marks,
-          'negativeMarks': q.negativeMarks,
-          'explanation': q.explanation,
-          'solution': q.solution,
-          'options': q.options.map((o) => {
-            'id': o.id,
-            'questionId': o.questionId,
-            'optionIndex': o.optionIndex,
-            'optionText': o.optionText,
-            'isCorrect': o.isCorrect,
-          }).toList(),
-        }).toList(),
-      };
-      await prefs.setString('cosmyra_active_test_session', jsonEncode(sessionMap));
-    } catch (e) {
-      debugPrint('Error saving active test session: $e');
-    }
-  }
-
-  static Future<Map<String, dynamic>?> loadActiveTestSession({String? targetSessionId, bool isExplicitResume = false}) async {
-    if (!isExplicitResume && targetSessionId == null) {
-      return null;
-    }
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final str = prefs.getString('cosmyra_active_test_session');
-      if (str != null && str.isNotEmpty) {
-        final data = jsonDecode(str) as Map<String, dynamic>;
-        if (targetSessionId != null && data['sessionId'] != null && data['sessionId'] != targetSessionId) {
-          return null;
-        }
-        return data;
-      }
-    } catch (e) {
-      debugPrint('Error loading active test session: $e');
-    }
-    return null;
-  }
-
-  static Future<void> clearActiveTestSession() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('cosmyra_active_test_session');
-    } catch (e) {
-      debugPrint('Error clearing active test session: $e');
     }
   }
 
@@ -4511,7 +4474,7 @@ class SupabaseService {
 
       // Query Supabase test_attempts table if available
       final query = client.from('test_attempts').select('*');
-      final uid = userId ?? client.auth.currentUser?.id ?? activeUserSession?.id;
+      final uid = userId ?? currentUser?.id ?? activeUserSession?.id;
       if (uid != null && uid.isNotEmpty) {
         query.eq('student_id', uid);
       }
@@ -4555,7 +4518,8 @@ class SupabaseService {
         }
       }
 
-      final uid = userId ?? client.auth.currentUser?.id ?? activeUserSession?.id;
+      // Query Supabase test_attempts table
+      final uid = userId ?? currentUser?.id ?? activeUserSession?.id;
       var query = client.from('test_attempts').select('*');
       if (uid != null && uid.isNotEmpty) {
         query = query.eq('student_id', uid);
@@ -4682,6 +4646,81 @@ class SupabaseService {
       debugPrint('Notice querying cohort statistics: $e');
     }
     return null;
+  }
+
+  // ================= ACTIVE SESSION PERSISTENCE FOR REFRESH / RECONNECT =================
+  static Future<void> saveActiveTestSession({
+    required String sessionId,
+    required List<QuestionModel> questions,
+    required Map<int, String> userAnswers,
+    required Set<int> markedForReview,
+    required int secondsRemaining,
+    required DateTime startedAt,
+    required int durationMinutes,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final sessionMap = {
+        'sessionId': sessionId,
+        'startedAt': startedAt.toIso8601String(),
+        'durationMinutes': durationMinutes,
+        'secondsRemaining': secondsRemaining,
+        'userAnswers': userAnswers.map((k, v) => MapEntry(k.toString(), v)),
+        'markedForReview': markedForReview.toList(),
+        'questions': questions.map((q) => {
+          'id': q.id,
+          'questionText': q.questionText,
+          'subjectId': q.subjectId,
+          'chapterId': q.chapterId,
+          'qType': q.qType,
+          'difficulty': q.difficulty,
+          'source': q.source,
+          'marks': q.marks,
+          'negativeMarks': q.negativeMarks,
+          'explanation': q.explanation,
+          'solution': q.solution,
+          'options': q.options.map((o) => {
+            'id': o.id,
+            'questionId': o.questionId,
+            'optionIndex': o.optionIndex,
+            'optionText': o.optionText,
+            'isCorrect': o.isCorrect,
+          }).toList(),
+        }).toList(),
+      };
+      await prefs.setString('cosmyra_active_test_session', jsonEncode(sessionMap));
+    } catch (e) {
+      debugPrint('Error saving active test session: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>?> loadActiveTestSession({String? targetSessionId, bool isExplicitResume = false}) async {
+    if (!isExplicitResume && targetSessionId == null) {
+      return null;
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final str = prefs.getString('cosmyra_active_test_session');
+      if (str != null && str.isNotEmpty) {
+        final data = jsonDecode(str) as Map<String, dynamic>;
+        if (targetSessionId != null && data['sessionId'] != null && data['sessionId'] != targetSessionId) {
+          return null;
+        }
+        return data;
+      }
+    } catch (e) {
+      debugPrint('Error loading active test session: $e');
+    }
+    return null;
+  }
+
+  static Future<void> clearActiveTestSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('cosmyra_active_test_session');
+    } catch (e) {
+      debugPrint('Error clearing active test session: $e');
+    }
   }
 
   /// Calculates user real cumulative stats across submitted attempts

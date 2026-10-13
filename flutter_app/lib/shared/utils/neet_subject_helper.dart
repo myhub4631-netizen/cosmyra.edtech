@@ -5,11 +5,18 @@ class NeetSubjectHelper {
     if (rawId.trim().isEmpty) return '';
     final s = rawId.trim().toLowerCase();
 
+    final isNeet = exam != null && exam.toUpperCase().contains('NEET');
+
     // Canonical UUID Mappings (Strict DB IDs)
-    if (s.contains('a1111111') || s.contains('a4444444') || s.contains('a7777777')) return 'Physics';
-    if (s.contains('a2222222') || s.contains('a5555555') || s.contains('a8888888')) return 'Chemistry';
+    if (s.contains('a1111111')) return 'Physics';
+    if (s.contains('a2222222')) return 'Chemistry';
     if (s.contains('a3333333')) return 'Biology';
-    if (s.contains('a6666666') || s.contains('a9999999')) return 'Mathematics';
+
+    if (!isNeet) {
+      if (s.contains('a4444444') || s.contains('a7777777')) return 'Physics';
+      if (s.contains('a5555555') || s.contains('a8888888')) return 'Chemistry';
+      if (s.contains('a6666666') || s.contains('a9999999')) return 'Mathematics';
+    }
 
     // Canonical Name / Textual Mappings
     if (s.contains('botan')) return 'Botany';
@@ -55,20 +62,25 @@ class NeetSubjectHelper {
     // 1. Resolve explicit subject if provided
     if (explicitSubject != null && explicitSubject.trim().isNotEmpty) {
       final mapped = getSubjectNameFromId(explicitSubject);
-      if (mapped.isNotEmpty && mapped != explicitSubject) {
+      if (mapped.isNotEmpty) {
         if (mapped == 'Botany' && !useBotanyZoology) return 'Biology';
         if (mapped == 'Zoology' && !useBotanyZoology) return 'Biology';
-        return mapped;
+        if (mapped == 'Physics' ||
+            mapped == 'Chemistry' ||
+            mapped == 'Botany' ||
+            mapped == 'Zoology' ||
+            mapped == 'Biology' ||
+            mapped == 'Mathematics') {
+          return mapped;
+        }
       }
       final s = explicitSubject.trim().toLowerCase();
-      if (!s.contains('uuid') && s.length < 30) {
-        if (s.contains('physic')) return 'Physics';
-        if (s.contains('chemist')) return 'Chemistry';
-        if (s.contains('botany')) return useBotanyZoology ? 'Botany' : 'Biology';
-        if (s.contains('zoology')) return useBotanyZoology ? 'Zoology' : 'Biology';
-        if (s.contains('biolog')) return 'Biology';
-        if (s.contains('math')) return 'Mathematics';
-      }
+      if (s.contains('phys')) return 'Physics';
+      if (s.contains('chem')) return 'Chemistry';
+      if (s.contains('botan')) return useBotanyZoology ? 'Botany' : 'Biology';
+      if (s.contains('zool')) return useBotanyZoology ? 'Zoology' : 'Biology';
+      if (s.contains('bio')) return 'Biology';
+      if (s.contains('math')) return 'Mathematics';
     }
 
     // 2. Infer by canonical paper ranges

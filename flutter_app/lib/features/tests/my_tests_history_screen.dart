@@ -1010,7 +1010,7 @@ class _MyTestsHistoryScreenState extends State<MyTestsHistoryScreen> {
         Widget ctaButton;
         if (item.status == TestStatusFilter.completed) {
           ctaButton = OutlinedButton(
-            onPressed: () {},
+            onPressed: () => context.go('/test/${item.id}/result'),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Color(0xFFC7D2FE)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
