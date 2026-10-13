@@ -31,6 +31,7 @@ import '../services/feature_config_service.dart';
 import '../../features/tests/mock_tests_screen.dart';
 import '../../features/tests/test_screen.dart';
 import '../../features/tests/test_result_screen.dart';
+import '../../features/tests/test_solutions_screen.dart';
 import '../../features/student/subscription_pricing_screen.dart';
 import '../../features/tests/my_tests_history_screen.dart';
 import '../../features/practice/practice_screen.dart';
@@ -828,6 +829,35 @@ final GoRouter appRouter = GoRouter(
         );
       },
     ),
+    GoRoute(
+      path: '/test/:testId/solutions',
+      builder: (context, state) {
+        final String testId = state.pathParameters['testId'] ?? '';
+        if (_lastTestAttempt != null &&
+            (_lastTestAttempt!.testId == testId ||
+                testId.isEmpty ||
+                _lastTestAttempt!.id == testId ||
+                _lastTestAttempt!.testTemplateId == testId)) {
+          return TestSolutionsScreen(
+            attempt: _lastTestAttempt!,
+            questions: _lastTestQuestions ?? [],
+            userAnswers: _lastTestUserAnswers ?? {},
+            onBack: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/test/$testId/result');
+              }
+            },
+          );
+        }
+        return TestSolutionsLoaderScreen(
+          testId: testId,
+          attemptId: testId,
+          onBackToDashboard: () => context.go('/dashboard'),
+        );
+      },
+    ),
     // Custom Practice & Custom Test Routes
     GoRoute(
       path: '/custom-practice',
@@ -902,6 +932,38 @@ final GoRouter appRouter = GoRouter(
         }
         return Scaffold(
           body: TestResultLoaderScreen(
+            testId: attemptId,
+            attemptId: attemptId,
+            onBackToDashboard: () => context.go('/dashboard'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/custom-test/solutions/:attemptId',
+      builder: (context, state) {
+        final attemptId = state.pathParameters['attemptId'] ?? '';
+        if (_lastTestAttempt != null &&
+            (_lastTestAttempt!.id == attemptId ||
+                attemptId.isEmpty ||
+                _lastTestAttempt!.testId == attemptId)) {
+          return Scaffold(
+            body: TestSolutionsScreen(
+              attempt: _lastTestAttempt!,
+              questions: _lastTestQuestions ?? [],
+              userAnswers: _lastTestUserAnswers ?? {},
+              onBack: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/custom-test/result/$attemptId');
+                }
+              },
+            ),
+          );
+        }
+        return Scaffold(
+          body: TestSolutionsLoaderScreen(
             testId: attemptId,
             attemptId: attemptId,
             onBackToDashboard: () => context.go('/dashboard'),
@@ -1152,6 +1214,38 @@ final GoRouter appRouter = GoRouter(
         }
         return Scaffold(
           body: TestResultLoaderScreen(
+            testId: attemptId,
+            attemptId: attemptId,
+            onBackToDashboard: () => context.go('/nta-practice'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/nta-practice/solutions/:attemptId',
+      builder: (context, state) {
+        final attemptId = state.pathParameters['attemptId'] ?? '';
+        if (_lastTestAttempt != null &&
+            (_lastTestAttempt!.id == attemptId ||
+                attemptId.isEmpty ||
+                _lastTestAttempt!.testId == attemptId)) {
+          return Scaffold(
+            body: TestSolutionsScreen(
+              attempt: _lastTestAttempt!,
+              questions: _lastTestQuestions ?? [],
+              userAnswers: _lastTestUserAnswers ?? {},
+              onBack: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/nta-practice/result/$attemptId');
+                }
+              },
+            ),
+          );
+        }
+        return Scaffold(
+          body: TestSolutionsLoaderScreen(
             testId: attemptId,
             attemptId: attemptId,
             onBackToDashboard: () => context.go('/nta-practice'),

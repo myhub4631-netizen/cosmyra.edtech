@@ -7,6 +7,7 @@ import '../../shared/utils/question_copy_helper.dart';
 import '../../shared/utils/neet_subject_helper.dart';
 import '../../core/services/supabase_service.dart';
 import '../leaderboard/leaderboard_screen.dart';
+import 'test_solutions_screen.dart';
 
 class TestResultScreen extends StatefulWidget {
   final TestAttemptModel attempt;
@@ -95,6 +96,19 @@ class _TestResultScreenState extends State<TestResultScreen> {
     return isJee
         ? ['Physics', 'Chemistry', 'Mathematics']
         : ['Physics', 'Chemistry', 'Botany', 'Zoology'];
+  }
+
+  void _openSolutionsScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) => TestSolutionsScreen(
+          attempt: widget.attempt,
+          questions: widget.questions,
+          userAnswers: widget.userAnswers,
+          onBack: () => Navigator.of(ctx).pop(),
+        ),
+      ),
+    );
   }
 
   void _scrollToSolutions() {
@@ -497,7 +511,7 @@ class _TestResultScreenState extends State<TestResultScreen> {
               if (widget.onRetryTest != null) const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: _scrollToSolutions,
+                  onPressed: _openSolutionsScreen,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2563EB),
                     foregroundColor: Colors.white,

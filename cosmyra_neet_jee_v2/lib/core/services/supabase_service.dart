@@ -4492,6 +4492,93 @@ class SupabaseService {
     return null;
   }
 
+  /// Retrieve all recorded test attempts for a test paper or session
+  static Future<List<Map<String, dynamic>>> fetchAllAttemptsForTest({
+    required String testId,
+    String? userId,
+  }) async {
+    final List<Map<String, dynamic>> results = [];
+    final Set<String> seenIds = {};
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existingStr = prefs.getString('cosmyra_test_attempts_history') ?? '[]';
+      final List<dynamic> history = jsonDecode(existingStr);
+      for (final item in history) {
+        if (item is Map) {
+          final id = item['id']?.toString() ?? '';
+          final tTitle = item['testTitle']?.toString() ?? '';
+          final tId = item['test_id']?.toString() ?? item['test_template_id']?.toString() ?? '';
+          if (id == testId || id.contains(testId) || tId == testId || tTitle.toLowerCase().contains(testId.toLowerCase())) {
+            if (id.isNotEmpty && !seenIds.contains(id)) {
+              seenIds.add(id);
+              results.add(Map<String, dynamic>.from(item));
+            }
+          }
+        }
+      }
+
+      // Query Supabase test_attempts table
+      final uid = userId ?? currentUser?.id ?? activeUserSession?.id;
+      var query = client.from('test_attempts').select('*');
+      if (uid != null && uid.isNotEmpty) {
+        query = query.eq('student_id', uid);
+      }
+      final res = await query
+          .or('id.eq.$testId,test_id.eq.$testId')
+          .order('submitted_at', ascending: false)
+          .limit(20);
+
+      if (res is List) {
+        for (final row in res) {
+          if (row is Map) {
+            final id = row['id']?.toString() ?? '';
+            if (id.isNotEmpty && !seenIds.contains(id)) {
+              seenIds.add(id);
+              results.add(Map<String, dynamic>.from(row));
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Notice loading all attempts for test: $e');
+    }
+    return results;
+  }
+
+  /// Toggle bookmark/review state for a question
+  static Future<bool> toggleBookmarkQuestion({
+    required String questionId,
+    required bool isBookmarked,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('cosmyra_bookmarked_qids') ?? [];
+      final set = list.toSet();
+      if (isBookmarked) {
+        set.add(questionId);
+      } else {
+        set.remove(questionId);
+      }
+      await prefs.setStringList('cosmyra_bookmarked_qids', set.toList());
+      return true;
+    } catch (e) {
+      debugPrint('Notice toggling bookmark: $e');
+      return false;
+    }
+  }
+
+  /// Fetch set of all bookmarked question IDs
+  static Future<Set<String>> getBookmarkedQuestionIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('cosmyra_bookmarked_qids') ?? [];
+      return list.toSet();
+    } catch (e) {
+      return {};
+    }
+  }
+
   /// Fetch genuine peer cohort statistics for a test without fabricating fallback numbers
   static Future<TestCohortStats?> fetchTestCohortStats({
     required String testTemplateId,
