@@ -745,6 +745,55 @@ class AnalyticsService {
       ));
     }
 
+    // Platform distribution
+    int webEvents = 0;
+    int androidEvents = 0;
+    int iosEvents = 0;
+    for (final ev in telemetryEvents) {
+      final plat = (ev['platform'] ?? '').toString().toLowerCase();
+      if (plat.contains('android')) {
+        androidEvents++;
+      } else if (plat.contains('ios')) {
+        iosEvents++;
+      } else {
+        webEvents++;
+      }
+    }
+    final platformDistribution = PlatformDistributionData(
+      webEvents: webEvents,
+      androidEvents: androidEvents,
+      iosEvents: iosEvents,
+      totalEvents: telemetryEvents.length,
+    );
+
+    // Latest event timestamp and status
+    DateTime? lastEventTime;
+    if (telemetryEvents.isNotEmpty) {
+      final raw = telemetryEvents.first['created_at'];
+      if (raw != null) lastEventTime = DateTime.tryParse(raw.toString())?.toLocal();
+    }
+
+    final hasStudentActivity = telemetryEvents.any((e) {
+      final uid = e['user_id']?.toString() ?? e['actor_id']?.toString();
+      return uid != null && uid.isNotEmpty && !adminUserIds.contains(uid);
+    });
+
+    String computedTelemetryStatus;
+    if (telemetryEvents.isEmpty) {
+      computedTelemetryStatus = 'Ingestion Pending';
+    } else {
+      final minutesAgo = lastEventTime != null ? now.difference(lastEventTime).inMinutes : 999;
+      if (minutesAgo <= 15) {
+        if (hasStudentActivity) {
+          computedTelemetryStatus = 'Connected (Student Activity Active)';
+        } else {
+          computedTelemetryStatus = 'Connected (Admin Telemetry • No Student Activity Yet)';
+        }
+      } else {
+        computedTelemetryStatus = 'Delayed (>15M since last event)';
+      }
+    }
+
     return KpiDashboardData(
       totalRegisteredUsers: totalRegisteredAllTime,
       newRegistrationsInPeriod: registeredInPeriod.length,
@@ -776,10 +825,32 @@ class AnalyticsService {
       funnelSeriesViews: funnelSeriesViews,
       funnelEnrollments: funnelEnrollments,
       funnelPaidPurchases: funnelPaidPurchases,
-      telemetryStatus: telemetryEvents.isNotEmpty ? 'Active (Supabase Ledger)' : 'Ingestion Pending',
+      telemetryStatus: computedTelemetryStatus,
       crashReportingStatus: 'Mobile (Android/iOS) Supported • Web Unsupported',
+      platformDistribution: platformDistribution,
+      lastEventTimestamp: lastEventTime,
+      hasStudentActivity: hasStudentActivity,
     );
   }
+}
+
+/// Dynamic Platform distribution counts and percentages
+class PlatformDistributionData {
+  final int webEvents;
+  final int androidEvents;
+  final int iosEvents;
+  final int totalEvents;
+
+  double get webPercentage => totalEvents > 0 ? (webEvents / totalEvents) * 100 : 0.0;
+  double get androidPercentage => totalEvents > 0 ? (androidEvents / totalEvents) * 100 : 0.0;
+  double get iosPercentage => totalEvents > 0 ? (iosEvents / totalEvents) * 100 : 0.0;
+
+  const PlatformDistributionData({
+    required this.webEvents,
+    required this.androidEvents,
+    required this.iosEvents,
+    required this.totalEvents,
+  });
 }
 
 /// DTO for holding all computed KPI metrics
@@ -816,6 +887,9 @@ class KpiDashboardData {
   final int funnelPaidPurchases;
   final String telemetryStatus;
   final String crashReportingStatus;
+  final PlatformDistributionData? platformDistribution;
+  final DateTime? lastEventTimestamp;
+  final bool hasStudentActivity;
 
   KpiDashboardData({
     required this.totalRegisteredUsers,
@@ -850,6 +924,9 @@ class KpiDashboardData {
     required this.funnelPaidPurchases,
     required this.telemetryStatus,
     required this.crashReportingStatus,
+    this.platformDistribution,
+    this.lastEventTimestamp,
+    this.hasStudentActivity = false,
   });
 }
 

@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../core/services/analytics_service.dart';
@@ -42,6 +44,13 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
 
   late UserProfileModel _adminProfile;
 
+  // Real-time streaming & auto-refresh state
+  RealtimeChannel? _realtimeChannel;
+  Timer? _periodicSyncTimer;
+  final Set<String> _knownEventIds = <String>{};
+  bool _hasQueryError = false;
+  bool _isRealtimeSubscribed = false;
+
   @override
   void initState() {
     super.initState();
@@ -54,11 +63,149 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
           role: 'super_admin',
         );
 
-    _loadAnalyticsData();
+    _loadAnalyticsData().then((_) {
+      if (mounted) {
+        _setupRealtimeSubscription();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _periodicSyncTimer?.cancel();
+    if (_realtimeChannel != null) {
+      try {
+        SupabaseService.client.removeChannel(_realtimeChannel!);
+      } catch (_) {}
+    }
+    super.dispose();
+  }
+
+  void _setupRealtimeSubscription() {
+    try {
+      _realtimeChannel = SupabaseService.client
+          .channel('admin_analytics_realtime_feed')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'audit_logs',
+            callback: (payload) {
+              _handleIncomingAuditLogRow(payload.newRecord);
+            },
+          )
+          .subscribe((status, [error]) {
+            if (mounted) {
+              setState(() {
+                _isRealtimeSubscribed = status == RealtimeSubscribeStatus.subscribed;
+              });
+            }
+          });
+    } catch (e) {
+      debugPrint('[AdminAnalytics] Realtime channel subscription error: $e');
+    }
+
+    // Secondary auto-sync timer every 15s to guarantee eventual consistency across network reconnects
+    _periodicSyncTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted) {
+        _syncLatestEventsSilently();
+      }
+    });
+  }
+
+  void _handleIncomingAuditLogRow(Map<String, dynamic> row) {
+    if (row['entity'] != 'analytics_event') return;
+    final rowId = row['id']?.toString();
+    if (rowId != null && _knownEventIds.contains(rowId)) return;
+    if (rowId != null) _knownEventIds.add(rowId);
+
+    final nv = row['new_value'];
+    final props = (nv is Map && nv['properties'] is Map)
+        ? Map<String, dynamic>.from(nv['properties'])
+        : <String, dynamic>{};
+    final devId = (nv is Map) ? nv['device_id']?.toString() : null;
+    final sessId = (nv is Map) ? nv['session_id']?.toString() : null;
+    final plat = (nv is Map) ? nv['platform']?.toString() : null;
+    final evtName = (nv is Map)
+        ? (nv['event_name'] ?? row['action'])?.toString()
+        : row['action']?.toString();
+    final uid = (nv is Map)
+        ? (nv['user_id'] ?? row['actor_id'])?.toString()
+        : row['actor_id']?.toString();
+
+    final parsedEvent = {
+      'id': row['id'],
+      'event_name': evtName ?? 'unknown',
+      'user_id': uid,
+      'device_id': devId,
+      'session_id': sessId,
+      'platform': plat,
+      'properties': props,
+      'created_at': row['created_at'],
+    };
+
+    if (mounted) {
+      setState(() {
+        _telemetryEvents.insert(0, parsedEvent);
+        _recalculateKpis();
+      });
+    }
+  }
+
+  Future<void> _syncLatestEventsSilently() async {
+    try {
+      final latestRes = await SupabaseService.client
+          .from('audit_logs')
+          .select('id, actor_id, action, entity, new_value, created_at')
+          .eq('entity', 'analytics_event')
+          .order('created_at', ascending: false)
+          .limit(25);
+
+      bool hasNew = false;
+      for (var row in latestRes) {
+        final rowId = row['id']?.toString();
+        if (rowId != null && !_knownEventIds.contains(rowId)) {
+          _knownEventIds.add(rowId);
+          final nv = row['new_value'];
+          final props = (nv is Map && nv['properties'] is Map)
+              ? Map<String, dynamic>.from(nv['properties'])
+              : <String, dynamic>{};
+          final devId = (nv is Map) ? nv['device_id']?.toString() : null;
+          final sessId = (nv is Map) ? nv['session_id']?.toString() : null;
+          final plat = (nv is Map) ? nv['platform']?.toString() : null;
+          final evtName = (nv is Map)
+              ? (nv['event_name'] ?? row['action'])?.toString()
+              : row['action']?.toString();
+          final uid = (nv is Map)
+              ? (nv['user_id'] ?? row['actor_id'])?.toString()
+              : row['actor_id']?.toString();
+
+          _telemetryEvents.insert(0, {
+            'id': row['id'],
+            'event_name': evtName ?? 'unknown',
+            'user_id': uid,
+            'device_id': devId,
+            'session_id': sessId,
+            'platform': plat,
+            'properties': props,
+            'created_at': row['created_at'],
+          });
+          hasNew = true;
+        }
+      }
+
+      if (hasNew && mounted) {
+        setState(() {
+          _recalculateKpis();
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadAnalyticsData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _hasQueryError = false;
+    });
 
     try {
       // 1. Concurrently fetch all authoritative database records and telemetry events from Supabase
@@ -79,9 +226,16 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
       _entitlements = results[3] as List<Map<String, dynamic>>;
       _telemetryEvents = results[4] as List<Map<String, dynamic>>;
 
+      _knownEventIds.clear();
+      for (var e in _telemetryEvents) {
+        final id = e['id']?.toString();
+        if (id != null) _knownEventIds.add(id);
+      }
+
       // 2. Compute authoritative KPI metrics via AnalyticsService
       _recalculateKpis();
     } catch (e) {
+      _hasQueryError = true;
       debugPrint('[AdminAnalytics] Error loading analytics data: $e');
     } finally {
       if (mounted) {
@@ -560,6 +714,52 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
 
   // ================= 3. TOP BANNER =================
   Widget _buildTopBanner() {
+    final String statusText;
+    final Color statusColor;
+    final Color badgeBg;
+    final Color badgeBorder;
+    final String statusDescription;
+
+    if (_hasQueryError) {
+      statusText = 'PIPELINE ERROR';
+      statusColor = const Color(0xFFEF4444);
+      badgeBg = const Color(0xFFEF4444).withOpacity(0.2);
+      badgeBorder = const Color(0xFFEF4444).withOpacity(0.4);
+      statusDescription = 'Supabase telemetry query error. Data may be unavailable or disconnected.';
+    } else if (_telemetryEvents.isEmpty) {
+      statusText = 'AWAITING TELEMETRY';
+      statusColor = const Color(0xFF94A3B8);
+      badgeBg = const Color(0xFF94A3B8).withOpacity(0.2);
+      badgeBorder = const Color(0xFF94A3B8).withOpacity(0.4);
+      statusDescription = 'No client telemetry events recorded yet. Ready to ingest from Web, Android & iOS.';
+    } else {
+      final latestTime = _kpiData?.lastEventTimestamp;
+      final minutesAgo = latestTime != null ? DateTime.now().difference(latestTime).inMinutes : 999;
+      final hasStudent = _kpiData?.hasStudentActivity ?? false;
+
+      if (minutesAgo <= 15) {
+        if (hasStudent) {
+          statusText = 'CONNECTED (STUDENT ACTIVITY)';
+          statusColor = const Color(0xFF10B981);
+          badgeBg = const Color(0xFF10B981).withOpacity(0.2);
+          badgeBorder = const Color(0xFF10B981).withOpacity(0.4);
+        } else {
+          statusText = 'CONNECTED (ADMIN ACTIVE • 0 STUDENTS)';
+          statusColor = const Color(0xFF818CF8);
+          badgeBg = const Color(0xFF818CF8).withOpacity(0.2);
+          badgeBorder = const Color(0xFF818CF8).withOpacity(0.4);
+        }
+      } else {
+        statusText = 'DELAYED (>15M SINCE LAST EVENT)';
+        statusColor = const Color(0xFFF59E0B);
+        badgeBg = const Color(0xFFF59E0B).withOpacity(0.2);
+        badgeBorder = const Color(0xFFF59E0B).withOpacity(0.4);
+      }
+
+      final timeFmt = latestTime != null ? DateFormat('hh:mm a, dd MMM (IST)').format(latestTime) : 'N/A';
+      statusDescription = 'Telemetry ledger active (${_telemetryEvents.length} events logged). Last ingestion: $timeFmt. Student DAU excludes admin actions.';
+    }
+
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
@@ -602,15 +802,15 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withOpacity(0.2),
+                        color: badgeBg,
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.4)),
+                        border: Border.all(color: badgeBorder),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          CircleAvatar(radius: 3, backgroundColor: Color(0xFF10B981)),
-                          SizedBox(width: 5),
-                          Text('LIVE TELEMETRY', style: TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w700, fontSize: 10)),
+                          CircleAvatar(radius: 3, backgroundColor: statusColor),
+                          const SizedBox(width: 5),
+                          Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.w700, fontSize: 10)),
                         ],
                       ),
                     ),
@@ -618,7 +818,7 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Authoritative Supabase database ledger, deduplicated client telemetry, and multi-platform performance metrics.',
+                  statusDescription,
                   style: GoogleFonts.inter(color: const Color(0xFFCBD5E1), fontSize: 12.5),
                 ),
               ],
@@ -862,8 +1062,12 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
                       children: [
                         Text('Daily Active Users & Engagement Trend',
                             style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16, color: const Color(0xFF0F172A))),
-                        Text('Daily active students and practice sessions',
-                            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                        Text(
+                          data.dailyTrendPoints.every((p) => p.activeUsers == 0)
+                              ? 'Authentic Student Activity: 0 active students in period (Admin sessions excluded)'
+                              : 'Daily active students and practice sessions',
+                          style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                        ),
                       ],
                     ),
                     Container(
@@ -950,43 +1154,101 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Platform & Device Distribution',
-                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16, color: const Color(0xFF0F172A))),
-                Text('Active device sessions across operating systems',
-                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 180,
-                  child: PieChart(
-                    PieChartData(
-                      sectionsSpace: 3,
-                      centerSpaceRadius: 40,
-                      sections: [
-                        PieChartSectionData(
-                          value: 100,
-                          title: '100%',
-                          color: const Color(0xFF6366F1),
-                          radius: 35,
-                          titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                      ],
+            child: Builder(builder: (context) {
+              final platDist = data.platformDistribution;
+              final totalPlatEvents = platDist?.totalEvents ?? 0;
+              final webEvents = platDist?.webEvents ?? 0;
+              final androidEvents = platDist?.androidEvents ?? 0;
+              final iosEvents = platDist?.iosEvents ?? 0;
+
+              final pieSections = <PieChartSectionData>[];
+              if (totalPlatEvents == 0) {
+                pieSections.add(PieChartSectionData(
+                  value: 100,
+                  title: '0%',
+                  color: const Color(0xFFE2E8F0),
+                  radius: 35,
+                  titleStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                ));
+              } else {
+                if (webEvents > 0) {
+                  final pct = (webEvents / totalPlatEvents * 100).round();
+                  pieSections.add(PieChartSectionData(
+                    value: webEvents.toDouble(),
+                    title: '$pct%',
+                    color: const Color(0xFF6366F1),
+                    radius: 35,
+                    titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  ));
+                }
+                if (androidEvents > 0) {
+                  final pct = (androidEvents / totalPlatEvents * 100).round();
+                  pieSections.add(PieChartSectionData(
+                    value: androidEvents.toDouble(),
+                    title: '$pct%',
+                    color: const Color(0xFF10B981),
+                    radius: 35,
+                    titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  ));
+                }
+                if (iosEvents > 0) {
+                  final pct = (iosEvents / totalPlatEvents * 100).round();
+                  pieSections.add(PieChartSectionData(
+                    value: iosEvents.toDouble(),
+                    title: '$pct%',
+                    color: const Color(0xFF06B6D4),
+                    radius: 35,
+                    titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  ));
+                }
+              }
+
+              final webPctStr = totalPlatEvents > 0 ? '${(webEvents / totalPlatEvents * 100).round()}%' : '0%';
+              final androidPctStr = totalPlatEvents > 0 ? '${(androidEvents / totalPlatEvents * 100).round()}%' : '0%';
+              final iosPctStr = totalPlatEvents > 0 ? '${(iosEvents / totalPlatEvents * 100).round()}%' : '0%';
+
+              final String platformNote = (androidEvents == 0 && iosEvents == 0 && webEvents > 0)
+                  ? 'Observed: 100% Flutter Web ($webEvents events). Mobile streams (Android/iOS) not yet observed.'
+                  : 'Telemetry breakdown across all confirmed devices and active platforms.';
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Platform & Device Distribution',
+                      style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16, color: const Color(0xFF0F172A))),
+                  Text('Active device sessions across operating systems',
+                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    height: 180,
+                    child: PieChart(
+                      PieChartData(
+                        sectionsSpace: 3,
+                        centerSpaceRadius: 40,
+                        sections: pieSections,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildLegendItem('Web Portal', '100%', const Color(0xFF6366F1)),
-                    _buildLegendItem('Android App', '0%', const Color(0xFF94A3B8)),
-                    _buildLegendItem('iOS App', '0%', const Color(0xFFCBD5E1)),
-                  ],
-                ),
-              ],
-            ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildLegendItem('Web Portal', webPctStr, const Color(0xFF6366F1)),
+                      _buildLegendItem('Android App', androidPctStr, const Color(0xFF10B981)),
+                      _buildLegendItem('iOS App', iosPctStr, const Color(0xFF06B6D4)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Center(
+                    child: Text(
+                      platformNote,
+                      style: GoogleFonts.inter(fontSize: 10.5, fontStyle: FontStyle.italic, color: const Color(0xFF94A3B8)),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              );
+            }),
           ),
         ),
       ],
@@ -1443,21 +1705,28 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
+                      color: _isRealtimeSubscribed ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                      border: Border.all(color: _isRealtimeSubscribed ? const Color(0xFFA7F3D0) : const Color(0xFFE2E8F0)),
                     ),
                     child: Row(
                       children: [
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle),
+                          decoration: BoxDecoration(
+                            color: _isRealtimeSubscribed ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                            shape: BoxShape.circle,
+                          ),
                         ),
                         const SizedBox(width: 6),
-                        const Text(
-                          'INGESTION ACTIVE',
-                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF065F46)),
+                        Text(
+                          _isRealtimeSubscribed ? 'REAL-TIME STREAMING' : 'POLLING SYNC (15S)',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            color: _isRealtimeSubscribed ? const Color(0xFF065F46) : const Color(0xFF475569),
+                          ),
                         ),
                       ],
                     ),
@@ -1624,6 +1893,27 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
                                     style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
                                   ),
                                   const SizedBox(width: 8),
+                                  if (student?.role.toLowerCase().contains('admin') == true || (uid != null && _adminProfile.id == uid))
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEF3C7),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: const Color(0xFFFDE68A)),
+                                      ),
+                                      child: const Text('ADMIN / AUDIT (EXCLUDED FROM DAU)', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFFB45309))),
+                                    )
+                                  else
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEEF2FF),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: const Color(0xFFC7D2FE)),
+                                      ),
+                                      child: const Text('STUDENT ACTIVITY', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF4338CA))),
+                                    ),
+                                  const SizedBox(width: 6),
                                   if (isRecentlyActive)
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

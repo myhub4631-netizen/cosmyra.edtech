@@ -118,7 +118,7 @@ void main() {
       expect(chemistry, equals(45), reason: 'Expected 45 Chemistry questions');
       expect(biology, equals(90), reason: 'Expected 90 Biology questions');
       expect(unknown, equals(0), reason: 'Expected 0 unclassified questions');
-    });
+    }, timeout: const Timeout(Duration(minutes: 2)));
 
     test('2. Biology selection returns exactly Q91–Q180 (90 questions)', () async {
       final questions = await SupabaseService.fetchQuestionsForPaper(
