@@ -662,6 +662,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                 const SizedBox(height: 20),
                 _buildSidebarSectionHeader('REPORTS & ANALYTICS'),
                 _buildSidebarTile(Icons.bar_chart_rounded, 'Analytics Dashboard'),
+                _buildSidebarTile(Icons.sensors_rounded, 'Live User Activity'),
                 _buildSidebarTile(Icons.description_outlined, 'Question Reports'),
                 _buildSidebarTile(Icons.insights_rounded, 'Student Performance'),
                 _buildSidebarTile(Icons.emoji_events_outlined, 'Leaderboard'),
@@ -786,7 +787,9 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
           setState(() {
             _activeSidebarItem = title;
           });
-          if (title.contains('Analytics')) {
+          if (title.contains('Live User Activity')) {
+            context.go('/admin/live-activity');
+          } else if (title.contains('Analytics')) {
             Navigator.of(context).push(SmoothPageRoute(child: AdminAnalyticsDashboardScreen(userProfile: widget.userProfile)));
           } else if (title.contains('Overview') || title.contains('Dashboard')) {
             Navigator.of(context).push(SmoothPageRoute(child: AdminDashboardScreen(userProfile: widget.userProfile)));

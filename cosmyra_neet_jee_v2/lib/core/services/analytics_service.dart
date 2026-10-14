@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
@@ -31,6 +32,9 @@ class AnalyticsService {
 
   String? _deviceId;
   String? _sessionId;
+
+  String? _lastScreenName;
+  DateTime? _lastScreenTime;
 
   // In-memory deduplication cache (LRU set bounded to 500 event IDs)
   static final Set<String> _recentEventIds = <String>{};
@@ -90,7 +94,12 @@ class AnalyticsService {
         debugPrint('[AnalyticsService] Firebase Analytics notice: $fbErr (Local & Supabase telemetry active).');
       }
 
-      // 4. Track first open if newly installed / visited
+      // 4. Register lifecycle observer for foreground/background tracking
+      try {
+        WidgetsBinding.instance.addObserver(AnalyticsLifecycleObserver());
+      } catch (_) {}
+
+      // 5. Track first open if newly installed / visited
       final firstOpenDone = prefs.getBool(_prefFirstOpenKey) ?? false;
       if (!firstOpenDone) {
         await prefs.setBool(_prefFirstOpenKey, true);
@@ -261,13 +270,26 @@ class AnalyticsService {
           await SupabaseService.client.from('analytics_events').insert(payload);
         } catch (_) {
           // Fallback to audit_logs if analytics_events table is not yet created
-          await SupabaseService.client.from('audit_logs').insert({
-            'action': eventName,
-            'entity': 'analytics_event',
-            'actor_id': userId,
-            'new_value': payload,
-            'created_at': DateTime.now().toUtc().toIso8601String(),
-          }).catchError((_) => null);
+          try {
+            await SupabaseService.client.from('audit_logs').insert({
+              'action': eventName,
+              'entity': 'analytics_event',
+              'actor_id': userId,
+              'new_value': payload,
+              'created_at': DateTime.now().toUtc().toIso8601String(),
+            });
+          } catch (_) {
+            // If actor_id failed foreign key constraint or null check, retry with actor_id: null
+            if (userId != null) {
+              await SupabaseService.client.from('audit_logs').insert({
+                'action': eventName,
+                'entity': 'analytics_event',
+                'actor_id': null,
+                'new_value': payload,
+                'created_at': DateTime.now().toUtc().toIso8601String(),
+              }).catchError((_) => null);
+            }
+          }
         }
       } catch (_) {
         // Telemetry failure should never crash the user application
@@ -276,6 +298,131 @@ class AnalyticsService {
   }
 
   // ================= Specific Domain Event Loggers =================
+
+  /// Screen / Page Navigation Event
+  /// Debounces rapid identical screen views and tracks screen navigation across platforms
+  Future<void> logScreenView(
+    String screenName, {
+    String? routePath,
+    Map<String, dynamic>? parameters,
+  }) async {
+    final now = DateTime.now();
+    if (_lastScreenName == screenName &&
+        _lastScreenTime != null &&
+        now.difference(_lastScreenTime!).inMilliseconds < 600) {
+      return;
+    }
+    _lastScreenName = screenName;
+    _lastScreenTime = now;
+
+    final params = <String, dynamic>{
+      'screen_name': screenName,
+      'screen_class': screenName,
+      if (routePath != null) 'route_path': routePath,
+    };
+    if (parameters != null) {
+      params.addAll(parameters);
+    }
+
+    if (_firebaseAnalyticsAvailable && _firebaseAnalytics != null) {
+      try {
+        await _firebaseAnalytics!.logScreenView(
+          screenName: screenName,
+          screenClass: screenName,
+        );
+      } catch (e) {
+        debugPrint('[AnalyticsService] Firebase logScreenView error: $e');
+      }
+    }
+
+    await logEvent('screen_view', parameters: params);
+  }
+
+  /// App Lifecycle: Foregrounded / Resumed
+  Future<void> logAppForegrounded() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_prefLastActiveMsKey, DateTime.now().millisecondsSinceEpoch);
+    } catch (_) {}
+    await logEvent('app_foregrounded');
+  }
+
+  /// App Lifecycle: Backgrounded / Paused
+  Future<void> logAppBackgrounded() async {
+    await logEvent('app_backgrounded');
+  }
+
+  /// User Logout Event
+  Future<void> logLogout() async {
+    await logEvent('logout');
+  }
+
+  /// Question Answer Event
+  Future<void> logQuestionAnswer({
+    required String questionId,
+    required String subject,
+    required bool isCorrect,
+    int? timeSpentSeconds,
+    String? exam,
+  }) async {
+    await logEvent('question_answer', parameters: {
+      'question_id': questionId,
+      'subject': subject,
+      'is_correct': isCorrect,
+      'time_spent_seconds': timeSpentSeconds ?? 0,
+      if (exam != null) 'exam': exam,
+    });
+  }
+
+  /// Practice / Study Session Event
+  Future<void> logPracticeSession({
+    required String subject,
+    String? chapter,
+    int? questionCount,
+  }) async {
+    await logEvent('practice_session', parameters: {
+      'subject': subject,
+      if (chapter != null) 'chapter': chapter,
+      'question_count': questionCount ?? 0,
+    });
+  }
+
+  /// Video Solution View
+  Future<void> logVideoSolutionOpened({
+    required String videoId,
+    required String title,
+    String? subject,
+  }) async {
+    await logEvent('video_solution_opened', parameters: {
+      'video_id': videoId,
+      'title': title,
+      if (subject != null) 'subject': subject,
+    });
+  }
+
+  /// Question Bank Search
+  Future<void> logQuestionBankSearch({
+    required String query,
+    int? resultsCount,
+  }) async {
+    await logEvent('question_bank_search', parameters: {
+      'query': query,
+      'results_count': resultsCount ?? 0,
+    });
+  }
+
+  /// Checkout Started
+  Future<void> logCheckoutStarted({
+    required String seriesId,
+    required String title,
+    required double price,
+  }) async {
+    await logEvent('checkout_started', parameters: {
+      'series_id': seriesId,
+      'title': title,
+      'price': price,
+    });
+  }
 
   /// 1. First Open
   Future<void> logFirstOpen({String? source}) async {
@@ -965,3 +1112,16 @@ class DailyKpiPoint {
     required this.testAttempts,
   });
 }
+
+/// App lifecycle observer to automatically emit foreground and background telemetry events
+class AnalyticsLifecycleObserver with WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      AnalyticsService.instance.logAppForegrounded();
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      AnalyticsService.instance.logAppBackgrounded();
+    }
+  }
+}
+

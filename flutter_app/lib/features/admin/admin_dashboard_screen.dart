@@ -569,6 +569,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('REPORTS & ANALYTICS'),
                 _buildSidebarTile('Analytics Dashboard', Icons.bar_chart_rounded, false, onTap: () => context.go('/admin/analytics')),
+                _buildSidebarTile('Live User Activity', Icons.sensors_rounded, false, onTap: () => context.go('/admin/live-activity')),
                 _buildSidebarTile('Question Reports', Icons.outlined_flag_rounded, false, onTap: () => context.go('/admin/questions')),
                 _buildSidebarTile('Student Performance', Icons.insights_rounded, false, onTap: () => context.go('/admin/analytics')),
                 _buildSidebarTile('Leaderboard', Icons.leaderboard_outlined, false, onTap: () => context.go('/admin/leaderboard')),

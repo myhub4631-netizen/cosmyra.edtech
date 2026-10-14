@@ -588,6 +588,7 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
                 const SizedBox(height: 16),
                 _buildSidebarSectionHeader('REPORTS & ANALYTICS'),
                 _buildSidebarTile(Icons.bar_chart_rounded, 'Analytics Dashboard', true, onTap: () {}),
+                _buildSidebarTile(Icons.sensors_rounded, 'Live User Activity', false, onTap: () => context.go('/admin/live-activity')),
                 _buildSidebarTile(Icons.insights_rounded, 'Student Performance', false, onTap: () {}),
 
                 const SizedBox(height: 16),
@@ -1739,6 +1740,19 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    onPressed: () => context.go('/admin/live-activity'),
+                    icon: const Icon(Icons.sensors_rounded, size: 14),
+                    label: const Text('Live User Activity Monitor', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6366F1),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),

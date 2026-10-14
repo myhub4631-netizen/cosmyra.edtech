@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/app_avatar.dart';
@@ -384,7 +385,8 @@ class _AdminHierarchyScreenState extends State<AdminHierarchyScreen> {
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('REPORTS & ANALYTICS'),
-                _buildSidebarTile('Analytics Dashboard', Icons.bar_chart_rounded, false),
+                _buildSidebarTile('Analytics Dashboard', Icons.bar_chart_rounded, false, onTap: () => context.go('/admin/analytics')),
+                _buildSidebarTile('Live User Activity', Icons.sensors_rounded, false, onTap: () => context.go('/admin/live-activity')),
                 _buildSidebarTile('Question Reports', Icons.assessment_outlined, false),
                 _buildSidebarTile('Student Performance', Icons.insights_rounded, false),
                 _buildSidebarTile('Leaderboard', Icons.emoji_events_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),

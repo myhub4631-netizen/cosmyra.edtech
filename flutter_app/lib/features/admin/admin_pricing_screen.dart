@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -1011,7 +1012,8 @@ class _AdminPricingScreenState extends State<AdminPricingScreen> {
 
                 const SizedBox(height: 16),
                 _buildSidebarSectionLabel('REPORTS & ANALYTICS'),
-                _buildSidebarTile('Analytics', Icons.bar_chart_rounded, false),
+                _buildSidebarTile('Analytics', Icons.bar_chart_rounded, false, onTap: () => context.go('/admin/analytics')),
+                _buildSidebarTile('Live User Activity', Icons.sensors_rounded, false, onTap: () => context.go('/admin/live-activity')),
                 _buildSidebarTile('Leaderboard', Icons.emoji_events_outlined, false, onTap: () => Navigator.pushNamed(context, '/admin/leaderboard')),
                 _buildSidebarTile('Student Performance', Icons.insights_rounded, false),
                 _buildSidebarTile('Sales Reports', Icons.trending_up_rounded, false),

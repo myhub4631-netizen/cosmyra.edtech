@@ -38,6 +38,8 @@ import '../../features/practice/practice_screen.dart';
 import '../../features/practice/custom_practice_wizard.dart';
 import '../../features/admin/admin_dashboard_screen.dart';
 import '../../features/admin/admin_analytics_dashboard_screen.dart';
+import '../../features/admin/admin_live_user_activity_screen.dart';
+import '../services/analytics_service.dart';
 import '../../features/admin/admin_user_management_screen.dart';
 import '../../features/admin/admin_chapters_topics_screen.dart';
 import '../../features/admin/admin_questions_bank_dashboard.dart';
@@ -240,11 +242,98 @@ class AuthRouteObserver extends NavigatorObserver {
   }
 }
 
+/// Production Route Observer that instruments screen view and page view telemetry events
+class AnalyticsRouteObserver extends NavigatorObserver {
+  String? _lastTrackedPath;
+
+  void _track(Route<dynamic>? route, {Route<dynamic>? previousRoute}) {
+    if (route == null) return;
+    final name = route.settings.name;
+    if (name == null || name.isEmpty) return;
+
+    // Do not track non-page routes (e.g. raw modal barriers without named paths)
+    if (route is PopupRoute && !name.startsWith('/')) return;
+
+    // Normalize path by stripping query strings or hash tokens to avoid PII / secret leak
+    String cleanPath = name;
+    if (cleanPath.contains('?')) {
+      cleanPath = cleanPath.split('?').first;
+    }
+    if (cleanPath.contains('#')) {
+      cleanPath = cleanPath.split('#').first;
+    }
+
+    if (_lastTrackedPath == cleanPath) return;
+    _lastTrackedPath = cleanPath;
+
+    final screenTitle = formatScreenTitle(cleanPath);
+
+    AnalyticsService.instance.logScreenView(
+      screenTitle,
+      routePath: cleanPath,
+      parameters: {
+        'canonical_path': cleanPath,
+        if (previousRoute?.settings.name != null)
+          'previous_path': previousRoute!.settings.name,
+      },
+    );
+  }
+
+  static String formatScreenTitle(String path) {
+    if (path == '/' || path.isEmpty) return 'Home / Landing';
+    if (path == '/login') return 'Login';
+    if (path == '/signup') return 'Sign Up';
+    if (path == '/dashboard') return 'Student Dashboard';
+    if (path == '/profile') return 'Student Profile';
+    if (path.startsWith('/admin/live-activity')) return 'Admin Live User Activity';
+    if (path.startsWith('/admin/analytics')) return 'Admin Analytics Dashboard';
+    if (path.startsWith('/admin/users')) return 'Admin User Management';
+    if (path.startsWith('/admin')) return 'Admin Portal';
+    if (path.startsWith('/pyq-nta') || path.startsWith('/question-bank')) return 'Question Bank';
+    if (path.startsWith('/nta-practice') || path.startsWith('/practice')) return 'Practice & Study';
+    if (path.startsWith('/test-series')) return 'Test Series';
+    if (path.startsWith('/mock-tests')) return 'Mock Tests';
+    if (path.startsWith('/test/')) return 'Test Examination';
+    if (path.startsWith('/test-result')) return 'Test Results';
+    if (path.startsWith('/test-solutions')) return 'Test Solutions';
+    if (path.startsWith('/cart')) return 'Cart';
+    if (path.startsWith('/checkout')) return 'Checkout';
+    if (path.startsWith('/leaderboard')) return 'Leaderboard';
+    if (path.startsWith('/mistakes-bookmarks')) return 'Bookmarks & Mistakes';
+    if (path.startsWith('/pricing') || path.startsWith('/subscription')) return 'Pricing & Plans';
+    if (path.startsWith('/updates')) return 'Updates';
+    if (path.startsWith('/blog')) return 'Blog';
+    return path;
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    _track(route, previousRoute: previousRoute);
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPop(route, previousRoute);
+    if (previousRoute != null) {
+      _track(previousRoute, previousRoute: route);
+    }
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    if (newRoute != null) {
+      _track(newRoute, previousRoute: oldRoute);
+    }
+  }
+}
+
 final GoRouter appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
   initialLocation: '/',
   debugLogDiagnostics: true,
-  observers: [AuthRouteObserver()],
+  observers: [AuthRouteObserver(), AnalyticsRouteObserver()],
   refreshListenable: Listenable.merge([SupabaseService.authNotifier, FeatureConfigService.notifier]),
   errorBuilder: (context, state) => NotFoundScreen(path: state.uri.toString()),
   redirect: (BuildContext context, GoRouterState state) {
@@ -1613,6 +1702,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/admin/analytics',
       builder: (context, state) => const AdminAnalyticsDashboardScreen(),
+    ),
+    GoRoute(
+      path: '/admin/live-activity',
+      builder: (context, state) => const AdminLiveUserActivityScreen(),
     ),
     GoRoute(
       path: '/admin/notifications',
