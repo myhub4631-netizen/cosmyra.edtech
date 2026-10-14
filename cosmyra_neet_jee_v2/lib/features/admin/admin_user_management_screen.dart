@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../models/models.dart';
 import '../../core/services/supabase_service.dart';
 import '../../shared/widgets/app_avatar.dart';
@@ -26,6 +27,8 @@ class AdminUserModel {
   final String status; // Active, Suspended, Pending, Blocked
   final String lastActive;
   final String joinedOn;
+  final DateTime? joinedAt;
+  final DateTime? lastActiveAt;
   final String phone;
   final String cohort;
   final String regSource;
@@ -44,6 +47,8 @@ class AdminUserModel {
     required this.status,
     required this.lastActive,
     required this.joinedOn,
+    this.joinedAt,
+    this.lastActiveAt,
     this.phone = '',
     this.cohort = 'NEET 2026',
     this.regSource = 'Web Portal',
@@ -52,6 +57,68 @@ class AdminUserModel {
     required this.avatarColor,
     this.avatarUrl,
   });
+
+  DateTime get resolvedJoinedAt {
+    if (joinedAt != null) return joinedAt!;
+    final parsed = DateTime.tryParse(joinedOn);
+    if (parsed != null) return parsed.toLocal();
+    return DateTime.now();
+  }
+
+  DateTime get resolvedLastActiveAt {
+    if (lastActiveAt != null) return lastActiveAt!;
+    final parsed = DateTime.tryParse(lastActive);
+    if (parsed != null) return parsed.toLocal();
+    return resolvedJoinedAt;
+  }
+
+  bool get isRecentlyActive {
+    final diff = DateTime.now().difference(resolvedLastActiveAt);
+    return diff.inMinutes.abs() < 5;
+  }
+
+  String get joinedDateDisplay {
+    return DateFormat('dd MMM yyyy').format(resolvedJoinedAt);
+  }
+
+  String get joinedTimeDisplay {
+    return DateFormat('hh:mm a').format(resolvedJoinedAt);
+  }
+
+  String get joinedDateTimeDisplay {
+    return DateFormat('dd MMM yyyy, hh:mm a').format(resolvedJoinedAt);
+  }
+
+  String get lastActiveDateDisplay {
+    final dt = resolvedLastActiveAt;
+    final now = DateTime.now();
+    if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+      return 'Today';
+    }
+    final yesterday = now.subtract(const Duration(days: 1));
+    if (dt.year == yesterday.year && dt.month == yesterday.month && dt.day == yesterday.day) {
+      return 'Yesterday';
+    }
+    return DateFormat('dd MMM yyyy').format(dt);
+  }
+
+  String get lastActiveTimeDisplay {
+    final dt = resolvedLastActiveAt;
+    final timeStr = DateFormat('hh:mm a').format(dt);
+    if (isRecentlyActive) {
+      return '$timeStr • Active';
+    }
+    return timeStr;
+  }
+
+  String get lastActiveDateTimeDisplay {
+    final dt = resolvedLastActiveAt;
+    final dtStr = DateFormat('dd MMM yyyy, hh:mm a').format(dt);
+    if (isRecentlyActive) {
+      return '$dtStr (Active now)';
+    }
+    return dtStr;
+  }
 
   AdminUserModel copyWith({
     String? id,
@@ -63,6 +130,8 @@ class AdminUserModel {
     String? status,
     String? lastActive,
     String? joinedOn,
+    DateTime? joinedAt,
+    DateTime? lastActiveAt,
     String? phone,
     String? cohort,
     String? regSource,
@@ -81,6 +150,8 @@ class AdminUserModel {
       status: status ?? this.status,
       lastActive: lastActive ?? this.lastActive,
       joinedOn: joinedOn ?? this.joinedOn,
+      joinedAt: joinedAt ?? this.joinedAt,
+      lastActiveAt: lastActiveAt ?? this.lastActiveAt,
       phone: phone ?? this.phone,
       cohort: cohort ?? this.cohort,
       regSource: regSource ?? this.regSource,
@@ -99,6 +170,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
   // Search & Filter Controllers
   final TextEditingController _searchController = TextEditingController();
+  DateTimeRange? _selectedDateRange;
   String _selectedRole = 'All Roles';
   String _selectedStatus = 'All Status';
   String _selectedExam = 'All Exams';
@@ -255,6 +327,11 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         }
       }
 
+      final joinedDt = p.createdAt ?? DateTime.now();
+      final isCurrentActive = em == SupabaseService.activeUserSession?.email.toLowerCase().trim() ||
+          em == SupabaseService.client.auth.currentUser?.email?.toLowerCase().trim();
+      final activeDt = isCurrentActive ? DateTime.now() : (p.updatedAt ?? joinedDt);
+
       return AdminUserModel(
         id: p.id,
         name: finalName,
@@ -263,8 +340,10 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         role: finalRole,
         examAccess: [exam],
         status: 'Active',
-        lastActive: 'Just now',
-        joinedOn: 'Aug 26, 2026',
+        lastActive: DateFormat('dd MMM yyyy, hh:mm a').format(activeDt),
+        joinedOn: DateFormat('dd MMM yyyy, hh:mm a').format(joinedDt),
+        joinedAt: joinedDt,
+        lastActiveAt: activeDt,
         phone: realPhone,
         cohort: realCohort,
         regSource: 'Web Portal',
@@ -323,6 +402,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                 ?.toString()
             : null);
 
+    final now = DateTime.now();
     return [
       AdminUserModel(
         id: 'usr-superadmin-01',
@@ -332,8 +412,10 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         role: 'Super Administrator',
         examAccess: ['NEET & JEE'],
         status: 'Active',
-        lastActive: 'Just now',
-        joinedOn: 'Aug 26, 2026',
+        lastActive: DateFormat('dd MMM yyyy, hh:mm a').format(now),
+        joinedOn: '25 Sep 2026, 07:44 PM',
+        joinedAt: DateTime(2026, 9, 25, 19, 44),
+        lastActiveAt: now,
         phone: '',
         cohort: 'NEET & JEE 2027',
         regSource: 'System Master Admin',
@@ -349,8 +431,10 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         role: 'Student',
         examAccess: ['NEET & JEE'],
         status: 'Active',
-        lastActive: 'Just now',
-        joinedOn: 'Aug 26, 2026',
+        lastActive: '26 Sep 2026, 12:05 PM',
+        joinedOn: '26 Aug 2026, 02:15 PM',
+        joinedAt: DateTime(2026, 8, 26, 14, 15),
+        lastActiveAt: DateTime(2026, 9, 26, 12, 5),
         phone: '',
         cohort: 'NEET 2026',
         regSource: 'Web Portal',
@@ -366,8 +450,10 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         role: 'Student',
         examAccess: ['NEET & JEE'],
         status: 'Active',
-        lastActive: 'Just now',
-        joinedOn: 'Aug 26, 2026',
+        lastActive: '27 Sep 2026, 04:08 PM',
+        joinedOn: '03 Sep 2026, 05:50 PM',
+        joinedAt: DateTime(2026, 9, 3, 17, 50),
+        lastActiveAt: DateTime(2026, 9, 27, 16, 8),
         phone: '',
         cohort: 'NEET 2026',
         regSource: 'Web Portal',
@@ -407,6 +493,13 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
             u.userIdCode.toLowerCase().contains(q) ||
             u.phone.contains(q);
         if (!match) return false;
+      }
+
+      if (_selectedDateRange != null) {
+        final j = u.resolvedJoinedAt;
+        if (j.isBefore(_selectedDateRange!.start) || j.isAfter(_selectedDateRange!.end.add(const Duration(days: 1)))) {
+          return false;
+        }
       }
 
       if (_selectedRole != 'All Roles' && u.role.toLowerCase() != _selectedRole.toLowerCase()) {
@@ -1222,20 +1315,39 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
               Row(
                 children: [
                   // Date Range Picker Box
-                  Container(
-                    height: 38,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Text('Aug 01, 2026 - Aug 31, 2026', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
-                        SizedBox(width: 8),
-                        Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFF64748B)),
-                      ],
+                  InkWell(
+                    onTap: () async {
+                      final picked = await showDateRangePicker(
+                        context: context,
+                        firstDate: DateTime(2024, 1, 1),
+                        lastDate: DateTime.now().add(const Duration(days: 365)),
+                        initialDateRange: _selectedDateRange,
+                      );
+                      if (picked != null) {
+                        setState(() => _selectedDateRange = picked);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      height: 38,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            _selectedDateRange != null
+                                ? '${DateFormat('dd MMM yyyy').format(_selectedDateRange!.start)} - ${DateFormat('dd MMM yyyy').format(_selectedDateRange!.end)}'
+                                : 'All Registration Dates',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.calendar_today_outlined, size: 14, color: Color(0xFF64748B)),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1249,6 +1361,7 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                         _selectedStatus = 'All Status';
                         _selectedExam = 'All Exams';
                         _selectedRegSource = 'All Registration Source';
+                        _selectedDateRange = null;
                       });
                     },
                     child: const Text('Clear Filters', style: TextStyle(color: Color(0xFFEF4444), fontSize: 13, fontWeight: FontWeight.w600)),
@@ -1544,15 +1657,45 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                 // Last Active Cell
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    u.lastActive.startsWith('•') ? u.lastActive : u.lastActive,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: u.lastActive.contains('min') || u.lastActive.contains('now')
-                          ? const Color(0xFF16A34A)
-                          : const Color(0xFF64748B),
-                      fontWeight: FontWeight.w500,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: u.isRecentlyActive ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            u.lastActiveDateDisplay,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: u.isRecentlyActive ? const Color(0xFF16A34A) : const Color(0xFF334155),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 11),
+                        child: Text(
+                          u.lastActiveTimeDisplay,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: u.isRecentlyActive ? const Color(0xFF16A34A) : const Color(0xFF64748B),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 
@@ -1563,8 +1706,15 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(u.joinedOn.split(" ").take(3).join(" "), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
-                      Text(u.joinedOn.split(" ").skip(3).join(" "), style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                      Text(
+                        u.joinedDateDisplay,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        u.joinedTimeDisplay,
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                      ),
                     ],
                   ),
                 ),
@@ -2015,8 +2165,8 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         ),
         const SizedBox(height: 12),
 
-        _buildDetailRow(Icons.calendar_today_outlined, 'Registered On', u.joinedOn),
-        _buildDetailRow(Icons.schedule_outlined, 'Last Active', u.lastActive),
+        _buildDetailRow(Icons.calendar_today_outlined, 'Registered On', u.joinedDateTimeDisplay),
+        _buildDetailRow(Icons.schedule_outlined, 'Last Active', u.lastActiveDateTimeDisplay),
 
         const SizedBox(height: 12),
         const Text('Exam Access', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
@@ -3098,7 +3248,14 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
               final actionStr = act['action'] ?? 'App Interaction';
               final deviceStr = act['device'] ?? 'Mobile / Web';
               final ipStr = act['ip_address'] ?? '103.21.124.89';
-              final timeStr = act['created_at'] != null ? act['created_at'].toString().split('T').first : 'Just now';
+              final timeStr = act['created_at'] != null
+                  ? () {
+                      final parsed = DateTime.tryParse(act['created_at'].toString())?.toLocal();
+                      return parsed != null
+                          ? DateFormat('dd MMM yyyy, hh:mm a').format(parsed)
+                          : act['created_at'].toString().split('T').first;
+                    }()
+                  : 'Just now';
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),

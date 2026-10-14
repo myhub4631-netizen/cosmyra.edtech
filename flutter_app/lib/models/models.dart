@@ -30,6 +30,8 @@ class UserProfileModel {
   final String studyGoal; // 'MBBS in Govt. College', 'IIT Bombay CS'
   final String city; // 'Supaul'
   final String state; // 'Bihar'
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   UserProfileModel({
     required this.id,
@@ -54,6 +56,8 @@ class UserProfileModel {
     this.studyGoal = 'MBBS in Govt. College',
     this.city = 'Supaul',
     this.state = 'Bihar',
+    this.createdAt,
+    this.updatedAt,
   });
 
   bool get isAdmin =>
@@ -88,6 +92,8 @@ class UserProfileModel {
     String? studyGoal,
     String? city,
     String? state,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return UserProfileModel(
       id: id ?? this.id,
@@ -112,6 +118,8 @@ class UserProfileModel {
       studyGoal: studyGoal ?? this.studyGoal,
       city: city ?? this.city,
       state: state ?? this.state,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -191,6 +199,18 @@ class UserProfileModel {
       studyGoal: json['study_goal'] ?? json['studyGoal'] ?? 'MBBS in Govt. College',
       city: json['city'] ?? 'Supaul',
       state: json['state'] ?? 'Bihar',
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString())?.toLocal()
+          : (json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString())?.toLocal() : null),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.tryParse(json['updated_at'].toString())?.toLocal()
+          : (json['updatedAt'] != null
+              ? DateTime.tryParse(json['updatedAt'].toString())?.toLocal()
+              : (json['last_active'] != null
+                  ? DateTime.tryParse(json['last_active'].toString())?.toLocal()
+                  : (json['last_sign_in_at'] != null
+                      ? DateTime.tryParse(json['last_sign_in_at'].toString())?.toLocal()
+                      : null))),
     );
   }
 
@@ -212,6 +232,8 @@ class UserProfileModel {
         'study_goal': studyGoal,
         'city': city,
         'state': state,
+        'created_at': createdAt?.toIso8601String(),
+        'updated_at': updatedAt?.toIso8601String(),
       };
 }
 

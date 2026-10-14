@@ -244,6 +244,8 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
           fullName: _fullNameController.text.trim(),
           phoneNumber: '+91${_mobileController.text.trim()}',
           targetExam: _selectedExam,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
         );
         await SupabaseService.addLocalUser(fallbackProfile);
 

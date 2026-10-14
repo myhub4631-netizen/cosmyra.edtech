@@ -370,6 +370,7 @@ class SupabaseService {
       debugPrint('Auth signup notice (continuing profile creation): $e');
     }
 
+    final now = DateTime.now();
     final realProfile = UserProfileModel(
       id: userId,
       email: email,
@@ -383,6 +384,8 @@ class SupabaseService {
       totalCorrect: 0,
       accuracy: 0.0,
       rank: 0,
+      createdAt: now,
+      updatedAt: now,
     );
 
     await addLocalUser(realProfile);
@@ -396,6 +399,8 @@ class SupabaseService {
           'phone_number': phone,
           'target_exam': targetExam,
           'target_year': targetYear,
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
         },
         onConflict: 'email',
       );
@@ -408,6 +413,8 @@ class SupabaseService {
           'phone_number': phone,
           'target_exam': targetExam,
           'target_year': targetYear,
+          'created_at': now.toIso8601String(),
+          'updated_at': now.toIso8601String(),
         });
       } catch (pe2) {
         debugPrint('Secondary profile insert error: $pe2');
@@ -450,6 +457,7 @@ class SupabaseService {
             ? 'admin'
             : (role.toLowerCase().contains('educator') ? 'educator' : (role.toLowerCase().contains('moderator') ? 'moderator' : 'student')));
 
+    final now = DateTime.now();
     final newProfile = UserProfileModel(
       id: userId,
       email: cleanEmail,
@@ -463,6 +471,8 @@ class SupabaseService {
       totalCorrect: 0,
       accuracy: 0.0,
       rank: 0,
+      createdAt: now,
+      updatedAt: now,
     );
 
     // Save to local registry and persistent SharedPreferences list
@@ -1015,6 +1025,7 @@ class SupabaseService {
         } else {
           // Newly logged in OAuth user (e.g. Google Sign-In)
           final compressedAvatar = googleAvatar.isNotEmpty ? (await downloadAndCompressAvatar(googleAvatar) ?? googleAvatar) : null;
+          final now = DateTime.now();
           final newProfile = UserProfileModel(
             id: user.id,
             email: userEmail,
@@ -1024,6 +1035,8 @@ class SupabaseService {
             targetExam: 'NEET',
             targetYear: 2026,
             role: 'student',
+            createdAt: now,
+            updatedAt: now,
           );
 
           try {
@@ -1036,6 +1049,8 @@ class SupabaseService {
               'target_exam': 'NEET',
               'target_year': 2026,
               'role': newProfile.role,
+              'created_at': now.toIso8601String(),
+              'updated_at': now.toIso8601String(),
             }, onConflict: 'id');
           } catch (pe) {
             debugPrint('Error upserting Google OAuth profile to Supabase: $pe');
@@ -1156,6 +1171,8 @@ class SupabaseService {
         profileMap[em] = p.copyWith(
           phoneNumber: phone,
           avatarUrl: avatar,
+          createdAt: p.createdAt ?? existing?.createdAt,
+          updatedAt: p.updatedAt ?? existing?.updatedAt,
         );
       }
     }
@@ -1172,6 +1189,7 @@ class SupabaseService {
           phoneNumber: (activeUserSession!.phoneNumber != null && activeUserSession!.phoneNumber!.isNotEmpty)
               ? activeUserSession!.phoneNumber
               : existing.phoneNumber,
+          updatedAt: DateTime.now(),
         );
       }
     }
