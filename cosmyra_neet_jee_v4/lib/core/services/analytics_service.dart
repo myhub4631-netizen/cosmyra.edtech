@@ -222,7 +222,8 @@ class AnalyticsService {
               fbParams[k] = v ? 1 : 0;
             }
           });
-          await _firebaseAnalytics!.logEvent(name: sanitizedName, parameters: fbParams);
+          final fbEventName = sanitizedName == 'first_open' ? 'app_first_open' : sanitizedName;
+          await _firebaseAnalytics!.logEvent(name: fbEventName, parameters: fbParams);
         } catch (e) {
           debugPrint('[AnalyticsService] Firebase Analytics logEvent error: $e');
         }

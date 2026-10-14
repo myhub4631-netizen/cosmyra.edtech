@@ -24,7 +24,7 @@ class AnalyticsService {
   static const String _prefFirstOpenKey = 'cosmyra_analytics_first_open_done';
   static const String _prefSessionIdKey = 'cosmyra_analytics_session_id';
   static const String _prefLastActiveMsKey = 'cosmyra_analytics_last_active_ms';
-  static const String _appVersion = '2.2.9+10';
+  static const String _appVersion = '4.1.1+1';
 
   static bool _initialized = false;
   static bool _firebaseAnalyticsAvailable = false;
@@ -222,7 +222,8 @@ class AnalyticsService {
               fbParams[k] = v ? 1 : 0;
             }
           });
-          await _firebaseAnalytics!.logEvent(name: sanitizedName, parameters: fbParams);
+          final fbEventName = sanitizedName == 'first_open' ? 'app_first_open' : sanitizedName;
+          await _firebaseAnalytics!.logEvent(name: fbEventName, parameters: fbParams);
         } catch (e) {
           debugPrint('[AnalyticsService] Firebase Analytics logEvent error: $e');
         }
