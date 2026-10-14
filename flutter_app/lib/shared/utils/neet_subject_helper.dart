@@ -124,6 +124,8 @@ class NeetSubjectHelper {
     final List<int> botRange = List<int>.from(dist['botanyRange'] as List);
     final List<int> zooRange = List<int>.from(dist['zoologyRange'] as List);
 
+    bool hasAnyExplicit = false;
+
     for (int i = 0; i < totalQuestions; i++) {
       String explicitSub = '';
       if (i < questions.length) {
@@ -137,6 +139,10 @@ class NeetSubjectHelper {
         }
       }
 
+      if (explicitSub.trim().isNotEmpty) {
+        hasAnyExplicit = true;
+      }
+
       final resolved = getSubjectForQuestionIndex(
         i,
         totalQuestions,
@@ -146,18 +152,18 @@ class NeetSubjectHelper {
       ).toLowerCase();
 
       bool matches = false;
-      if (target == 'physics' && (resolved == 'physics' || (i >= pRange[0] - 1 && i <= pRange[1] - 1))) {
-        matches = true;
-      } else if (target == 'chemistry' && (resolved == 'chemistry' || (i >= cRange[0] - 1 && i <= cRange[1] - 1))) {
-        matches = true;
-      } else if (target == 'botany' && (resolved == 'botany' || (resolved == 'biology' && i >= botRange[0] - 1 && i <= botRange[1] - 1))) {
-        matches = true;
-      } else if (target == 'zoology' && (resolved == 'zoology' || (resolved == 'biology' && i >= zooRange[0] - 1 && i <= zooRange[1] - 1))) {
-        matches = true;
-      } else if (target == 'biology' && (resolved == 'biology' || resolved == 'botany' || resolved == 'zoology' || (i >= bRange[0] - 1 && i <= bRange[1] - 1))) {
-        matches = true;
-      } else if (target == 'mathematics' && resolved == 'mathematics') {
-        matches = true;
+      if (target == 'physics') {
+        matches = resolved == 'physics';
+      } else if (target == 'chemistry') {
+        matches = resolved == 'chemistry';
+      } else if (target == 'botany') {
+        matches = resolved == 'botany';
+      } else if (target == 'zoology') {
+        matches = resolved == 'zoology';
+      } else if (target == 'biology') {
+        matches = resolved == 'biology' || resolved == 'botany' || resolved == 'zoology';
+      } else if (target == 'mathematics') {
+        matches = resolved == 'mathematics';
       }
 
       if (matches) {
@@ -165,18 +171,28 @@ class NeetSubjectHelper {
       }
     }
 
-    // Fallback if explicit matching produced 0 items
-    if (indices.isEmpty) {
+    // Fallback if questions had no explicit metadata and no matches found
+    if (indices.isEmpty && !hasAnyExplicit) {
       if (target == 'physics') {
-        for (int i = pRange[0] - 1; i < pRange[1]; i++) indices.add(i);
+        for (int i = pRange[0] - 1; i < pRange[1]; i++) {
+          indices.add(i);
+        }
       } else if (target == 'chemistry') {
-        for (int i = cRange[0] - 1; i < cRange[1]; i++) indices.add(i);
+        for (int i = cRange[0] - 1; i < cRange[1]; i++) {
+          indices.add(i);
+        }
       } else if (target == 'botany') {
-        for (int i = botRange[0] - 1; i < botRange[1]; i++) indices.add(i);
+        for (int i = botRange[0] - 1; i < botRange[1]; i++) {
+          indices.add(i);
+        }
       } else if (target == 'zoology') {
-        for (int i = zooRange[0] - 1; i < zooRange[1]; i++) indices.add(i);
+        for (int i = zooRange[0] - 1; i < zooRange[1]; i++) {
+          indices.add(i);
+        }
       } else if (target == 'biology') {
-        for (int i = bRange[0] - 1; i < bRange[1]; i++) indices.add(i);
+        for (int i = bRange[0] - 1; i < bRange[1]; i++) {
+          indices.add(i);
+        }
       }
     }
 

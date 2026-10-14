@@ -37,6 +37,9 @@ class _PracticeScreenState extends State<PracticeScreen> {
   final Map<int, String> _selectedAnswers = {};
   final Map<int, bool> _hasAnswered = {};
   final Set<int> _markedForReview = {};
+  final Set<int> _visitedQuestions = {0};
+  String _selectedGridSubject = 'Physics';
+  StateSetter? _modalSetState;
   final Map<int, bool> _isCorrectMap = {};
   final Map<int, bool> _isPartialMap = {};
 
@@ -160,6 +163,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
         _finishPracticeSession();
       } else {
         setState(() => _secondsRemaining--);
+        _modalSetState?.call(() {});
       }
     });
   }
@@ -167,6 +171,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _modalSetState = null;
     super.dispose();
   }
 
@@ -358,7 +363,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
         widget.questions.length,
         explicitSubject: q.subjectId,
         isNeet: isNeet,
-        useBotanyZoology: true,
+        useBotanyZoology: false,
       );
     }
     return 'Physics';
@@ -370,7 +375,9 @@ class _PracticeScreenState extends State<PracticeScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _buildGridViewSheet(ctx),
-    );
+    ).whenComplete(() {
+      _modalSetState = null;
+    });
   }
 
   void _showInstructionsModal(BuildContext ctx) {
@@ -483,45 +490,59 @@ class _PracticeScreenState extends State<PracticeScreen> {
     );
   }
 
+  List<String> _getSubjectTabs() {
+    final bool hasMath = widget.questions.any((q) {
+      final sub = NeetSubjectHelper.getSubjectNameFromId(q.subjectId).toLowerCase();
+      return sub.contains('math');
+    });
+
+    if (hasMath) {
+      return ['Physics', 'Chemistry', 'Mathematics'];
+    }
+    return ['Physics', 'Chemistry', 'Biology'];
+  }
+
   Widget _buildGridViewSheet(BuildContext ctx) {
-    int answeredCount = 0;
-    int notAnsweredCount = 0;
-    int markedReviewCount = 0;
-    int notVisitedCount = 0;
-    int answeredAndMarkedCount = 0;
-
-    for (int i = 0; i < widget.questions.length; i++) {
-      final ans = _selectedAnswers[i];
-      final hasAns = ans != null && ans.trim().isNotEmpty;
-      final isRev = _markedForReview.contains(i);
-
-      if (hasAns && isRev) {
-        answeredAndMarkedCount++;
-      } else if (hasAns) {
-        answeredCount++;
-      } else if (isRev) {
-        markedReviewCount++;
-      } else if (i <= _currentIndex) {
-        notAnsweredCount++;
-      } else {
-        notVisitedCount++;
-      }
+    final List<String> subjectList = _getSubjectTabs();
+    if (!subjectList.contains(_selectedGridSubject)) {
+      _selectedGridSubject = subjectList.first;
     }
-
-    final Set<String> subjects = {};
-    for (var q in widget.questions) {
-      if (q.subjectId.isNotEmpty && !q.subjectId.contains('-') && q.subjectId.length < 25) {
-        subjects.add(q.subjectId);
-      }
-    }
-    if (subjects.isEmpty) {
-      subjects.addAll(['Physics', 'Chemistry', 'Botany']);
-    }
-    final subjectList = subjects.toList();
-    String activeModalSub = subjectList.contains(_currentSubjectName) ? _currentSubjectName : subjectList.first;
 
     return StatefulBuilder(
       builder: (modalCtx, setModalState) {
+        _modalSetState = setModalState;
+        final List<int> filteredIndices = NeetSubjectHelper.getQuestionIndicesForSubject(
+          subject: _selectedGridSubject,
+          totalQuestions: widget.questions.length,
+          questions: widget.questions,
+          isNeet: true,
+        );
+
+        int answeredCount = 0;
+        int notAnsweredCount = 0;
+        int markedReviewCount = 0;
+        int notVisitedCount = 0;
+        int answeredAndMarkedCount = 0;
+
+        for (final qIdx in filteredIndices) {
+          final ans = _selectedAnswers[qIdx];
+          final hasAns = ans != null && ans.trim().isNotEmpty;
+          final isRev = _markedForReview.contains(qIdx);
+          final isVisited = _visitedQuestions.contains(qIdx) || qIdx == _currentIndex;
+
+          if (hasAns && isRev) {
+            answeredAndMarkedCount++;
+          } else if (hasAns) {
+            answeredCount++;
+          } else if (isRev) {
+            markedReviewCount++;
+          } else if (isVisited) {
+            notAnsweredCount++;
+          } else {
+            notVisitedCount++;
+          }
+        }
+
         return Container(
           height: MediaQuery.of(context).size.height * 0.88,
           decoration: const BoxDecoration(
@@ -569,10 +590,19 @@ class _PracticeScreenState extends State<PracticeScreen> {
                 ),
                 child: Row(
                   children: subjectList.map((sub) {
-                    final isSelected = sub.toLowerCase() == activeModalSub.toLowerCase();
+                    final isSelected = sub.toLowerCase() == _selectedGridSubject.toLowerCase();
                     return Expanded(
                       child: GestureDetector(
-                        onTap: () => setModalState(() => activeModalSub = sub),
+                        onTap: () {
+                          if (_selectedGridSubject != sub) {
+                            setModalState(() {
+                              _selectedGridSubject = sub;
+                            });
+                            setState(() {
+                              _selectedGridSubject = sub;
+                            });
+                          }
+                        },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
@@ -622,7 +652,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
               const SizedBox(height: 18),
 
-              // 5-Column Question Grid Matrix
+              // 5-Column Question Grid Matrix (Filtered for activeSubject)
               Expanded(
                 child: GridView.builder(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -631,12 +661,14 @@ class _PracticeScreenState extends State<PracticeScreen> {
                     mainAxisSpacing: 10,
                     childAspectRatio: 1.1,
                   ),
-                  itemCount: widget.questions.length,
-                  itemBuilder: (gridCtx, qIdx) {
+                  itemCount: filteredIndices.length,
+                  itemBuilder: (gridCtx, fIdx) {
+                    final qIdx = filteredIndices[fIdx];
                     final isCur = qIdx == _currentIndex;
                     final ans = _selectedAnswers[qIdx];
                     final hasAns = ans != null && ans.trim().isNotEmpty;
                     final isRev = _markedForReview.contains(qIdx);
+                    final isVisited = _visitedQuestions.contains(qIdx) || isCur;
 
                     Color borderColor = const Color(0xFFE2E8F0);
                     Color bgColor = const Color(0xFFF8FAFC);
@@ -658,11 +690,18 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       bgColor = const Color(0xFFFEF2F2);
                       borderColor = const Color(0xFFEF4444);
                       textColor = const Color(0xFFDC2626);
+                    } else if (isVisited && !hasAns) {
+                      bgColor = const Color(0xFFFEF2F2);
+                      borderColor = const Color(0xFFEF4444);
+                      textColor = const Color(0xFFDC2626);
                     }
 
                     return InkWell(
                       onTap: () {
-                        setState(() => _currentIndex = qIdx);
+                        setState(() {
+                          _currentIndex = qIdx;
+                          _visitedQuestions.add(qIdx);
+                        });
                         Navigator.pop(ctx);
                         _savePracticeSession();
                       },

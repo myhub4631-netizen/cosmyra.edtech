@@ -41,6 +41,9 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
   int _currentIndex = 0;
   final Map<int, String> _userAnswers = {};
   final Set<int> _markedForReview = {};
+  final Set<int> _visitedQuestions = {0};
+  String _selectedGridSubject = 'Physics';
+  StateSetter? _modalSetState;
   TestAttemptModel? _submittedAttempt;
 
   late DateTime _startedAt;
@@ -79,12 +82,16 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
             final idx = int.tryParse(k);
             if (idx != null) {
               _userAnswers[idx] = v.toString();
+              _visitedQuestions.add(idx);
             }
           });
         }
         if (savedReviewRaw != null) {
-          _markedForReview.addAll(savedReviewRaw.map((e) => e as int));
+          final reviewList = savedReviewRaw.map((e) => e as int).toList();
+          _markedForReview.addAll(reviewList);
+          _visitedQuestions.addAll(reviewList);
         }
+        _visitedQuestions.add(_currentIndex);
         if (savedSecs != null && savedSecs > 0) {
           _secondsRemaining = savedSecs;
         }
@@ -112,6 +119,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
         _submitTest(auto: true);
       } else {
         setState(() => _secondsRemaining--);
+        _modalSetState?.call(() {});
         if (_secondsRemaining % 10 == 0) {
           _persistCurrentSession();
         }
@@ -122,6 +130,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _modalSetState = null;
     super.dispose();
   }
 
@@ -362,6 +371,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
         widget.questions.length,
         explicitSubject: explicit,
         isNeet: true,
+        useBotanyZoology: false,
       );
     }
     return 'Physics';
@@ -373,7 +383,9 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _buildGridViewSheet(ctx),
-    );
+    ).whenComplete(() {
+      _modalSetState = null;
+    });
   }
 
   void _showInstructionsModal(BuildContext ctx) {
@@ -457,42 +469,58 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
     );
   }
 
-  Widget _buildGridViewSheet(BuildContext ctx) {
-    int answeredCount = 0;
-    int notAnsweredCount = 0;
-    int markedReviewCount = 0;
-    int notVisitedCount = 0;
-    int answeredAndMarkedCount = 0;
+  List<String> _getSubjectTabs() {
+    final bool hasMath = widget.questions.any((q) {
+      final sub = NeetSubjectHelper.getSubjectNameFromId(q.subjectId).toLowerCase();
+      return sub.contains('math');
+    });
 
-    for (int i = 0; i < widget.questions.length; i++) {
-      final ans = _userAnswers[i];
-      final hasAns = ans != null && ans.trim().isNotEmpty;
-      final isRev = _markedForReview.contains(i);
-
-      if (hasAns && isRev) {
-        answeredAndMarkedCount++;
-      } else if (hasAns) {
-        answeredCount++;
-      } else if (isRev) {
-        markedReviewCount++;
-      } else if (i <= _currentIndex) {
-        notAnsweredCount++;
-      } else {
-        notVisitedCount++;
-      }
+    if (hasMath) {
+      return ['Physics', 'Chemistry', 'Mathematics'];
     }
+    return ['Physics', 'Chemistry', 'Biology'];
+  }
 
-    final List<String> subjectList = ['Physics', 'Chemistry', 'Botany', 'Zoology'];
-    String activeModalSub = subjectList.contains(_currentSubjectName) ? _currentSubjectName : subjectList.first;
+  Widget _buildGridViewSheet(BuildContext ctx) {
+    final List<String> subjectList = _getSubjectTabs();
+    if (!subjectList.contains(_selectedGridSubject)) {
+      _selectedGridSubject = subjectList.first;
+    }
 
     return StatefulBuilder(
       builder: (modalCtx, setModalState) {
+        _modalSetState = setModalState;
         final List<int> filteredIndices = NeetSubjectHelper.getQuestionIndicesForSubject(
-          subject: activeModalSub,
+          subject: _selectedGridSubject,
           totalQuestions: widget.questions.length,
           questions: widget.questions,
           isNeet: true,
         );
+
+        int answeredCount = 0;
+        int notAnsweredCount = 0;
+        int markedReviewCount = 0;
+        int notVisitedCount = 0;
+        int answeredAndMarkedCount = 0;
+
+        for (final qIdx in filteredIndices) {
+          final ans = _userAnswers[qIdx];
+          final hasAns = ans != null && ans.trim().isNotEmpty;
+          final isRev = _markedForReview.contains(qIdx);
+          final isVisited = _visitedQuestions.contains(qIdx) || qIdx == _currentIndex;
+
+          if (hasAns && isRev) {
+            answeredAndMarkedCount++;
+          } else if (hasAns) {
+            answeredCount++;
+          } else if (isRev) {
+            markedReviewCount++;
+          } else if (isVisited) {
+            notAnsweredCount++;
+          } else {
+            notVisitedCount++;
+          }
+        }
 
         return Container(
           height: MediaQuery.of(context).size.height * 0.88,
@@ -541,10 +569,19 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                 ),
                 child: Row(
                   children: subjectList.map((sub) {
-                    final isSelected = sub.toLowerCase() == activeModalSub.toLowerCase();
+                    final isSelected = sub.toLowerCase() == _selectedGridSubject.toLowerCase();
                     return Expanded(
                       child: GestureDetector(
-                        onTap: () => setModalState(() => activeModalSub = sub),
+                        onTap: () {
+                          if (_selectedGridSubject != sub) {
+                            setModalState(() {
+                              _selectedGridSubject = sub;
+                            });
+                            setState(() {
+                              _selectedGridSubject = sub;
+                            });
+                          }
+                        },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
@@ -610,6 +647,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                     final ans = _userAnswers[qIdx];
                     final hasAns = ans != null && ans.trim().isNotEmpty;
                     final isRev = _markedForReview.contains(qIdx);
+                    final isVisited = _visitedQuestions.contains(qIdx) || isCur;
 
                     Color borderColor = const Color(0xFFE2E8F0);
                     Color bgColor = const Color(0xFFF8FAFC);
@@ -631,11 +669,18 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                       bgColor = const Color(0xFFFEF2F2);
                       borderColor = const Color(0xFFEF4444);
                       textColor = const Color(0xFFDC2626);
+                    } else if (isVisited && !hasAns) {
+                      bgColor = const Color(0xFFFEF2F2);
+                      borderColor = const Color(0xFFEF4444);
+                      textColor = const Color(0xFFDC2626);
                     }
 
                     return InkWell(
                       onTap: () {
-                        setState(() => _currentIndex = qIdx);
+                        setState(() {
+                          _currentIndex = qIdx;
+                          _visitedQuestions.add(qIdx);
+                        });
                         Navigator.pop(ctx);
                         _persistCurrentSession();
                       },
@@ -730,6 +775,10 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
             _submittedAttempt = null;
             _currentIndex = 0;
             _userAnswers.clear();
+            _markedForReview.clear();
+            _visitedQuestions.clear();
+            _visitedQuestions.add(0);
+            _selectedGridSubject = 'Physics';
             _isSubmitting = false;
             _secondsRemaining = widget.durationMinutes * 60;
             _startTimer();
@@ -936,7 +985,10 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
 
                         return GestureDetector(
                           onTap: () {
-                            setState(() => _currentIndex = idx);
+                            setState(() {
+                              _currentIndex = idx;
+                              _visitedQuestions.add(idx);
+                            });
                             _persistCurrentSession();
                           },
                           child: Container(
@@ -1284,6 +1336,7 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
                       if (_currentIndex < widget.questions.length - 1) {
                         setState(() {
                           _currentIndex++;
+                          _visitedQuestions.add(_currentIndex);
                         });
                         _persistCurrentSession();
                       } else {
