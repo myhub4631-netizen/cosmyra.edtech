@@ -1,6 +1,8 @@
 *.apk
 flutter_app/build/
 flutter_app/.dart_tool/
+cosmyra_neet_jee_v2/build/
+cosmyra_neet_jee_v2/.dart_tool/
 .git/
 .idea/
 .vscode/
