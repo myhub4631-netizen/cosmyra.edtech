@@ -685,8 +685,8 @@ class AnalyticsService {
           final evalStart = cohortStart.add(Duration(days: targetWeekOffset * 7));
           final evalEnd = evalStart.add(const Duration(days: 7));
 
-          // If evaluation week is in the future or not complete, return null ('—')
-          if (now.isBefore(evalStart)) return null;
+          // If evaluation week is in the future or not yet complete, return null ('—')
+          if (now.isBefore(evalEnd)) return null;
 
           // If evaluation week was in pre-telemetry period without events, display unavailable ('—')
           if (evalEnd.isBefore(telemetryInceptionDate) && telemetryEvents.isEmpty) {
