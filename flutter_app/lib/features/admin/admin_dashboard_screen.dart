@@ -391,6 +391,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                   width: double.infinity,
                   child: ElevatedButton.icon(
+                    onPressed: () => context.go('/admin/analytics'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      elevation: 3,
+                      shadowColor: const Color(0xFF2563EB).withOpacity(0.4),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.analytics_rounded, size: 18, color: Colors.white),
+                    label: const Text(
+                      '📊 Analytics & KPI Dashboard',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ),
+
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
                     onPressed: () => context.go('/admin/promo-dropdown'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF10B981),
@@ -1479,7 +1500,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
               Navigator.of(context).push(SmoothPageRoute(child: AdminUserManagementScreen(userProfile: widget.userProfile)));
             }),
             _buildQuickActionCard('Question Reports', 'View detailed reports', Icons.bar_chart_rounded, const Color(0xFF8B5CF6), () {}),
-            _buildQuickActionCard('Performance Analytics', 'Detailed performance data', Icons.trending_up_rounded, const Color(0xFF0D9488), () {}),
+            _buildQuickActionCard('Performance Analytics', 'Detailed performance data', Icons.trending_up_rounded, const Color(0xFF0D9488), () => context.go('/admin/analytics')),
+            _buildQuickActionCard('Analytics & KPIs', 'DAU, Revenue & Funnels', Icons.analytics_rounded, const Color(0xFF2563EB), () => context.go('/admin/analytics')),
             _buildQuickActionCard('System Settings', 'Configure platform settings', Icons.settings_outlined, const Color(0xFF64748B), () {}),
             _buildQuickActionCard('Backup & Restore', 'Data backup management', Icons.backup_outlined, const Color(0xFF3B82F6), () {}),
             _buildQuickActionCard('Notification Center', 'Send announcements', Icons.notifications_active_outlined, const Color(0xFFF59E0B), () {}, badgeCount: 3),
