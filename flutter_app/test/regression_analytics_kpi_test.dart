@@ -121,44 +121,105 @@ void main() {
       expect(metrics.netRevenue, equals(1998.0));
     });
 
-    test('DAU, WAU, and MAU are calculated authoritatively from active dates', () {
+    test('DAU, WAU, and MAU are calculated authoritatively from genuine student qualifying activity', () {
       final now = DateTime.now();
 
       final mockProfiles = [
-        // Active today (DAU, WAU, MAU)
         UserProfileModel.fromJson({
           'id': 'u1',
-          'email': 'u1@example.com',
+          'email': 'student1@example.com',
+          'role': 'student',
           'created_at': now.subtract(const Duration(days: 20)).toIso8601String(),
           'updated_at': now.toIso8601String(),
         }),
-        // Active 3 days ago (WAU, MAU)
         UserProfileModel.fromJson({
           'id': 'u2',
-          'email': 'u2@example.com',
+          'email': 'student2@example.com',
+          'role': 'student',
           'created_at': now.subtract(const Duration(days: 15)).toIso8601String(),
           'updated_at': now.subtract(const Duration(days: 3)).toIso8601String(),
         }),
-        // Active 15 days ago (MAU only)
         UserProfileModel.fromJson({
           'id': 'u3',
-          'email': 'u3@example.com',
+          'email': 'student3@example.com',
+          'role': 'student',
           'created_at': now.subtract(const Duration(days: 25)).toIso8601String(),
           'updated_at': now.subtract(const Duration(days: 15)).toIso8601String(),
         }),
+        // Profile u4 has updated_at today (e.g. profile edit or background job) but NO qualifying events
+        UserProfileModel.fromJson({
+          'id': 'u4_profile_edit_only',
+          'email': 'student4@example.com',
+          'role': 'student',
+          'created_at': now.subtract(const Duration(days: 10)).toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        }),
+        // Admin user with events today (MUST BE EXCLUDED from student DAU)
+        UserProfileModel.fromJson({
+          'id': 'u_admin',
+          'email': 'admin@example.com',
+          'role': 'superadmin',
+          'created_at': now.subtract(const Duration(days: 30)).toIso8601String(),
+          'updated_at': now.toIso8601String(),
+        }),
+      ];
+
+      final mockTelemetry = [
+        // u1 has duplicate session_start events today (deduplication check)
+        {
+          'event_name': 'session_start',
+          'user_id': 'u1',
+          'created_at': now.subtract(const Duration(hours: 2)).toIso8601String(),
+        },
+        {
+          'event_name': 'session_start',
+          'user_id': 'u1',
+          'created_at': now.subtract(const Duration(hours: 1)).toIso8601String(),
+        },
+        // Admin active today
+        {
+          'event_name': 'session_start',
+          'user_id': 'u_admin',
+          'created_at': now.subtract(const Duration(hours: 3)).toIso8601String(),
+        },
+      ];
+
+      // u2 has a test attempt 3 days ago (WAU & MAU qualifying activity)
+      final mockAttempts = [
+        {
+          'id': 'att_u2',
+          'student_id': 'u2',
+          'status': 'submitted',
+          'created_at': now.subtract(const Duration(days: 3)).toIso8601String(),
+        },
+      ];
+
+      // u3 has a completed order 15 days ago (MAU qualifying activity)
+      final mockOrders = [
+        {
+          'id': 'ord_u3',
+          'user_id': 'u3',
+          'status': 'completed',
+          'total_amount': 999.0,
+          'created_at': now.subtract(const Duration(days: 15)).toIso8601String(),
+        },
       ];
 
       final metrics = AnalyticsService.calculateKpiMetrics(
         profiles: mockProfiles,
-        orders: [],
-        testAttempts: [],
+        orders: mockOrders,
+        testAttempts: mockAttempts,
         entitlements: [],
+        telemetryEvents: mockTelemetry,
         startDate: now.subtract(const Duration(days: 30)),
         endDate: now.add(const Duration(days: 1)),
       );
 
+      // DAU: exactly 1 student ('u1'). Admin 'u_admin' is excluded. 'u4' (profile edit only) is excluded!
       expect(metrics.dau, equals(1));
+      // WAU: 2 students ('u1' + 'u2')
       expect(metrics.wau, equals(2));
+      // MAU: 3 students ('u1' + 'u2' + 'u3')
       expect(metrics.mau, equals(3));
     });
 
@@ -279,14 +340,34 @@ void main() {
         expect(cohort.week1Pct, isNull);
       }
 
-      // Test with genuine cohort signups (100% week 0 baseline)
+      // Test with genuine cohort signups and subsequent qualifying activity
       final mockProfiles = [
         UserProfileModel.fromJson({
           'id': 'c_u1',
-          'email': 'c_u1@example.com',
+          'email': 'cohort_student1@example.com',
+          'role': 'student',
           'created_at': now.subtract(const Duration(days: 10)).toIso8601String(),
           'updated_at': now.subtract(const Duration(days: 2)).toIso8601String(),
         }),
+      ];
+
+      // c_u1 had qualifying session_start in week 1 after signup
+      final mockCohortTelemetry = [
+        {
+          'event_name': 'session_start',
+          'user_id': 'c_u1',
+          'device_id': 'dev_test_device_1',
+          'session_id': 'sess_1',
+          'created_at': now.subtract(const Duration(days: 2)).toIso8601String(),
+        },
+        // Duplicate event on same device
+        {
+          'event_name': 'test_start',
+          'user_id': 'c_u1',
+          'device_id': 'dev_test_device_1',
+          'session_id': 'sess_1',
+          'created_at': now.subtract(const Duration(days: 2)).toIso8601String(),
+        },
       ];
 
       final metricsPopulated = AnalyticsService.calculateKpiMetrics(
@@ -294,12 +375,28 @@ void main() {
         orders: [],
         testAttempts: [],
         entitlements: [],
+        telemetryEvents: mockCohortTelemetry,
         startDate: now.subtract(const Duration(days: 35)),
         endDate: now.add(const Duration(days: 1)),
       );
 
       final populatedCohort = metricsPopulated.retentionCohorts.firstWhere((c) => c.signupsCount > 0);
       expect(populatedCohort.week0Pct, equals(100));
+      // Deduplicated device count
+      expect(metricsPopulated.installedDevicesCount, equals(1));
+      expect(metricsPopulated.uniqueVisitorsCount, equals(1));
+
+      // Test zero denominator safety in funnel
+      final zeroMetrics = AnalyticsService.calculateKpiMetrics(
+        profiles: [],
+        orders: [],
+        testAttempts: [],
+        entitlements: [],
+        telemetryEvents: [],
+      );
+      expect(zeroMetrics.funnelVisits, equals(0));
+      expect(zeroMetrics.funnelSignups, equals(0));
+      expect(zeroMetrics.installedDevicesCount, equals(0));
     });
   });
 }

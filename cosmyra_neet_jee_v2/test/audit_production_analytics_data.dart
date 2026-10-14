@@ -30,6 +30,8 @@ void main() {
     final profiles = List<Map<String, dynamic>>.from(profilesRes);
     print('1. PROFILES (Registered Users):');
     print('   Total Count: ${profiles.length}');
+    final actorUser = profiles.firstWhere((p) => p['id'] == '9ba12984-93a3-49ed-8a4b-420dcdd46901', orElse: () => {});
+    print('   Actor User in profiles: $actorUser');
 
     final now = DateTime.now();
     int active1d = 0;
@@ -146,14 +148,31 @@ void main() {
     }
 
     // 6. Audit Logs (fallback)
-    print('\n6. AUDIT LOGS:');
+    print('\n6. AUDIT LOGS (Analytics Event Telemetry):');
     try {
       final logsRes = await SupabaseService.client
           .from('audit_logs')
-          .select('id, action, user_id, created_at')
-          .limit(100);
+          .select('id, actor_id, action, entity, new_value, created_at')
+          .eq('entity', 'analytics_event');
       final logs = List<Map<String, dynamic>>.from(logsRes);
-      print('   Sample audit_logs count: ${logs.length}');
+      print('   Total analytics events logged in audit_logs: ${logs.length}');
+      final actionMap = <String, int>{};
+      final uniqueDevices = <String>{};
+      final uniqueActors = <String>{};
+      for (var l in logs) {
+        final a = (l['action'] ?? 'unknown').toString();
+        actionMap[a] = (actionMap[a] ?? 0) + 1;
+        final actor = l['actor_id']?.toString();
+        if (actor != null && actor.isNotEmpty) uniqueActors.add(actor);
+        final nv = l['new_value'];
+        if (nv is Map) {
+          final dev = nv['device_id']?.toString();
+          if (dev != null && dev.isNotEmpty) uniqueDevices.add(dev);
+        }
+      }
+      print('   Actions breakdown: $actionMap');
+      print('   Unique device_ids in audit_logs: ${uniqueDevices.length} -> $uniqueDevices');
+      print('   Unique actor_ids in audit_logs:  ${uniqueActors.length} -> $uniqueActors');
     } catch (e) {
       print('   audit_logs query note: $e');
     }

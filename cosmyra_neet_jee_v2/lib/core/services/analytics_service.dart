@@ -423,17 +423,40 @@ class AnalyticsService {
 
   // ================= Authoritative KPI Aggregator =================
 
-  /// Aggregates all live platform KPIs across:
-  /// - Supabase `profiles` (Registered users, DAU, WAU, MAU, retention cohorts)
-  /// - Supabase `orders` (Authoritative verified revenue, completed orders, refunds)
-  /// - Supabase `test_attempts` (Test starts, completions, average scores)
+  /// Set of action names considered meaningful student qualifying activities.
+  /// Strictly excludes admin screen views, profile edits, background refreshes,
+  /// and administrative maintenance.
+  static const Set<String> qualifyingActivityNames = {
+    'session_start',
+    'first_open',
+    'login',
+    'test_start',
+    'test_submit',
+    'test_abandon',
+    'question_answer',
+    'question_answered',
+    'note_view',
+    'note_viewed',
+    'formula_view',
+    'flashcard_reviewed',
+    'series_explored',
+    'practice_session',
+    'study_session',
+  };
+
+  /// Calculates authoritative KPI metrics for the executive analytics dashboard:
+  /// - Real Active Users (DAU, WAU, MAU) from genuine student qualifying activity events
+  /// - Excludes admin viewing, profile edits, and background updates
+  /// - Supabase `orders` (Verified Revenue: status == 'completed')
+  /// - Supabase `test_attempts` (Completion Rate: submitted vs started)
   /// - Supabase `entitlements` (Test series enrollments: Free vs Paid)
-  /// - Deduplicated device installations vs user accounts
+  /// - Genuine device installations and privacy-conscious visitor baseline
   static KpiDashboardData calculateKpiMetrics({
     required List<UserProfileModel> profiles,
     required List<Map<String, dynamic>> orders,
     required List<Map<String, dynamic>> testAttempts,
     required List<Map<String, dynamic>> entitlements,
+    List<Map<String, dynamic>> telemetryEvents = const [],
     DateTime? startDate,
     DateTime? endDate,
     String? platformFilter, // 'all', 'web', 'android', 'ios'
@@ -441,6 +464,15 @@ class AnalyticsService {
     final now = DateTime.now();
     final filterStart = startDate ?? now.subtract(const Duration(days: 30));
     final filterEnd = endDate ?? now;
+
+    // 0. Distinct Non-Admin Student Profiles Filter
+    // Admin viewing must be strictly excluded from student active-user metrics
+    final adminUserIds = profiles
+        .where((p) => p.role.toLowerCase().contains('admin'))
+        .map((p) => p.id)
+        .toSet();
+
+    final studentProfiles = profiles.where((p) => !adminUserIds.contains(p.id)).toList();
 
     // 1. Registered Users Filtering & Growth
     final totalRegisteredAllTime = profiles.length;
@@ -450,32 +482,73 @@ class AnalyticsService {
           joined.isBefore(filterEnd.add(const Duration(days: 1)));
     }).toList();
 
-    // 2. Active User Counts (DAU, WAU, MAU)
-    // If filterEnd is in the future, anchor active window to now
+    // 2. Qualifying Student Activity Resolver (IST Timezone)
+    // Meaningful student actions only. Excludes admin views, profile edits, background refreshes.
+    // NEVER uses profiles.updated_at as proof of activity.
+    Set<String> getQualifyingActiveStudentIds(DateTime windowStart, DateTime windowEnd) {
+      final activeIds = <String>{};
+
+      // A. Telemetry Events (in Supabase audit_logs or analytics_events)
+      for (final ev in telemetryEvents) {
+        final action = (ev['event_name'] ?? ev['action'] ?? '').toString().toLowerCase().trim();
+        if (!qualifyingActivityNames.contains(action)) continue;
+
+        final uid = ev['user_id']?.toString() ?? ev['actor_id']?.toString();
+        if (uid == null || uid.isEmpty || adminUserIds.contains(uid)) continue;
+
+        final dt = DateTime.tryParse(ev['created_at']?.toString() ?? '')?.toLocal();
+        if (dt == null) continue;
+
+        if (!dt.isBefore(windowStart) && !dt.isAfter(windowEnd)) {
+          activeIds.add(uid);
+        }
+      }
+
+      // B. Test Attempts (Authoritative student exam practice)
+      for (final t in testAttempts) {
+        final uid = t['student_id']?.toString() ?? t['user_id']?.toString();
+        if (uid == null || uid.isEmpty || adminUserIds.contains(uid)) continue;
+
+        final dt = DateTime.tryParse(t['started_at']?.toString() ?? t['created_at']?.toString() ?? '')?.toLocal();
+        if (dt == null) continue;
+
+        if (!dt.isBefore(windowStart) && !dt.isAfter(windowEnd)) {
+          activeIds.add(uid);
+        }
+      }
+
+      // C. Completed Financial Orders (Student course enrollment/purchase)
+      for (final o in orders) {
+        final status = (o['status'] ?? '').toString().toLowerCase();
+        if (status != 'completed') continue;
+
+        final uid = o['user_id']?.toString();
+        if (uid == null || uid.isEmpty || adminUserIds.contains(uid)) continue;
+
+        final dt = DateTime.tryParse(o['created_at']?.toString() ?? '')?.toLocal();
+        if (dt == null) continue;
+
+        if (!dt.isBefore(windowStart) && !dt.isAfter(windowEnd)) {
+          activeIds.add(uid);
+        }
+      }
+
+      return activeIds;
+    }
+
+    // 3. Active User Counts (DAU, WAU, MAU)
+    // Timezone: Indian Standard Time (IST, UTC+5:30)
+    // DAU: past 24 hours relative to filterEnd
     final refTime = filterEnd.isAfter(now) ? now : filterEnd;
     final oneDayAgo = refTime.subtract(const Duration(hours: 24));
     final sevenDaysAgo = refTime.subtract(const Duration(days: 7));
     final thirtyDaysAgo = refTime.subtract(const Duration(days: 30));
 
-    final dauCount = profiles.where((p) {
-      final active = p.updatedAt ?? p.createdAt;
-      if (active == null) return false;
-      return !active.isBefore(oneDayAgo) && !active.isAfter(refTime.add(const Duration(seconds: 1)));
-    }).length;
+    final dauCount = getQualifyingActiveStudentIds(oneDayAgo, refTime).length;
+    final wauCount = getQualifyingActiveStudentIds(sevenDaysAgo, refTime).length;
+    final mauCount = getQualifyingActiveStudentIds(thirtyDaysAgo, refTime).length;
 
-    final wauCount = profiles.where((p) {
-      final active = p.updatedAt ?? p.createdAt;
-      if (active == null) return false;
-      return !active.isBefore(sevenDaysAgo) && !active.isAfter(refTime.add(const Duration(seconds: 1)));
-    }).length;
-
-    final mauCount = profiles.where((p) {
-      final active = p.updatedAt ?? p.createdAt;
-      if (active == null) return false;
-      return !active.isBefore(thirtyDaysAgo) && !active.isAfter(refTime.add(const Duration(seconds: 1)));
-    }).length;
-
-    // 3. Authoritative Verified Financial Records
+    // 4. Authoritative Verified Financial Records
     // Only orders with status == 'completed' count as verified revenue!
     final completedOrders = orders.where((o) {
       final status = (o['status'] ?? '').toString().toLowerCase();
@@ -508,7 +581,7 @@ class AnalyticsService {
     final netRevenue = (grossRevenue - refundedRevenue).clamp(0.0, double.infinity);
     final aov = completedOrders.isNotEmpty ? (grossRevenue / completedOrders.length) : 0.0;
 
-    // 4. Test Attempts & Performance (Authoritative)
+    // 5. Test Attempts & Performance (Authoritative)
     final filteredAttempts = testAttempts.where((t) {
       final dt = DateTime.tryParse(t['created_at']?.toString() ?? t['started_at']?.toString() ?? '') ?? now;
       return dt.isAfter(filterStart.subtract(const Duration(seconds: 1))) &&
@@ -533,7 +606,7 @@ class AnalyticsService {
     }
     final avgScorePercentage = maxScoreSum > 0 ? (totalScoreSum / maxScoreSum) * 100.0 : 0.0;
 
-    // 5. Test Series Enrollments (Authoritative)
+    // 6. Test Series Enrollments (Authoritative)
     final filteredEntitlements = entitlements.where((e) {
       final dt = DateTime.tryParse(e['created_at']?.toString() ?? '') ?? now;
       return dt.isAfter(filterStart.subtract(const Duration(seconds: 1))) &&
@@ -547,39 +620,55 @@ class AnalyticsService {
     }).length;
     final paidEnrollments = totalEnrollments - freeEnrollments;
 
-    // 6. Device Installs (Genuine telemetry count without synthetic multipliers)
-    // If telemetry table analytics_events is populated, count distinct device_ids
-    // When telemetry has not yet recorded devices, report 0 (not synthetic 52)
-    const installedDevicesCount = 0;
+    // 7. Device Installs & Unique Visitors from Telemetry
+    final confirmedDeviceIds = <String>{};
+    final confirmedVisitorSessions = <String>{};
 
-    // 7. Crash-Free Rate (Nullable: explicit unavailable state when remote API is pending)
-    // Never fabricate static 99.85%
+    for (final ev in telemetryEvents) {
+      final devId = ev['device_id']?.toString();
+      if (devId != null && devId.trim().isNotEmpty && devId.trim() != 'device_unknown') {
+        confirmedDeviceIds.add(devId.trim());
+      }
+      final sessId = ev['session_id']?.toString();
+      if (sessId != null && sessId.trim().isNotEmpty) {
+        confirmedVisitorSessions.add(sessId.trim());
+      }
+    }
+
+    final installedDevicesCount = confirmedDeviceIds.length;
+    final uniqueVisitorsCount = confirmedVisitorSessions.isNotEmpty ? confirmedVisitorSessions.length : null;
+
+    // 8. Crash-Free Rate (Nullable: explicit unavailable state when remote API is pending)
     const double? crashFreeUsersPercentage = null;
 
-    // 8. Conversion Funnel (Authoritative Stage Counts without Synthetic Multipliers)
-    final funnelVisits = totalRegisteredAllTime;
+    // 9. Conversion Funnel (Honest Stage Counts)
+    final funnelVisits = uniqueVisitorsCount ?? 0;
     final funnelSignups = registeredInPeriod.length;
     final funnelTestStarts = testStartsCount;
     final funnelTestCompletes = submittedAttempts.length;
-    const funnelSeriesViews = 0; // Telemetry accumulating
+    const funnelSeriesViews = 0;
     final funnelEnrollments = totalEnrollments;
     final funnelPaidPurchases = completedOrders.length;
 
-    // 9. Retention Cohorts: Dynamically Computed from Actual Profiles Signups & Activity
+    // 10. Retention Cohorts: Dynamically Computed from Actual Profiles Signups & Qualifying Activity Events
+    // Note: Telemetry streaming commenced 14 Oct 2026. Pre-telemetry historical activity is not fabricated.
+    final telemetryInceptionDate = DateTime(2026, 10, 14, 8, 0);
+
     final retentionCohortWeeks = <RetentionCohortRow>[];
     for (int w = 3; w >= 0; w--) {
       final cohortStart = now.subtract(Duration(days: (w + 1) * 7));
       final cohortEnd = now.subtract(Duration(days: w * 7));
       final label = 'W-${w + 1} (${cohortStart.day}/${cohortStart.month} - ${cohortEnd.day}/${cohortEnd.month})';
 
-      final cohortProfiles = profiles.where((p) {
+      final cohortStudentProfiles = studentProfiles.where((p) {
         final joined = p.createdAt;
         if (joined == null) return false;
-        return joined.isAfter(cohortStart.subtract(const Duration(seconds: 1))) &&
-            joined.isBefore(cohortEnd);
+        return !joined.isBefore(cohortStart) && joined.isBefore(cohortEnd);
       }).toList();
 
-      final signups = cohortProfiles.length;
+      final signups = cohortStudentProfiles.length;
+      final isPreTelemetry = cohortEnd.isBefore(telemetryInceptionDate);
+
       if (signups == 0) {
         retentionCohortWeeks.add(RetentionCohortRow(
           cohortLabel: label,
@@ -589,22 +678,26 @@ class AnalyticsService {
           week2Pct: null,
           week3Pct: null,
           week4Pct: null,
+          isHistoricalLimitation: isPreTelemetry,
         ));
       } else {
-        // Activity in subsequent weeks
         int? calcRetention(int targetWeekOffset) {
           final evalStart = cohortStart.add(Duration(days: targetWeekOffset * 7));
           final evalEnd = evalStart.add(const Duration(days: 7));
-          if (now.isBefore(evalStart)) return null; // Week has not occurred yet
 
-          final activeInWk = cohortProfiles.where((p) {
-            final act = p.updatedAt ?? p.createdAt;
-            if (act == null) return false;
-            return act.isAfter(evalStart.subtract(const Duration(seconds: 1))) &&
-                act.isBefore(evalEnd);
-          }).length;
+          // If evaluation week is in the future or not complete, return null ('—')
+          if (now.isBefore(evalStart)) return null;
 
-          return ((activeInWk / signups) * 100).round();
+          // If evaluation week was in pre-telemetry period without events, display unavailable ('—')
+          if (evalEnd.isBefore(telemetryInceptionDate) && telemetryEvents.isEmpty) {
+            return null;
+          }
+
+          final cohortIds = cohortStudentProfiles.map((p) => p.id).toSet();
+          final activeCohortStudents = getQualifyingActiveStudentIds(evalStart, evalEnd)
+              .intersection(cohortIds);
+
+          return ((activeCohortStudents.length / signups) * 100).round();
         }
 
         retentionCohortWeeks.add(RetentionCohortRow(
@@ -615,11 +708,12 @@ class AnalyticsService {
           week2Pct: calcRetention(2),
           week3Pct: calcRetention(3),
           week4Pct: calcRetention(4),
+          isHistoricalLimitation: isPreTelemetry,
         ));
       }
     }
 
-    // 10. Daily Activity Trend Points (Actual daily counts without synthetic additions)
+    // 11. Daily Activity Trend Points (past 7 days from genuine qualifying student activity)
     final dailyTrendPoints = <DailyKpiPoint>[];
     for (int i = 6; i >= 0; i--) {
       final day = now.subtract(Duration(days: i));
@@ -627,11 +721,7 @@ class AnalyticsService {
       final dayEnd = dayStart.add(const Duration(days: 1));
       final dayLabel = '${day.day}/${day.month}';
 
-      final dayActive = profiles.where((p) {
-        final act = p.updatedAt ?? p.createdAt;
-        if (act == null) return false;
-        return act.isAfter(dayStart.subtract(const Duration(seconds: 1))) && act.isBefore(dayEnd);
-      }).length;
+      final dayActive = getQualifyingActiveStudentIds(dayStart, dayEnd).length;
 
       double dayRevenue = 0.0;
       for (var o in completedOrders) {
@@ -662,6 +752,7 @@ class AnalyticsService {
       wau: wauCount,
       mau: mauCount,
       installedDevicesCount: installedDevicesCount,
+      uniqueVisitorsCount: uniqueVisitorsCount,
       grossRevenue: grossRevenue,
       netRevenue: netRevenue,
       refundsCount: refundedOrders.length,
@@ -685,6 +776,8 @@ class AnalyticsService {
       funnelSeriesViews: funnelSeriesViews,
       funnelEnrollments: funnelEnrollments,
       funnelPaidPurchases: funnelPaidPurchases,
+      telemetryStatus: telemetryEvents.isNotEmpty ? 'Active (Supabase Ledger)' : 'Ingestion Pending',
+      crashReportingStatus: 'Mobile (Android/iOS) Supported • Web Unsupported',
     );
   }
 }
@@ -697,6 +790,7 @@ class KpiDashboardData {
   final int wau;
   final int mau;
   final int installedDevicesCount;
+  final int? uniqueVisitorsCount;
   final double grossRevenue;
   final double netRevenue;
   final int refundsCount;
@@ -720,6 +814,8 @@ class KpiDashboardData {
   final int funnelSeriesViews;
   final int funnelEnrollments;
   final int funnelPaidPurchases;
+  final String telemetryStatus;
+  final String crashReportingStatus;
 
   KpiDashboardData({
     required this.totalRegisteredUsers,
@@ -728,6 +824,7 @@ class KpiDashboardData {
     required this.wau,
     required this.mau,
     required this.installedDevicesCount,
+    this.uniqueVisitorsCount,
     required this.grossRevenue,
     required this.netRevenue,
     required this.refundsCount,
@@ -751,6 +848,8 @@ class KpiDashboardData {
     required this.funnelSeriesViews,
     required this.funnelEnrollments,
     required this.funnelPaidPurchases,
+    required this.telemetryStatus,
+    required this.crashReportingStatus,
   });
 }
 
@@ -762,6 +861,7 @@ class RetentionCohortRow {
   final int? week2Pct;
   final int? week3Pct;
   final int? week4Pct;
+  final bool isHistoricalLimitation;
 
   RetentionCohortRow({
     required this.cohortLabel,
@@ -771,6 +871,7 @@ class RetentionCohortRow {
     required this.week2Pct,
     required this.week3Pct,
     required this.week4Pct,
+    this.isHistoricalLimitation = false,
   });
 }
 

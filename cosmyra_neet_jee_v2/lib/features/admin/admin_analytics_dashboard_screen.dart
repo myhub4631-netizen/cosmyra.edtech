@@ -33,6 +33,7 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
   List<Map<String, dynamic>> _orders = [];
   List<Map<String, dynamic>> _attempts = [];
   List<Map<String, dynamic>> _entitlements = [];
+  List<Map<String, dynamic>> _telemetryEvents = [];
   KpiDashboardData? _kpiData;
 
   late UserProfileModel _adminProfile;
@@ -56,7 +57,7 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
     setState(() => _isLoading = true);
 
     try {
-      // 1. Concurrently fetch all authoritative database records from Supabase
+      // 1. Concurrently fetch all authoritative database records and telemetry events from Supabase
       final results = await Future.wait([
         SupabaseService.fetchAllProfiles().timeout(
           const Duration(seconds: 4),
@@ -65,12 +66,14 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
         _fetchOrdersFromSupabase(),
         _fetchTestAttemptsFromSupabase(),
         _fetchEntitlementsFromSupabase(),
+        _fetchTelemetryEventsFromSupabase(),
       ]);
 
       _profiles = results[0] as List<UserProfileModel>;
       _orders = results[1] as List<Map<String, dynamic>>;
       _attempts = results[2] as List<Map<String, dynamic>>;
       _entitlements = results[3] as List<Map<String, dynamic>>;
+      _telemetryEvents = results[4] as List<Map<String, dynamic>>;
 
       // 2. Compute authoritative KPI metrics via AnalyticsService
       _recalculateKpis();
@@ -89,10 +92,65 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
       orders: _orders,
       testAttempts: _attempts,
       entitlements: _entitlements,
+      telemetryEvents: _telemetryEvents,
       startDate: _startDate,
       endDate: _endDate,
       platformFilter: _selectedPlatform,
     );
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchTelemetryEventsFromSupabase() async {
+    try {
+      // 1. Query dedicated analytics_events table if populated
+      try {
+        final res = await SupabaseService.client
+            .from('analytics_events')
+            .select('id, event_name, event_id, user_id, device_id, session_id, platform, properties, created_at')
+            .order('created_at', ascending: false)
+            .limit(1000);
+        return List<Map<String, dynamic>>.from(res);
+      } catch (_) {
+        // 2. Fall back to audit_logs where entity = 'analytics_event'
+        final res = await SupabaseService.client
+            .from('audit_logs')
+            .select('id, actor_id, action, entity, new_value, created_at')
+            .eq('entity', 'analytics_event')
+            .order('created_at', ascending: false)
+            .limit(1000);
+
+        final events = <Map<String, dynamic>>[];
+        for (var row in res) {
+          final nv = row['new_value'];
+          final props = (nv is Map && nv['properties'] is Map)
+              ? Map<String, dynamic>.from(nv['properties'])
+              : <String, dynamic>{};
+          final devId = (nv is Map) ? nv['device_id']?.toString() : null;
+          final sessId = (nv is Map) ? nv['session_id']?.toString() : null;
+          final plat = (nv is Map) ? nv['platform']?.toString() : null;
+          final evtName = (nv is Map)
+              ? (nv['event_name'] ?? row['action'])?.toString()
+              : row['action']?.toString();
+          final uid = (nv is Map)
+              ? (nv['user_id'] ?? row['actor_id'])?.toString()
+              : row['actor_id']?.toString();
+
+          events.add({
+            'id': row['id'],
+            'event_name': evtName ?? 'unknown',
+            'user_id': uid,
+            'device_id': devId,
+            'session_id': sessId,
+            'platform': plat,
+            'properties': props,
+            'created_at': row['created_at'],
+          });
+        }
+        return events;
+      }
+    } catch (e) {
+      debugPrint('[AdminAnalytics] Telemetry events fetch note: $e');
+      return [];
+    }
   }
 
   Future<List<Map<String, dynamic>>> _fetchOrdersFromSupabase() async {
@@ -240,6 +298,7 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
           orders: _orders,
           testAttempts: _attempts,
           entitlements: _entitlements,
+          telemetryEvents: _telemetryEvents,
           startDate: _startDate,
           endDate: _endDate,
         );
@@ -589,7 +648,7 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
                 onSelected: (_) => _applyDatePreset(preset),
               ),
             );
-          }).toList(),
+          }),
 
           // Custom Picker Button
           ActionChip(
@@ -651,7 +710,7 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
             subValue: '${data.wau} WAU • ${data.mau} MAU',
             icon: Icons.people_outline_rounded,
             badgeColor: const Color(0xFF3B82F6),
-            trend: 'Rolling 24h Window',
+            trend: 'Qualifying Activity (IST)',
             isPositiveTrend: true,
           ),
 
@@ -681,12 +740,10 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
           _buildKpiCard(
             title: 'CRASH-FREE USERS',
             value: data.crashFreePercentage != null ? '${data.crashFreePercentage}%' : 'N/A',
-            subValue: data.crashFreePercentage != null
-                ? '${data.installedDevicesCount} installed devices tracked'
-                : 'Mobile Crashlytics Active (0 crashes)',
+            subValue: 'Mobile (Android/iOS): Active • Web: Unsupported',
             icon: Icons.health_and_safety_outlined,
             badgeColor: const Color(0xFF06B6D4),
-            trend: data.crashFreePercentage != null ? '0 Fatal Crashes' : 'Web/PWA Session',
+            trend: 'Awaiting Mobile Stream',
             isPositiveTrend: true,
           ),
         ],
@@ -940,14 +997,45 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
 
   // ================= 7. CONVERSION FUNNEL =================
   Widget _buildConversionFunnelCard(KpiDashboardData data) {
+    // Only calculate conversion against visitors if visitors were actually tracked and exceed or equal signups
+    final hasValidVisitorBaseline = data.funnelVisits > 0 && data.funnelVisits >= data.funnelSignups;
+
     final steps = [
-      {'name': '1. App / Web Visitors', 'count': data.funnelVisits, 'pct': 100},
-      {'name': '2. Registered Accounts', 'count': data.funnelSignups, 'pct': ((data.funnelSignups / data.funnelVisits) * 100).round()},
-      {'name': '3. Tests Started', 'count': data.funnelTestStarts, 'pct': ((data.funnelTestStarts / data.funnelVisits) * 100).round()},
-      {'name': '4. Tests Submitted', 'count': data.funnelTestCompletes, 'pct': ((data.funnelTestCompletes / data.funnelVisits) * 100).round()},
-      {'name': '5. Series Explored', 'count': data.funnelSeriesViews, 'pct': ((data.funnelSeriesViews / data.funnelVisits) * 100).round()},
-      {'name': '6. Enrolled (Free/Paid)', 'count': data.funnelEnrollments, 'pct': ((data.funnelEnrollments / data.funnelVisits) * 100).round()},
-      {'name': '7. Verified Customers', 'count': data.funnelPaidPurchases, 'pct': ((data.funnelPaidPurchases / data.funnelVisits) * 100).round()},
+      {
+        'name': data.funnelVisits > 0 ? '1. App / Web Visitors (Telemetry)' : '1. App / Web Visitors (Pipeline Pending)',
+        'count': data.funnelVisits > 0 ? '${data.funnelVisits}' : 'Awaiting',
+        'pct': hasValidVisitorBaseline ? 100 : null,
+      },
+      {
+        'name': '2. Registered Accounts',
+        'count': '${data.funnelSignups}',
+        'pct': hasValidVisitorBaseline ? ((data.funnelSignups / data.funnelVisits) * 100).round() : 100,
+      },
+      {
+        'name': '3. Tests Started',
+        'count': '${data.funnelTestStarts}',
+        'pct': data.funnelSignups > 0 ? ((data.funnelTestStarts / data.funnelSignups) * 100).round() : 0,
+      },
+      {
+        'name': '4. Tests Submitted',
+        'count': '${data.funnelTestCompletes}',
+        'pct': data.funnelTestStarts > 0 ? ((data.funnelTestCompletes / data.funnelTestStarts) * 100).round() : 0,
+      },
+      {
+        'name': '5. Series Explored',
+        'count': '${data.funnelSeriesViews}',
+        'pct': data.funnelSignups > 0 ? ((data.funnelSeriesViews / data.funnelSignups) * 100).round() : 0,
+      },
+      {
+        'name': '6. Enrolled (Free/Paid)',
+        'count': '${data.funnelEnrollments}',
+        'pct': data.funnelSignups > 0 ? ((data.funnelEnrollments / data.funnelSignups) * 100).round() : 0,
+      },
+      {
+        'name': '7. Verified Customers',
+        'count': '${data.funnelPaidPurchases}',
+        'pct': data.funnelSignups > 0 ? ((data.funnelPaidPurchases / data.funnelSignups) * 100).round() : 0,
+      },
     ];
 
     return Container(
@@ -969,10 +1057,16 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
             ],
           ),
           const SizedBox(height: 4),
-          Text('Visitor acquisition to verified paying students', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+          Text(
+            hasValidVisitorBaseline
+                ? 'Visitor acquisition to verified paying students'
+                : 'Stage progression (Visitor telemetry baseline newly instrumenting; pre-telemetry accounts in Auth DB)',
+            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+          ),
           const SizedBox(height: 20),
           ...steps.map((s) {
-            final pct = s['pct'] as int;
+            final pct = s['pct'] as int?;
+            final pctDisplay = pct != null ? '$pct%' : '—';
             return Padding(
               padding: const EdgeInsets.only(bottom: 12.0),
               child: Column(
@@ -982,17 +1076,17 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(s['name'] as String, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF334155))),
-                      Text('${s['count']} ($pct%)', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
+                      Text('${s['count']} ($pctDisplay)', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A))),
                     ],
                   ),
                   const SizedBox(height: 6),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(6),
                     child: LinearProgressIndicator(
-                      value: (pct / 100.0).clamp(0.02, 1.0),
+                      value: pct != null ? (pct / 100.0).clamp(0.02, 1.0) : 0.02,
                       backgroundColor: const Color(0xFFF1F5F9),
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        pct > 50 ? const Color(0xFF6366F1) : (pct > 20 ? const Color(0xFF3B82F6) : const Color(0xFF10B981)),
+                        (pct ?? 0) > 50 ? const Color(0xFF6366F1) : ((pct ?? 0) > 20 ? const Color(0xFF3B82F6) : const Color(0xFF10B981)),
                       ),
                       minHeight: 7,
                     ),
@@ -1000,7 +1094,7 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -1027,7 +1121,10 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
             ],
           ),
           const SizedBox(height: 4),
-          Text('% of registered students active across subsequent weeks', style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B))),
+          Text(
+            '% of registered students active across subsequent weeks from genuine qualifying activity. Pre-telemetry historical periods display as unavailable (—).',
+            style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+          ),
           const SizedBox(height: 20),
 
           // Table
@@ -1069,7 +1166,7 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
                     _cohortHeatmapCell(row.week4Pct),
                   ],
                 );
-              }).toList(),
+              }),
             ],
           ),
         ],
@@ -1127,9 +1224,14 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
 
   // ================= 9. DEVICE VS ACCOUNTS & PLATFORM AUDIT =================
   Widget _buildDeviceVsAccountSection(KpiDashboardData data) {
-    final conversionText = data.installedDevicesCount > 0
-        ? '${((data.totalRegisteredUsers / data.installedDevicesCount) * 100).toStringAsFixed(1)}% Conversion'
-        : '100% Direct (Auth DB)';
+    final String conversionText;
+    if (data.installedDevicesCount > 0 && data.installedDevicesCount >= data.totalRegisteredUsers) {
+      conversionText = '${((data.totalRegisteredUsers / data.installedDevicesCount) * 100).toStringAsFixed(1)}% Conversion';
+    } else if (data.installedDevicesCount > 0) {
+      conversionText = 'Direct Auth DB (${data.installedDevicesCount} Device Tracked)';
+    } else {
+      conversionText = 'Telemetry Ingestion Pending';
+    }
 
     return Container(
       padding: const EdgeInsets.all(22),
@@ -1164,10 +1266,12 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
               Expanded(
                 child: _buildIdentityPill(
                   title: 'Tracked Device Installations',
-                  value: data.installedDevicesCount > 0 ? '${data.installedDevicesCount} Unique Devices' : '0 Devices Tracked',
+                  value: data.installedDevicesCount > 0
+                      ? '${data.installedDevicesCount} Unique Device${data.installedDevicesCount > 1 ? 's' : ''}'
+                      : '0 Devices Tracked (Pipeline Active)',
                   description: data.installedDevicesCount > 0
-                      ? 'Anonymous browsers & installed apps with stable hardware IDs'
-                      : 'Telemetry ingestion pending; accounts counted strictly by verified profiles',
+                      ? 'Privacy-conscious local install UUIDs confirmed in telemetry ledger'
+                      : 'Telemetry pipeline active; awaiting client first-open telemetry',
                   color: const Color(0xFF3B82F6),
                   icon: Icons.devices_rounded,
                 ),
