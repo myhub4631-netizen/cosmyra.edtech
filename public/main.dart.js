@@ -91181,7 +91181,7 @@ if(d==null)d="device_unknown"
 c=n.b
 if(c==null)c="session_default"
 a0=t.N
-h=A.n(["device_id",d,"session_id",c,"platform",A.czf(),"app_version","2.2.8+9","is_anonymous",j],a0,t.z)
+h=A.n(["device_id",d,"session_id",c,"platform",A.czf(),"app_version","2.2.9+10","is_anonymous",j],a0,t.z)
 J.eV(h,n.awp(a6))
 s=$.azU&&$.azT!=null?7:8
 break
@@ -91296,7 +91296,7 @@ k=k.b
 if(k==null)k="session_default"
 i=t.N
 h=t.X
-n=A.n(["event_name",m,"event_id",o.c,"user_id",l,"device_id",j,"session_id",k,"platform",A.czf(),"app_version","2.2.8+9","is_anonymous",l==null,"properties",o.e,"created_at",new A.am(Date.now(),0,!1).KO().a5()],i,h)
+n=A.n(["event_name",m,"event_id",o.c,"user_id",l,"device_id",j,"session_id",k,"platform",A.czf(),"app_version","2.2.9+10","is_anonymous",l==null,"properties",o.e,"created_at",new A.am(Date.now(),0,!1).KO().a5()],i,h)
 q=7
 k=$.ai().b
 k===$&&A.b()

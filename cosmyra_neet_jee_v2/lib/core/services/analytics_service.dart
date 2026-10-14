@@ -23,7 +23,7 @@ class AnalyticsService {
   static const String _prefFirstOpenKey = 'cosmyra_analytics_first_open_done';
   static const String _prefSessionIdKey = 'cosmyra_analytics_session_id';
   static const String _prefLastActiveMsKey = 'cosmyra_analytics_last_active_ms';
-  static const String _appVersion = '2.2.8+9';
+  static const String _appVersion = '2.2.9+10';
 
   static bool _initialized = false;
   static bool _firebaseAnalyticsAvailable = false;
