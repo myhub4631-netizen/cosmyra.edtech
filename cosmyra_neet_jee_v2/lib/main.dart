@@ -12,6 +12,7 @@ import 'core/services/seo_tracking_service.dart';
 
 import 'core/services/feature_config_service.dart';
 import 'core/services/platform_time_tracker_service.dart';
+import 'core/services/analytics_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +32,9 @@ void main() async {
 void _initializeBackgroundServices() {
   Future.wait([
     CrashAnalyticsService.initialize(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ),
+    AnalyticsService.initialize(
       options: DefaultFirebaseOptions.currentPlatform,
     ),
     PlatformTimeTrackerService.initialize(),

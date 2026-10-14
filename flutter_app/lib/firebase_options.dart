@@ -43,36 +43,36 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'YOUR_NEW_API_KEY',
-    appId: '1:YOUR_NEW_PROJECT_NUMBER:android:placeholder',
-    messagingSenderId: 'YOUR_NEW_PROJECT_NUMBER',
-    projectId: 'YOUR_NEW_PROJECT_ID',
-    storageBucket: 'YOUR_NEW_PROJECT.appspot.com',
+    apiKey: 'AIzaSyAP1bSXD1ho4dLeamygyeTbLCO3FLxoxfs',
+    appId: '1:852782340906:android:f306b7e0c88a9c9aaf9856',
+    messagingSenderId: '852782340906',
+    projectId: 'cosmyra-neet-jee',
+    storageBucket: 'cosmyra-edu.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'YOUR_NEW_API_KEY',
-    appId: '1:YOUR_NEW_PROJECT_NUMBER:ios:placeholder',
-    messagingSenderId: 'YOUR_NEW_PROJECT_NUMBER',
-    projectId: 'YOUR_NEW_PROJECT_ID',
-    storageBucket: 'YOUR_NEW_PROJECT.appspot.com',
+    apiKey: 'AIzaSyAP1bSXD1ho4dLeamygyeTbLCO3FLxoxfs',
+    appId: '1:852782340906:ios:f306b7e0c88a9c9aaf9856',
+    messagingSenderId: '852782340906',
+    projectId: 'cosmyra-neet-jee',
+    storageBucket: 'cosmyra-edu.firebasestorage.app',
     iosBundleId: 'com.cosmyra.neetjee',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'YOUR_NEW_API_KEY',
-    appId: '1:YOUR_NEW_PROJECT_NUMBER:ios:placeholder',
-    messagingSenderId: 'YOUR_NEW_PROJECT_NUMBER',
-    projectId: 'YOUR_NEW_PROJECT_ID',
-    storageBucket: 'YOUR_NEW_PROJECT.appspot.com',
+    apiKey: 'AIzaSyAP1bSXD1ho4dLeamygyeTbLCO3FLxoxfs',
+    appId: '1:852782340906:ios:f306b7e0c88a9c9aaf9856',
+    messagingSenderId: '852782340906',
+    projectId: 'cosmyra-neet-jee',
+    storageBucket: 'cosmyra-edu.firebasestorage.app',
     iosBundleId: 'com.cosmyra.neetjee',
   );
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'YOUR_NEW_API_KEY',
-    appId: '1:YOUR_NEW_PROJECT_NUMBER:web:placeholder',
-    messagingSenderId: 'YOUR_NEW_PROJECT_NUMBER',
-    projectId: 'YOUR_NEW_PROJECT_ID',
-    storageBucket: 'YOUR_NEW_PROJECT.appspot.com',
+    apiKey: 'AIzaSyAP1bSXD1ho4dLeamygyeTbLCO3FLxoxfs',
+    appId: '1:852782340906:web:f306b7e0c88a9c9aaf9856',
+    messagingSenderId: '852782340906',
+    projectId: 'cosmyra-neet-jee',
+    storageBucket: 'cosmyra-edu.firebasestorage.app',
   );
 }

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/analytics_service.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/promo_dropdown_banner.dart';
 
@@ -157,6 +158,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      AnalyticsService.instance.logLogin(method: 'email');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -220,6 +222,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
         phone: phone,
         targetExam: _selectedExam,
       );
+      AnalyticsService.instance.logRegistration(method: 'email', targetExam: _selectedExam);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -283,6 +286,7 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
     try {
       final success = await SupabaseService.signInWithGoogle();
       if (success && mounted) {
+        AnalyticsService.instance.logLogin(method: 'google');
         final profile = SupabaseService.activeUserSession;
         if (profile != null) {
           widget.onAuthSuccess?.call(profile);

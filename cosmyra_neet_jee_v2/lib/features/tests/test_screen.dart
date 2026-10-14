@@ -7,6 +7,7 @@ import '../../shared/widgets/latex_view.dart';
 import '../../shared/widgets/smart_image.dart';
 import '../../shared/utils/question_copy_helper.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/analytics_service.dart';
 import '../../shared/utils/neet_subject_helper.dart';
 import 'test_result_screen.dart';
 
@@ -62,6 +63,12 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
     if (!widget.isPreview) {
       if (widget.isNewSession) {
         SupabaseService.clearActiveTestSession();
+        AnalyticsService.instance.logTestStart(
+          testId: widget.testTemplateId ?? _activeSessionId,
+          paperName: widget.testTitle ?? 'Practice Test',
+          exam: 'NEET',
+          questionCount: widget.questions.length,
+        );
       } else {
         _restoreActiveSession();
       }
@@ -340,6 +347,14 @@ class _CustomTestScreenState extends State<CustomTestScreen> {
         attempt: attempt,
         questions: widget.questions,
         userAnswers: _userAnswers,
+      );
+      AnalyticsService.instance.logTestSubmit(
+        testId: templateId,
+        score: score,
+        maxScore: calculatedMaxMarks,
+        accuracy: accuracy,
+        durationSeconds: timeSpent,
+        totalQuestions: widget.questions.length,
       );
     }
 

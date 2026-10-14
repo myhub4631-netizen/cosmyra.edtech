@@ -37,6 +37,7 @@ import '../../features/tests/my_tests_history_screen.dart';
 import '../../features/practice/practice_screen.dart';
 import '../../features/practice/custom_practice_wizard.dart';
 import '../../features/admin/admin_dashboard_screen.dart';
+import '../../features/admin/admin_analytics_dashboard_screen.dart';
 import '../../features/admin/admin_user_management_screen.dart';
 import '../../features/admin/admin_chapters_topics_screen.dart';
 import '../../features/admin/admin_questions_bank_dashboard.dart';
@@ -1611,7 +1612,7 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/admin/analytics',
-      builder: (context, state) => const AnalyticsScreen(),
+      builder: (context, state) => const AdminAnalyticsDashboardScreen(),
     ),
     GoRoute(
       path: '/admin/notifications',

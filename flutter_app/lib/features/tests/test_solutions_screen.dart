@@ -8,6 +8,7 @@ import '../../shared/widgets/solution_video_player.dart';
 import '../../shared/utils/question_copy_helper.dart';
 import '../../shared/utils/neet_subject_helper.dart';
 import '../../core/services/supabase_service.dart';
+import '../../core/services/analytics_service.dart';
 
 enum SolutionFilterType { all, correct, incorrect, skipped, review }
 
@@ -55,6 +56,10 @@ class _TestSolutionsScreenState extends State<TestSolutionsScreen> {
   @override
   void initState() {
     super.initState();
+    AnalyticsService.instance.logSolutionView(
+      testId: widget.attempt.testTemplateId.isNotEmpty ? widget.attempt.testTemplateId : widget.attempt.id,
+      paperName: widget.attempt.testTitle.isNotEmpty ? widget.attempt.testTitle : 'Practice Test',
+    );
     _currentAttempt = widget.attempt;
     _currentUserAnswers = Map<int, String>.from(widget.userAnswers);
     _selectedQuestionOriginalIndex = widget.initialQuestionIndex.clamp(0, (widget.questions.length - 1).clamp(0, 9999));
