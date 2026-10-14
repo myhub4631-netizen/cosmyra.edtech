@@ -8352,48 +8352,159 @@ class SupabaseService {
       debugPrint('Notice fetching user activity logs: $e');
     }
 
-    if (logs.isEmpty) {
-      final now = DateTime.now();
-      logs.addAll([
-        {
-          'id': 'act_1',
-          'action': 'Logged In (Web Portal)',
-          'device': 'Chrome / macOS (Brave Browser)',
-          'ip_address': '103.21.124.89',
-          'location': 'Kolkata, WB, India',
-          'created_at': now.subtract(const Duration(minutes: 15)).toIso8601String(),
-          'status': 'active_session',
-        },
-        {
-          'id': 'act_2',
-          'action': 'Completed Practice Test: Physics Mechanics',
-          'device': 'Cosmyra Android App (v2.4.1)',
-          'ip_address': '103.21.124.89',
-          'location': 'Kolkata, WB, India',
-          'created_at': now.subtract(const Duration(hours: 3)).toIso8601String(),
-          'status': 'completed',
-        },
-        {
-          'id': 'act_3',
-          'action': 'Attempted PYQ 2024 Biology Section',
-          'device': 'Cosmyra Android App (v2.4.1)',
-          'ip_address': '103.21.124.89',
-          'location': 'Kolkata, WB, India',
-          'created_at': now.subtract(const Duration(days: 1)).toIso8601String(),
-          'status': 'completed',
-        },
-        {
-          'id': 'act_4',
-          'action': 'Password Changed & Security Updated',
-          'device': 'Chrome / macOS',
-          'ip_address': '103.21.124.89',
-          'location': 'Kolkata, WB, India',
-          'created_at': now.subtract(const Duration(days: 4)).toIso8601String(),
-          'status': 'system',
-        },
-      ]);
+    // 2. Query authentic telemetry from analytics_events table
+    try {
+      final res = await client
+          .from('analytics_events')
+          .select('id, event_name, device_id, platform, properties, created_at')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .limit(50);
+      if (res is List && res.isNotEmpty) {
+        for (var e in res) {
+          final Map<String, dynamic> props = (e['properties'] is Map)
+              ? Map<String, dynamic>.from(e['properties'] as Map)
+              : <String, dynamic>{};
+          final name = e['event_name']?.toString() ?? 'Event';
+          logs.add({
+            'id': e['id']?.toString() ?? 'evt_${DateTime.now().millisecondsSinceEpoch}',
+            'action': _formatEventActionTitle(name, props),
+            'device': '${e['platform']?.toString().toUpperCase() ?? 'WEB'} (${e['device_id'] ?? 'device'})',
+            'created_at': e['created_at'],
+            'status': 'telemetry',
+            'properties': props,
+          });
+        }
+      }
+    } catch (_) {
+      // 3. Fallback: Query authentic telemetry events stored in audit_logs
+      try {
+        final res = await client
+            .from('audit_logs')
+            .select('id, action, entity, new_value, created_at')
+            .eq('actor_id', userId)
+            .eq('entity', 'analytics_event')
+            .order('created_at', ascending: false)
+            .limit(50);
+        if (res is List && res.isNotEmpty) {
+          for (var r in res) {
+            final Map<String, dynamic> nv = (r['new_value'] is Map)
+                ? Map<String, dynamic>.from(r['new_value'] as Map)
+                : <String, dynamic>{};
+            final Map<String, dynamic> props = (nv['properties'] is Map)
+                ? Map<String, dynamic>.from(nv['properties'] as Map)
+                : <String, dynamic>{};
+            final evtName = nv['event_name']?.toString() ?? r['action']?.toString() ?? 'Activity';
+            logs.add({
+              'id': r['id']?.toString() ?? 'audit_${DateTime.now().millisecondsSinceEpoch}',
+              'action': _formatEventActionTitle(evtName, props),
+              'device': '${nv['platform']?.toString().toUpperCase() ?? 'WEB'} (${nv['device_id'] ?? 'device'})',
+              'created_at': r['created_at'],
+              'status': 'telemetry',
+              'properties': props,
+            });
+          }
+        }
+      } catch (_) {}
     }
+
+    // 4. Query authentic student test attempts
+    try {
+      final res = await client
+          .from('test_attempts')
+          .select('id, status, score, score_percentage, started_at, completed_at, created_at')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .limit(20);
+      if (res is List && res.isNotEmpty) {
+        for (var t in res) {
+          final st = t['status']?.toString() ?? 'started';
+          final score = t['score'] ?? t['score_percentage'];
+          logs.add({
+            'id': t['id']?.toString() ?? 'test_${DateTime.now().millisecondsSinceEpoch}',
+            'action': st == 'completed'
+                ? 'Submitted Test Attempt (Score: ${score != null ? "$score%" : "Graded"})'
+                : 'Started Test Attempt',
+            'device': 'Cosmyra Portal',
+            'created_at': t['completed_at'] ?? t['started_at'] ?? t['created_at'],
+            'status': st,
+            'properties': t,
+          });
+        }
+      }
+    } catch (_) {}
+
+    // 5. Query authentic student orders
+    try {
+      final res = await client
+          .from('orders')
+          .select('id, amount, total_amount, status, created_at')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .limit(20);
+      if (res is List && res.isNotEmpty) {
+        for (var o in res) {
+          final amt = o['total_amount'] ?? o['amount'] ?? '0';
+          logs.add({
+            'id': o['id']?.toString() ?? 'ord_${DateTime.now().millisecondsSinceEpoch}',
+            'action': 'Order Placed (₹$amt - ${o['status']?.toString().toUpperCase() ?? 'PENDING'})',
+            'device': 'Payment Gateway',
+            'created_at': o['created_at'],
+            'status': o['status'] ?? 'order',
+            'properties': o,
+          });
+        }
+      }
+    } catch (_) {}
+
+    // Sort all genuine records chronologically descending
+    logs.sort((a, b) {
+      final dtA = DateTime.tryParse(a['created_at']?.toString() ?? '') ?? DateTime(1970);
+      final dtB = DateTime.tryParse(b['created_at']?.toString() ?? '') ?? DateTime(1970);
+      return dtB.compareTo(dtA);
+    });
+
     return logs;
+  }
+
+  /// Helper to convert snake_case event names to human-readable activity descriptions
+  static String _formatEventActionTitle(String eventName, Map<String, dynamic> props) {
+    switch (eventName) {
+      case 'session_start':
+        return 'Session Started';
+      case 'login':
+      case 'user_login':
+        return 'Logged In (Authenticated)';
+      case 'sign_up':
+      case 'signup_completed':
+        return 'Account Created & Registered';
+      case 'test_start':
+      case 'test_started':
+        final title = props['paper_name'] ?? props['test_name'] ?? props['test_title'] ?? 'Test Paper';
+        return 'Started Test: $title';
+      case 'test_submit':
+      case 'test_submitted':
+        final title = props['paper_name'] ?? props['test_name'] ?? props['test_title'] ?? 'Test Paper';
+        return 'Submitted Test: $title';
+      case 'question_answer':
+      case 'question_answered':
+        final qNum = props['question_number'] ?? props['question_index'] ?? '';
+        return 'Answered Question ${qNum.toString().isNotEmpty ? "#$qNum" : ""}';
+      case 'practice_session':
+      case 'practice_started':
+        final chap = props['chapter'] ?? props['topic'] ?? 'Subject Practice';
+        return 'Practiced: $chap';
+      case 'video_solution_opened':
+        return 'Watched Video Solution';
+      case 'solution_viewed':
+        return 'Viewed Question Solution';
+      case 'checkout_started':
+        return 'Initiated Checkout';
+      case 'payment_verified':
+        return 'Payment Verified';
+      default:
+        return eventName.replaceAll('_', ' ').split(' ').map((s) => s.isNotEmpty ? '${s[0].toUpperCase()}${s.substring(1)}' : '').join(' ');
+    }
   }
 
   /// Fetch questions linked to a specific Test Series or Paper for editing

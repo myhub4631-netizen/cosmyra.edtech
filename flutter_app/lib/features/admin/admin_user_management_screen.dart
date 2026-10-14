@@ -3245,13 +3245,27 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
         const SizedBox(height: 10),
 
         if (_userActivityLogs.isEmpty)
-          const Text('No recent activity logged.', style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)))
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, size: 16, color: Color(0xFF94A3B8)),
+                SizedBox(width: 8),
+                Text('No activity recorded yet for this student.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              ],
+            ),
+          )
         else
           Column(
             children: _userActivityLogs.map((act) {
               final actionStr = act['action'] ?? 'App Interaction';
               final deviceStr = act['device'] ?? 'Mobile / Web';
-              final ipStr = act['ip_address'] ?? '103.21.124.89';
+              final statusStr = (act['status'] ?? 'event').toString().toUpperCase();
               final timeStr = act['created_at'] != null
                   ? () {
                       final parsed = DateTime.tryParse(act['created_at'].toString())?.toLocal();
@@ -3263,23 +3277,44 @@ class _AdminUserManagementScreenState extends State<AdminUserManagementScreen> {
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.history_rounded, size: 16, color: Color(0xFF6366F1)),
-                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.history_rounded, size: 16, color: Color(0xFF6366F1)),
+                    ),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(actionStr, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                          Text('$deviceStr • IP: $ipStr', style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                          Text(actionStr, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Text(deviceStr, style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B))),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(statusStr, style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),

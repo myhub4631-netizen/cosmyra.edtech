@@ -28,6 +28,10 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _endDate = DateTime.now();
   String _selectedPlatform = 'all'; // 'all', 'web', 'android', 'ios'
+  String _activityEventTypeFilter = 'all'; // 'all', 'tests', 'learning', 'auth', 'commerce'
+  String _activitySearchQuery = '';
+  int _activityCurrentPage = 1;
+  static const int _activityPageSize = 10;
 
   List<UserProfileModel> _profiles = [];
   List<Map<String, dynamic>> _orders = [];
@@ -350,6 +354,10 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
 
                               // Device Installs vs Registered Accounts & Platform Coverage
                               _buildDeviceVsAccountSection(data),
+                              const SizedBox(height: 28),
+
+                              // Section B: Live Student Activity Feed (Real-Time Ingestion)
+                              _buildLiveStudentActivitySection(),
                               const SizedBox(height: 40),
                             ],
                           ),
@@ -1331,6 +1339,390 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
           Text(value, style: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w800, color: const Color(0xFF0F172A))),
           const SizedBox(height: 4),
           Text(description, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B))),
+        ],
+      ),
+    );
+  }
+
+  // ================= 10. SECTION B: LIVE STUDENT ACTIVITY STREAM =================
+  Widget _buildLiveStudentActivitySection() {
+    // 1. Filter telemetry events based on platform, event category, and search query
+    final filtered = _telemetryEvents.where((e) {
+      final plat = (e['platform'] ?? '').toString().toLowerCase();
+      if (_selectedPlatform != 'all' && plat != _selectedPlatform) {
+        return false;
+      }
+
+      final evtName = (e['event_name'] ?? '').toString().toLowerCase();
+      if (_activityEventTypeFilter != 'all') {
+        if (_activityEventTypeFilter == 'tests') {
+          if (!evtName.contains('test') && !evtName.contains('question') && !evtName.contains('answer')) {
+            return false;
+          }
+        } else if (_activityEventTypeFilter == 'learning') {
+          if (!evtName.contains('practice') && !evtName.contains('solution') && !evtName.contains('note') && !evtName.contains('chapter')) {
+            return false;
+          }
+        } else if (_activityEventTypeFilter == 'auth') {
+          if (!evtName.contains('session') && !evtName.contains('login') && !evtName.contains('sign') && !evtName.contains('open')) {
+            return false;
+          }
+        } else if (_activityEventTypeFilter == 'commerce') {
+          if (!evtName.contains('order') && !evtName.contains('checkout') && !evtName.contains('payment') && !evtName.contains('enroll')) {
+            return false;
+          }
+        }
+      }
+
+      if (_activitySearchQuery.isNotEmpty) {
+        final q = _activitySearchQuery.toLowerCase();
+        final dev = (e['device_id'] ?? '').toString().toLowerCase();
+        final sess = (e['session_id'] ?? '').toString().toLowerCase();
+        final uid = (e['user_id'] ?? '').toString().toLowerCase();
+        final student = _profiles.where((p) => p.id == e['user_id']).firstOrNull;
+        final name = (student?.fullName ?? '').toLowerCase();
+        final email = (student?.email ?? '').toLowerCase();
+        if (!evtName.contains(q) && !dev.contains(q) && !sess.contains(q) && !uid.contains(q) && !name.contains(q) && !email.contains(q)) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+
+    final totalPages = (filtered.length / _activityPageSize).ceil().clamp(1, 9999);
+    if (_activityCurrentPage > totalPages) {
+      _activityCurrentPage = totalPages;
+    }
+    final startIndex = (_activityCurrentPage - 1) * _activityPageSize;
+    final pageItems = filtered.skip(startIndex).take(_activityPageSize).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.stream_rounded, color: Color(0xFF6366F1), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Live Student Activity Stream (Real-Time Ingestion)',
+                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 16, color: const Color(0xFF0F172A)),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Authoritative chronological telemetry of authentic student actions. Zero fabricated rows.',
+                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'INGESTION ACTIVE',
+                          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Color(0xFF065F46)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  OutlinedButton.icon(
+                    onPressed: _loadAnalyticsData,
+                    icon: const Icon(Icons.refresh_rounded, size: 14, color: Color(0xFF475569)),
+                    label: const Text('Refresh Feed', style: TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Filters Bar: Categories & Search
+          Row(
+            children: [
+              // Event category chips
+              ...[
+                {'id': 'all', 'label': 'All Actions'},
+                {'id': 'tests', 'label': 'Tests & Questions'},
+                {'id': 'learning', 'label': 'Practice & Solutions'},
+                {'id': 'auth', 'label': 'Sessions & Logins'},
+                {'id': 'commerce', 'label': 'Orders & Enrollments'},
+              ].map((cat) {
+                final isSel = _activityEventTypeFilter == cat['id'];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: FilterChip(
+                    selected: isSel,
+                    label: Text(cat['label']!, style: TextStyle(fontSize: 11.5, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
+                    selectedColor: const Color(0xFF6366F1),
+                    labelStyle: TextStyle(color: isSel ? Colors.white : const Color(0xFF475569)),
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    onSelected: (_) {
+                      setState(() {
+                        _activityEventTypeFilter = cat['id']!;
+                        _activityCurrentPage = 1;
+                      });
+                    },
+                  ),
+                );
+              }),
+
+              const Spacer(),
+
+              // Search bar
+              SizedBox(
+                width: 260,
+                height: 36,
+                child: TextField(
+                  onChanged: (val) {
+                    setState(() {
+                      _activitySearchQuery = val.trim();
+                      _activityCurrentPage = 1;
+                    });
+                  },
+                  style: const TextStyle(fontSize: 12),
+                  decoration: InputDecoration(
+                    hintText: 'Search student or action...',
+                    hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                    prefixIcon: const Icon(Icons.search, size: 16, color: Color(0xFF94A3B8)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF6366F1))),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+
+          // Activity Event Stream List
+          if (filtered.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.inbox_outlined, size: 36, color: Color(0xFF94A3B8)),
+                  const SizedBox(height: 10),
+                  Text(
+                    'No student activity matches the selected filters in this time window.',
+                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'The activity ledger reflects genuine, non-fabricated events emitted by real users.',
+                    style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF94A3B8)),
+                  ),
+                ],
+              ),
+            )
+          else
+            Column(
+              children: [
+                ...pageItems.map((evt) {
+                  final evtName = evt['event_name']?.toString() ?? 'unknown_event';
+                  final uid = evt['user_id']?.toString();
+                  final student = uid != null ? _profiles.where((p) => p.id == uid).firstOrNull : null;
+                  final studentName = student?.fullName.isNotEmpty == true
+                      ? student!.fullName
+                      : (student?.email.isNotEmpty == true ? student!.email : (uid != null ? 'User: ${uid.substring(0, 8)}' : 'Anonymous Visitor'));
+                  final plat = (evt['platform'] ?? 'web').toString().toUpperCase();
+                  final devId = evt['device_id']?.toString() ?? 'device_unknown';
+                  final sessId = evt['session_id']?.toString() ?? '';
+                  final rawTime = evt['created_at'];
+                  final parsedTime = rawTime != null ? DateTime.tryParse(rawTime.toString())?.toLocal() : null;
+                  final timeLabel = parsedTime != null
+                      ? DateFormat('dd MMM yyyy, hh:mm:ss a').format(parsedTime)
+                      : (rawTime?.toString() ?? 'Just now');
+
+                  // Check if student was active within the 5-minute presence window
+                  final isRecentlyActive = parsedTime != null && DateTime.now().difference(parsedTime).inMinutes <= 5;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Avatar / Identity Icon
+                        AppAvatar(
+                          name: studentName,
+                          size: 36,
+                          backgroundColor: uid != null ? const Color(0xFFEEF2FF) : const Color(0xFFF1F5F9),
+                          textStyle: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: uid != null ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+
+                        // Event Body
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    studentName,
+                                    style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  if (isRecentlyActive)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDCFCE7),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text('ACTIVE NOW', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF15803D))),
+                                    ),
+                                  const Spacer(),
+                                  Text(timeLabel, style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEEF2FF),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFFC7D2FE)),
+                                    ),
+                                    child: Text(
+                                      evtName,
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF4338CA)),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(plat, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Device: ${devId.length > 20 ? "${devId.substring(0, 16)}..." : devId}',
+                                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
+                                  ),
+                                  if (sessId.isNotEmpty) ...[
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '• Session: ${sessId.length > 16 ? "${sessId.substring(0, 12)}..." : sessId}',
+                                      style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+
+                // Pagination Row
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Showing ${startIndex + 1} - ${(startIndex + pageItems.length).clamp(0, filtered.length)} of ${filtered.length} genuine events',
+                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                    ),
+                    Row(
+                      children: [
+                        OutlinedButton(
+                          onPressed: _activityCurrentPage > 1
+                              ? () => setState(() => _activityCurrentPage--)
+                              : null,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            minimumSize: Size.zero,
+                          ),
+                          child: const Text('Previous', style: TextStyle(fontSize: 11)),
+                        ),
+                        const SizedBox(width: 8),
+                        Text('$_activityCurrentPage of $totalPages', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 8),
+                        OutlinedButton(
+                          onPressed: _activityCurrentPage < totalPages
+                              ? () => setState(() => _activityCurrentPage++)
+                              : null,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            minimumSize: Size.zero,
+                          ),
+                          child: const Text('Next', style: TextStyle(fontSize: 11)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
         ],
       ),
     );
