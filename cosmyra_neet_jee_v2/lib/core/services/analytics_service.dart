@@ -451,24 +451,28 @@ class AnalyticsService {
     }).toList();
 
     // 2. Active User Counts (DAU, WAU, MAU)
-    // DAU: active in past 24 hours
-    final oneDayAgo = now.subtract(const Duration(hours: 24));
-    final sevenDaysAgo = now.subtract(const Duration(days: 7));
-    final thirtyDaysAgo = now.subtract(const Duration(days: 30));
+    // If filterEnd is in the future, anchor active window to now
+    final refTime = filterEnd.isAfter(now) ? now : filterEnd;
+    final oneDayAgo = refTime.subtract(const Duration(hours: 24));
+    final sevenDaysAgo = refTime.subtract(const Duration(days: 7));
+    final thirtyDaysAgo = refTime.subtract(const Duration(days: 30));
 
     final dauCount = profiles.where((p) {
-      final active = p.updatedAt ?? p.createdAt ?? now;
-      return active.isAfter(oneDayAgo);
+      final active = p.updatedAt ?? p.createdAt;
+      if (active == null) return false;
+      return !active.isBefore(oneDayAgo) && !active.isAfter(refTime.add(const Duration(seconds: 1)));
     }).length;
 
     final wauCount = profiles.where((p) {
-      final active = p.updatedAt ?? p.createdAt ?? now;
-      return active.isAfter(sevenDaysAgo);
+      final active = p.updatedAt ?? p.createdAt;
+      if (active == null) return false;
+      return !active.isBefore(sevenDaysAgo) && !active.isAfter(refTime.add(const Duration(seconds: 1)));
     }).length;
 
     final mauCount = profiles.where((p) {
-      final active = p.updatedAt ?? p.createdAt ?? now;
-      return active.isAfter(thirtyDaysAgo);
+      final active = p.updatedAt ?? p.createdAt;
+      if (active == null) return false;
+      return !active.isBefore(thirtyDaysAgo) && !active.isAfter(refTime.add(const Duration(seconds: 1)));
     }).length;
 
     // 3. Authoritative Verified Financial Records
@@ -477,7 +481,7 @@ class AnalyticsService {
       final status = (o['status'] ?? '').toString().toLowerCase();
       final dt = DateTime.tryParse(o['created_at']?.toString() ?? '') ?? now;
       final inRange = dt.isAfter(filterStart.subtract(const Duration(seconds: 1))) &&
-          dt.isBefore(filterEnd.add(const Duration(days: 1)));
+          dt.isBefore(filterEnd.add(const Duration(seconds: 1)));
       return status == 'completed' && inRange;
     }).toList();
 
@@ -485,7 +489,7 @@ class AnalyticsService {
       final status = (o['status'] ?? '').toString().toLowerCase();
       final dt = DateTime.tryParse(o['created_at']?.toString() ?? '') ?? now;
       final inRange = dt.isAfter(filterStart.subtract(const Duration(seconds: 1))) &&
-          dt.isBefore(filterEnd.add(const Duration(days: 1)));
+          dt.isBefore(filterEnd.add(const Duration(seconds: 1)));
       return status == 'refunded' && inRange;
     }).toList();
 
@@ -504,9 +508,15 @@ class AnalyticsService {
     final netRevenue = (grossRevenue - refundedRevenue).clamp(0.0, double.infinity);
     final aov = completedOrders.isNotEmpty ? (grossRevenue / completedOrders.length) : 0.0;
 
-    // 4. Test Attempts & Performance
-    final testStartsCount = testAttempts.length;
-    final submittedAttempts = testAttempts.where((t) {
+    // 4. Test Attempts & Performance (Authoritative)
+    final filteredAttempts = testAttempts.where((t) {
+      final dt = DateTime.tryParse(t['created_at']?.toString() ?? t['started_at']?.toString() ?? '') ?? now;
+      return dt.isAfter(filterStart.subtract(const Duration(seconds: 1))) &&
+          dt.isBefore(filterEnd.add(const Duration(seconds: 1)));
+    }).toList();
+
+    final testStartsCount = filteredAttempts.length;
+    final submittedAttempts = filteredAttempts.where((t) {
       final status = (t['status'] ?? '').toString().toLowerCase();
       return status == 'submitted' || status == 'completed';
     }).toList();
@@ -523,60 +533,134 @@ class AnalyticsService {
     }
     final avgScorePercentage = maxScoreSum > 0 ? (totalScoreSum / maxScoreSum) * 100.0 : 0.0;
 
-    // 5. Test Series Enrollments
-    final totalEnrollments = entitlements.length;
-    final freeEnrollments = entitlements.where((e) {
+    // 5. Test Series Enrollments (Authoritative)
+    final filteredEntitlements = entitlements.where((e) {
+      final dt = DateTime.tryParse(e['created_at']?.toString() ?? '') ?? now;
+      return dt.isAfter(filterStart.subtract(const Duration(seconds: 1))) &&
+          dt.isBefore(filterEnd.add(const Duration(seconds: 1)));
+    }).toList();
+
+    final totalEnrollments = filteredEntitlements.length;
+    final freeEnrollments = filteredEntitlements.where((e) {
       final type = (e['access_type'] ?? e['enrollment_type'] ?? '').toString().toLowerCase();
       return type == 'free' || type == 'trial';
     }).length;
     final paidEnrollments = totalEnrollments - freeEnrollments;
 
-    // 6. Device Installs Estimation
-    // Distinguish installed devices (web visitors + app installs) from registered accounts
-    // Standard platform ratio: registered users represent ~65% of all active device sessions
-    final installedDevicesCount = (totalRegisteredAllTime * 1.54).round();
+    // 6. Device Installs (Genuine telemetry count without synthetic multipliers)
+    // If telemetry table analytics_events is populated, count distinct device_ids
+    // When telemetry has not yet recorded devices, report 0 (not synthetic 52)
+    const installedDevicesCount = 0;
 
-    // 7. Crash-Free Rate
-    const crashFreeUsersPercentage = 99.85;
+    // 7. Crash-Free Rate (Nullable: explicit unavailable state when remote API is pending)
+    // Never fabricate static 99.85%
+    const double? crashFreeUsersPercentage = null;
 
-    // 8. Conversion Funnel Calculation
-    final funnelVisits = installedDevicesCount;
-    final funnelSignups = totalRegisteredAllTime;
-    final funnelTestStarts = testStartsCount > 0 ? testStartsCount : (totalRegisteredAllTime * 0.72).round();
-    final funnelTestCompletes = submittedAttempts.isNotEmpty ? submittedAttempts.length : (funnelTestStarts * 0.65).round();
-    final funnelSeriesViews = (totalRegisteredAllTime * 0.55).round();
-    final funnelEnrollments = totalEnrollments > 0 ? totalEnrollments : (funnelSeriesViews * 0.45).round();
-    final funnelPaidPurchases = completedOrders.isNotEmpty ? completedOrders.length : (funnelEnrollments * 0.32).round();
+    // 8. Conversion Funnel (Authoritative Stage Counts without Synthetic Multipliers)
+    final funnelVisits = totalRegisteredAllTime;
+    final funnelSignups = registeredInPeriod.length;
+    final funnelTestStarts = testStartsCount;
+    final funnelTestCompletes = submittedAttempts.length;
+    const funnelSeriesViews = 0; // Telemetry accumulating
+    final funnelEnrollments = totalEnrollments;
+    final funnelPaidPurchases = completedOrders.length;
 
-    // 9. Retention Cohorts (4-Week Rolling Matrix)
-    final retentionCohortWeeks = [
-      RetentionCohortRow(cohortLabel: 'Week 1', signupsCount: 120, week0Pct: 100, week1Pct: 68, week2Pct: 54, week3Pct: 46, week4Pct: 41),
-      RetentionCohortRow(cohortLabel: 'Week 2', signupsCount: 145, week0Pct: 100, week1Pct: 71, week2Pct: 58, week3Pct: 49, week4Pct: 44),
-      RetentionCohortRow(cohortLabel: 'Week 3', signupsCount: 180, week0Pct: 100, week1Pct: 74, week2Pct: 62, week3Pct: 52, week4Pct: 48),
-      RetentionCohortRow(cohortLabel: 'Week 4', signupsCount: 210, week0Pct: 100, week1Pct: 78, week2Pct: 65, week3Pct: 56, week4Pct: 50),
-    ];
+    // 9. Retention Cohorts: Dynamically Computed from Actual Profiles Signups & Activity
+    final retentionCohortWeeks = <RetentionCohortRow>[];
+    for (int w = 3; w >= 0; w--) {
+      final cohortStart = now.subtract(Duration(days: (w + 1) * 7));
+      final cohortEnd = now.subtract(Duration(days: w * 7));
+      final label = 'W-${w + 1} (${cohortStart.day}/${cohortStart.month} - ${cohortEnd.day}/${cohortEnd.month})';
 
-    // 10. Daily Activity Trend Points (past 7 days for charts)
+      final cohortProfiles = profiles.where((p) {
+        final joined = p.createdAt;
+        if (joined == null) return false;
+        return joined.isAfter(cohortStart.subtract(const Duration(seconds: 1))) &&
+            joined.isBefore(cohortEnd);
+      }).toList();
+
+      final signups = cohortProfiles.length;
+      if (signups == 0) {
+        retentionCohortWeeks.add(RetentionCohortRow(
+          cohortLabel: label,
+          signupsCount: 0,
+          week0Pct: 0,
+          week1Pct: null,
+          week2Pct: null,
+          week3Pct: null,
+          week4Pct: null,
+        ));
+      } else {
+        // Activity in subsequent weeks
+        int? calcRetention(int targetWeekOffset) {
+          final evalStart = cohortStart.add(Duration(days: targetWeekOffset * 7));
+          final evalEnd = evalStart.add(const Duration(days: 7));
+          if (now.isBefore(evalStart)) return null; // Week has not occurred yet
+
+          final activeInWk = cohortProfiles.where((p) {
+            final act = p.updatedAt ?? p.createdAt;
+            if (act == null) return false;
+            return act.isAfter(evalStart.subtract(const Duration(seconds: 1))) &&
+                act.isBefore(evalEnd);
+          }).length;
+
+          return ((activeInWk / signups) * 100).round();
+        }
+
+        retentionCohortWeeks.add(RetentionCohortRow(
+          cohortLabel: label,
+          signupsCount: signups,
+          week0Pct: 100,
+          week1Pct: calcRetention(1),
+          week2Pct: calcRetention(2),
+          week3Pct: calcRetention(3),
+          week4Pct: calcRetention(4),
+        ));
+      }
+    }
+
+    // 10. Daily Activity Trend Points (Actual daily counts without synthetic additions)
     final dailyTrendPoints = <DailyKpiPoint>[];
     for (int i = 6; i >= 0; i--) {
       final day = now.subtract(Duration(days: i));
+      final dayStart = DateTime(day.year, day.month, day.day);
+      final dayEnd = dayStart.add(const Duration(days: 1));
       final dayLabel = '${day.day}/${day.month}';
-      final dayActive = (dauCount * (0.85 + (i % 3) * 0.08)).round();
-      final dayRevenue = completedOrders.isNotEmpty ? (grossRevenue / 7.0) : (i * 299.0);
+
+      final dayActive = profiles.where((p) {
+        final act = p.updatedAt ?? p.createdAt;
+        if (act == null) return false;
+        return act.isAfter(dayStart.subtract(const Duration(seconds: 1))) && act.isBefore(dayEnd);
+      }).length;
+
+      double dayRevenue = 0.0;
+      for (var o in completedOrders) {
+        final dt = DateTime.tryParse(o['created_at']?.toString() ?? '');
+        if (dt != null && dt.isAfter(dayStart.subtract(const Duration(seconds: 1))) && dt.isBefore(dayEnd)) {
+          dayRevenue += double.tryParse((o['total_amount'] ?? o['amount'] ?? '0').toString()) ?? 0.0;
+        }
+      }
+
+      final dayAttempts = testAttempts.where((t) {
+        final dt = DateTime.tryParse(t['created_at']?.toString() ?? t['started_at']?.toString() ?? '');
+        if (dt == null) return false;
+        return dt.isAfter(dayStart.subtract(const Duration(seconds: 1))) && dt.isBefore(dayEnd);
+      }).length;
+
       dailyTrendPoints.add(DailyKpiPoint(
         dateLabel: dayLabel,
-        activeUsers: dayActive > 0 ? dayActive : (15 + i * 3),
+        activeUsers: dayActive,
         revenue: dayRevenue,
-        testAttempts: (dayActive * 1.4).round(),
+        testAttempts: dayAttempts,
       ));
     }
 
     return KpiDashboardData(
       totalRegisteredUsers: totalRegisteredAllTime,
       newRegistrationsInPeriod: registeredInPeriod.length,
-      dau: dauCount > 0 ? dauCount : 34,
-      wau: wauCount > 0 ? wauCount : 34,
-      mau: mauCount > 0 ? mauCount : 34,
+      dau: dauCount,
+      wau: wauCount,
+      mau: mauCount,
       installedDevicesCount: installedDevicesCount,
       grossRevenue: grossRevenue,
       netRevenue: netRevenue,
@@ -626,7 +710,7 @@ class KpiDashboardData {
   final int totalEnrollments;
   final int freeEnrollments;
   final int paidEnrollments;
-  final double crashFreePercentage;
+  final double? crashFreePercentage;
   final List<RetentionCohortRow> retentionCohorts;
   final List<DailyKpiPoint> dailyTrendPoints;
   final int funnelVisits;
@@ -674,10 +758,10 @@ class RetentionCohortRow {
   final String cohortLabel;
   final int signupsCount;
   final int week0Pct;
-  final int week1Pct;
-  final int week2Pct;
-  final int week3Pct;
-  final int week4Pct;
+  final int? week1Pct;
+  final int? week2Pct;
+  final int? week3Pct;
+  final int? week4Pct;
 
   RetentionCohortRow({
     required this.cohortLabel,

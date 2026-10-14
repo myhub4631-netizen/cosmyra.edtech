@@ -253,10 +253,11 @@ void main() {
       expect(metrics.totalEnrollments, equals(3));
     });
 
-    test('4-Week retention cohort contains valid percentages between 0 and 100', () {
+    test('Retention cohorts and crash-free metrics handle dynamic data and unavailable states cleanly', () {
       final now = DateTime.now();
 
-      final metrics = AnalyticsService.calculateKpiMetrics(
+      // Test with empty dataset (no fake baseline)
+      final metricsEmpty = AnalyticsService.calculateKpiMetrics(
         profiles: [],
         orders: [],
         testAttempts: [],
@@ -265,13 +266,40 @@ void main() {
         endDate: now.add(const Duration(days: 1)),
       );
 
-      final cohorts = metrics.retentionCohorts;
-      expect(cohorts.length, equals(4));
-      for (final cohort in cohorts) {
-        expect(cohort.week0Pct, equals(100.0));
-        expect(cohort.week1Pct, inInclusiveRange(0.0, 100.0));
-        expect(cohort.week2Pct, inInclusiveRange(0.0, 100.0));
+      // Crash-free percentage should be null (N/A) without mobile crashlytics telemetry
+      expect(metricsEmpty.crashFreePercentage, isNull);
+      // Installed devices count should be 0 without fake multiplier
+      expect(metricsEmpty.installedDevicesCount, equals(0));
+
+      final cohortsEmpty = metricsEmpty.retentionCohorts;
+      expect(cohortsEmpty.length, equals(4));
+      for (final cohort in cohortsEmpty) {
+        expect(cohort.signupsCount, equals(0));
+        expect(cohort.week0Pct, equals(0));
+        expect(cohort.week1Pct, isNull);
       }
+
+      // Test with genuine cohort signups (100% week 0 baseline)
+      final mockProfiles = [
+        UserProfileModel.fromJson({
+          'id': 'c_u1',
+          'email': 'c_u1@example.com',
+          'created_at': now.subtract(const Duration(days: 10)).toIso8601String(),
+          'updated_at': now.subtract(const Duration(days: 2)).toIso8601String(),
+        }),
+      ];
+
+      final metricsPopulated = AnalyticsService.calculateKpiMetrics(
+        profiles: mockProfiles,
+        orders: [],
+        testAttempts: [],
+        entitlements: [],
+        startDate: now.subtract(const Duration(days: 35)),
+        endDate: now.add(const Duration(days: 1)),
+      );
+
+      final populatedCohort = metricsPopulated.retentionCohorts.firstWhere((c) => c.signupsCount > 0);
+      expect(populatedCohort.week0Pct, equals(100));
     });
   });
 }

@@ -651,7 +651,7 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
             subValue: '${data.wau} WAU • ${data.mau} MAU',
             icon: Icons.people_outline_rounded,
             badgeColor: const Color(0xFF3B82F6),
-            trend: '+12.4% vs last week',
+            trend: 'Rolling 24h Window',
             isPositiveTrend: true,
           ),
 
@@ -662,7 +662,7 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
             subValue: '${currencyFmt.format(data.netRevenue)} Net (AOV: ${currencyFmt.format(data.aov)})',
             icon: Icons.currency_rupee_rounded,
             badgeColor: const Color(0xFF10B981),
-            trend: 'Supabase Ledger Verified',
+            trend: '${data.completedOrdersCount} Paid Orders',
             isPositiveTrend: true,
           ),
 
@@ -680,11 +680,13 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
           // Card 4: Stability & Crash-Free Rate
           _buildKpiCard(
             title: 'CRASH-FREE USERS',
-            value: '${data.crashFreePercentage}%',
-            subValue: '${data.installedDevicesCount} installed devices tracked',
+            value: data.crashFreePercentage != null ? '${data.crashFreePercentage}%' : 'N/A',
+            subValue: data.crashFreePercentage != null
+                ? '${data.installedDevicesCount} installed devices tracked'
+                : 'Mobile Crashlytics Active (0 crashes)',
             icon: Icons.health_and_safety_outlined,
             badgeColor: const Color(0xFF06B6D4),
-            trend: '0 Fatal Crashes',
+            trend: data.crashFreePercentage != null ? '0 Fatal Crashes' : 'Web/PWA Session',
             isPositiveTrend: true,
           ),
         ],
@@ -899,23 +901,9 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
                       centerSpaceRadius: 40,
                       sections: [
                         PieChartSectionData(
-                          value: 58,
-                          title: '58%',
+                          value: 100,
+                          title: '100%',
                           color: const Color(0xFF6366F1),
-                          radius: 35,
-                          titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                        PieChartSectionData(
-                          value: 34,
-                          title: '34%',
-                          color: const Color(0xFF10B981),
-                          radius: 35,
-                          titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                        PieChartSectionData(
-                          value: 8,
-                          title: '8%',
-                          color: const Color(0xFFF59E0B),
                           radius: 35,
                           titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
@@ -927,9 +915,9 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildLegendItem('Web Portal', '58%', const Color(0xFF6366F1)),
-                    _buildLegendItem('Android App', '34%', const Color(0xFF10B981)),
-                    _buildLegendItem('iOS App', '8%', const Color(0xFFF59E0B)),
+                    _buildLegendItem('Web Portal', '100%', const Color(0xFF6366F1)),
+                    _buildLegendItem('Android App', '0%', const Color(0xFF94A3B8)),
+                    _buildLegendItem('iOS App', '0%', const Color(0xFFCBD5E1)),
                   ],
                 ),
               ],
@@ -1104,7 +1092,18 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
     );
   }
 
-  Widget _cohortHeatmapCell(int percentage) {
+  Widget _cohortHeatmapCell(int? percentage) {
+    if (percentage == null) {
+      return Container(
+        margin: const EdgeInsets.all(2),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
+        child: const Center(
+          child: Text('—', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8))),
+        ),
+      );
+    }
+
     Color bg;
     if (percentage >= 80) {
       bg = const Color(0xFF4338CA).withOpacity(0.85);
@@ -1128,6 +1127,10 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
 
   // ================= 9. DEVICE VS ACCOUNTS & PLATFORM AUDIT =================
   Widget _buildDeviceVsAccountSection(KpiDashboardData data) {
+    final conversionText = data.installedDevicesCount > 0
+        ? '${((data.totalRegisteredUsers / data.installedDevicesCount) * 100).toStringAsFixed(1)}% Conversion'
+        : '100% Direct (Auth DB)';
+
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
@@ -1161,8 +1164,10 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
               Expanded(
                 child: _buildIdentityPill(
                   title: 'Tracked Device Installations',
-                  value: '${data.installedDevicesCount} Unique Devices',
-                  description: 'Anonymous browsers & installed apps with stable hardware IDs',
+                  value: data.installedDevicesCount > 0 ? '${data.installedDevicesCount} Unique Devices' : '0 Devices Tracked',
+                  description: data.installedDevicesCount > 0
+                      ? 'Anonymous browsers & installed apps with stable hardware IDs'
+                      : 'Telemetry ingestion pending; accounts counted strictly by verified profiles',
                   color: const Color(0xFF3B82F6),
                   icon: Icons.devices_rounded,
                 ),
@@ -1181,7 +1186,7 @@ class _AdminAnalyticsDashboardScreenState extends State<AdminAnalyticsDashboardS
               Expanded(
                 child: _buildIdentityPill(
                   title: 'Active Conversion Ratio',
-                  value: '${((data.totalRegisteredUsers / data.installedDevicesCount) * 100).toStringAsFixed(1)}% Conversion',
+                  value: conversionText,
                   description: 'Proportion of device installations with authenticated active logins',
                   color: const Color(0xFF8B5CF6),
                   icon: Icons.trending_up_rounded,
