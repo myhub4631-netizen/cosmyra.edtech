@@ -1,0 +1,1946 @@
+import 'dart:math';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../services/supabase_service.dart';
+import '../../models/models.dart';
+import '../../models/pyq_models.dart';
+import '../../shared/widgets/not_found_screen.dart';
+import '../../features/landing/landing_page_screen.dart';
+import '../../features/auth/auth_screen.dart';
+import '../../features/auth/login_screen.dart';
+import '../../features/auth/signup_screen.dart';
+import '../../features/auth/oauth_callback_screen.dart';
+import '../../features/dashboard/user_dashboard_screen.dart';
+import '../../features/profile/profile_screen.dart';
+import '../../features/pyq_nta/pyq_nta_screen.dart';
+import '../../features/pyq_nta/pyq_practice_screen.dart';
+import '../../features/pyq_nta/pyq_result_screen.dart';
+import '../../features/pyq_nta/nta_practice_test_screen.dart';
+import '../../features/pyq_nta/nta_chapter_topic_wise_screen.dart';
+import '../../features/pyq_nta/nta_paper_wise_screen.dart';
+import '../../features/mistakes_bookmarks/mistakes_bookmarks_screen.dart';
+import '../../features/analytics/analytics_screen.dart';
+import '../../features/leaderboard/leaderboard_screen.dart';
+import '../../features/student/test_series_screen.dart';
+import '../../features/student/product_detail_screen.dart';
+import '../../features/student/checkout_screen.dart';
+import '../../features/student/upi_payment_verification_screen.dart';
+import '../../features/student/cart_screen.dart';
+import '../services/cart_service.dart';
+import '../services/feature_config_service.dart';
+import '../../features/tests/mock_tests_screen.dart';
+import '../../features/tests/test_screen.dart';
+import '../../features/tests/test_result_screen.dart';
+import '../../features/tests/test_solutions_screen.dart';
+import '../../features/student/subscription_pricing_screen.dart';
+import '../../features/tests/my_tests_history_screen.dart';
+import '../../features/practice/practice_screen.dart';
+import '../../features/practice/custom_practice_wizard.dart';
+import '../../features/admin/admin_dashboard_screen.dart';
+import '../../features/admin/admin_analytics_dashboard_screen.dart';
+import '../../features/admin/admin_live_user_activity_screen.dart';
+import '../services/analytics_service.dart';
+import '../../features/admin/admin_user_management_screen.dart';
+import '../../features/admin/admin_chapters_topics_screen.dart';
+import '../../features/admin/admin_questions_bank_dashboard.dart';
+import '../../features/admin/admin_pyq_paper_manager_screen.dart';
+import '../../features/admin/admin_student_paper_preview_screen.dart';
+import '../../features/admin/admin_bulk_upload_step1_screen.dart';
+import '../../features/admin/admin_bulk_upload_step2_screen.dart';
+import '../../features/admin/admin_pricing_screen.dart';
+import '../../features/updates/updates_screen.dart';
+import '../../features/admin/admin_updates_manager_screen.dart';
+import '../../features/admin/admin_hierarchy_screen.dart';
+import '../../features/admin/admin_leaderboard_screen.dart';
+import '../../features/admin/admin_predictions_screen.dart';
+import '../../features/admin/admin_question_builder_screen.dart';
+import '../../features/admin/admin_pdf_import_screen.dart';
+import '../../features/admin/admin_banner_manager_screen.dart';
+import '../../features/admin/admin_promo_dropdown_screen.dart';
+import '../../features/legal/privacy_policy_screen.dart';
+import '../../features/admin/admin_privacy_policy_manager_screen.dart';
+import '../../features/legal/terms_of_service_screen.dart';
+import '../../features/admin/admin_terms_manager_screen.dart';
+import '../../features/admin/cms/admin_page_manager_screen.dart';
+import '../../features/admin/cms/admin_page_editor_screen.dart';
+import '../../features/admin/cms/admin_blog_manager_screen.dart';
+import '../../features/admin/cms/admin_blog_editor_screen.dart';
+import '../../features/admin/cms/admin_navigation_manager_screen.dart';
+import '../../features/admin/cms/admin_auth_manager_screen.dart';
+import '../../features/admin/cms/admin_landing_page_manager_screen.dart';
+import '../../features/admin/seo/admin_seo_screen.dart';
+import '../../features/admin/admin_test_series_manager_screen.dart';
+import '../../features/admin/admin_recommendations_screen.dart';
+import '../../features/admin/admin_coupons_screen.dart';
+import '../../features/admin/admin_media_screen.dart';
+import '../../features/admin/admin_orders_screen.dart';
+import '../../features/admin/admin_marketing_automation_screen.dart';
+import '../../features/admin/admin_feature_manager_screen.dart';
+import '../../features/cms/dynamic_page_screen.dart';
+import '../../features/blog/blog_list_screen.dart';
+import '../../features/blog/blog_post_screen.dart';
+
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
+List<QuestionModel>? _activeTestQuestions;
+int _activeTestTimerMinutes = 30;
+TestAttemptModel? _lastTestAttempt;
+Map<int, String>? _lastTestUserAnswers;
+List<QuestionModel>? _lastTestQuestions;
+String? _activePracticeSessionId;
+bool _isNewPracticeSession = false;
+String? _activeTestSessionId;
+bool _isNewTestSession = false;
+
+UserProfileModel _getEffectiveProfile() {
+  if (SupabaseService.activeUserSession != null) {
+    return SupabaseService.activeUserSession!;
+  }
+  final user = SupabaseService.client.auth.currentUser;
+  if (user != null) {
+    final meta = user.userMetadata ?? {};
+    return UserProfileModel(
+      id: user.id,
+      email: user.email ?? '',
+      fullName: (meta['full_name'] ?? meta['name'] ?? user.email?.split('@').first ?? 'Student').toString(),
+      avatarUrl: (meta['avatar_url'] ?? meta['picture'] ?? meta['photo_url'])?.toString(),
+      phoneNumber: (user.phone ?? meta['phone'] ?? meta['phone_number'])?.toString(),
+      role: 'student',
+      targetExam: 'NEET',
+      targetYear: 2026,
+    );
+  }
+  return SupabaseService.getMockProfile(role: 'student');
+}
+
+UserProfileModel _getEffectiveAdminProfile() {
+  final user = SupabaseService.client.auth.currentUser;
+  final meta = user?.userMetadata;
+  final googleAvatar = meta != null
+      ? (meta['avatar_url'] ?? meta['picture'] ?? meta['photo_url'] ?? meta['avatar'] ?? meta['picture_url'])?.toString()
+      : null;
+
+  if (SupabaseService.activeUserSession != null) {
+    var session = SupabaseService.activeUserSession!;
+    if ((session.avatarUrl == null || session.avatarUrl!.trim().isEmpty) && googleAvatar != null && googleAvatar.trim().isNotEmpty) {
+      session = session.copyWith(avatarUrl: googleAvatar.trim());
+    }
+    return session;
+  }
+
+  if (user != null) {
+    return UserProfileModel(
+      id: user.id,
+      email: user.email ?? '',
+      fullName: (meta?['full_name'] ?? meta?['name'] ?? user.email ?? 'User').toString(),
+      avatarUrl: googleAvatar,
+      phoneNumber: (user.phone ?? meta?['phone'] ?? meta?['phone_number'])?.toString(),
+      role: (meta?['role'] ?? 'student').toString(),
+      targetExam: 'NEET & JEE',
+      targetYear: 2026,
+    );
+  }
+  return SupabaseService.getMockProfile(role: 'student');
+}
+
+Page<dynamic> buildSmoothPage({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) {
+  final mediaQuery = MediaQuery.maybeOf(context);
+  final bool reduceMotion = mediaQuery?.disableAnimations ?? false;
+
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    name: state.name ?? state.matchedLocation,
+    child: child,
+    transitionDuration: reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 220),
+    reverseTransitionDuration: reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 180),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      if (reduceMotion) {
+        return child;
+      }
+
+      final curvedAnimation = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+
+      return FadeTransition(
+        opacity: curvedAnimation,
+        child: AnimatedBuilder(
+          animation: curvedAnimation,
+          builder: (context, child) {
+            final double dx = (1.0 - curvedAnimation.value) * 16.0;
+            return Transform.translate(
+              offset: Offset(dx, 0.0),
+              child: child,
+            );
+          },
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+List<RouteBase> _applySmoothTransitions(List<RouteBase> routes) {
+  return routes.map((route) {
+    if (route is GoRoute) {
+      if (route.pageBuilder == null && route.builder != null) {
+        final originalBuilder = route.builder!;
+        return GoRoute(
+          path: route.path,
+          name: route.name,
+          parentNavigatorKey: route.parentNavigatorKey,
+          redirect: route.redirect,
+          routes: _applySmoothTransitions(route.routes),
+          pageBuilder: (context, state) => buildSmoothPage(
+            context: context,
+            state: state,
+            child: originalBuilder(context, state),
+          ),
+        );
+      } else if (route.routes.isNotEmpty) {
+        return GoRoute(
+          path: route.path,
+          name: route.name,
+          parentNavigatorKey: route.parentNavigatorKey,
+          redirect: route.redirect,
+          pageBuilder: route.pageBuilder,
+          routes: _applySmoothTransitions(route.routes),
+        );
+      }
+    }
+    return route;
+  }).toList();
+}
+
+class AuthRouteObserver extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    final prevName = previousRoute?.settings.name ?? previousRoute?.settings.arguments?.toString() ?? '/';
+    final nextName = route.settings.name ?? route.settings.arguments?.toString() ?? route.toString();
+    print('AUTH_NAVIGATION:\nprevious = $prevName\nnext = $nextName');
+    print('CURRENT_ROUTE:\n$nextName');
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    final prevName = oldRoute?.settings.name ?? oldRoute?.settings.arguments?.toString() ?? '/';
+    final nextName = newRoute?.settings.name ?? newRoute?.settings.arguments?.toString() ?? newRoute.toString();
+    print('AUTH_NAVIGATION:\nprevious = $prevName\nnext = $nextName');
+    print('CURRENT_ROUTE:\n$nextName');
+  }
+}
+
+/// Production Route Observer that instruments screen view and page view telemetry events
+class AnalyticsRouteObserver extends NavigatorObserver {
+  String? _lastTrackedPath;
+
+  void _track(Route<dynamic>? route, {Route<dynamic>? previousRoute}) {
+    if (route == null) return;
+    final name = route.settings.name;
+    if (name == null || name.isEmpty) return;
+
+    // Do not track non-page routes (e.g. raw modal barriers without named paths)
+    if (route is PopupRoute && !name.startsWith('/')) return;
+
+    // Normalize path by stripping query strings or hash tokens to avoid PII / secret leak
+    String cleanPath = name;
+    if (cleanPath.contains('?')) {
+      cleanPath = cleanPath.split('?').first;
+    }
+    if (cleanPath.contains('#')) {
+      cleanPath = cleanPath.split('#').first;
+    }
+
+    if (_lastTrackedPath == cleanPath) return;
+    _lastTrackedPath = cleanPath;
+
+    final screenTitle = formatScreenTitle(cleanPath);
+
+    AnalyticsService.instance.logScreenView(
+      screenTitle,
+      routePath: cleanPath,
+      parameters: {
+        'canonical_path': cleanPath,
+        if (previousRoute?.settings.name != null)
+          'previous_path': previousRoute!.settings.name,
+      },
+    );
+  }
+
+  static String formatScreenTitle(String path) {
+    if (path == '/' || path.isEmpty) return 'Home / Landing';
+    if (path == '/login') return 'Login';
+    if (path == '/signup') return 'Sign Up';
+    if (path == '/dashboard') return 'Student Dashboard';
+    if (path == '/profile') return 'Student Profile';
+    if (path.startsWith('/admin/live-activity')) return 'Admin Live User Activity';
+    if (path.startsWith('/admin/analytics')) return 'Admin Analytics Dashboard';
+    if (path.startsWith('/admin/users')) return 'Admin User Management';
+    if (path.startsWith('/admin')) return 'Admin Portal';
+    if (path.startsWith('/pyq-nta') || path.startsWith('/question-bank')) return 'Question Bank';
+    if (path.startsWith('/nta-practice') || path.startsWith('/practice')) return 'Practice & Study';
+    if (path.startsWith('/test-series')) return 'Test Series';
+    if (path.startsWith('/mock-tests')) return 'Mock Tests';
+    if (path.startsWith('/test/')) return 'Test Examination';
+    if (path.startsWith('/test-result')) return 'Test Results';
+    if (path.startsWith('/test-solutions')) return 'Test Solutions';
+    if (path.startsWith('/cart')) return 'Cart';
+    if (path.startsWith('/checkout')) return 'Checkout';
+    if (path.startsWith('/leaderboard')) return 'Leaderboard';
+    if (path.startsWith('/mistakes-bookmarks')) return 'Bookmarks & Mistakes';
+    if (path.startsWith('/pricing') || path.startsWith('/subscription')) return 'Pricing & Plans';
+    if (path.startsWith('/updates')) return 'Updates';
+    if (path.startsWith('/blog')) return 'Blog';
+    return path;
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    _track(route, previousRoute: previousRoute);
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPop(route, previousRoute);
+    if (previousRoute != null) {
+      _track(previousRoute, previousRoute: route);
+    }
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    if (newRoute != null) {
+      _track(newRoute, previousRoute: oldRoute);
+    }
+  }
+}
+
+final GoRouter appRouter = GoRouter(
+  navigatorKey: rootNavigatorKey,
+  initialLocation: '/',
+  debugLogDiagnostics: true,
+  observers: [AuthRouteObserver(), AnalyticsRouteObserver()],
+  refreshListenable: Listenable.merge([SupabaseService.authNotifier, FeatureConfigService.notifier]),
+  errorBuilder: (context, state) => NotFoundScreen(path: state.uri.toString()),
+  redirect: (BuildContext context, GoRouterState state) {
+    final session = SupabaseService.activeUserSession;
+    final bool hasSupabaseSession = SupabaseService.client.auth.currentSession != null;
+    final bool isLoggedIn = session != null || hasSupabaseSession;
+    final String path = state.uri.path;
+
+    // 1. Admin route protection: /admin and all /admin/*
+    if (path == '/admin' || path.startsWith('/admin/')) {
+      if (!isLoggedIn) {
+        final dest = state.uri.toString();
+        return '/login?redirect=${Uri.encodeComponent(dest)}';
+      }
+      final role = session?.role.toLowerCase() ?? '';
+      final bool isAdmin = role == 'admin' || role == 'superadmin' || (session?.isAdmin ?? false) || (session?.isSuperAdmin ?? false);
+      if (!isAdmin && session != null) {
+        // Non-admin signed-in user is blocked from admin dashboard
+        return '/dashboard';
+      }
+    }
+
+    // 2. Auth & Root routes: enforce 2-state application architecture
+    // NOT LOGGED IN  -> /login (AuthScreen)
+    // LOGGED IN      -> /dashboard or /admin
+    if (path == '/' || path == '/landing' || path == '/login' || path == '/signup') {
+      if (isLoggedIn) {
+        final redirectParam = state.uri.queryParameters['redirect'];
+        if (redirectParam != null && redirectParam.trim().isNotEmpty && redirectParam != '/login' && redirectParam != '/signup' && redirectParam != '/' && redirectParam != '/landing') {
+          return redirectParam;
+        }
+        final role = session?.role.toLowerCase() ?? '';
+        final bool isAdmin = role == 'admin' || role == 'superadmin' || (session?.isAdmin ?? false) || (session?.isSuperAdmin ?? false);
+        return isAdmin ? '/admin' : '/dashboard';
+      } else {
+        if (path == '/' || path == '/landing') {
+          return '/login';
+        }
+      }
+    }
+
+    // 3. OAuth Callback deep link handler route
+    if (path == '/login-callback') {
+      if (isLoggedIn) {
+        final role = session?.role.toLowerCase() ?? '';
+        final bool isAdmin = role == 'admin' || role == 'superadmin' || (session?.isAdmin ?? false) || (session?.isSuperAdmin ?? false);
+        return isAdmin ? '/admin' : '/dashboard';
+      }
+      return null;
+    }
+
+    // 4. Public allowed routes (legal and static dynamic pages)
+    final publicPaths = [
+      '/',
+      '/login',
+      '/signup',
+      '/landing',
+      '/login-callback',
+      '/privacy-policy',
+      '/privacy',
+      '/terms',
+      '/terms-of-service',
+      '/about-us',
+      '/contact-us',
+      '/disclaimer',
+      '/refund-policy',
+      '/shipping-policy',
+      '/cookie-policy',
+      '/faq',
+      '/careers',
+      '/help',
+      '/updates',
+    ];
+    final bool isPublicPath = publicPaths.contains(path) || path.startsWith('/pages/') || path.startsWith('/blog');
+
+    if (!isLoggedIn && !isPublicPath) {
+      final dest = state.uri.toString();
+      return '/login?redirect=${Uri.encodeComponent(dest)}';
+    }
+
+    // 5. Feature Manager Route Guards: Block access if Admin set feature to Hidden
+    final bool isAdminPath = path.startsWith('/admin');
+    if (!isAdminPath) {
+      if ((path == '/pricing' || path == '/subscription') && FeatureConfigService.isHidden('premium_plans')) {
+        return '/dashboard';
+      }
+      if ((path.startsWith('/custom-practice') || path.startsWith('/practice')) && FeatureConfigService.isHidden('custom_practice')) {
+        return '/dashboard';
+      }
+      if (path.startsWith('/custom-test') && FeatureConfigService.isHidden('custom_test')) {
+        return '/dashboard';
+      }
+      if (path.startsWith('/pyq') && FeatureConfigService.isHidden('pyq_practice')) {
+        return '/dashboard';
+      }
+      if ((path.startsWith('/nta-practice') || path.startsWith('/nta-questions')) && FeatureConfigService.isHidden('nta_questions')) {
+        return '/dashboard';
+      }
+      if (path.startsWith('/analytics') && FeatureConfigService.isHidden('performance_analytics')) {
+        return '/dashboard';
+      }
+      if (path.startsWith('/test-series') && FeatureConfigService.isHidden('test_series')) {
+        return '/dashboard';
+      }
+    }
+
+    return null; // Public routes allowed
+  },
+  routes: _applySmoothTransitions([
+    // =========================================================================
+    // PUBLIC & AUTHENTICATION ROUTES
+    // =========================================================================
+    GoRoute(
+      path: '/',
+      builder: (context, state) => AuthScreen(
+        initialIsLogin: true,
+        onAuthSuccess: (userProfile) {
+          final redirect = state.uri.queryParameters['redirect'];
+          if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
+            context.go(redirect);
+          } else if (userProfile.isAdmin || userProfile.isSuperAdmin) {
+            context.go('/admin');
+          } else {
+            context.go('/dashboard');
+          }
+        },
+      ),
+    ),
+    GoRoute(
+      path: '/landing',
+      redirect: (context, state) => '/login',
+    ),
+    GoRoute(
+      path: '/login',
+      builder: (context, state) => AuthScreen(
+        initialIsLogin: true,
+        onAuthSuccess: (userProfile) {
+          final redirect = state.uri.queryParameters['redirect'];
+          if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
+            context.go(redirect);
+          } else if (userProfile.isAdmin || userProfile.isSuperAdmin) {
+            context.go('/admin');
+          } else {
+            context.go('/dashboard');
+          }
+        },
+      ),
+    ),
+    GoRoute(
+      path: '/signup',
+      builder: (context, state) => AuthScreen(
+        initialIsLogin: false,
+        onAuthSuccess: (userProfile) {
+          final redirect = state.uri.queryParameters['redirect'];
+          if (redirect != null && redirect.trim().isNotEmpty && redirect != '/login' && redirect != '/signup') {
+            context.go(redirect);
+          } else if (userProfile.isAdmin || userProfile.isSuperAdmin) {
+            context.go('/admin');
+          } else {
+            context.go('/dashboard');
+          }
+        },
+      ),
+    ),
+    GoRoute(
+      path: '/login-callback',
+      builder: (context, state) => OAuthCallbackScreen(
+        rawUri: state.uri,
+      ),
+    ),
+    GoRoute(
+      path: '/updates',
+      builder: (context, state) => const UpdatesScreen(),
+    ),
+    GoRoute(
+      path: '/admin/updates',
+      builder: (context, state) => const AdminUpdatesManagerScreen(),
+    ),
+    GoRoute(
+      path: '/privacy-policy',
+      builder: (context, state) => const PrivacyPolicyScreen(),
+    ),
+    GoRoute(
+      path: '/privacy',
+      builder: (context, state) => const PrivacyPolicyScreen(),
+    ),
+    GoRoute(
+      path: '/terms',
+      builder: (context, state) => const TermsOfServiceScreen(),
+    ),
+    GoRoute(
+      path: '/terms-of-service',
+      builder: (context, state) => const TermsOfServiceScreen(),
+    ),
+    GoRoute(
+      path: '/pages/:slug',
+      builder: (context, state) => DynamicPageScreen(
+        slug: state.pathParameters['slug'] ?? '',
+      ),
+    ),
+    GoRoute(
+      path: '/about-us',
+      builder: (context, state) => const DynamicPageScreen(slug: 'about-us'),
+    ),
+    GoRoute(
+      path: '/contact-us',
+      builder: (context, state) => const DynamicPageScreen(slug: 'contact-us'),
+    ),
+    GoRoute(
+      path: '/disclaimer',
+      builder: (context, state) => const DynamicPageScreen(slug: 'disclaimer'),
+    ),
+    GoRoute(
+      path: '/refund-policy',
+      builder: (context, state) => const DynamicPageScreen(slug: 'refund-policy'),
+    ),
+    GoRoute(
+      path: '/shipping-policy',
+      builder: (context, state) => const DynamicPageScreen(slug: 'shipping-policy'),
+    ),
+    GoRoute(
+      path: '/cookie-policy',
+      builder: (context, state) => const DynamicPageScreen(slug: 'cookie-policy'),
+    ),
+    GoRoute(
+      path: '/faq',
+      builder: (context, state) => const DynamicPageScreen(slug: 'faq'),
+    ),
+    GoRoute(
+      path: '/careers',
+      builder: (context, state) => const DynamicPageScreen(slug: 'careers'),
+    ),
+    GoRoute(
+      path: '/help',
+      builder: (context, state) => const DynamicPageScreen(slug: 'help'),
+    ),
+    GoRoute(
+      path: '/blog',
+      builder: (context, state) => const BlogListScreen(),
+    ),
+    GoRoute(
+      path: '/blog/:slug',
+      builder: (context, state) => BlogPostScreen(
+        slug: state.pathParameters['slug'] ?? '',
+      ),
+    ),
+
+    // =========================================================================
+    // STUDENT / USER ROUTES
+    // =========================================================================
+    GoRoute(
+      path: '/dashboard',
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: UserDashboardScreen(
+          userProfile: _getEffectiveProfile(),
+          activeExam: 'NEET',
+          onOpenPractice: () => context.go('/practice'),
+          onOpenCustomTest: () => context.go('/my-tests'),
+          onOpenMockTests: () => context.go('/my-tests'),
+          onOpenMyTests: () => context.go('/my-tests'),
+          onOpenTestSeries: () => context.go('/test-series'),
+          onOpenPyqs: () => context.go('/pyq'),
+          onOpenMistakes: () => context.go('/mistakes'),
+          onLogout: () async {
+            await SupabaseService.logoutUserSession();
+            if (context.mounted) {
+              context.go('/login');
+            }
+          },
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/user/dashboard',
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: UserDashboardScreen(
+          userProfile: _getEffectiveProfile(),
+          activeExam: 'NEET',
+          onOpenPractice: () => context.go('/practice'),
+          onOpenCustomTest: () => context.go('/my-tests'),
+          onOpenMockTests: () => context.go('/my-tests'),
+          onOpenMyTests: () => context.go('/my-tests'),
+          onOpenTestSeries: () => context.go('/test-series'),
+          onOpenPyqs: () => context.go('/pyq'),
+          onOpenMistakes: () => context.go('/mistakes'),
+          onLogout: () async {
+            await SupabaseService.logoutUserSession();
+            if (context.mounted) {
+              context.go('/login');
+            }
+          },
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/my-tests',
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: MyTestsHistoryScreen(
+          userProfile: _getEffectiveProfile(),
+          onBack: () => context.go('/dashboard'),
+          onNavigateTab: (idx) {},
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/tests',
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: MyTestsHistoryScreen(
+          userProfile: _getEffectiveProfile(),
+          onBack: () => context.go('/dashboard'),
+          onNavigateTab: (idx) {},
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/history',
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: MyTestsHistoryScreen(
+          userProfile: _getEffectiveProfile(),
+          onBack: () => context.go('/dashboard'),
+          onNavigateTab: (idx) {},
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/profile',
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: ProfileScreen(
+          userProfile: _getEffectiveProfile(),
+          activeExam: 'NEET',
+          onExamChanged: (newExam) {},
+          onSignOut: () => context.go('/login'),
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/settings',
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: ProfileScreen(
+          userProfile: _getEffectiveProfile(),
+          activeExam: 'NEET',
+          onExamChanged: (newExam) {},
+          onSignOut: () => context.go('/login'),
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/courses',
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: TestSeriesScreen(
+          onBackToDashboard: () => context.go('/dashboard'),
+          onNavigateTab: (idx) {},
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/courses/:courseId',
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: TestSeriesScreen(
+          onBackToDashboard: () => context.go('/dashboard'),
+          onNavigateTab: (idx) {},
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/test-series',
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: TestSeriesScreen(
+          onBackToDashboard: () => context.go('/dashboard'),
+          onNavigateTab: (idx) {},
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/store',
+      pageBuilder: (context, state) => buildSmoothPage(
+        context: context,
+        state: state,
+        child: TestSeriesScreen(
+          onBackToDashboard: () => context.go('/dashboard'),
+          onNavigateTab: (idx) {},
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/products',
+      builder: (context, state) => TestSeriesScreen(
+        onBackToDashboard: () => context.go('/dashboard'),
+        onNavigateTab: (idx) {},
+      ),
+    ),
+    GoRoute(
+      path: '/products/:id',
+      builder: (context, state) => ProductDetailScreen(
+        productId: state.pathParameters['id'] ?? 'ts_neet_all_india_2026',
+      ),
+    ),
+    GoRoute(
+      path: '/product/:id',
+      builder: (context, state) => ProductDetailScreen(
+        productId: state.pathParameters['id'] ?? 'ts_neet_all_india_2026',
+      ),
+    ),
+    GoRoute(
+      path: '/test-series/:id',
+      builder: (context, state) => ProductDetailScreen(
+        productId: state.pathParameters['id'] ?? 'ts_neet_all_india_2026',
+      ),
+    ),
+    GoRoute(
+      path: '/cart',
+      builder: (context, state) => const CartScreen(),
+    ),
+    GoRoute(
+      path: '/pricing',
+      builder: (context, state) => const SubscriptionPricingScreen(),
+    ),
+    GoRoute(
+      path: '/plans',
+      builder: (context, state) => const SubscriptionPricingScreen(),
+    ),
+    GoRoute(
+      path: '/subscription-plans',
+      builder: (context, state) => const SubscriptionPricingScreen(),
+    ),
+    GoRoute(
+      path: '/checkout',
+      builder: (context, state) {
+        CartItem? item;
+        if (state.extra is CartItem) {
+          item = state.extra as CartItem;
+        }
+        final productId = state.uri.queryParameters['id'] ?? state.uri.queryParameters['productId'];
+        return CheckoutScreen(
+          singleItem: item,
+          productId: productId,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/payment-verification',
+      builder: (context, state) {
+        final Map<String, dynamic> data = (state.extra is Map<String, dynamic>)
+            ? state.extra as Map<String, dynamic>
+            : {};
+        final UserProfileModel defaultUser = UserProfileModel(
+          id: (data['userId'] ?? data['customerEmail'] ?? 'user_1').toString(),
+          email: (data['customerEmail'] ?? '').toString(),
+          fullName: (data['customerName'] ?? 'Student').toString(),
+          phoneNumber: (data['customerPhone'] ?? '').toString(),
+          role: 'student',
+        );
+        final upiIdStr = data['upiId']?.toString();
+        final payeeNameStr = data['payeeName']?.toString();
+        final totalAmountNum = (data['totalAmount'] as num?)?.toDouble() ?? 0.0;
+        final upiUrlStr = data['upiUrl']?.toString();
+
+        return UpiPaymentVerificationScreen(
+          user: data['user'] is UserProfileModel ? data['user'] as UserProfileModel : defaultUser,
+          items: (data['items'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [],
+          totalAmount: totalAmountNum,
+          couponCode: (data['couponCode'] ?? '').toString(),
+          upiId: upiIdStr,
+          payeeName: payeeNameStr,
+          upiUrl: upiUrlStr,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/upi-payment-verification',
+      builder: (context, state) {
+        final Map<String, dynamic> data = (state.extra is Map<String, dynamic>)
+            ? state.extra as Map<String, dynamic>
+            : {};
+        final UserProfileModel defaultUser = UserProfileModel(
+          id: (data['userId'] ?? data['customerEmail'] ?? 'user_1').toString(),
+          email: (data['customerEmail'] ?? '').toString(),
+          fullName: (data['customerName'] ?? 'Student').toString(),
+          phoneNumber: (data['customerPhone'] ?? '').toString(),
+          role: 'student',
+        );
+        final upiIdStr = data['upiId']?.toString();
+        final payeeNameStr = data['payeeName']?.toString();
+        final totalAmountNum = (data['totalAmount'] as num?)?.toDouble() ?? 0.0;
+        final upiUrlStr = data['upiUrl']?.toString();
+
+        return UpiPaymentVerificationScreen(
+          user: data['user'] is UserProfileModel ? data['user'] as UserProfileModel : defaultUser,
+          items: (data['items'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [],
+          totalAmount: totalAmountNum,
+          couponCode: (data['couponCode'] ?? '').toString(),
+          upiId: upiIdStr,
+          payeeName: payeeNameStr,
+          upiUrl: upiUrlStr,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/test/:testId',
+      builder: (context, state) {
+        final String testId = state.pathParameters['testId'] ?? 'test_1';
+        Map<String, dynamic>? extraMap;
+        if (state.extra is Map<String, dynamic>) {
+          extraMap = state.extra as Map<String, dynamic>;
+        }
+        final String title = extraMap?['title'] as String? ?? 'Leader Test Series Paper';
+        final int durationMins = (extraMap?['duration'] as num?)?.toInt() ?? 180;
+        return TestRunnerLoaderScreen(
+          testId: testId,
+          testTitle: title,
+          durationMins: durationMins,
+          onSubmitted: (attempt, questions, answers) {
+            _lastTestAttempt = attempt;
+            _lastTestQuestions = List<QuestionModel>.from(questions);
+            _lastTestUserAnswers = answers;
+            context.go('/test/$testId/result');
+          },
+        );
+      },
+    ),
+    GoRoute(
+      path: '/test/:testId/start',
+      builder: (context, state) {
+        final String testId = state.pathParameters['testId'] ?? 'test_1';
+        Map<String, dynamic>? extraMap;
+        if (state.extra is Map<String, dynamic>) {
+          extraMap = state.extra as Map<String, dynamic>;
+        }
+        final String title = extraMap?['title'] as String? ?? 'Leader Test Series Paper';
+        final int durationMins = (extraMap?['duration'] as num?)?.toInt() ?? 180;
+        return TestRunnerLoaderScreen(
+          testId: testId,
+          testTitle: title,
+          durationMins: durationMins,
+          onSubmitted: (attempt, questions, answers) {
+            _lastTestAttempt = attempt;
+            _lastTestQuestions = List<QuestionModel>.from(questions);
+            _lastTestUserAnswers = answers;
+            context.go('/test/$testId/result');
+          },
+        );
+      },
+    ),
+    GoRoute(
+      path: '/test/:testId/result',
+      builder: (context, state) {
+        final String testId = state.pathParameters['testId'] ?? '';
+        if (_lastTestAttempt != null &&
+            (_lastTestAttempt!.testId == testId ||
+                testId.isEmpty ||
+                _lastTestAttempt!.id == testId ||
+                _lastTestAttempt!.testTemplateId == testId)) {
+          return TestResultScreen(
+            attempt: _lastTestAttempt!,
+            questions: _lastTestQuestions ?? [],
+            userAnswers: _lastTestUserAnswers ?? {},
+            onBackToDashboard: () => context.go('/dashboard'),
+          );
+        }
+        return TestResultLoaderScreen(
+          testId: testId,
+          onBackToDashboard: () => context.go('/dashboard'),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/test/:testId/solutions',
+      builder: (context, state) {
+        final String testId = state.pathParameters['testId'] ?? '';
+        if (_lastTestAttempt != null &&
+            (_lastTestAttempt!.testId == testId ||
+                testId.isEmpty ||
+                _lastTestAttempt!.id == testId ||
+                _lastTestAttempt!.testTemplateId == testId)) {
+          return TestSolutionsScreen(
+            attempt: _lastTestAttempt!,
+            questions: _lastTestQuestions ?? [],
+            userAnswers: _lastTestUserAnswers ?? {},
+            onBack: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/test/$testId/result');
+              }
+            },
+          );
+        }
+        return TestSolutionsLoaderScreen(
+          testId: testId,
+          attemptId: testId,
+          onBackToDashboard: () => context.go('/dashboard'),
+        );
+      },
+    ),
+    // Custom Practice & Custom Test Routes
+    GoRoute(
+      path: '/custom-practice',
+      builder: (context, state) => CustomPracticeWizardModal(
+        initialExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        mode: PracticeTestMode.practice,
+        onClose: () => context.go('/dashboard'),
+        onStartPractice: (questions, timerMins) {
+          _activeTestQuestions = questions;
+          _activeTestTimerMinutes = timerMins;
+          final newSessionId = 'session_${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(999999)}';
+          _activePracticeSessionId = newSessionId;
+          _isNewPracticeSession = true;
+          context.go('/practice/session');
+        },
+      ),
+    ),
+    GoRoute(
+      path: '/custom-test',
+      builder: (context, state) => CustomPracticeWizardModal(
+        initialExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        mode: PracticeTestMode.test,
+        onClose: () => context.go('/dashboard'),
+        onStartPractice: (questions, timerMins) {
+          _activeTestQuestions = questions;
+          _activeTestTimerMinutes = timerMins;
+          final String attemptId = 'attempt_${DateTime.now().microsecondsSinceEpoch}';
+          _activeTestSessionId = attemptId;
+          _isNewTestSession = true;
+          context.go('/custom-test/attempt/$attemptId');
+        },
+      ),
+    ),
+    GoRoute(
+      path: '/custom-test/attempt/:attemptId',
+      builder: (context, state) {
+        final attemptId = state.pathParameters['attemptId'] ?? _activeTestSessionId ?? 'attempt_${DateTime.now().microsecondsSinceEpoch}';
+        final questions = _activeTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        final bool isNew = _isNewTestSession;
+        _isNewTestSession = false;
+        return CustomTestScreen(
+          sessionId: attemptId,
+          isNewSession: isNew,
+          questions: questions,
+          durationMinutes: _activeTestTimerMinutes > 0 ? _activeTestTimerMinutes : 30,
+          onTestSubmitted: (attempt, answers) {
+            _lastTestAttempt = attempt;
+            _lastTestUserAnswers = answers;
+            _lastTestQuestions = List<QuestionModel>.from(questions);
+            _activeTestQuestions = null;
+            context.go('/custom-test/result/$attemptId');
+          },
+        );
+      },
+    ),
+    GoRoute(
+      path: '/custom-test/result/:attemptId',
+      builder: (context, state) {
+        final attemptId = state.pathParameters['attemptId'] ?? '';
+        if (_lastTestAttempt != null &&
+            (_lastTestAttempt!.id == attemptId ||
+                attemptId.isEmpty ||
+                _lastTestAttempt!.testId == attemptId)) {
+          return Scaffold(
+            body: TestResultScreen(
+              attempt: _lastTestAttempt!,
+              questions: _lastTestQuestions ?? [],
+              userAnswers: _lastTestUserAnswers ?? {},
+              onBackToDashboard: () => context.go('/dashboard'),
+            ),
+          );
+        }
+        return Scaffold(
+          body: TestResultLoaderScreen(
+            testId: attemptId,
+            attemptId: attemptId,
+            onBackToDashboard: () => context.go('/dashboard'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/custom-test/solutions/:attemptId',
+      builder: (context, state) {
+        final attemptId = state.pathParameters['attemptId'] ?? '';
+        if (_lastTestAttempt != null &&
+            (_lastTestAttempt!.id == attemptId ||
+                attemptId.isEmpty ||
+                _lastTestAttempt!.testId == attemptId)) {
+          return Scaffold(
+            body: TestSolutionsScreen(
+              attempt: _lastTestAttempt!,
+              questions: _lastTestQuestions ?? [],
+              userAnswers: _lastTestUserAnswers ?? {},
+              onBack: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/custom-test/result/$attemptId');
+                }
+              },
+            ),
+          );
+        }
+        return Scaffold(
+          body: TestSolutionsLoaderScreen(
+            testId: attemptId,
+            attemptId: attemptId,
+            onBackToDashboard: () => context.go('/dashboard'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/practice',
+      builder: (context, state) => CustomPracticeWizardModal(
+        initialExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        mode: PracticeTestMode.practice,
+        onClose: () => context.go('/dashboard'),
+        onStartPractice: (questions, timerMins) {
+          _activeTestQuestions = questions;
+          _activeTestTimerMinutes = timerMins;
+          final newSessionId = 'session_${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(999999)}';
+          _activePracticeSessionId = newSessionId;
+          _isNewPracticeSession = true;
+          context.go('/practice/session');
+        },
+      ),
+    ),
+    GoRoute(
+      path: '/practice/:subject',
+      builder: (context, state) {
+        final questions = _activeTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        final String currentSessionId = _activePracticeSessionId ?? 'session_${DateTime.now().microsecondsSinceEpoch}';
+        final bool isNew = _isNewPracticeSession;
+        _isNewPracticeSession = false;
+        return PracticeScreen(
+          sessionId: currentSessionId,
+          isNewSession: isNew,
+          questions: questions,
+          timerMinutes: _activeTestTimerMinutes,
+          onFinish: () => context.go('/dashboard'),
+        );
+      },
+    ),
+    // =========================================================================
+    // PYQ PRACTICE ROUTES (/pyq/...)
+    // =========================================================================
+    GoRoute(
+      path: '/pyq',
+      builder: (context, state) => PYQPracticeScreen(
+        activeExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        onStartPYQSession: (questions, timerMins, isTestMode) {
+          _activeTestQuestions = questions;
+          _activeTestTimerMinutes = timerMins;
+          final attemptId = 'pyq_${DateTime.now().microsecondsSinceEpoch}';
+          _activePracticeSessionId = attemptId;
+          _isNewPracticeSession = true;
+          _activeTestSessionId = attemptId;
+          _isNewTestSession = true;
+          if (isTestMode) {
+            context.go('/pyq/test');
+          } else {
+            context.go('/pyq/practice');
+          }
+        },
+        onBack: () => context.go('/dashboard'),
+      ),
+    ),
+    GoRoute(
+      path: '/pyq/practice',
+      builder: (context, state) {
+        final questions = _activeTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        final String currentSessionId = _activePracticeSessionId ?? 'pyq_${DateTime.now().microsecondsSinceEpoch}';
+        final bool isNew = _isNewPracticeSession;
+        _isNewPracticeSession = false;
+        return PracticeScreen(
+          sessionId: currentSessionId,
+          isNewSession: isNew,
+          questions: questions,
+          timerMinutes: 0,
+          onFinish: () => context.go('/pyq'),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/pyq/test',
+      builder: (context, state) {
+        final questions = _activeTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        final attemptId = _activeTestSessionId ?? 'pyq_${DateTime.now().microsecondsSinceEpoch}';
+        final bool isNew = _isNewTestSession;
+        _isNewTestSession = false;
+        return CustomTestScreen(
+          sessionId: attemptId,
+          isNewSession: isNew,
+          questions: questions,
+          durationMinutes: _activeTestTimerMinutes > 0 ? _activeTestTimerMinutes : 30,
+          onTestSubmitted: (attempt, answers) {
+            _lastTestAttempt = attempt;
+            _lastTestUserAnswers = answers;
+            _lastTestQuestions = List<QuestionModel>.from(questions);
+            context.go('/pyq/result/$attemptId');
+          },
+        );
+      },
+    ),
+    GoRoute(
+      path: '/pyq/papers',
+      builder: (context, state) => PYQPracticeScreen(
+        activeExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        onBack: () => context.go('/dashboard'),
+      ),
+    ),
+    GoRoute(
+      path: '/pyq/result/:attemptId',
+      builder: (context, state) {
+        if (_lastTestAttempt == null) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('PYQ Result'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.go('/pyq'),
+              ),
+            ),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.assignment_late_outlined, size: 54, color: Color(0xFF94A3B8)),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'No Recorded PYQ Session Found',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Please complete a practice session to view your score breakdown.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () => context.go('/pyq'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Go to PYQ Practice'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        final pyqResult = PYQSessionResultModel(
+          id: _lastTestAttempt!.id,
+          userId: _lastTestAttempt!.userId,
+          exam: _lastTestAttempt!.testTitle.toLowerCase().contains('jee') ? 'JEE' : 'NEET',
+          mode: PYQPracticeMode.chapterWise,
+          subjects: const ['Physics', 'Chemistry', 'Biology'],
+          years: const [2024, 2025, 2026],
+          attemptedAt: _lastTestAttempt!.submittedAt ?? DateTime.now(),
+          totalQuestions: _lastTestAttempt!.totalQuestions,
+          attemptedCount: _lastTestAttempt!.attemptedCount,
+          correctCount: _lastTestAttempt!.correctCount,
+          incorrectCount: _lastTestAttempt!.incorrectCount,
+          skippedCount: _lastTestAttempt!.unattemptedCount,
+          accuracy: _lastTestAttempt!.accuracy,
+          timeSpentSeconds: _lastTestAttempt!.timeSpentSeconds,
+        );
+        final questions = _lastTestQuestions ?? [];
+        final userAnswers = _lastTestUserAnswers ?? {};
+
+        return PYQResultScreen(
+          result: pyqResult,
+          questions: questions,
+          userAnswers: userAnswers,
+          onDone: () => context.go('/pyq'),
+        );
+      },
+    ),
+
+    // =========================================================================
+    // NTA PRACTICE & TEST ROUTES (/nta-practice/...)
+    // =========================================================================
+    GoRoute(
+      path: '/nta-practice',
+      builder: (context, state) => NtaPracticeTestScreen(
+        activeExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        onStartSession: (questions, timerMins, isTestMode) {
+          _activeTestQuestions = questions;
+          _activeTestTimerMinutes = timerMins;
+          final attemptId = 'nta_${DateTime.now().millisecondsSinceEpoch}';
+          if (isTestMode) {
+            context.go('/nta-practice/test/$attemptId');
+          } else {
+            context.go('/nta-practice/questions');
+          }
+        },
+      ),
+    ),
+    GoRoute(
+      path: '/nta-practice/questions',
+      builder: (context, state) => NtaChapterTopicWiseScreen(
+        activeExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        onBack: () => context.go('/nta-practice'),
+      ),
+    ),
+    GoRoute(
+      path: '/nta-practice/papers',
+      builder: (context, state) => NtaPaperWiseScreen(
+        activeExam: state.uri.queryParameters['exam'] ?? 'NEET',
+        onBack: () => context.go('/nta-practice'),
+      ),
+    ),
+    GoRoute(
+      path: '/nta-practice/test/:paperId',
+      builder: (context, state) {
+        final paperId = state.pathParameters['paperId'] ?? 'nta_paper_1';
+        final questions = _activeTestQuestions ?? SupabaseService.getSampleQuestions(20);
+        return CustomTestScreen(
+          questions: questions,
+          durationMinutes: _activeTestTimerMinutes > 0 ? _activeTestTimerMinutes : 180,
+          onTestSubmitted: (attempt, answers) {
+            _lastTestAttempt = attempt;
+            _lastTestUserAnswers = answers;
+            _lastTestQuestions = List<QuestionModel>.from(questions);
+            context.go('/nta-practice/result/$paperId');
+          },
+        );
+      },
+    ),
+    GoRoute(
+      path: '/nta-practice/result/:attemptId',
+      builder: (context, state) {
+        final attemptId = state.pathParameters['attemptId'] ?? '';
+        if (_lastTestAttempt != null &&
+            (_lastTestAttempt!.id == attemptId ||
+                attemptId.isEmpty ||
+                _lastTestAttempt!.testId == attemptId)) {
+          return Scaffold(
+            body: TestResultScreen(
+              attempt: _lastTestAttempt!,
+              questions: _lastTestQuestions ?? [],
+              userAnswers: _lastTestUserAnswers ?? {},
+              onBackToDashboard: () => context.go('/nta-practice'),
+            ),
+          );
+        }
+        return Scaffold(
+          body: TestResultLoaderScreen(
+            testId: attemptId,
+            attemptId: attemptId,
+            onBackToDashboard: () => context.go('/nta-practice'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/nta-practice/solutions/:attemptId',
+      builder: (context, state) {
+        final attemptId = state.pathParameters['attemptId'] ?? '';
+        if (_lastTestAttempt != null &&
+            (_lastTestAttempt!.id == attemptId ||
+                attemptId.isEmpty ||
+                _lastTestAttempt!.testId == attemptId)) {
+          return Scaffold(
+            body: TestSolutionsScreen(
+              attempt: _lastTestAttempt!,
+              questions: _lastTestQuestions ?? [],
+              userAnswers: _lastTestUserAnswers ?? {},
+              onBack: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/nta-practice/result/$attemptId');
+                }
+              },
+            ),
+          );
+        }
+        return Scaffold(
+          body: TestSolutionsLoaderScreen(
+            testId: attemptId,
+            attemptId: attemptId,
+            onBackToDashboard: () => context.go('/nta-practice'),
+          ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/predictions',
+      builder: (context, state) => AdminPredictionsScreen(
+        userProfile: _getEffectiveProfile(),
+      ),
+    ),
+    GoRoute(
+      path: '/predictions/:paperId',
+      builder: (context, state) => AdminPredictionsScreen(
+        userProfile: _getEffectiveProfile(),
+      ),
+    ),
+    GoRoute(
+      path: '/mistakes',
+      builder: (context, state) => MistakesBookmarksScreen(
+        onStartPractice: (questions) {},
+      ),
+    ),
+    GoRoute(
+      path: '/bookmarks',
+      builder: (context, state) => MistakesBookmarksScreen(
+        onStartPractice: (questions) {},
+      ),
+    ),
+    GoRoute(
+      path: '/analytics',
+      builder: (context, state) => const AnalyticsScreen(),
+    ),
+    GoRoute(
+      path: '/leaderboard',
+      builder: (context, state) => LeaderboardScreen(
+        userProfile: _getEffectiveProfile(),
+      ),
+    ),
+    GoRoute(
+      path: '/notifications',
+      builder: (context, state) => Scaffold(
+        appBar: AppBar(title: const Text('Notifications')),
+        body: const Center(child: Text('Notifications Center')),
+      ),
+    ),
+
+    // =========================================================================
+    // ADMIN ROUTES (/admin/...)
+    // =========================================================================
+    GoRoute(
+      path: '/admin',
+      builder: (context, state) => AdminDashboardScreen(
+        userProfile: _getEffectiveAdminProfile(),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/dashboard',
+      builder: (context, state) => AdminDashboardScreen(
+        userProfile: _getEffectiveAdminProfile(),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/sections',
+      redirect: (context, state) => '/admin/dashboard',
+    ),
+    GoRoute(
+      path: '/admin/cms/auth',
+      builder: (context, state) => const AdminAuthManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/cms/landing',
+      builder: (context, state) => const AdminLandingPageManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/landing-cms',
+      builder: (context, state) => const AdminLandingPageManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/landing-manager',
+      builder: (context, state) => const AdminLandingPageManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/auth-cms',
+      builder: (context, state) => const AdminAuthManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/auth-manager',
+      builder: (context, state) => const AdminAuthManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/auth_cms',
+      builder: (context, state) => const AdminAuthManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/banners',
+      builder: (context, state) => AdminBannerManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/promo-dropdown',
+      builder: (context, state) => AdminPromoDropdownScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/promo-manager',
+      builder: (context, state) => AdminPromoDropdownScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/dropdown-banner',
+      builder: (context, state) => AdminPromoDropdownScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/feature-manager',
+      builder: (context, state) => AdminFeatureManagerScreen(
+        onBack: () => context.go('/admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/users',
+      builder: (context, state) => AdminUserManagementScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/exams',
+      builder: (context, state) => const AdminChaptersTopicsScreen(),
+    ),
+    GoRoute(
+      path: '/admin/subjects',
+      builder: (context, state) => const AdminChaptersTopicsScreen(),
+    ),
+    GoRoute(
+      path: '/admin/chapters',
+      builder: (context, state) => const AdminChaptersTopicsScreen(),
+    ),
+    GoRoute(
+      path: '/admin/topics',
+      builder: (context, state) => const AdminChaptersTopicsScreen(),
+    ),
+    GoRoute(
+      path: '/admin/questions',
+      builder: (context, state) => AdminQuestionsBankDashboard(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/question-bank',
+      builder: (context, state) => AdminQuestionsBankDashboard(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/questions/upload',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final mode = extra?['workflowMode'] as String? ?? state.uri.queryParameters['mode'];
+        final pId = extra?['paperId'] as String? ?? state.uri.queryParameters['paper_id'];
+        return AdminBulkUploadStep1Screen(
+          userProfile: SupabaseService.getMockProfile(role: 'admin'),
+          initialWorkflowMode: mode,
+          initialPaperId: pId,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/admin/bulk-upload',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final mode = extra?['workflowMode'] as String? ?? state.uri.queryParameters['mode'];
+        final pId = extra?['paperId'] as String? ?? state.uri.queryParameters['paper_id'];
+        return AdminBulkUploadStep1Screen(
+          userProfile: SupabaseService.getMockProfile(role: 'admin'),
+          initialWorkflowMode: mode,
+          initialPaperId: pId,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/admin/upload-step1',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        final mode = extra?['workflowMode'] as String? ?? state.uri.queryParameters['mode'];
+        final pId = extra?['paperId'] as String? ?? state.uri.queryParameters['paper_id'];
+        return AdminBulkUploadStep1Screen(
+          userProfile: SupabaseService.getMockProfile(role: 'admin'),
+          initialWorkflowMode: mode,
+          initialPaperId: pId,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/admin/upload-step2',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return AdminBulkUploadStep2Screen(
+          userProfile: SupabaseService.getMockProfile(role: 'admin'),
+          paperRecord: extra?['paperRecord'] as Map<String, dynamic>?,
+          paperName: (extra?['paperName'] ?? 'NEET 2026 Phase 1').toString(),
+          totalQuestionsCount: (extra?['totalQuestionsCount'] as int?) ?? 180,
+          isEditMode: extra?['isEditMode'] == true,
+          editingPaperId: extra?['editingPaperId'] as String?,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/admin/bulk-upload-step2',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return AdminBulkUploadStep2Screen(
+          userProfile: SupabaseService.getMockProfile(role: 'admin'),
+          paperRecord: extra?['paperRecord'] as Map<String, dynamic>?,
+          paperName: (extra?['paperName'] ?? 'NEET 2026 Phase 1').toString(),
+          totalQuestionsCount: (extra?['totalQuestionsCount'] as int?) ?? 180,
+          isEditMode: extra?['isEditMode'] == true,
+          editingPaperId: extra?['editingPaperId'] as String?,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/admin/questions/:questionId',
+      builder: (context, state) => AdminQuestionBuilderScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/papers',
+      redirect: (context, state) => '/admin/papers/pyq',
+    ),
+    GoRoute(
+      path: '/admin/pyq-papers',
+      redirect: (context, state) => '/admin/papers/pyq',
+    ),
+    GoRoute(
+      path: '/admin/papers/pyq',
+      builder: (context, state) => AdminPyqPaperManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        initialCatalogue: 'PYQ',
+      ),
+    ),
+    GoRoute(
+      path: '/admin/papers/nta',
+      builder: (context, state) => AdminPyqPaperManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        initialCatalogue: 'NTA',
+      ),
+    ),
+    GoRoute(
+      path: '/admin/papers/test-series',
+      builder: (context, state) => AdminPyqPaperManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        initialCatalogue: 'Test Series',
+      ),
+    ),
+    GoRoute(
+      path: '/admin/papers/preview/:paperId',
+      builder: (context, state) {
+        final paperId = state.pathParameters['paperId'] ?? '';
+        return AdminStudentPaperPreviewScreen(paperId: paperId);
+      },
+    ),
+    GoRoute(
+      path: '/admin/papers/:paperId',
+      builder: (context, state) {
+        final paperId = state.pathParameters['paperId'] ?? '';
+        return FutureBuilder<Map<String, dynamic>?>(
+          future: SupabaseService.fetchPaperById(paperId),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                backgroundColor: Color(0xFFF8FAFC),
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            final paperRecord = snapshot.data ?? {'id': paperId};
+            final paperName = (paperRecord['paper_name'] ?? paperRecord['title'] ?? 'Question Paper').toString();
+            return AdminBulkUploadStep2Screen(
+              userProfile: SupabaseService.getMockProfile(role: 'admin'),
+              paperRecord: paperRecord,
+              paperName: paperName,
+            );
+          },
+        );
+      },
+    ),
+    GoRoute(
+      path: '/admin/mock-papers',
+      builder: (context, state) => AdminQuestionsBankDashboard(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/test-series',
+      builder: (context, state) => TestSeriesScreen(
+        onBackToDashboard: () => context.go('/admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/pricing',
+      builder: (context, state) => AdminPricingScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/payment-gateways',
+      builder: (context, state) => AdminPricingScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        autoOpenPaymentModal: true,
+      ),
+    ),
+    GoRoute(
+      path: '/admin/payment-gateway',
+      builder: (context, state) => AdminPricingScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        autoOpenPaymentModal: true,
+      ),
+    ),
+    GoRoute(
+      path: '/admin/payment-settings',
+      builder: (context, state) => AdminPricingScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        autoOpenPaymentModal: true,
+      ),
+    ),
+    GoRoute(
+      path: '/admin/payments',
+      builder: (context, state) => AdminPricingScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        autoOpenPaymentModal: true,
+      ),
+    ),
+    GoRoute(
+      path: '/admin/hierarchy',
+      builder: (context, state) => AdminHierarchyScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/leaderboard',
+      builder: (context, state) => AdminLeaderboardScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/predictions',
+      builder: (context, state) => AdminPredictionsScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/pdf-import',
+      builder: (context, state) => AdminPdfImportScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/analytics',
+      builder: (context, state) => const AdminAnalyticsDashboardScreen(),
+    ),
+    GoRoute(
+      path: '/admin/live-activity',
+      builder: (context, state) => const AdminLiveUserActivityScreen(),
+    ),
+    GoRoute(
+      path: '/admin/notifications',
+      builder: (context, state) => Scaffold(
+        appBar: AppBar(title: const Text('Admin Notifications')),
+        body: const Center(child: Text('Admin Notification Center')),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/settings',
+      builder: (context, state) => AdminPricingScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/privacy-policy',
+      builder: (context, state) => AdminPrivacyPolicyManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/cms/privacy',
+      builder: (context, state) => AdminPrivacyPolicyManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/terms',
+      builder: (context, state) => AdminTermsManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/cms/terms',
+      builder: (context, state) => AdminTermsManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+
+
+    // --- CMS & Dynamic Content Routes ---
+    GoRoute(
+      path: '/admin/pages',
+      builder: (context, state) => AdminPageManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/pages/new',
+      builder: (context, state) => const AdminPageEditorScreen(),
+    ),
+    GoRoute(
+      path: '/admin/blog',
+      builder: (context, state) => AdminBlogManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/blog/new',
+      builder: (context, state) => const AdminBlogEditorScreen(),
+    ),
+    GoRoute(
+      path: '/admin/navigation',
+      builder: (context, state) => AdminNavigationManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/seo',
+      builder: (context, state) => AdminSeoScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/site-code-manager',
+      builder: (context, state) => AdminSeoScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/site-configuration/site-code-manager',
+      builder: (context, state) => AdminSeoScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/site-code',
+      builder: (context, state) => AdminSeoScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/test-series-manager',
+      builder: (context, state) => AdminTestSeriesManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        onBack: () => context.go('/admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/test-series',
+      builder: (context, state) => AdminTestSeriesManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'admin'),
+        onBack: () => context.go('/admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/admin/recommendations',
+      builder: (context, state) => const AdminRecommendationsScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/recommendations',
+      builder: (context, state) => const AdminRecommendationsScreen(),
+    ),
+    GoRoute(
+      path: '/admin/coupons',
+      builder: (context, state) => const AdminCouponManagerScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/coupons',
+      builder: (context, state) => const AdminCouponManagerScreen(),
+    ),
+    GoRoute(
+      path: '/admin/media',
+      builder: (context, state) => const AdminMediaScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/media',
+      builder: (context, state) => const AdminMediaScreen(),
+    ),
+    GoRoute(
+      path: '/admin/orders',
+      builder: (context, state) => const AdminOrdersScreen(),
+    ),
+    GoRoute(
+      path: '/admin/order',
+      builder: (context, state) => const AdminOrdersScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/orders',
+      builder: (context, state) => const AdminOrdersScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/order',
+      builder: (context, state) => const AdminOrdersScreen(),
+    ),
+    GoRoute(
+      path: '/admin/marketing-automation',
+      builder: (context, state) => const AdminMarketingAutomationScreen(),
+    ),
+    GoRoute(
+      path: '/superadmin/marketing-automation',
+      builder: (context, state) => const AdminMarketingAutomationScreen(),
+    ),
+
+    // Super Admin CMS & SEO shortcuts
+    GoRoute(
+      path: '/superadmin/test-series-manager',
+      builder: (context, state) => AdminTestSeriesManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+        onBack: () => context.go('/superadmin/dashboard'),
+      ),
+    ),
+    GoRoute(
+      path: '/superadmin/pages',
+      builder: (context, state) => AdminPageManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/superadmin/blog',
+      builder: (context, state) => AdminBlogManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/superadmin/navigation',
+      builder: (context, state) => AdminNavigationManagerScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/superadmin/seo',
+      builder: (context, state) => AdminSeoScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+      ),
+    ),
+
+    // =========================================================================
+    // SUPER ADMIN ROUTES (/superadmin/...)
+    // =========================================================================
+    GoRoute(
+      path: '/superadmin',
+      builder: (context, state) => AdminDashboardScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/superadmin/users',
+      builder: (context, state) => AdminUserManagementScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/superadmin/admins',
+      builder: (context, state) => AdminUserManagementScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/superadmin/roles',
+      builder: (context, state) => AdminUserManagementScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/superadmin/permissions',
+      builder: (context, state) => AdminUserManagementScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/superadmin/system-settings',
+      builder: (context, state) => AdminPricingScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/superadmin/audit-logs',
+      builder: (context, state) => AdminUserManagementScreen(
+        userProfile: SupabaseService.getMockProfile(role: 'super_admin'),
+      ),
+    ),
+    GoRoute(
+      path: '/superadmin/analytics',
+      builder: (context, state) => const AnalyticsScreen(),
+    ),
+  ]),
+);

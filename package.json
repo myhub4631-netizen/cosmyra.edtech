@@ -9,6 +9,10 @@
     "build-v2": "cd cosmyra_neet_jee_v2 && flutter build web --release && rm -rf ../public/* && cp -r build/web/* ../public/",
     "sync-public-v2": "rm -rf public/* && cp -r cosmyra_neet_jee_v2/build/web/* public/",
     "test-v2": "cd cosmyra_neet_jee_v2 && flutter test",
-    "start-v2": "cd cosmyra_neet_jee_v2 && flutter run -d chrome"
+    "start-v2": "cd cosmyra_neet_jee_v2 && flutter run -d chrome",
+    "build-v4": "cd cosmyra_neet_jee_v4 && flutter build web --release && rm -rf ../public/* && cp -r build/web/* ../public/",
+    "sync-public-v4": "rm -rf public/* && cp -r cosmyra_neet_jee_v4/build/web/* public/",
+    "test-v4": "cd cosmyra_neet_jee_v4 && flutter test",
+    "start-v4": "cd cosmyra_neet_jee_v4 && flutter run -d chrome"
   }
 }
